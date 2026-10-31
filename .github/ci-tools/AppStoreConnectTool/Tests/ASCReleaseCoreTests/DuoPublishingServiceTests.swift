@@ -87,6 +87,18 @@ final class DuoPublishingServiceTests: XCTestCase {
         XCTAssertEqual(transport.count, 1)
     }
 
+    func testPlacementReaderRequestsExplicitImageRelationship() throws {
+        let transport = DuoServiceTransport { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!
+            XCTAssertEqual(query.first { $0.name == "include" }?.value, "image")
+            let value: JSONValue = .object(["data": .array([])])
+            return TransportResponse(data: try JSONEncoder().encode(value), statusCode: 200)
+        }
+        XCTAssertTrue(try ASCDuoPublishingService(client: client(transport)).placements(localizationID: "locale", group: "group").isEmpty)
+        XCTAssertEqual(transport.count, 1)
+    }
+
     private func client(_ transport: HTTPTransport) -> ASCAPIClient {
         ASCAPIClient(credentials: ASCCredentials(keyId: "unit", issuerId: "unit", privateKeyPEM: P256.Signing.PrivateKey().pemRepresentation),
                      transport: transport, maxRetries: 4)

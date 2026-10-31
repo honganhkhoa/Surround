@@ -6,6 +6,7 @@ public final class Publisher {
     private let snapshotProvider: (NormalizedRelease) throws -> RemoteSnapshot
     private let sleeper: (TimeInterval) -> Void
     private let duoService: DuoPublishingService
+    private var managedDuo: DuoReleaseCoordinator?
     private var journal: PublishJournal
 
     public init(
@@ -66,6 +67,9 @@ public final class Publisher {
         defer { releaseLock?.release() }
         let duo = selected.map { DuoReleaseCoordinator(handoff: $0, service: duoService,
                                                        journalDirectory: journalURL.deletingLastPathComponent()) }
+        managedDuo = duo
+        defer { managedDuo = nil }
+        try duo?.prepareForReconciliation()
 
         var snapshot = try snapshotProvider(manifest.release)
         guard snapshot.appId == manifest.remoteSnapshot.appId else {
@@ -276,11 +280,13 @@ public final class Publisher {
             }
         }
 
+        try duo?.prepareForReconciliation()
         let finalSnapshot = try snapshotProvider(manifest.release)
         guard finalSnapshot.appId == manifest.remoteSnapshot.appId else {
             throw ReleaseToolError.remoteDrift("App resource changed before final verification")
         }
         try verifyReadBack(manifest: manifest, snapshot: finalSnapshot)
+        if duo != nil { try reconcileLiveState(manifest: manifest, live: finalSnapshot) }
         try duo?.verifyCompleted()
         journal.completedAt = ISO8601DateFormatter.releaseTool.string(from: Date())
         try persistJournal()
@@ -831,6 +837,10 @@ public final class Publisher {
             throw ReleaseToolError.remoteDrift("Live app identity differs from the reviewed snapshot")
         }
         if journal.operations.isEmpty {
+            if let managedDuo {
+                try managedDuo.requireInitialSnapshot(live, reviewed: manifest.remoteSnapshot)
+                return
+            }
             guard live.fingerprint == manifest.remoteFingerprint else {
                 throw ReleaseToolError.remoteDrift(
                     "Run prepare again; the live snapshot changed before publishing"
@@ -1106,7 +1116,15 @@ public final class Publisher {
             expectedTypes.insert(desired.displayType)
             createdTypes.insert(desired.displayType)
         }
-        let actualTypes = Set(live.screenshotSets.map(\.displayType))
+        var actualTypes = Set(live.screenshotSets.map(\.displayType))
+        if let managedDuo {
+            let projection = live.screenshotSets.filter { $0.displayType == "APP_IPHONE_DUO" }
+            try managedDuo.requireSnapshotProjection(locale: manifestLocale.appStoreLocale, sets: projection)
+            // This target view has just been explicitly checked against the
+            // owned Duo graph/content. All other types retain the strict policy.
+            actualTypes.remove("APP_IPHONE_DUO")
+            expectedTypes.remove("APP_IPHONE_DUO")
+        }
         let typeSetIsValid = allowsInheritedIds
             ? actualTypes.isSubset(of: expectedTypes) && createdTypes.isSubset(of: actualTypes)
             : actualTypes == expectedTypes
@@ -1116,11 +1134,13 @@ public final class Publisher {
             )
         }
         for actual in live.screenshotSets {
+            if managedDuo != nil && actual.displayType == "APP_IPHONE_DUO" { continue }
             let baselineSet = baselineSets[actual.displayType]
             guard let desired = manifestLocale.screenshotSets.first(where: {
                 $0.displayType == actual.displayType
             }) else {
                 guard let baselineSet,
+                      (allowsInheritedIds || actual.id == baselineSet.id),
                       stableScreenshotProjection(actual.screenshots)
                         == stableScreenshotProjection(baselineSet.screenshots) else {
                     throw ReleaseToolError.remoteDrift("Unmanaged screenshot set changed")

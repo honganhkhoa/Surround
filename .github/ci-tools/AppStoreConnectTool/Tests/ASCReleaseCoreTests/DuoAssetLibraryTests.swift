@@ -266,12 +266,25 @@ final class DuoAssetLibraryTests: XCTestCase {
             RemoteSnapshot(capturedAt: "fixture", fingerprint: "fixture", appId: "app", bundleId: release.bundleId,
                 platform: "IOS", requestedVersion: "3.0", targetVersion: version, sourceVersion: source, appInfo: nil)
         }
-        func build(_ snap: RemoteSnapshot) throws -> SelectedReleaseHandoff {
-            try SelectedReleaseHandoff.build(importFile: HandoffFileBinding(path: fixture.importURL.path,
+        let compatibilityURL = fixture.directory.appendingPathComponent("compatibility.json")
+        func build(_ snap: RemoteSnapshot, proofVersion: String = "3.0") throws -> SelectedReleaseHandoff {
+            let legacy = try DuoLegacyView.read(snap.targetVersion?.localizations.first?.screenshotSets.first { $0.displayType == "APP_IPHONE_DUO" })
+            let baseline = DuoCompatibilityBaseline(policy: DuoCompatibilityBaseline.policyName, legacy: legacy, placements: [], content: [])
+            let baselineJSON = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(baseline))
+            try FileIO.writeJSONValue(.object(["schemaVersion": .number(1), "mode": .string("duo-cross-view-readonly-proof"),
+                "snapshotFingerprint": .string(snap.fingerprint),
+                "inspectionSHA256": .string(FileIO.sha256(try Data(contentsOf: fixture.inspection))),
+                "appID": .string("app"), "bundleID": .string("com.example.App"), "version": .string(proofVersion),
+                "versionID": .string("target"), "policy": .string(DuoCompatibilityBaseline.policyName),
+                "requestMethods": .array([.string("GET")]), "remoteMutationsPerformed": .bool(false), "writePropagationProven": .bool(false),
+                "locales": .array([.object(["locale": .string("en-US"), "localizationID": .string("target-en-US"), "baseline": baselineJSON])])]), to: compatibilityURL)
+            return try SelectedReleaseHandoff.build(importFile: HandoffFileBinding(path: fixture.importURL.path,
                 sha256: FileIO.sha256(try Data(contentsOf: fixture.importURL))), selectionSHA256: selectionSHA,
                 acceptance: finalAcceptance, integrityVerification: HandoffFileBinding(path: integrityURL.path,
                 sha256: FileIO.sha256(try Data(contentsOf: integrityURL))), inspection: HandoffFileBinding(path: fixture.inspection.path,
-                sha256: FileIO.sha256(try Data(contentsOf: fixture.inspection))), release: release, snapshot: snap)
+                sha256: FileIO.sha256(try Data(contentsOf: fixture.inspection))),
+                compatibility: HandoffFileBinding(path: compatibilityURL.path, sha256: FileIO.sha256(try Data(contentsOf: compatibilityURL))),
+                release: release, snapshot: snap)
         }
         XCTAssertThrowsError(try build(snapshot(nil))) { XCTAssertTrue($0.localizedDescription.contains("existing editable target")) }
         var inspection = try FileIO.readJSON(at: fixture.inspection).objectValue!
@@ -287,6 +300,94 @@ final class DuoAssetLibraryTests: XCTestCase {
         XCTAssertEqual(result.sets[0].localizationID, "target-en-US")
         XCTAssertEqual(result.sets[0].images.map(\.position), Array(1...10))
         XCTAssertTrue(result.sets[0].reviewedBaseline.isEmpty)
+        // Exercise the actual selected Publisher entry point with read-only Duo
+        // proof first, while released-source and unrelated-set drift stay strict.
+        let wireInfo = RemoteAppInfo(id: "info", state: "PREPARE_FOR_SUBMISSION", localizations: [
+            RemoteAppInfoLocalization(id: "info-en", locale: "en-US", attributes: ["locale": .string("en-US"),
+                "name": .string("Example"), "subtitle": .string("Test"), "privacyPolicyUrl": .string("https://example.com/privacy")])])
+        let externalImage = RemoteScreenshot(id: "external-image", fileName: "external.png", checksum: String(repeating: "a", count: 32),
+            attributes: ["assetDeliveryState": .object(["state": .string("COMPLETE")])])
+        let externalSet = RemoteScreenshotSet(id: "external-set", displayType: "UNMANAGED_DISPLAY", screenshots: [externalImage])
+        let wireLocale = RemoteLocalization(id: "target-en-US", locale: "en-US",
+            attributes: ["locale": .string("en-US"), "whatsNew": .string("Notes"), "description": .string("Description"),
+                "keywords": .string("game"), "supportUrl": .string("https://example.com/support")], screenshotSets: [externalSet])
+        let wireTarget = RemoteVersion(id: "target", versionString: "3.0", state: "PREPARE_FOR_SUBMISSION",
+            attributes: ["versionString": .string("3.0")], localizations: [wireLocale])
+        let wireSource = RemoteVersion(id: "released", versionString: "2.4.1", state: "READY_FOR_DISTRIBUTION",
+            attributes: ["copyright": .string("Original")], localizations: [RemoteLocalization(id: "released-en", locale: "en-US",
+                attributes: wireLocale.attributes, screenshotSets: [])])
+        func wireSnapshot(target: RemoteVersion, source: RemoteVersion) throws -> RemoteSnapshot {
+            let draft = RemoteSnapshot(capturedAt: "fixture", fingerprint: "", appId: "app", bundleId: release.bundleId,
+                platform: "IOS", requestedVersion: "3.0", targetVersion: target, sourceVersion: source, appInfo: wireInfo)
+            return RemoteSnapshot(capturedAt: draft.capturedAt, fingerprint: try SnapshotService.fingerprint(snapshot: draft),
+                appId: draft.appId, bundleId: draft.bundleId, platform: draft.platform, requestedVersion: draft.requestedVersion,
+                targetVersion: target, sourceVersion: source, appInfo: wireInfo)
+        }
+        let wireReviewed = try wireSnapshot(target: wireTarget, source: wireSource)
+        let wireHandoff = try build(wireReviewed)
+        let wireHandoffURL = fixture.directory.appendingPathComponent("wire-handoff.json")
+        try FileIO.writeJSON(wireHandoff, to: wireHandoffURL)
+        let sets = try ["iphone-6.9", "ipad-13"].map { family -> ManifestScreenshotSet in
+            let images = try cards.filter { $0["family"] == .string(family) }.map { card -> ManifestScreenshot in
+                let url = root.appendingPathComponent(card["assets"]!["screenshots"]!["importedPath"]!.stringValue!)
+                let data = try Data(contentsOf: url)
+                return ManifestScreenshot(path: url.path, fileName: url.lastPathComponent, byteCount: data.count,
+                    sha256: FileIO.sha256(data), md5: FileIO.md5(data), order: card["position"]!.intValue!)
+            }
+            return ManifestScreenshotSet(family: family, displayType: family == "iphone-6.9" ? "APP_IPHONE_67" : "APP_IPAD_PRO_3GEN_129",
+                pixelWidth: 1398, pixelHeight: 2034, screenshots: images)
+        }
+        let wireHandoffSHA = FileIO.sha256(try Data(contentsOf: wireHandoffURL))
+        func wireManifest(_ digest: String) -> PublishManifest {
+            PublishManifest(schemaVersion: 1, generatedAt: "fixture", release: release, remoteSnapshot: wireReviewed,
+                remoteFingerprint: wireReviewed.fingerprint, captureMetadata: .object(["mode": .string("selected-lineup"),
+                    "expectedScreenshotCount": .number(20), "selectedHandoff": .object(["path": .string(wireHandoffURL.path),
+                    "sha256": .string(wireHandoffSHA)])]),
+                localizations: [ManifestLocale(appStoreLocale: "en-US", versionMetadata: ["whatsNew": .string("Notes")],
+                    appMetadata: [:], screenshotSets: sets)], manifestDigest: digest)
+        }
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let manifest = wireManifest(FileIO.sha256(try encoder.encode(wireManifest(""))))
+        try ManifestBuilder.verify(manifest)
+        for fault in ["source", "unmanaged-content", "unmanaged-set-id"] {
+            var source = wireSource, target = wireTarget
+            if fault == "source" {
+                source = RemoteVersion(id: wireSource.id, versionString: wireSource.versionString, state: wireSource.state,
+                    attributes: ["copyright": .string("Unreviewed")], localizations: wireSource.localizations)
+            } else {
+                let image = RemoteScreenshot(id: externalImage.id, fileName: externalImage.fileName,
+                    checksum: fault == "unmanaged-content" ? String(repeating: "b", count: 32) : externalImage.checksum,
+                    attributes: externalImage.attributes)
+                let other = RemoteScreenshotSet(id: fault == "unmanaged-set-id" ? "unowned-replacement-set" : externalSet.id,
+                    displayType: externalSet.displayType, screenshots: [image])
+                target = RemoteVersion(id: wireTarget.id, versionString: wireTarget.versionString, state: wireTarget.state,
+                    attributes: wireTarget.attributes, localizations: [RemoteLocalization(id: wireLocale.id, locale: wireLocale.locale,
+                        attributes: wireLocale.attributes, screenshotSets: [other])])
+            }
+            let live = try wireSnapshot(target: target, source: source)
+            let directory = fixture.directory.appendingPathComponent("wire-" + fault)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+            let journalURL = directory.appendingPathComponent("journal.json")
+            let journal = PublishJournal(version: "3.0", manifestDigest: manifest.manifestDigest, startedAt: "fixture",
+                operations: [JournalOperation(key: "version-locale:en-US:metadata", status: "complete", timestamp: "fixture", detail: "target-en-US")])
+            try FileIO.writeJSON(journal, to: journalURL)
+            let before = try Data(contentsOf: journalURL)
+            var trace: [String] = []
+            let service = WireReadOnlyDuoService { trace.append($0) }
+            let transport = WireNoHTTPTransport()
+            let client = ASCAPIClient(credentials: ASCCredentials(keyId: "test", issuerId: "test",
+                privateKeyPEM: P256.Signing.PrivateKey().pemRepresentation), transport: transport)
+            let publisher = try Publisher(client: client, journalURL: journalURL, manifest: manifest,
+                snapshotProvider: { _ in trace.append("snapshot"); return live }, duoService: service)
+            XCTAssertThrowsError(try publisher.publish(manifest: manifest, confirmedVersion: "3.0",
+                confirmedManifestDigest: manifest.manifestDigest)) { error in
+                XCTAssertTrue(error.localizedDescription.contains(fault == "source" ? "Live source version" : "Unmanaged screenshot set changed"), error.localizedDescription)
+            }
+            XCTAssertLessThan(try XCTUnwrap(trace.firstIndex(of: "duo-legacy")), try XCTUnwrap(trace.firstIndex(of: "snapshot")))
+            XCTAssertEqual(transport.count, 0)
+            XCTAssertEqual(service.writes, 0)
+            XCTAssertEqual(try Data(contentsOf: journalURL), before)
+        }
         let dualLocale = RemoteLocalization(id: "target-en-US", locale: "en-US", attributes: [:],
             screenshotSets: [RemoteScreenshotSet(id: "legacy-duo", displayType: "APP_IPHONE_DUO", screenshots: [])])
         let dualTarget = RemoteVersion(id: "target", versionString: "3.0", state: "PREPARE_FOR_SUBMISSION",
@@ -294,7 +395,11 @@ final class DuoAssetLibraryTests: XCTestCase {
         let dualSource = RemoteVersion(id: "released-source", versionString: "2.4.1", state: "READY_FOR_DISTRIBUTION",
             attributes: [:], localizations: [dualLocale])
         for value in [snapshot(dualTarget), snapshot(target, source: dualSource)] {
-            XCTAssertThrowsError(try build(value)) { XCTAssertTrue($0.localizedDescription.contains("unqualified legacy Duo view")) }
+            let qualified = try build(value)
+            XCTAssertEqual(qualified.sets[0].compatibilityBaseline?.policy, DuoCompatibilityBaseline.policyName)
+        }
+        XCTAssertThrowsError(try build(snapshot(target), proofVersion: "2.4.1")) {
+            XCTAssertTrue($0.localizedDescription.contains("different target/snapshot"))
         }
         var changedCards = cards
         var changed = changedCards[0].objectValue!
@@ -444,5 +549,26 @@ private final class ReadOnlyDuoTransport: HTTPTransport, @unchecked Sendable {
         default: throw ReleaseToolError.api("Unexpected mocked GET")
         }
         return TransportResponse(data: try JSONEncoder().encode(value), statusCode: 200)
+    }
+}
+
+private final class WireReadOnlyDuoService: DuoPublishingService {
+    let read: (String) -> Void
+    var writes = 0
+    init(_ read: @escaping (String) -> Void) { self.read = read }
+    func verifyEditableTarget(_ set: DuoPublishSet) throws { read("duo-context") }
+    func placements(localizationID: String, group: String) throws -> [DuoRemotePlacement] { read("duo-placements"); return [] }
+    func legacyDuoSet(localizationID: String) throws -> RemoteScreenshotSet? { read("duo-legacy"); return nil }
+    func image(id: String) throws -> JSONValue { throw ReleaseToolError.validation("Unexpected fixture image read") }
+    func download(_ url: URL) throws -> Data { throw ReleaseToolError.validation("Unexpected fixture download") }
+    func send(_ request: DuoAssetLibraryRequest) throws -> JSONValue? { writes += 1; throw ReleaseToolError.validation("Unexpected fixture mutation") }
+    func upload(_ operation: UploadOperation, bytes: Data) throws { writes += 1; throw ReleaseToolError.validation("Unexpected fixture upload") }
+}
+
+private final class WireNoHTTPTransport: HTTPTransport, @unchecked Sendable {
+    var count = 0
+    func send(_ request: URLRequest) throws -> TransportResponse {
+        count += 1
+        throw ReleaseToolError.validation("No HTTP is authorized in this fixture")
     }
 }

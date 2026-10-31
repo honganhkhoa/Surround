@@ -126,6 +126,25 @@ final class MixedOrientationManifestTests: XCTestCase {
         }
     }
 
+    func testCanonicalPixelsIgnoreOpaqueAlphaEncodingAndDetectContentChanges() throws {
+        func image(alpha: Bool, red: UInt8 = 96) throws -> Data {
+            let row: [UInt8] = alpha ? [red, 96, 96, 255] : [red, 96, 96]
+            let bytes = Data(Array(repeating: row, count: 4).flatMap { $0 })
+            let provider = CGDataProvider(data: bytes as CFData)!
+            let cg = CGImage(width: 2, height: 2, bitsPerComponent: 8, bitsPerPixel: alpha ? 32 : 24, bytesPerRow: alpha ? 8 : 6,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGBitmapInfo(rawValue: alpha ? CGImageAlphaInfo.premultipliedLast.rawValue : CGImageAlphaInfo.none.rawValue),
+                provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)!
+            let output = NSMutableData()
+            let destination = CGImageDestinationCreateWithData(output, UTType.png.identifier as CFString, 1, nil)!
+            CGImageDestinationAddImage(destination, cg, nil); XCTAssertTrue(CGImageDestinationFinalize(destination))
+            return output as Data
+        }
+        let rgb = try image(alpha: false), rgba = try image(alpha: true)
+        XCTAssertNotEqual(FileIO.sha256(rgb), FileIO.sha256(rgba))
+        XCTAssertEqual(try ImageValidation.pixelSHA256(rgb, context: "rgb"), try ImageValidation.pixelSHA256(rgba, context: "rgba"))
+        XCTAssertNotEqual(try ImageValidation.pixelSHA256(rgb, context: "original"), try ImageValidation.pixelSHA256(image(alpha: false, red: 100), context: "changed"))
+    }
+
     private func fixture(
         second: (Int, Int), optIn: Bool?, family: String = "iphone-6.9",
         body: (PublishManifest) throws -> Void

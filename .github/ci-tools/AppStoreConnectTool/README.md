@@ -99,13 +99,44 @@ source-version IDs or guess what Apple will inherit. Prepare the review-only
 packet first; separately authorized target creation and a fresh snapshot are
 needed before an exact executable Duo handoff can be reviewed.
 
-The selected mixed-transport route also refuses an observed `APP_IPHONE_DUO`
-set in either the released source or target. That legacy set is retained in the
-snapshot and fingerprint. Its synchronization with Asset Library placement
-writes is not established, and an apparent change would otherwise be treated
-as unmanaged drift on resume. Resolve and qualify a cross-view policy or migrate
-the complete screenshot publisher to one transport before enabling that case.
-There is no override flag and no inferred compatibility from matching GET views.
+The Duo compatibility policy keeps Asset Library as its only writer and reads
+both representations. `inspect-duo-compatibility` takes pinned snapshot and Duo
+inspection files, reads the existing version's live legacy and placement views,
+and compares native-size PNG renditions as canonical sRGB RGBA pixels. It
+brackets content reads with both live projections, retains metadata/hash proof
+without rendition URLs or downloaded images, and declares
+`writePropagationProven: false`. It uses GET only:
+
+```sh
+app-store-connect-tool inspect-duo-compatibility \
+  --snapshot /review/remote-snapshot.json --expected-snapshot-sha256 SHA256 \
+  --inspection /review/duo-inspection.json --expected-inspection-sha256 SHA256 \
+  --output /review/duo-compatibility-proof.json
+```
+
+An executable selected handoff additionally requires `--compatibility-proof`
+and `--expected-compatibility-sha256` on `build-selected-handoff`. The proof must
+match the actual editable target's version/localization IDs, snapshot fingerprint,
+inspection hash and ordered baselines. A released-source proof cannot qualify a
+new target. Missing target/proof produces no executable handoff.
+
+The journal binds both reviewed baselines and the last proven compatibility
+checkpoint. The executor derives expected content only from surviving reviewed
+images or exact journal-owned desired/backup uploads. Each mutation boundary,
+resume, completion and rollback reads both views and fresh remote pixels. Shared
+rendition identity, filename, size, dimensions and ordered decoded content must
+agree; a present legacy checksum must also agree. A missing checksum is never
+reported as verified MD5 equality. Unknown rows, reordered or changed resources
+and contradictory content stop. The previous proven projection or identified
+owned processing rows may poll boundedly, granting no further write until they
+converge. No mutation is replayed because a compatibility view is stale.
+
+Only the explicitly proven target Duo projection participates in compatibility
+comparison. Both full raw views remain in the stored snapshots; released-source,
+metadata, unrelated locale and screenshot-set checks stay strict. This also
+handles an otherwise-empty aggregate journal with known Duo progress. Local
+fixtures qualify the reconciliation policy; actual Apple upload and write
+propagation remain verified only during a separately approved publish.
 
 `verify-manifest --manifest FILE` verifies the complete handoff offline. The
 public wrapper also supports `publish --manifest FILE --confirm-version V

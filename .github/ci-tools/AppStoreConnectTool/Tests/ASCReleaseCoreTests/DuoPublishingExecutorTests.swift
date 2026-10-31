@@ -261,7 +261,7 @@ extension DuoPublishingExecutorTests {
         let binding = HandoffFileBinding(path: "/unused-test-binding", sha256: String(repeating: "a", count: 64))
         let handoff = SelectedReleaseHandoff(schemaVersion: 1, mode: "selected-release-handoff",
             selectedImport: binding, selectionSHA256: binding.sha256, evidenceAcceptance: binding,
-            integrityVerification: binding, duoInspection: binding, qualificationLimits: .object([:]), sets: [fixture.set])
+            integrityVerification: binding, duoInspection: binding, duoCompatibility: binding, qualificationLimits: .object([:]), sets: [fixture.set])
         return DuoReleaseCoordinator(handoff: handoff, service: fixture.service, journalDirectory: fixture.directory)
     }
 
@@ -355,12 +355,223 @@ extension DuoPublishingExecutorTests {
     }
 }
 
+extension DuoPublishingExecutorTests {
+    func testCompatibilityInspectorBracketsBothLiveViewsAndNeverMutates() throws {
+        let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }
+        let original = try XCTUnwrap(fixture.service.makeLegacy())
+        let target = RemoteVersion(id: fixture.set.versionID, versionString: "3.0", state: "PREPARE_FOR_SUBMISSION", attributes: [:],
+            localizations: [RemoteLocalization(id: fixture.set.localizationID, locale: "en-US", attributes: [:], screenshotSets: [original])])
+        let snapshot = RemoteSnapshot(capturedAt: "fixture", fingerprint: "fixture", appId: "app", bundleId: "com.example.App", platform: "IOS",
+            requestedVersion: "3.0", targetVersion: target, sourceVersion: nil, appInfo: nil)
+        let placements = fixture.service.rows.map { row -> JSONValue in
+            .object(["type": .string("appAssetLibraryPlacements"), "id": .string(row.id),
+                "attributes": .object(["placementGroup": .string(row.group), "placementType": .string(row.placementType), "state": .string(row.state)]),
+                "relationships": .object(["image": .object(["data": .object(["type": .string("appAssetLibraryImages"), "id": .string(row.imageID)])])])])
+        }
+        let inspection: JSONValue = .object(["remoteMutationsPerformed": .bool(false), "requestMethods": .array([.string("GET")]),
+            "appId": .string("app"), "bundleId": .string("com.example.App"), "targetVersion": .object(["id": .string(fixture.set.versionID)]),
+            "requestedVersion": .string("3.0"), "routing": .object(["placementGroup": .string("test-duo-group")]),
+            "localizations": .array([.object(["locale": .string("en-US"), "localizationId": .string(fixture.set.localizationID),
+                                             "orderedPlacements": .array(placements)])])])
+        let good = try DuoCompatibilityInspector.capture(snapshot: snapshot, snapshotSHA256: String(repeating: "a", count: 64),
+            inspection: inspection, inspectionSHA256: String(repeating: "b", count: 64), service: fixture.service)
+        XCTAssertEqual(good["writePropagationProven"], .bool(false))
+        XCTAssertEqual(good["locales"]?.arrayValue?.count, 1)
+        var reads = 0
+        fixture.service.legacyOverride = {
+            reads += 1
+            return reads == 1 ? original : RemoteScreenshotSet(id: original.id, displayType: original.displayType,
+                screenshots: Array(original.screenshots.reversed()))
+        }
+        XCTAssertThrowsError(try DuoCompatibilityInspector.capture(snapshot: snapshot, snapshotSHA256: String(repeating: "a", count: 64),
+            inspection: inspection, inspectionSHA256: String(repeating: "b", count: 64), service: fixture.service))
+        XCTAssertTrue(fixture.service.events.isEmpty)
+    }
+
+    func testDualViewReplacementAndCompleteResumeReadBothViewsWithoutReplay() throws {
+        let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }
+        try fixture.run()
+        let completed = try fixture.state()
+        XCTAssertEqual(completed.phase, "complete")
+        XCTAssertEqual(completed.compatibilityCheckpoint?.legacy.images.count, 10)
+        XCTAssertNotEqual(completed.compatibilityCheckpoint?.legacy.images.map(\.id), fixture.service.rows.map(\.id))
+        let writes = fixture.service.events.count, reads = fixture.service.downloads
+        try fixture.run()
+        XCTAssertEqual(fixture.service.events.count, writes)
+        XCTAssertGreaterThan(fixture.service.downloads, reads)
+    }
+
+    func testDualViewKnownLagWaitsBeforeNextMutationAndTimeoutResumesWithoutReplay() throws {
+        let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }
+        var remaining = 100, frozen: RemoteScreenshotSet?
+        fixture.service.beforeMutation = { label in
+            if label == "delete:old-placement-1" && frozen == nil {
+                frozen = try fixture.service.makeLegacy()
+                fixture.service.legacyOverride = {
+                    if remaining > 0 { remaining -= 1; return frozen }
+                    return try fixture.service.makeLegacy()
+                }
+            }
+        }
+        XCTAssertThrowsError(try fixture.run()) { error in
+            guard case DuoExecutionFailure.uncertain = error else { return XCTFail("Unexpected \(error)") }
+        }
+        XCTAssertEqual(fixture.service.events.filter { $0.hasPrefix("delete:") }.count, 1)
+        let count = fixture.service.events.count
+        XCTAssertThrowsError(try fixture.run())
+        XCTAssertEqual(fixture.service.events.count, count)
+        remaining = 0
+        try fixture.run()
+        XCTAssertEqual(fixture.service.events.filter { $0 == "delete:old-placement-1" }.count, 1)
+        XCTAssertEqual(try fixture.state().phase, "complete")
+    }
+
+    func testDualViewUnknownLegacyRowOrOrderStopsBeforeAnyCloudMutation() throws {
+        for fault in ["identity", "order", "processing"] {
+            let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }
+            let original = try XCTUnwrap(fixture.service.makeLegacy())
+            var rows = original.screenshots
+            if fault == "order" { rows.reverse() }
+            else {
+                let old = rows[0]; var attributes = old.attributes
+                if fault == "processing" { attributes["assetDeliveryState"] = .object(["state": .string("PROCESSING")]) }
+                rows[0] = RemoteScreenshot(id: "unowned-identical-content", fileName: old.fileName,
+                    checksum: old.checksum, attributes: attributes)
+            }
+            let foreign = RemoteScreenshotSet(id: original.id, displayType: original.displayType, screenshots: rows)
+            fixture.service.legacyOverride = { foreign }
+            XCTAssertThrowsError(try fixture.run())
+            XCTAssertTrue(fixture.service.events.isEmpty)
+        }
+    }
+
+    func testDualViewFreshPixelsDetectChangeUnderAnUnchangedTemplate() throws {
+        let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }
+        let executor = try DuoPublishingExecutor(set: fixture.set, journalURL: fixture.journal,
+            service: fixture.service, compatibilityPollAttempts: 2, sleeper: { _ in })
+        try executor.preflight()
+        let old = try fixture.service.makeLegacy()
+        fixture.service.legacyOverride = { old }
+        fixture.service.data["old-image-1"] = try Data(contentsOf: URL(fileURLWithPath: fixture.set.images[0].path))
+        XCTAssertThrowsError(try executor.preflight()) { XCTAssertTrue($0.localizedDescription.contains("pixels differ")) }
+        XCTAssertTrue(fixture.service.events.isEmpty)
+    }
+
+    func testDualViewRollbackRecordsActualBackupContentAndNewCompatibilityIDs() throws {
+        let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }
+        fixture.service.fault = { label, after in
+            if label == "place:3.png" && !after {
+                fixture.service.fault = nil; throw DuoExecutionFailure.rejected("known placement failure")
+            }
+        }
+        XCTAssertThrowsError(try fixture.run()) { error in
+            guard case DuoExecutionFailure.restored = error else { return XCTFail("Unexpected \(error)") }
+        }
+        let state = try fixture.state()
+        XCTAssertEqual(state.phase, "rolledBack")
+        XCTAssertEqual(state.activeCompatibility?.legacy.images.map(\.fileName), (1...10).map { "backup-\($0).png" })
+        XCTAssertEqual(state.activeCompatibility?.placements, state.activeBaseline)
+        XCTAssertTrue(fixture.originalImagesPreserved())
+    }
+
+    func testDualViewPartialDeleteLostRollbackOrderReconcilesSurvivorsBeforeRecovery() throws {
+        let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }
+        var rejected = false
+        fixture.service.fault = { label, after in
+            if label == "delete:old-placement-2" && !after && !rejected {
+                rejected = true; throw DuoExecutionFailure.rejected("known second deletion failure")
+            }
+            if label == "order" && after && rejected {
+                fixture.service.fault = nil; throw DuoExecutionFailure.uncertain("lost restore ordering response")
+            }
+        }
+        XCTAssertThrowsError(try fixture.run())
+        XCTAssertEqual(try fixture.state().phase, "rollingBack")
+        let count = fixture.service.events.count
+        do {
+            let reader = try DuoPublishingExecutor(set: fixture.set, journalURL: fixture.journal,
+                service: fixture.service, compatibilityPollAttempts: 2, sleeper: { _ in })
+            try reader.preflight(allowRollbackProof: true)
+        }
+        XCTAssertEqual(fixture.service.events.count, count)
+        XCTAssertThrowsError(try fixture.run()) { error in
+            guard case DuoExecutionFailure.restored = error else { return XCTFail("Unexpected \(error)") }
+        }
+        XCTAssertEqual(fixture.service.events.count, count)
+        let proof = try XCTUnwrap(fixture.state().activeCompatibility)
+        XCTAssertEqual(proof.legacy.images[0].fileName, "backup-1.png")
+        XCTAssertEqual(proof.legacy.images[1].fileName, "old-2.png")
+    }
+
+    func testDualViewInitialSnapshotExceptionIsLimitedToProvenTargetProjection() throws {
+        let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }
+        let value = coordinator(fixture)
+        func snapshot(_ legacy: RemoteScreenshotSet?, sourceCopyright: String = "Original", extra: Bool = false) throws -> RemoteSnapshot {
+            var sets = legacy.map { [$0] } ?? []
+            if extra { sets.append(RemoteScreenshotSet(id: "foreign", displayType: "UNMANAGED_DISPLAY", screenshots: [])) }
+            let target = RemoteVersion(id: fixture.set.versionID, versionString: "3.0", state: "PREPARE_FOR_SUBMISSION",
+                attributes: [:], localizations: [RemoteLocalization(id: fixture.set.localizationID, locale: "en-US", attributes: [:], screenshotSets: sets)])
+            let source = RemoteVersion(id: "released", versionString: "2.4.1", state: "READY_FOR_DISTRIBUTION",
+                attributes: ["copyright": .string(sourceCopyright)], localizations: [])
+            let draft = RemoteSnapshot(capturedAt: "fixture", fingerprint: "", appId: "app", bundleId: "com.example.App", platform: "IOS",
+                requestedVersion: "3.0", targetVersion: target, sourceVersion: source, appInfo: nil)
+            return RemoteSnapshot(capturedAt: draft.capturedAt, fingerprint: try SnapshotService.fingerprint(snapshot: draft),
+                appId: draft.appId, bundleId: draft.bundleId, platform: draft.platform, requestedVersion: draft.requestedVersion,
+                targetVersion: target, sourceVersion: source, appInfo: nil)
+        }
+        let reviewed = try snapshot(fixture.service.makeLegacy())
+        try value.publish()
+        try value.prepareForReconciliation()
+        let current = try fixture.service.makeLegacy()
+        try value.requireInitialSnapshot(snapshot(current), reviewed: reviewed)
+        XCTAssertThrowsError(try value.requireInitialSnapshot(snapshot(current, sourceCopyright: "Unreviewed"), reviewed: reviewed))
+        XCTAssertThrowsError(try value.requireInitialSnapshot(snapshot(current, extra: true), reviewed: reviewed))
+    }
+
+    func testDualViewSecondLocaleFailureBlocksAllCloudMutations() throws {
+        let first = try DuoExecutorFixture(compatibility: true), second = try DuoExecutorFixture(compatibility: true)
+        defer { first.clean(); second.clean() }
+        let old = second.set
+        let fr = DuoPublishSet(version: old.version, bundleID: old.bundleID, appID: old.appID, assetLibraryID: old.assetLibraryID,
+            versionID: old.versionID, localizationID: "target-fr", locale: "fr-FR", sourceManifestSHA256: old.sourceManifestSHA256,
+            catalog: old.catalog, images: old.images, reviewedBaseline: old.reviewedBaseline, compatibilityBaseline: old.compatibilityBaseline)
+        let original = try XCTUnwrap(second.service.makeLegacy())
+        second.service.legacyOverride = { RemoteScreenshotSet(id: "unreviewed-legacy-container", displayType: original.displayType,
+            screenshots: original.screenshots) }
+        let binding = HandoffFileBinding(path: "/unused", sha256: String(repeating: "a", count: 64))
+        let handoff = SelectedReleaseHandoff(schemaVersion: 1, mode: "selected-release-handoff", selectedImport: binding,
+            selectionSHA256: binding.sha256, evidenceAcceptance: binding, integrityVerification: binding,
+            duoInspection: binding, duoCompatibility: binding, qualificationLimits: .object([:]), sets: [first.set, fr])
+        let service = TwoLocaleDuoService(first: first.service, second: second.service)
+        let value = DuoReleaseCoordinator(handoff: handoff, service: service, journalDirectory: first.directory)
+        XCTAssertThrowsError(try value.prepareForReconciliation())
+        XCTAssertTrue(first.service.events.isEmpty)
+        XCTAssertTrue(second.service.events.isEmpty)
+        XCTAssertEqual(service.writes, 0)
+    }
+
+    func testDualViewCoordinatorAdmitsOwnedProgressButRejectsUnprovenSnapshot() throws {
+        let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }
+        let value = coordinator(fixture)
+        try value.prepareForReconciliation()
+        try value.requireSnapshotProjection(locale: "en-US", sets: [try XCTUnwrap(fixture.service.makeLegacy())])
+        try value.publish()
+        try value.prepareForReconciliation()
+        try value.requireSnapshotProjection(locale: "en-US", sets: [try XCTUnwrap(fixture.service.makeLegacy())])
+        XCTAssertThrowsError(try value.requireSnapshotProjection(locale: "another-locale", sets: []))
+        var foreign = try XCTUnwrap(fixture.service.makeLegacy()).screenshots
+        foreign.reverse()
+        XCTAssertThrowsError(try value.requireSnapshotProjection(locale: "en-US", sets: [RemoteScreenshotSet(
+            id: "legacy-view", displayType: "APP_IPHONE_DUO", screenshots: foreign)]))
+    }
+}
+
 private final class DuoExecutorFixture {
     let directory: URL, journal: URL, set: DuoPublishSet
     let service: DuoMemoryService
     let originalPixels: [Data]
 
-    init(baselineCount: Int = 10) throws {
+    init(baselineCount: Int = 10, compatibility: Bool = false) throws {
         directory = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("duo-executor-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         journal = directory.appendingPathComponent("journal.json")
@@ -394,13 +605,26 @@ private final class DuoExecutorFixture {
             }
         }
         service.rows = baseline; originalPixels = originals
+        let paired: DuoCompatibilityBaseline?
+        if compatibility {
+            let legacy = try DuoLegacyView.read(service.makeLegacy())
+            let linkedService = service
+            let content = try baseline.map { row -> DuoContentProof in
+                let cloud = linkedService.images[row.imageID]!["attributes"]!
+                return DuoContentProof(imageID: row.imageID, fileName: cloud["fileName"]!.stringValue!,
+                    byteCount: cloud["fileSize"]!.intValue!, asset: try DuoImageAsset.read(cloud["imageAsset"]!).0,
+                    pixelSHA256: try ImageValidation.pixelSHA256(linkedService.data[row.imageID]!, context: "linked baseline fixture"))
+            }
+            paired = DuoCompatibilityBaseline(policy: DuoCompatibilityBaseline.policyName,
+                legacy: legacy, placements: baseline, content: content)
+        } else { paired = nil }
         set = DuoPublishSet(version: "3.0", bundleID: "com.example.App", appID: "app", assetLibraryID: "library", versionID: "target3",
             localizationID: "target3-locale", locale: "en-US", sourceManifestSHA256: String(repeating: "a", count: 64),
-            catalog: catalog, images: desired, reviewedBaseline: baseline)
+            catalog: catalog, images: desired, reviewedBaseline: baseline, compatibilityBaseline: paired)
     }
     func clean() { service.fault = nil; service.beforeMutation = nil; try? FileManager.default.removeItem(at: directory) }
     func run(writer: ((Data, URL) throws -> Void)? = nil, backupWriter: ((Data, URL) throws -> Void)? = nil) throws {
-        let executor = try DuoPublishingExecutor(set: set, journalURL: journal, service: service, pollAttempts: 2, sleeper: { _ in }, journalWriter: writer, backupWriter: backupWriter)
+        let executor = try DuoPublishingExecutor(set: set, journalURL: journal, service: service, pollAttempts: 2, compatibilityPollAttempts: 3, sleeper: { _ in }, journalWriter: writer, backupWriter: backupWriter)
         try executor.publish(confirmedVersion: set.version, confirmedSetDigest: set.digest())
     }
     func state() throws -> DuoExecutionJournal { try ManifestBuilder.decode(DuoExecutionJournal.self, at: journal) }
@@ -430,7 +654,28 @@ private final class DuoMemoryService: DuoPublishingService {
     var fault: ((String, Bool) throws -> Void)?
     var beforeMutation: ((String) throws -> Void)?
     var failProcessing = false, wrongSpecification = false, wrongOriginalResponseID = false
+    var legacyOverride: (() throws -> RemoteScreenshotSet?)?
+    var legacyReads = 0
+    var downloads = 0
     private var nextImage = 0, nextPlacement = 0
+    func makeLegacy() throws -> RemoteScreenshotSet? {
+        if rows.isEmpty { return nil }
+        let screenshots = try rows.map { row -> RemoteScreenshot in
+            let raw = try XCTUnwrap(images[row.imageID])["attributes"]!
+            let bytes = try XCTUnwrap(data[row.imageID])
+            let attributes: [String: JSONValue] = ["fileName": raw["fileName"]!, "fileSize": raw["fileSize"]!,
+                "imageAsset": raw["imageAsset"]!, "sourceFileChecksum": .string(FileIO.md5(bytes)),
+                "assetDeliveryState": .object(["state": .string("COMPLETE")])]
+            return RemoteScreenshot(id: "legacy-" + row.id, fileName: raw["fileName"]!.stringValue,
+                checksum: FileIO.md5(bytes), attributes: attributes)
+        }
+        return RemoteScreenshotSet(id: "legacy-view", displayType: "APP_IPHONE_DUO", screenshots: screenshots)
+    }
+    func legacyDuoSet(localizationID: String) throws -> RemoteScreenshotSet? {
+        legacyReads += 1
+        if let legacyOverride { return try legacyOverride() }
+        return try makeLegacy()
+    }
     func verifyEditableTarget(_ set: DuoPublishSet) throws {}
     func placements(localizationID: String, group: String) throws -> [DuoRemotePlacement] { rows }
     func image(id: String) throws -> JSONValue {
@@ -438,7 +683,7 @@ private final class DuoMemoryService: DuoPublishingService {
         if wrongOriginalResponseID && id.hasPrefix("old-image-") { row["id"] = .string("another-resource") }
         return .object(row)
     }
-    func download(_ url: URL) throws -> Data { try XCTUnwrap(data[url.deletingPathExtension().lastPathComponent]) }
+    func download(_ url: URL) throws -> Data { downloads += 1; return try XCTUnwrap(data[url.deletingPathExtension().lastPathComponent]) }
     private func begin(_ label: String) throws { try beforeMutation?(label); events.append(label); try fault?(label, false) }
     private func end(_ label: String) throws { try fault?(label, true) }
     func upload(_ operation: UploadOperation, bytes: Data) throws {
@@ -486,4 +731,21 @@ private final class DuoMemoryService: DuoPublishingService {
         }
         throw DuoExecutionFailure.rejected("Unexpected mock route")
     }
+}
+
+private final class TwoLocaleDuoService: DuoPublishingService {
+    let first: DuoMemoryService, second: DuoMemoryService
+    var writes = 0
+    init(first: DuoMemoryService, second: DuoMemoryService) { self.first = first; self.second = second }
+    func verifyEditableTarget(_ set: DuoPublishSet) throws {}
+    func placements(localizationID: String, group: String) throws -> [DuoRemotePlacement] {
+        try (localizationID == "target-fr" ? second : first).placements(localizationID: localizationID, group: group)
+    }
+    func legacyDuoSet(localizationID: String) throws -> RemoteScreenshotSet? {
+        try (localizationID == "target-fr" ? second : first).legacyDuoSet(localizationID: localizationID)
+    }
+    func image(id: String) throws -> JSONValue { try first.image(id: id) }
+    func download(_ url: URL) throws -> Data { try first.download(url) }
+    func send(_ request: DuoAssetLibraryRequest) throws -> JSONValue? { writes += 1; throw ReleaseToolError.validation("Unexpected multi-locale mutation") }
+    func upload(_ operation: UploadOperation, bytes: Data) throws { writes += 1; throw ReleaseToolError.validation("Unexpected multi-locale upload") }
 }

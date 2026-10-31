@@ -11,6 +11,36 @@ public struct DecodedImage: Equatable, Sendable {
 }
 
 public enum ImageValidation {
+    /// Encoding-independent fingerprint in a fixed 8-bit premultiplied sRGB raster.
+    /// It never changes or writes the source PNG.
+    public static func pixelSHA256(_ data: Data, context: String) throws -> String {
+        let decoded = try decodePNG(data, context: context)
+        let options = [kCGImageSourceShouldCache: true] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(data as CFData, options),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, options),
+              let space = CGColorSpace(name: CGColorSpace.sRGB) else {
+            throw ReleaseToolError.validation("Could not render canonical PNG pixels: \(context)")
+        }
+        let (count, overflow) = image.width.multipliedReportingOverflow(by: image.height)
+        let (byteCount, byteOverflow) = count.multipliedReportingOverflow(by: 4)
+        guard !overflow, !byteOverflow, byteCount > 0 else {
+            throw ReleaseToolError.validation("PNG raster dimensions overflow: \(context)")
+        }
+        var pixels = Data(count: byteCount)
+        try pixels.withUnsafeMutableBytes { buffer in
+            guard let bitmap = CGContext(data: buffer.baseAddress, width: image.width, height: image.height,
+                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: space,
+                bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue) else {
+                throw ReleaseToolError.validation("Could not allocate canonical PNG raster: \(context)")
+            }
+            bitmap.interpolationQuality = .none
+            bitmap.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        }
+        var identity = Data("sRGB8-RGBA-v1:\(decoded.pixelWidth)x\(decoded.pixelHeight):".utf8)
+        identity.append(pixels)
+        return FileIO.sha256(identity)
+    }
+
     public static func decodePNG(_ data: Data, context: String) throws -> DecodedImage {
         let options = [kCGImageSourceShouldCache: true] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, options) else {

@@ -11,14 +11,23 @@ public final class DuoPublishingExecutor {
     private let attempts: Int
     private let sleeper: (TimeInterval) -> Void
     private let backupWriter: (Data, URL) throws -> Void
+    private let compatibilityVerifier: DuoCompatibilityVerifier?
+    private var localPixelCache: [String: String] = [:]
 
     public init(set: DuoPublishSet, journalURL: URL, service: DuoPublishingService,
-                pollAttempts: Int = 120, sleeper: @escaping (TimeInterval) -> Void = Thread.sleep,
+                pollAttempts: Int = 120, compatibilityPollAttempts: Int = 12,
+                sleeper: @escaping (TimeInterval) -> Void = Thread.sleep,
                 journalWriter: ((Data, URL) throws -> Void)? = nil,
                 backupWriter: ((Data, URL) throws -> Void)? = nil) throws {
         self.set = set; self.service = service; self.attempts = max(1, pollAttempts); self.sleeper = sleeper
         self.backupWriter = backupWriter ?? DuoJournalFile.writeNewDataDurably
-        adapter = try DuoAssetLibraryAdapter(catalog: set.catalog, assetLibraryID: set.assetLibraryID)
+        let resolvedAdapter = try DuoAssetLibraryAdapter(catalog: set.catalog, assetLibraryID: set.assetLibraryID)
+        adapter = resolvedAdapter
+        compatibilityVerifier = set.compatibilityBaseline.map { _ in
+            DuoCompatibilityVerifier(service: service, localizationID: set.localizationID,
+                group: resolvedAdapter.routing["placementGroup"]!.stringValue!,
+                attempts: compatibilityPollAttempts, sleeper: sleeper)
+        }
         file = try DuoJournalFile(url: journalURL, writer: journalWriter)
         let digest = try set.digest()
         if FileManager.default.fileExists(atPath: journalURL.path) {
@@ -29,25 +38,38 @@ public final class DuoPublishingExecutor {
             }
         } else {
             journal = DuoExecutionJournal(setDigest: digest, version: set.version,
-                rollbackStrategy: "verified-png-backup-reupload-v1", activeBaseline: set.reviewedBaseline)
+                rollbackStrategy: "verified-png-backup-reupload-v1", activeBaseline: set.reviewedBaseline,
+                activeCompatibility: set.compatibilityBaseline, compatibilityCheckpoint: set.compatibilityBaseline)
             try file.save(journal)
+        }
+        if let baseline = set.compatibilityBaseline {
+            try baseline.validate()
+            guard baseline.placements == set.reviewedBaseline,
+                  let active = journal.activeCompatibility, let checkpoint = journal.compatibilityCheckpoint else {
+                throw ReleaseToolError.validation("Dual-view publishing cannot adopt a journal without its reviewed content proof")
+            }
+            try active.validate(); try checkpoint.validate()
+            guard duoSameGraph(active.placements, journal.activeBaseline) else {
+                throw ReleaseToolError.validation("Duo active baseline and compatibility proof differ")
+            }
         }
     }
 
     /// GET-only remote reconciliation before the aggregate publisher may write.
     /// Known readbacks may update the local journal; an offline dry run never calls this.
-    func preflight() throws {
+    func preflight(allowRollbackProof: Bool = false) throws {
         for image in set.images { _ = try validatedBytes(image) }
         try service.verifyEditableTarget(set)
         if journal.phase == "complete" {
             try requireExactGroup(journal.completedPlacements)
             for image in set.images { _ = try processedImage(id: try reservedID("desired:\(image.position)"), file: image) }
+            try proveCompatibility(try group())
             return
         }
         guard ["preparing", "switching", "rollingBack", "rolledBack"].contains(journal.phase) else {
             throw DuoExecutionFailure.uncertain("Unknown Duo journal phase before aggregate publishing")
         }
-        guard journal.phase != "rollingBack" else {
+        guard journal.phase != "rollingBack" || allowRollbackProof else {
             throw DuoExecutionFailure.uncertain("Pending Duo rollback must finish before other aggregate writes")
         }
         try sealAndVerifyBackup()
@@ -60,9 +82,17 @@ public final class DuoPublishingExecutor {
             for stage in ["switch", "restore"] {
                 let key = "\(stage):\(journal.epoch):order"
                 guard let pending = latest(key), ["intent", "uncertain", "responseKnown"].contains(pending.status) else { continue }
-                let count = stage == "switch" ? set.images.count : journal.backups.count
-                let ids = (1...max(1, count)).prefix(count).compactMap { latest("\(stage):\(journal.epoch):place:\($0)")?.resourceID }
                 let current = try group()
+                let count = stage == "switch" ? set.images.count : journal.backups.count
+                let ids: [String]
+                if stage == "restore" {
+                    ids = journal.activeBaseline.enumerated().compactMap { index, old in
+                        current.contains(where: { $0.id == old.id && $0.imageID == old.imageID })
+                            ? old.id : latest("restore:\(journal.epoch):place:\(index + 1)")?.resourceID
+                    }
+                } else {
+                    ids = (1...max(1, count)).prefix(count).compactMap { latest("switch:\(journal.epoch):place:\($0)")?.resourceID }
+                }
                 guard ids.count == count, current.map(\.id) == ids else {
                     throw DuoExecutionFailure.uncertain("Pending ordering has no exact whole-group readback before aggregate writes")
                 }
@@ -72,6 +102,7 @@ public final class DuoPublishingExecutor {
             try guardOwnedGraph()
         } else {
             try requireExactGroup(journal.activeBaseline)
+            try proveCompatibility(try group())
         }
         let keys = Set(journal.entries.map(\.key))
         guard keys.allSatisfy({ key in
@@ -122,6 +153,7 @@ public final class DuoPublishingExecutor {
         if journal.phase == "complete" {
             try requireExactGroup(journal.completedPlacements)
             for image in set.images { _ = try processedImage(id: try reservedID("desired:\(image.position)"), file: image) }
+            try proveCompatibility(try group())
             return
         }
         if journal.phase == "rollingBack" {
@@ -132,6 +164,7 @@ public final class DuoPublishingExecutor {
             try requireExactGroup(journal.activeBaseline)
             journal.epoch += 1; journal.phase = "preparing"; try save()
         }
+        if journal.phase == "preparing" { try proveCompatibility(try group()) }
         try sealAndVerifyBackup()
         var desiredImages: [Int: String] = [:]
         for image in set.images { desiredImages[image.position] = try stage(image, key: "desired:\(image.position)") }
@@ -186,6 +219,7 @@ public final class DuoPublishingExecutor {
             throw DuoExecutionFailure.uncertain("Final Duo order/image readback does not match the reviewed set")
         }
         for image in set.images { _ = try processedImage(id: desiredImages[image.position]!, file: image) }
+        try proveCompatibility(current)
         journal.completedPlacements = current; journal.phase = "complete"; try save()
     }
     private func save() throws { try file.save(journal) }
@@ -432,6 +466,7 @@ public final class DuoPublishingExecutor {
         }
         journal.expectedGraph = current
         try verify(key)
+        try proveCompatibility(current)
     }
     private func createPlacement(key: String, request: DuoAssetLibraryRequest, imageID: String) throws -> String {
         try guardOwnedGraph()
@@ -448,7 +483,9 @@ public final class DuoPublishingExecutor {
             throw DuoExecutionFailure.drift("Existing placements were reordered during creation")
         }
         journal.expectedGraph = current
-        try verify(key); return id
+        try verify(key)
+        try proveCompatibility(current)
+        return id
     }
     private func order(_ ids: [String], key: String, baselineCount: Int?) throws {
         try guardOwnedGraph()
@@ -459,6 +496,7 @@ public final class DuoPublishingExecutor {
         guard current.map(\.id) == ids else { throw DuoExecutionFailure.uncertain("Whole-group ordering readback failed") }
         journal.expectedGraph = current
         try verify(key)
+        try proveCompatibility(current)
     }
 
     private func ownedPlacementImages() throws -> [String: String] {
@@ -531,6 +569,7 @@ public final class DuoPublishingExecutor {
                 throw DuoExecutionFailure.drift("A known placement vanished without this journal's verified deletion")
             }
         }
+        try proveCompatibility(current)
     }
 
     private func rollback() throws {
@@ -591,7 +630,61 @@ public final class DuoPublishingExecutor {
                 identities[row.imageID] = try imageIdentity(raw)
             }
         }
+        try proveCompatibility(current)
         journal.activeBaseline = current; journal.activeImageIdentities = identities
+        journal.activeCompatibility = journal.compatibilityCheckpoint
         journal.phase = "rolledBack"; try save()
+    }
+
+    var provenLegacyView: DuoLegacyView? { journal.compatibilityCheckpoint?.legacy }
+
+    private func fileContent(_ image: DuoPublishImage, row: DuoRemotePlacement) throws -> DuoExpectedContent {
+        let bytes = try validatedBytes(image)
+        let pixelSHA: String
+        if let existing = localPixelCache[image.sha256] { pixelSHA = existing }
+        else {
+            pixelSHA = try ImageValidation.pixelSHA256(bytes, context: "owned Duo upload content")
+            localPixelCache[image.sha256] = pixelSHA
+        }
+        let previous = journal.compatibilityCheckpoint
+        let index = previous?.placements.firstIndex { $0.id == row.id && $0.imageID == row.imageID }
+        return DuoExpectedContent(fileName: image.fileName, byteCount: image.byteCount,
+            width: image.pixelWidth, height: image.pixelHeight, pixels: pixelSHA, checksum: FileIO.md5(bytes),
+            pinnedAsset: index.flatMap { previous?.content[$0].asset },
+            pinnedLegacyID: index.flatMap { previous?.legacy.images[$0].id })
+    }
+
+    private func expectedContent(_ row: DuoRemotePlacement) throws -> DuoExpectedContent {
+        if let active = journal.activeCompatibility,
+           let index = active.placements.firstIndex(where: { $0.id == row.id && $0.imageID == row.imageID }) {
+            let proof = active.content[index], legacy = active.legacy.images[index]
+            return DuoExpectedContent(fileName: proof.fileName, byteCount: proof.byteCount,
+                width: proof.asset.width, height: proof.asset.height, pixels: proof.pixelSHA256,
+                checksum: legacy.checksum, pinnedAsset: proof.asset, pinnedLegacyID: legacy.id)
+        }
+        for image in set.images where latest("switch:\(journal.epoch):place:\(image.position)")?.resourceID == row.id {
+            guard try reservedID("desired:\(image.position)") == row.imageID else {
+                throw DuoExecutionFailure.drift("Duo desired placement points at a different image")
+            }
+            return try fileContent(image, row: row)
+        }
+        for backup in journal.backups where latest("restore:\(journal.epoch):place:\(backup.file.position)")?.resourceID == row.id {
+            guard try reservedID("restore:\(journal.epoch):\(backup.file.position)") == row.imageID else {
+                throw DuoExecutionFailure.drift("Duo restored placement points at a different image")
+            }
+            return try fileContent(backup.file, row: row)
+        }
+        throw DuoExecutionFailure.drift("Duo compatibility content has no reviewed or journal-owned origin")
+    }
+
+    private func proveCompatibility(_ graph: [DuoRemotePlacement]) throws {
+        guard let compatibilityVerifier else { return }
+        let expected = try graph.map(expectedContent)
+        let checkpoint = try compatibilityVerifier.prove(graph: graph, expected: expected,
+            previous: journal.compatibilityCheckpoint)
+        if checkpoint != journal.compatibilityCheckpoint {
+            journal.compatibilityCheckpoint = checkpoint
+            try save()
+        }
     }
 }

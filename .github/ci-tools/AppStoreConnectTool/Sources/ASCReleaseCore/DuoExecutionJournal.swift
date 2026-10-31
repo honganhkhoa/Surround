@@ -28,6 +28,8 @@ struct DuoExecutionJournal: Codable {
     var expectedGraph: [DuoRemotePlacement]?
     var completedPlacements: [DuoRemotePlacement] = []
     var entries: [DuoExecutionEntry] = []
+    var activeCompatibility: DuoCompatibilityBaseline?
+    var compatibilityCheckpoint: DuoCompatibilityBaseline?
 }
 
 /// Exclusive ownership plus fsync-before-rename journal writes. Temporary files

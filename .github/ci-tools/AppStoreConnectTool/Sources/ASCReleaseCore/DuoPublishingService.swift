@@ -77,14 +77,17 @@ public struct DuoPublishSet: Codable, Equatable, Sendable {
     public let catalog: [JSONValue]
     public let images: [DuoPublishImage]
     public let reviewedBaseline: [DuoRemotePlacement]
+    public let compatibilityBaseline: DuoCompatibilityBaseline?
 
     public init(version: String, bundleID: String, appID: String, assetLibraryID: String, versionID: String,
                 localizationID: String, locale: String, sourceManifestSHA256: String, catalog: [JSONValue],
-                images: [DuoPublishImage], reviewedBaseline: [DuoRemotePlacement]) {
+                images: [DuoPublishImage], reviewedBaseline: [DuoRemotePlacement],
+                compatibilityBaseline: DuoCompatibilityBaseline? = nil) {
         self.version = version; self.bundleID = bundleID; self.appID = appID; self.assetLibraryID = assetLibraryID
         self.versionID = versionID; self.localizationID = localizationID; self.locale = locale
         self.sourceManifestSHA256 = sourceManifestSHA256; self.catalog = catalog
         self.images = images; self.reviewedBaseline = reviewedBaseline
+        self.compatibilityBaseline = compatibilityBaseline
     }
 
     public func digest() throws -> String {
@@ -109,6 +112,13 @@ public protocol DuoPublishingService {
     func send(_ request: DuoAssetLibraryRequest) throws -> JSONValue?
     func upload(_ operation: UploadOperation, bytes: Data) throws
     func download(_ url: URL) throws -> Data
+    func legacyDuoSet(localizationID: String) throws -> RemoteScreenshotSet?
+}
+
+public extension DuoPublishingService {
+    func legacyDuoSet(localizationID: String) throws -> RemoteScreenshotSet? {
+        throw ReleaseToolError.validation("This service has no legacy Duo compatibility reader")
+    }
 }
 
 public final class ASCDuoPublishingService: DuoPublishingService {
@@ -142,7 +152,8 @@ public final class ASCDuoPublishingService: DuoPublishingService {
         try client.list(path: "/v1/appStoreVersionLocalizations/\(duoIdentifier(localizationID))/placements", query: [
             URLQueryItem(name: "filter[placementType]", value: "APP_SCREENSHOT"),
             URLQueryItem(name: "filter[placementGroup]", value: group),
-            URLQueryItem(name: "sort", value: "placementGroupPosition"), URLQueryItem(name: "limit", value: "200")
+            URLQueryItem(name: "sort", value: "placementGroupPosition"),
+            URLQueryItem(name: "include", value: "image"), URLQueryItem(name: "limit", value: "200")
         ]).map(DuoRemotePlacement.parse)
     }
 
@@ -152,6 +163,25 @@ public final class ASCDuoPublishingService: DuoPublishingService {
             throw DuoExecutionFailure.drift("Image resource disappeared")
         }
         return image
+    }
+
+    public func legacyDuoSet(localizationID: String) throws -> RemoteScreenshotSet? {
+        let sets = try client.list(path: "/v1/appStoreVersionLocalizations/\(duoIdentifier(localizationID))/appScreenshotSets",
+                                  query: [URLQueryItem(name: "limit", value: "200")])
+            .filter { $0["attributes"]?["screenshotDisplayType"] == .string("APP_IPHONE_DUO") }
+        guard sets.count <= 1 else { throw DuoExecutionFailure.drift("Multiple legacy Duo compatibility sets") }
+        guard let set = sets.first, let id = set["id"]?.stringValue else { return nil }
+        let raw = try client.list(path: "/v1/appScreenshotSets/\(duoIdentifier(id))/appScreenshots",
+                                  query: [URLQueryItem(name: "limit", value: "200")])
+        let images = try raw.map { row -> RemoteScreenshot in
+            guard row["type"] == .string("appScreenshots"), let imageID = row["id"]?.stringValue,
+                  let attributes = row["attributes"]?.objectValue else {
+                throw DuoExecutionFailure.drift("Malformed legacy Duo compatibility image")
+            }
+            return RemoteScreenshot(id: try duoIdentifier(imageID), fileName: attributes["fileName"]?.stringValue,
+                checksum: attributes["sourceFileChecksum"]?.stringValue, attributes: attributes)
+        }
+        return RemoteScreenshotSet(id: id, displayType: "APP_IPHONE_DUO", screenshots: images)
     }
 
     public func send(_ request: DuoAssetLibraryRequest) throws -> JSONValue? {

@@ -30,6 +30,7 @@ public struct SelectedReleaseHandoff: Codable, Equatable, Sendable {
     public let evidenceAcceptance: HandoffFileBinding
     public let integrityVerification: HandoffFileBinding
     public let duoInspection: HandoffFileBinding
+    public let duoCompatibility: HandoffFileBinding
     public let qualificationLimits: JSONValue
     public let sets: [DuoPublishSet]
 
@@ -37,7 +38,7 @@ public struct SelectedReleaseHandoff: Codable, Equatable, Sendable {
 
     public static func build(importFile: HandoffFileBinding, selectionSHA256: String,
                              acceptance: HandoffFileBinding, integrityVerification: HandoffFileBinding,
-                             inspection: HandoffFileBinding,
+                             inspection: HandoffFileBinding, compatibility: HandoffFileBinding? = nil,
                              release: NormalizedRelease, snapshot: RemoteSnapshot) throws -> Self {
         let envelope = try JSONDecoder().decode(JSONValue.self, from: importFile.bytes())
         let report = try JSONDecoder().decode(JSONValue.self, from: integrityVerification.bytes())
@@ -54,12 +55,6 @@ public struct SelectedReleaseHandoff: Codable, Equatable, Sendable {
         _ = try verifierBinding.bytes()
         try verifyEvidence(envelope, root: URL(fileURLWithPath: importFile.path).deletingLastPathComponent(),
                            selectionSHA256: selectionSHA256, acceptance: acceptance)
-        let observedVersions = [snapshot.sourceVersion, snapshot.targetVersion].compactMap { $0 }
-        guard !observedVersions.contains(where: { version in
-            version.localizations.contains { $0.screenshotSets.contains { $0.displayType == "APP_IPHONE_DUO" } }
-        }) else {
-            throw ReleaseToolError.validation("Selected mixed-transport publishing has an unqualified legacy Duo view (APP_IPHONE_DUO); keep both views in preflight and resolve their compatibility policy before execution")
-        }
         let inspected = try JSONDecoder().decode(JSONValue.self, from: inspection.bytes())
         guard let target = snapshot.targetVersion,
               target.state == "PREPARE_FOR_SUBMISSION",
@@ -70,6 +65,22 @@ public struct SelectedReleaseHandoff: Codable, Equatable, Sendable {
               let library = inspected["assetLibraryId"]?.stringValue,
               let catalog = inspected["catalogResources"]?.arrayValue else {
             throw ReleaseToolError.validation("Duo handoff requires an existing editable target and its actual localization/baseline IDs; no version was created")
+        }
+        guard let compatibility else {
+            throw ReleaseToolError.validation("Duo handoff requires the actual target's SHA-bound two-view content proof")
+        }
+        let proof = try JSONDecoder().decode(JSONValue.self, from: compatibility.bytes())
+        guard proof["schemaVersion"] == .number(1), proof["mode"] == .string("duo-cross-view-readonly-proof"),
+              proof["snapshotFingerprint"] == .string(snapshot.fingerprint),
+              proof["inspectionSHA256"] == .string(inspection.sha256),
+              proof["appID"] == .string(snapshot.appId), proof["bundleID"] == .string(release.bundleId),
+              proof["version"] == .string(release.version), proof["versionID"] == .string(target.id),
+              proof["policy"] == .string(DuoCompatibilityBaseline.policyName),
+              proof["requestMethods"] == .array([.string("GET")]), proof["remoteMutationsPerformed"] == .bool(false),
+              proof["writePropagationProven"] == .bool(false), let proofLocales = proof["locales"]?.arrayValue,
+              proofLocales.count == release.localizations.count,
+              Set(proofLocales.compactMap { $0["locale"]?.stringValue }) == Set(release.localizations.map(\.appStoreLocale)) else {
+            throw ReleaseToolError.validation("Duo compatibility proof belongs to a different target/snapshot or claims unsupported write evidence")
         }
         let plan = try DuoAssetLibraryPlanBuilder.build(inspectionURL: URL(fileURLWithPath: inspection.path),
             expectedInspectionSHA256: inspection.sha256, importURL: URL(fileURLWithPath: importFile.path),
@@ -88,6 +99,18 @@ public struct SelectedReleaseHandoff: Codable, Equatable, Sendable {
                   let placements = remote["orderedPlacements"]?.arrayValue else {
                 throw ReleaseToolError.validation("Duo target localization has no exact reviewed baseline")
             }
+            let mapped = proofLocales.filter { $0["locale"] == .string(locale) && $0["localizationID"] == .string(localizationID) }
+            guard mapped.count == 1, let baselineValue = mapped[0]["baseline"] else {
+                throw ReleaseToolError.validation("Duo target compatibility proof has a missing/ambiguous locale")
+            }
+            let baseline = try JSONDecoder().decode(DuoCompatibilityBaseline.self, from: JSONEncoder().encode(baselineValue))
+            try baseline.validate()
+            let legacySets = target.localizations.first { $0.locale == locale }!.screenshotSets.filter { $0.displayType == "APP_IPHONE_DUO" }
+            guard legacySets.count <= 1,
+                  baseline.legacy == (try DuoLegacyView.read(legacySets.first)),
+                  baseline.placements == (try placements.map(DuoRemotePlacement.parse)) else {
+                throw ReleaseToolError.validation("Duo compatibility baseline differs from the exact reviewed target views")
+            }
             let images = try (row["images"]?.arrayValue ?? []).map { card -> DuoPublishImage in
                 guard let position = card["position"]?.intValue,
                       let path = card["asset"]?["importedPath"]?.stringValue,
@@ -104,11 +127,11 @@ public struct SelectedReleaseHandoff: Codable, Equatable, Sendable {
             return DuoPublishSet(version: release.version, bundleID: release.bundleId, appID: snapshot.appId,
                 assetLibraryID: library, versionID: target.id, localizationID: localizationID, locale: locale,
                 sourceManifestSHA256: importFile.sha256, catalog: catalog, images: images,
-                reviewedBaseline: try placements.map(DuoRemotePlacement.parse))
+                reviewedBaseline: try placements.map(DuoRemotePlacement.parse), compatibilityBaseline: baseline)
         }
         return Self(schemaVersion: 1, mode: "selected-release-handoff", selectedImport: importFile,
             selectionSHA256: selectionSHA256, evidenceAcceptance: acceptance,
-            integrityVerification: integrityVerification, duoInspection: inspection,
+            integrityVerification: integrityVerification, duoInspection: inspection, duoCompatibility: compatibility,
             qualificationLimits: envelope["qualificationLimits"]!, sets: sets)
     }
 
@@ -130,7 +153,7 @@ public struct SelectedReleaseHandoff: Codable, Equatable, Sendable {
         }
         let rebuilt = try build(importFile: handoff.selectedImport, selectionSHA256: handoff.selectionSHA256,
             acceptance: handoff.evidenceAcceptance, integrityVerification: handoff.integrityVerification,
-            inspection: handoff.duoInspection,
+            inspection: handoff.duoInspection, compatibility: handoff.duoCompatibility,
             release: manifest.release, snapshot: manifest.remoteSnapshot)
         guard rebuilt == handoff else { throw ReleaseToolError.validation("Selected handoff differs from its pinned inputs") }
         let envelope = try JSONDecoder().decode(JSONValue.self, from: handoff.selectedImport.bytes())
@@ -252,6 +275,7 @@ final class DuoReleaseCoordinator {
     let handoff: SelectedReleaseHandoff
     let service: DuoPublishingService
     let journalDirectory: URL
+    private var provenViews: [String: DuoLegacyView] = [:]
 
     init(handoff: SelectedReleaseHandoff, service: DuoPublishingService, journalDirectory: URL) {
         self.handoff = handoff; self.service = service; self.journalDirectory = journalDirectory
@@ -265,16 +289,59 @@ final class DuoReleaseCoordinator {
         for set in handoff.sets {
             _ = try duoIdentifier(set.locale)
             try service.verifyEditableTarget(set)
-            if FileManager.default.fileExists(atPath: journal(set).path) {
-                let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
-                try executor.preflight()
-            } else {
-                let adapter = try DuoAssetLibraryAdapter(catalog: set.catalog, assetLibraryID: set.assetLibraryID)
-                guard try service.placements(localizationID: set.localizationID,
-                    group: adapter.routing["placementGroup"]!.stringValue!) == set.reviewedBaseline else {
-                    throw ReleaseToolError.remoteDrift("Duo placements changed since review for \(set.locale)")
-                }
+            let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
+            try executor.preflight()
+            provenViews[set.locale] = executor.provenLegacyView
+        }
+    }
+
+    /// Establish target-only compatibility before generic reconciliation; no
+    /// cloud mutation is permitted here, including while rollback is pending.
+    func prepareForReconciliation() throws {
+        provenViews.removeAll()
+        for set in handoff.sets {
+            let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
+            try executor.preflight(allowRollbackProof: true)
+            provenViews[set.locale] = executor.provenLegacyView
+        }
+    }
+
+    func requireSnapshotProjection(locale: String, sets: [RemoteScreenshotSet]) throws {
+        guard handoff.sets.contains(where: { $0.locale == locale && $0.compatibilityBaseline != nil }),
+              sets.count <= 1, let expected = provenViews[locale],
+              try DuoLegacyView.read(sets.first) == expected else {
+            throw ReleaseToolError.remoteDrift("Target Duo compatibility snapshot has no exact current content proof for \(locale)")
+        }
+    }
+
+    /// Comparison-only normalization of the explicitly proven target alias.
+    /// The stored/live snapshots and released-source fingerprint remain intact.
+    func requireInitialSnapshot(_ live: RemoteSnapshot, reviewed: RemoteSnapshot) throws {
+        guard let target = live.targetVersion, let original = reviewed.targetVersion,
+              target.id == original.id else {
+            throw ReleaseToolError.remoteDrift("Selected target version changed before publishing")
+        }
+        let locales = try target.localizations.map { locale -> RemoteLocalization in
+            guard let set = handoff.sets.first(where: { $0.locale == locale.locale }) else { return locale }
+            guard set.versionID == target.id, set.localizationID == locale.id,
+                  let old = original.localizations.first(where: { $0.locale == locale.locale && $0.id == locale.id }) else {
+                throw ReleaseToolError.remoteDrift("Selected target localization changed")
             }
+            try requireSnapshotProjection(locale: locale.locale,
+                sets: locale.screenshotSets.filter { $0.displayType == "APP_IPHONE_DUO" })
+            let comparedSets = (locale.screenshotSets.filter { $0.displayType != "APP_IPHONE_DUO" }
+                + old.screenshotSets.filter { $0.displayType == "APP_IPHONE_DUO" }).sorted { $0.displayType < $1.displayType }
+            return RemoteLocalization(id: locale.id, locale: locale.locale, attributes: locale.attributes,
+                screenshotSets: comparedSets)
+        }
+        let comparedTarget = RemoteVersion(id: target.id, versionString: target.versionString, state: target.state,
+            attributes: target.attributes, localizations: locales)
+        let compared = RemoteSnapshot(schemaVersion: live.schemaVersion, capturedAt: live.capturedAt, fingerprint: "",
+            appId: live.appId, bundleId: live.bundleId, platform: live.platform, requestedVersion: live.requestedVersion,
+            targetVersion: comparedTarget, sourceVersion: live.sourceVersion, appInfo: live.appInfo,
+            sourceAppInfo: live.sourceAppInfo, targetAppInfo: live.targetAppInfo)
+        guard try SnapshotService.fingerprint(snapshot: compared) == reviewed.fingerprint else {
+            throw ReleaseToolError.remoteDrift("Unreviewed source, metadata or non-Duo screenshot change before selected publishing")
         }
     }
 
@@ -282,6 +349,7 @@ final class DuoReleaseCoordinator {
         for set in handoff.sets {
             let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
             try executor.publish(confirmedVersion: set.version, confirmedSetDigest: set.digest())
+            provenViews[set.locale] = executor.provenLegacyView
         }
     }
 
@@ -293,6 +361,7 @@ final class DuoReleaseCoordinator {
             guard state.phase == "rollingBack" else { continue }
             let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
             try executor.publish(confirmedVersion: set.version, confirmedSetDigest: set.digest())
+            provenViews[set.locale] = executor.provenLegacyView
         }
     }
 

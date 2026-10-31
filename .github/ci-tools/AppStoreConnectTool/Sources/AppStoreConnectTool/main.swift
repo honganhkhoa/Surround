@@ -47,6 +47,8 @@ private struct Arguments {
       validate-release --release FILE --locales-config FILE --output FILE
       snapshot --release NORMALIZED_JSON --output FILE
       inspect-duo-placement --bundle-id ID --version V --output FILE
+      inspect-duo-compatibility --snapshot FILE --inspection FILE \\
+        --expected-snapshot-sha256 SHA256 --expected-inspection-sha256 SHA256 --output FILE
       build-duo-placement-plan --inspection FILE --selected-import FILE \\
         --expected-inspection-sha256 SHA256 --expected-import-sha256 SHA256 \\
         --expected-selection-sha256 SHA256 --output FILE
@@ -54,6 +56,7 @@ private struct Arguments {
         --selected-import FILE --expected-import-sha256 SHA256 --expected-selection-sha256 SHA256 \\
         --evidence-acceptance FILE --expected-acceptance-sha256 SHA256 \\
         --integrity-report FILE --expected-integrity-sha256 SHA256 \\
+        [--compatibility-proof FILE --expected-compatibility-sha256 SHA256] \\
         --inspection FILE --expected-inspection-sha256 SHA256 --output FILE
       verify-manifest --manifest FILE
       validate-snapshot --release NORMALIZED_JSON --snapshot REMOTE_SNAPSHOT_JSON
@@ -71,7 +74,7 @@ private struct Arguments {
         --expected-source-version V --confirm-version V \\
         --confirm-manifest-digest SHA256 --journal FILE
 
-    snapshot, inspect-duo-placement and both publish commands require ASC_KEY_ID,
+    snapshot, both inspect-duo commands and both publish commands require ASC_KEY_ID,
     ASC_ISSUER_ID, and ASC_PRIVATE_KEY_PATH. build-duo-placement-plan is offline.
     """
 }
@@ -137,6 +140,32 @@ do {
         try SnapshotPreflight.validate(release: release, snapshot: snapshot)
         print("Validated App Store Connect metadata preflight for \(release.version)")
 
+    case "inspect-duo-compatibility":
+        let values = try arguments.require("--snapshot", "--inspection", "--expected-snapshot-sha256",
+            "--expected-inspection-sha256", "--output")
+        let output = fileURL(values[4])
+        guard !FileManager.default.fileExists(atPath: output.path) else {
+            throw ReleaseToolError.validation("Compatibility evidence output already exists")
+        }
+        let snapshotBytes = try Data(contentsOf: fileURL(values[0]))
+        let inspectionBytes = try Data(contentsOf: fileURL(values[1]))
+        guard FileIO.sha256(snapshotBytes) == values[2], FileIO.sha256(inspectionBytes) == values[3] else {
+            throw ReleaseToolError.validation("Compatibility input SHA pins differ")
+        }
+        let snapshot = try JSONDecoder().decode(RemoteSnapshot.self, from: snapshotBytes)
+        guard try SnapshotService.fingerprint(snapshot: snapshot) == snapshot.fingerprint else {
+            throw ReleaseToolError.validation("Compatibility snapshot fingerprint differs")
+        }
+        let inspection = try JSONDecoder().decode(JSONValue.self, from: inspectionBytes)
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment(), maxRetries: 0)
+        let proof = try DuoCompatibilityInspector.capture(snapshot: snapshot, snapshotSHA256: values[2],
+            inspection: inspection, inspectionSHA256: values[3], service: ASCDuoPublishingService(client: client),
+            progress: { done, total in
+                FileHandle.standardOutput.write(Data("GET-only Duo content proof: \(done)/\(total) locales\n".utf8))
+            })
+        try FileIO.writeJSONValue(proof, to: output)
+        print("Saved read-only baseline content proof; write propagation remains unproven")
+
     case "build-duo-placement-plan":
         let values = try arguments.require("--inspection", "--selected-import", "--expected-inspection-sha256", "--expected-import-sha256", "--expected-selection-sha256", "--output")
         let output = fileURL(values[5])
@@ -153,7 +182,8 @@ do {
     case "build-selected-handoff":
         let v = try arguments.require("--release", "--snapshot", "--selected-import", "--expected-import-sha256",
             "--expected-selection-sha256", "--evidence-acceptance", "--expected-acceptance-sha256",
-            "--inspection", "--expected-inspection-sha256", "--integrity-report", "--expected-integrity-sha256", "--output")
+            "--inspection", "--expected-inspection-sha256", "--integrity-report", "--expected-integrity-sha256", "--output",
+            optional: ["--compatibility-proof", "--expected-compatibility-sha256"])
         let output = fileURL(v[11])
         guard !FileManager.default.fileExists(atPath: output.path) else {
             throw ReleaseToolError.validation("Selected handoff output already exists")
@@ -161,11 +191,21 @@ do {
         let release = try ManifestBuilder.decode(NormalizedRelease.self, at: fileURL(v[0]))
         let snapshot = try ManifestBuilder.decode(RemoteSnapshot.self, at: fileURL(v[1]))
         try SnapshotPreflight.validate(release: release, snapshot: snapshot)
+        let compatibility: HandoffFileBinding?
+        if let path = arguments.options["--compatibility-proof"], let sha = arguments.options["--expected-compatibility-sha256"] {
+            compatibility = HandoffFileBinding(path: fileURL(path).path, sha256: sha)
+        } else {
+            guard arguments.options["--compatibility-proof"] == nil && arguments.options["--expected-compatibility-sha256"] == nil else {
+                throw ReleaseToolError.usage("Compatibility proof path and SHA must be supplied together")
+            }
+            compatibility = nil
+        }
         let handoff = try SelectedReleaseHandoff.build(
             importFile: HandoffFileBinding(path: fileURL(v[2]).path, sha256: v[3]), selectionSHA256: v[4],
             acceptance: HandoffFileBinding(path: fileURL(v[5]).path, sha256: v[6]),
             integrityVerification: HandoffFileBinding(path: fileURL(v[9]).path, sha256: v[10]),
-            inspection: HandoffFileBinding(path: fileURL(v[7]).path, sha256: v[8]), release: release, snapshot: snapshot)
+            inspection: HandoffFileBinding(path: fileURL(v[7]).path, sha256: v[8]), compatibility: compatibility,
+            release: release, snapshot: snapshot)
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         try encoder.encode(handoff).write(to: output, options: .withoutOverwriting)
         print("Saved admitted selected handoff with actual target IDs; publishing remains separately authorized")
