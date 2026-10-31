@@ -549,6 +549,7 @@ struct PrivateMessageLog: View {
                                 .resizable()
                                 .foregroundStyle(.secondary)
                         }
+                        .appStoreScreenshotAvatar(player: peer, size: 32)
                         .frame(width: 32, height: 32)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                         .frame(minWidth: 44, minHeight: 44)

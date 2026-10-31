@@ -33,6 +33,7 @@ struct MessageAvatar: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(fallbackColor)
         }
+        .appStoreScreenshotAvatar(player: user, size: size)
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: max(9, size * 0.23)))
         .accessibilityHidden(true)

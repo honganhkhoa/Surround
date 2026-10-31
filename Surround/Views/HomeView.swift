@@ -870,6 +870,7 @@ struct HomeView: View {
                     .scaledToFit()
                     .foregroundStyle(.secondary)
             }
+            .appStoreScreenshotAvatar(player: ogs.user, size: 40)
             .frame(width: 40, height: 40)
             .clipShape(Circle())
             .accessibilityHidden(true)

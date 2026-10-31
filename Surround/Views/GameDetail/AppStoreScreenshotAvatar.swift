@@ -7,6 +7,24 @@
 
 import SwiftUI
 
+extension View {
+    /// Keep the same deterministic identity art in both App Store journeys:
+    /// the game fixtures and the separately launched Messages marketing scene.
+    @ViewBuilder
+    func appStoreScreenshotAvatar(player: OGSUser?, size: CGFloat) -> some View {
+        #if DEBUG && MAIN_APP
+        if (SurroundUITestContract.isCapturingAppStoreScreenshots
+            || SurroundUITestContract.includesMessagesMarketing), let player {
+            AppStoreScreenshotAvatar(player: player, size: size)
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+}
+
 #if DEBUG && MAIN_APP
 struct AppStoreScreenshotAvatar: View {
     let player: OGSUser
