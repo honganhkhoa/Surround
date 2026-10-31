@@ -54,6 +54,12 @@ public struct SelectedReleaseHandoff: Codable, Equatable, Sendable {
         _ = try verifierBinding.bytes()
         try verifyEvidence(envelope, root: URL(fileURLWithPath: importFile.path).deletingLastPathComponent(),
                            selectionSHA256: selectionSHA256, acceptance: acceptance)
+        let observedVersions = [snapshot.sourceVersion, snapshot.targetVersion].compactMap { $0 }
+        guard !observedVersions.contains(where: { version in
+            version.localizations.contains { $0.screenshotSets.contains { $0.displayType == "APP_IPHONE_DUO" } }
+        }) else {
+            throw ReleaseToolError.validation("Selected mixed-transport publishing has an unqualified legacy Duo view (APP_IPHONE_DUO); keep both views in preflight and resolve their compatibility policy before execution")
+        }
         let inspected = try JSONDecoder().decode(JSONValue.self, from: inspection.bytes())
         guard let target = snapshot.targetVersion,
               target.state == "PREPARE_FOR_SUBMISSION",

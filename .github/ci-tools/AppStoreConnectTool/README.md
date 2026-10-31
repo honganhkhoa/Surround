@@ -99,6 +99,14 @@ source-version IDs or guess what Apple will inherit. Prepare the review-only
 packet first; separately authorized target creation and a fresh snapshot are
 needed before an exact executable Duo handoff can be reviewed.
 
+The selected mixed-transport route also refuses an observed `APP_IPHONE_DUO`
+set in either the released source or target. That legacy set is retained in the
+snapshot and fingerprint. Its synchronization with Asset Library placement
+writes is not established, and an apparent change would otherwise be treated
+as unmanaged drift on resume. Resolve and qualify a cross-view policy or migrate
+the complete screenshot publisher to one transport before enabling that case.
+There is no override flag and no inferred compatibility from matching GET views.
+
 `verify-manifest --manifest FILE` verifies the complete handoff offline. The
 public wrapper also supports `publish --manifest FILE --confirm-version V
 --confirm-manifest-digest SHA256 --dry-run`. Dry runs load no credentials, create

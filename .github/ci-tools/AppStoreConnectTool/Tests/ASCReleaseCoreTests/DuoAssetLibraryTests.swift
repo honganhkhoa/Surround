@@ -262,9 +262,9 @@ final class DuoAssetLibraryTests: XCTestCase {
                 versionMetadata: ["whatsNew": .string("Notes")], appMetadata: [:], sourceFiles: [:])], versionMetadata: [:])
         let remoteLocale = RemoteLocalization(id: "target-en-US", locale: "en-US", attributes: [:], screenshotSets: [])
         let target = RemoteVersion(id: "target", versionString: "3.0", state: "PREPARE_FOR_SUBMISSION", attributes: [:], localizations: [remoteLocale])
-        func snapshot(_ version: RemoteVersion?) -> RemoteSnapshot {
+        func snapshot(_ version: RemoteVersion?, source: RemoteVersion? = nil) -> RemoteSnapshot {
             RemoteSnapshot(capturedAt: "fixture", fingerprint: "fixture", appId: "app", bundleId: release.bundleId,
-                platform: "IOS", requestedVersion: "3.0", targetVersion: version, sourceVersion: nil, appInfo: nil)
+                platform: "IOS", requestedVersion: "3.0", targetVersion: version, sourceVersion: source, appInfo: nil)
         }
         func build(_ snap: RemoteSnapshot) throws -> SelectedReleaseHandoff {
             try SelectedReleaseHandoff.build(importFile: HandoffFileBinding(path: fixture.importURL.path,
@@ -287,6 +287,15 @@ final class DuoAssetLibraryTests: XCTestCase {
         XCTAssertEqual(result.sets[0].localizationID, "target-en-US")
         XCTAssertEqual(result.sets[0].images.map(\.position), Array(1...10))
         XCTAssertTrue(result.sets[0].reviewedBaseline.isEmpty)
+        let dualLocale = RemoteLocalization(id: "target-en-US", locale: "en-US", attributes: [:],
+            screenshotSets: [RemoteScreenshotSet(id: "legacy-duo", displayType: "APP_IPHONE_DUO", screenshots: [])])
+        let dualTarget = RemoteVersion(id: "target", versionString: "3.0", state: "PREPARE_FOR_SUBMISSION",
+            attributes: [:], localizations: [dualLocale])
+        let dualSource = RemoteVersion(id: "released-source", versionString: "2.4.1", state: "READY_FOR_DISTRIBUTION",
+            attributes: [:], localizations: [dualLocale])
+        for value in [snapshot(dualTarget), snapshot(target, source: dualSource)] {
+            XCTAssertThrowsError(try build(value)) { XCTAssertTrue($0.localizedDescription.contains("unqualified legacy Duo view")) }
+        }
         var changedCards = cards
         var changed = changedCards[0].objectValue!
         changed["origin"] = .object(["kind": .string("rewritten-origin")]); changedCards[0] = .object(changed)
