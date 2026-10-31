@@ -267,6 +267,7 @@ public enum ManifestBuilder {
                 }
             }
         }
+        _ = try SelectedReleaseHandoff.load(manifest: manifest)
     }
 
     private static func resolvedPixelSize(

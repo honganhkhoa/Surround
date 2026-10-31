@@ -5,6 +5,7 @@ public final class Publisher {
     private let journalURL: URL
     private let snapshotProvider: (NormalizedRelease) throws -> RemoteSnapshot
     private let sleeper: (TimeInterval) -> Void
+    private let duoService: DuoPublishingService
     private var journal: PublishJournal
 
     public init(
@@ -12,7 +13,8 @@ public final class Publisher {
         journalURL: URL,
         manifest: PublishManifest,
         snapshotProvider: ((NormalizedRelease) throws -> RemoteSnapshot)? = nil,
-        sleeper: @escaping (TimeInterval) -> Void = Thread.sleep
+        sleeper: @escaping (TimeInterval) -> Void = Thread.sleep,
+        duoService: DuoPublishingService? = nil
     ) throws {
         self.client = client
         self.journalURL = journalURL
@@ -20,6 +22,7 @@ public final class Publisher {
             try SnapshotService(client: client).capture(release: release)
         }
         self.sleeper = sleeper
+        self.duoService = duoService ?? ASCDuoPublishingService(client: client)
         if FileManager.default.fileExists(atPath: journalURL.path) {
             journal = try ManifestBuilder.decode(PublishJournal.self, at: journalURL)
             guard journal.version == manifest.release.version,
@@ -37,7 +40,8 @@ public final class Publisher {
         }
     }
 
-    public func publish(manifest: PublishManifest, confirmedVersion: String) throws {
+    public func publish(manifest: PublishManifest, confirmedVersion: String,
+                        confirmedManifestDigest: String? = nil) throws {
         guard manifest.captureMetadata["mode"]?.stringValue
             != MetadataOnlyManifestBuilder.mode else {
             throw ReleaseToolError.validation(
@@ -50,12 +54,26 @@ public final class Publisher {
             )
         }
         try ManifestBuilder.verify(manifest)
+        let selected = try SelectedReleaseHandoff.load(manifest: manifest)
+        if (selected != nil && confirmedManifestDigest == nil) ||
+            (confirmedManifestDigest != nil && confirmedManifestDigest != manifest.manifestDigest) {
+            throw ReleaseToolError.validation("Selected release requires the exact reviewed aggregate manifest digest")
+        }
+        let releaseLock = try selected.map { _ in
+            try MetadataOnlyReleaseLock(bundleId: manifest.release.bundleId,
+                platform: manifest.release.platform, version: manifest.release.version)
+        }
+        defer { releaseLock?.release() }
+        let duo = selected.map { DuoReleaseCoordinator(handoff: $0, service: duoService,
+                                                       journalDirectory: journalURL.deletingLastPathComponent()) }
 
         var snapshot = try snapshotProvider(manifest.release)
         guard snapshot.appId == manifest.remoteSnapshot.appId else {
             throw ReleaseToolError.remoteDrift("Live app resource does not match the reviewed manifest")
         }
         try reconcileLiveState(manifest: manifest, live: snapshot)
+        try duo?.recoverPendingRollback()
+        try duo?.preflight()
 
         let versionId: String
         if let target = snapshot.targetVersion {
@@ -208,6 +226,8 @@ public final class Publisher {
             }
         }
 
+        try duo?.publish()
+
         // Apply reviewed textual metadata only after every screenshot has processed and been ordered.
         let effectiveVersionMetadata = effectiveVersionMetadata(manifest)
         if !effectiveVersionMetadata.isEmpty {
@@ -261,6 +281,7 @@ public final class Publisher {
             throw ReleaseToolError.remoteDrift("App resource changed before final verification")
         }
         try verifyReadBack(manifest: manifest, snapshot: finalSnapshot)
+        try duo?.verifyCompleted()
         journal.completedAt = ISO8601DateFormatter.releaseTool.string(from: Date())
         try persistJournal()
     }

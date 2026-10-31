@@ -63,8 +63,8 @@ public struct DuoPublishImage: Codable, Equatable, Sendable {
     }
 }
 
-/// A group bound by a future qualified publisher handoff. This is deliberately
-/// incompatible with the unqualified offline plan and has no CLI conversion.
+/// A group bound by an admitted selected publisher handoff with actual target IDs.
+/// A plan-only record cannot be decoded as this executable contract.
 public struct DuoPublishSet: Codable, Equatable, Sendable {
     public let version: String
     public let bundleID: String
@@ -100,8 +100,8 @@ func duoIdentifier(_ id: String) throws -> String {
     return id
 }
 
-/// Tests inject an in-memory service. The concrete ASC service is never
-/// constructed by the plan CLI or this task's local checks.
+/// Tests inject an in-memory service or transport. Offline planning and dry runs
+/// never invoke the concrete service's network methods.
 public protocol DuoPublishingService {
     func verifyEditableTarget(_ set: DuoPublishSet) throws
     func placements(localizationID: String, group: String) throws -> [DuoRemotePlacement]

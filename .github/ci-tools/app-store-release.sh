@@ -15,7 +15,8 @@ Usage:
   app-store-release.sh validate --release FILE [--output FILE]
   app-store-release.sh prepare --release FILE
   app-store-release.sh prepare-metadata-only --release FILE --source-version VERSION
-  app-store-release.sh publish --manifest FILE --confirm-version VERSION
+  app-store-release.sh publish --manifest FILE --confirm-version VERSION \
+    [--confirm-manifest-digest SHA256] [--dry-run]
   app-store-release.sh publish-metadata-only --manifest FILE \
     --confirm-source-version VERSION --confirm-version VERSION \
     --confirm-manifest-digest SHA256
@@ -52,7 +53,9 @@ Options:
   --confirm-version VERSION  Required exact version confirmation for publish.
   --confirm-manifest-digest SHA256
                              Required exact reviewed manifest confirmation for
-                             publish-metadata-only.
+                             publish-metadata-only and selected-lineup publish.
+  --dry-run                  Verify publish offline without credentials,
+                             network requests or journal creation.
   -h, --help                 Show this help.
 
 Authentication for both prepare and publish modes:
@@ -746,6 +749,9 @@ command_prepare_metadata_only() {
 command_publish() {
   local manifest_path=""
   local confirmed_version=""
+  local confirmed_manifest_digest=""
+  local dry_run=0
+  local -a publish_arguments=(publish)
   local manifest_version
   local journal_path
 
@@ -760,6 +766,15 @@ command_publish() {
         (( $# >= 2 )) || usage_error "--confirm-version requires a value."
         confirmed_version="$2"
         shift 2
+        ;;
+      --confirm-manifest-digest)
+        (( $# >= 2 )) || usage_error "--confirm-manifest-digest requires a value."
+        confirmed_manifest_digest="$2"
+        shift 2
+        ;;
+      --dry-run)
+        dry_run=1
+        shift
         ;;
       -h|--help)
         usage
@@ -792,14 +807,26 @@ command_publish() {
   )" || fail "The publish manifest does not contain a release version."
   [[ "$manifest_version" == "$confirmed_version" ]] \
     || fail "Confirmed version '${confirmed_version}' does not match manifest version '${manifest_version}'."
+  if [[ -n "$confirmed_manifest_digest" ]]; then
+    validate_sha256_string "$confirmed_manifest_digest"
+    [[ "$(jq -r '.manifestDigest' "$manifest_path")" == "$confirmed_manifest_digest" ]] \
+      || fail "Confirmed digest differs from the reviewed manifest."
+    publish_arguments+=(--confirm-manifest-digest "$confirmed_manifest_digest")
+  fi
+  if [[ "$(jq -r '.captureMetadata.mode // empty' "$manifest_path")" == "selected-lineup" ]]; then
+    [[ -n "$confirmed_manifest_digest" ]] || fail "Selected lineup publish requires --confirm-manifest-digest."
+  fi
+  journal_path="$(dirname "$manifest_path")/publish-journal.json"
+  publish_arguments+=(--manifest "$manifest_path" --confirm-version "$confirmed_version" --journal "$journal_path")
+  if [[ "$dry_run" == 1 ]]; then
+    unset ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY_PATH
+    run_app_store_connect_tool "${publish_arguments[@]}" --dry-run true
+    return 0
+  fi
   validate_shipping_marketing_versions "$confirmed_version"
   require_app_store_credentials
 
-  journal_path="$(dirname "$manifest_path")/publish-journal.json"
-  run_app_store_connect_tool publish \
-    --manifest "$manifest_path" \
-    --confirm-version "$confirmed_version" \
-    --journal "$journal_path"
+  run_app_store_connect_tool "${publish_arguments[@]}"
 
   echo "App Store release ${confirmed_version} was published and verified."
   echo "Publish journal: ${journal_path}"

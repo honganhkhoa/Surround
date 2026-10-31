@@ -83,12 +83,29 @@ Local plans remain unpublishable and do not change capture/widget qualification
 or prove Apple write acceptance. An existing placement's `ACTIVE` state does
 not prove its image processing metadata; that needs separate image readback.
 
-The separate `DuoPublishingExecutor` component implements per-localization
-execution and recovery for a future qualified handoff. It has no CLI entry point
-and cannot decode the unqualified offline plan as a `DuoPublishSet`. The caller
-must supply actual editable target/localization IDs, the reviewed target baseline
-and exact version/set-digest confirmations. Version creation and listing metadata
-remain in the parent publishing workflow.
+The separate `DuoPublishingExecutor` implements per-localization execution and
+recovery. The established `publish` command invokes it only for a SHA-bound
+`selected-lineup` handoff. A plan-only record cannot become a `DuoPublishSet`:
+admission requires the full private import-verification receipt, canonical
+selection, explicit owner acceptance of the recorded widget evidence limits,
+actual editable target/localization IDs and reviewed ordered Duo baselines.
+Historical qualification flags remain unchanged. The existing metadata-only and
+legacy screenshot routes remain separate.
+
+`build-selected-handoff` is offline. It requires normalized release/snapshot,
+selected import/selection SHA pins, evidence-acceptance SHA, integrity-report SHA
+and GET-only Duo inspection SHA. It refuses an absent target rather than reuse
+source-version IDs or guess what Apple will inherit. Prepare the review-only
+packet first; separately authorized target creation and a fresh snapshot are
+needed before an exact executable Duo handoff can be reviewed.
+
+`verify-manifest --manifest FILE` verifies the complete handoff offline. The
+public wrapper also supports `publish --manifest FILE --confirm-version V
+--confirm-manifest-digest SHA256 --dry-run`. Dry runs load no credentials, create
+no journal and send no requests. Actual selected publication requires the exact
+aggregate digest in addition to the version. Any supplied digest must match for
+legacy manifests too. Those parameters do not replace the owner's approval of
+the exact reviewed mutation scope.
 
 It seals full-size PNG backups and image identities, stages and processes all ten
 replacement images, then replaces and orders placements. Its recovery strategy
@@ -112,8 +129,12 @@ journaled. Mutation requests and upload operations use a single attempt.
 This component is tested with injected fixtures, including recovery and existing
 legacy retry/rollback compatibility. The current selected capture remains gated;
 local execution tests do not establish server write acceptance, storefront
-presentation or historical capture qualification. No publishing command invokes
-the new component yet.
+presentation or historical capture qualification. Before any aggregate writes,
+the coordinator verifies every actual Duo target and ordered baseline, validates
+resume journals and known staged cloud resources, and reconciles exact known
+readbacks. A pending rollback is resumed first and stops at its verified recovery
+checkpoint before any other group or metadata work. Unknown image reservations
+or uploads still stop without blind replay.
 
 For a patch release that changes only localized What's New text, use the dedicated
 metadata-only manifest and publisher instead of capturing screenshots:

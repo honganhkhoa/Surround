@@ -175,6 +175,132 @@ final class DuoAssetLibraryTests: XCTestCase {
         }
     }
 
+    func testSelectedAdmissionPinsOwnerLimitsAndActualTargetBeforeBuildingExecutableHandoff() throws {
+        let fixture = try planFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.directory) }
+        let root = fixture.importURL.deletingLastPathComponent()
+        var envelope = try FileIO.readJSON(at: fixture.importURL).objectValue!
+        let limits: JSONValue = .object(["selectedXCTestDuoQualificationClaimed": .bool(false),
+            "widgetUnresolved": .array([.string("SAME_RENDER_DISPLAY_BINDING_UNRESOLVED")])])
+        var selected = try FileIO.readJSON(at: root.appendingPathComponent("selection.json")).objectValue!
+        selected["qualificationLimits"] = limits
+        var completeCards = envelope["cards"]!.arrayValue!
+        var selectedCards = selected["images"]!.arrayValue!
+        let originalRoot = URL(fileURLWithPath: envelope["selectionOriginalPath"]!.stringValue!).deletingLastPathComponent().deletingLastPathComponent()
+        for i in completeCards.indices {
+            var card = completeCards[i].objectValue!, source = selectedCards[i].objectValue!
+            let template = card["assets"]!["screenshots"]!.objectValue!
+            var assets: [String: JSONValue] = [:], originals: [String: JSONValue] = [:]
+            for role in ["raw", "source-screenshots", "screenshots"] {
+                let relative = role + "/en-US/" + card["family"]!.stringValue! + "/" + String(card["position"]!.intValue!) + ".png"
+                let original = "artifacts/fixture/" + relative
+                var asset = template
+                asset["importedPath"] = .string(relative)
+                asset["originalPath"] = .string(originalRoot.appendingPathComponent(original).path)
+                assets[role] = .object(asset)
+                asset["path"] = .string(original)
+                originals[role] = .object(asset)
+            }
+            card["assets"] = .object(assets); source["assets"] = .object(originals)
+            completeCards[i] = .object(card); selectedCards[i] = .object(source)
+        }
+        envelope["cards"] = .array(completeCards); selected["images"] = .array(selectedCards)
+        try FileIO.writeJSONValue(.object(selected), to: root.appendingPathComponent("selection.json"))
+        let selectionBytes = try Data(contentsOf: root.appendingPathComponent("selection.json"))
+        let selectionSHA = FileIO.sha256(selectionBytes)
+        var bindings = envelope["sourceBindings"]!.arrayValue!
+        var binding = bindings[0].objectValue!
+        binding["sha256"] = .string(selectionSHA); binding["bytes"] = .number(Double(selectionBytes.count))
+        bindings[0] = .object(binding); envelope["sourceBindings"] = .array(bindings)
+        envelope["qualificationLimits"] = limits; envelope["selectionSHA256"] = .string(selectionSHA)
+        let cards = envelope["cards"]!.arrayValue!
+        let png = try Data(contentsOf: root.appendingPathComponent("screenshots/en-US/iphone-duo-profile/1.png"))
+        for card in cards {
+            for asset in card["assets"]!.objectValue!.values {
+                try FileIO.write(data: png, to: root.appendingPathComponent(asset["importedPath"]!.stringValue!))
+            }
+        }
+        try FileIO.writeJSONValue(.object(envelope), to: fixture.importURL)
+        let verifierURL = fixture.directory.appendingPathComponent("synthetic-verifier.py")
+        try Data("Synthetic successful semantic verifier fixture".utf8).write(to: verifierURL)
+        let integrityURL = fixture.directory.appendingPathComponent("integrity.json")
+        try FileIO.writeJSONValue(.object(["mode": .string("selected-import-integrity-verification"),
+            "selectedImport": .object(["path": .string(fixture.importURL.path),
+                "sha256": .string(FileIO.sha256(try Data(contentsOf: fixture.importURL)))]),
+            "selectionSHA256": .string(selectionSHA),
+            "verifier": .object(["path": .string(verifierURL.path), "sha256": .string(FileIO.sha256(try Data(contentsOf: verifierURL)))]),
+            "result": .object(["integrity": .string("passed"), "images": .number(30), "sourceBindings": .number(2), "publishable": .bool(false)])]), to: integrityURL)
+        let widgets = cards.filter { $0["position"] == .number($0["family"] == .string("iphone-duo-profile") ? 10 : 6) }.map {
+            JSONValue.object(["screenshotConfiguration": $0["screenshotConfiguration"]!, "family": $0["family"]!,
+                "position": $0["position"]!, "sha256": $0["assets"]!["screenshots"]!["sha256"]!])
+        }
+        var receipt: [String: JSONValue] = ["status": .string("owner-accepted-historical-widget-evidence-limits"),
+            "selectionSHA256": .string(selectionSHA), "qualificationLimits": limits,
+            "historicalTechnicalProofEstablished": .bool(false), "publishingAuthorization": .bool(false),
+            "remoteMutationAuthorization": .bool(false), "approvesUnrelatedVisualDifferences": .bool(false),
+            "question": .object(["text": .string("Accept these historical evidence limits without recapture?")]),
+            "response": .object(["text": .string("Yes")]), "selectedWidgetEntries": .array(widgets)]
+        let acceptanceURL = fixture.directory.appendingPathComponent("acceptance.json")
+        func acceptance() throws -> HandoffFileBinding {
+            try FileIO.writeJSONValue(.object(receipt), to: acceptanceURL)
+            return HandoffFileBinding(path: acceptanceURL.path, sha256: FileIO.sha256(try Data(contentsOf: acceptanceURL)))
+        }
+        let accepted = try acceptance()
+        try SelectedReleaseHandoff.verifyEvidence(.object(envelope), root: root, selectionSHA256: selectionSHA, acceptance: accepted)
+        receipt["historicalTechnicalProofEstablished"] = .bool(true)
+        XCTAssertThrowsError(try SelectedReleaseHandoff.verifyEvidence(.object(envelope), root: root,
+            selectionSHA256: selectionSHA, acceptance: acceptance()))
+        receipt["historicalTechnicalProofEstablished"] = .bool(false)
+        receipt["status"] = .string("visual-approved-by-user")
+        XCTAssertThrowsError(try SelectedReleaseHandoff.verifyEvidence(.object(envelope), root: root,
+            selectionSHA256: selectionSHA, acceptance: acceptance()))
+        receipt["status"] = .string("owner-accepted-historical-widget-evidence-limits")
+        let finalAcceptance = try acceptance()
+        let release = NormalizedRelease(version: "3.0", bundleId: "com.example.App", platform: "IOS",
+            sourceReleasePath: "/release.json", sourceDigest: "source", localizations: [NormalizedLocaleRelease(
+                appStoreLocale: "en-US", screenshotConfiguration: "en-US", whatsNew: "Notes",
+                versionMetadata: ["whatsNew": .string("Notes")], appMetadata: [:], sourceFiles: [:])], versionMetadata: [:])
+        let remoteLocale = RemoteLocalization(id: "target-en-US", locale: "en-US", attributes: [:], screenshotSets: [])
+        let target = RemoteVersion(id: "target", versionString: "3.0", state: "PREPARE_FOR_SUBMISSION", attributes: [:], localizations: [remoteLocale])
+        func snapshot(_ version: RemoteVersion?) -> RemoteSnapshot {
+            RemoteSnapshot(capturedAt: "fixture", fingerprint: "fixture", appId: "app", bundleId: release.bundleId,
+                platform: "IOS", requestedVersion: "3.0", targetVersion: version, sourceVersion: nil, appInfo: nil)
+        }
+        func build(_ snap: RemoteSnapshot) throws -> SelectedReleaseHandoff {
+            try SelectedReleaseHandoff.build(importFile: HandoffFileBinding(path: fixture.importURL.path,
+                sha256: FileIO.sha256(try Data(contentsOf: fixture.importURL))), selectionSHA256: selectionSHA,
+                acceptance: finalAcceptance, integrityVerification: HandoffFileBinding(path: integrityURL.path,
+                sha256: FileIO.sha256(try Data(contentsOf: integrityURL))), inspection: HandoffFileBinding(path: fixture.inspection.path,
+                sha256: FileIO.sha256(try Data(contentsOf: fixture.inspection))), release: release, snapshot: snap)
+        }
+        XCTAssertThrowsError(try build(snapshot(nil))) { XCTAssertTrue($0.localizedDescription.contains("existing editable target")) }
+        var inspection = try FileIO.readJSON(at: fixture.inspection).objectValue!
+        inspection["appId"] = .string("app")
+        inspection["targetVersion"] = .object(["id": .string("target"), "attributes": .object([
+            "versionString": .string("3.0"), "platform": .string("IOS"), "appVersionState": .string("PREPARE_FOR_SUBMISSION")])])
+        inspection["localizations"] = .array([.object(["locale": .string("en-US"),
+            "localizationId": .string("target-en-US"), "orderedPlacements": .array([])])])
+        try FileIO.writeJSONValue(.object(inspection), to: fixture.inspection)
+        let result = try build(snapshot(target))
+        XCTAssertEqual(result.qualificationLimits, limits)
+        XCTAssertEqual(result.sets.count, 1)
+        XCTAssertEqual(result.sets[0].localizationID, "target-en-US")
+        XCTAssertEqual(result.sets[0].images.map(\.position), Array(1...10))
+        XCTAssertTrue(result.sets[0].reviewedBaseline.isEmpty)
+        var changedCards = cards
+        var changed = changedCards[0].objectValue!
+        changed["origin"] = .object(["kind": .string("rewritten-origin")]); changedCards[0] = .object(changed)
+        envelope["cards"] = .array(changedCards)
+        try FileIO.writeJSONValue(.object(envelope), to: fixture.importURL)
+        XCTAssertThrowsError(try build(snapshot(target))) { XCTAssertTrue($0.localizedDescription.contains("missing or stale")) }
+        envelope["cards"] = .array(cards)
+        try FileIO.writeJSONValue(.object(envelope), to: fixture.importURL)
+        inspection["localizations"] = .array([.object(["locale": .string("en-US"),
+            "localizationId": .string("old-source-2.4-ID"), "orderedPlacements": .array([])])])
+        try FileIO.writeJSONValue(.object(inspection), to: fixture.inspection)
+        XCTAssertThrowsError(try build(snapshot(target)))
+    }
+
     private func processedImage(state: String = "PREPARE_FOR_SUBMISSION") -> JSONValue {
         .object(["type": .string("appAssetLibraryImages"), "id": .string("returned-image"),
                  "attributes": .object(["state": .string(state), "category": .string("APP_SCREENSHOTS_AND_PREVIEWS"), "specId": .string("spec-0")])])

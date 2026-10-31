@@ -26,8 +26,8 @@ private struct Arguments {
         self.options = options
     }
 
-    func require(_ names: String...) throws -> [String] {
-        let expected = Set(names)
+    func require(_ names: String..., optional: Set<String> = []) throws -> [String] {
+        let expected = Set(names).union(optional)
         let unknown = Set(options.keys).subtracting(expected)
         guard unknown.isEmpty else {
             throw ReleaseToolError.usage("Unknown options: \(unknown.sorted().joined(separator: ", "))")
@@ -50,6 +50,12 @@ private struct Arguments {
       build-duo-placement-plan --inspection FILE --selected-import FILE \\
         --expected-inspection-sha256 SHA256 --expected-import-sha256 SHA256 \\
         --expected-selection-sha256 SHA256 --output FILE
+      build-selected-handoff --release NORMALIZED_JSON --snapshot FILE \\
+        --selected-import FILE --expected-import-sha256 SHA256 --expected-selection-sha256 SHA256 \\
+        --evidence-acceptance FILE --expected-acceptance-sha256 SHA256 \\
+        --integrity-report FILE --expected-integrity-sha256 SHA256 \\
+        --inspection FILE --expected-inspection-sha256 SHA256 --output FILE
+      verify-manifest --manifest FILE
       validate-snapshot --release NORMALIZED_JSON --snapshot REMOTE_SNAPSHOT_JSON
       build-manifest --release NORMALIZED_JSON --locales-config FILE \\
         --screenshots-root DIR --capture-metadata FILE --remote-snapshot FILE \\
@@ -59,7 +65,8 @@ private struct Arguments {
         --output FILE --review-html FILE
       verify-metadata-only-manifest --manifest FILE --locales-config FILE \\
         --expected-source-version V
-      publish --manifest FILE --confirm-version V --journal FILE
+      publish --manifest FILE --confirm-version V --journal FILE \\
+        [--confirm-manifest-digest SHA256] [--dry-run true]
       publish-metadata-only --manifest FILE --locales-config FILE \\
         --expected-source-version V --confirm-version V \\
         --confirm-manifest-digest SHA256 --journal FILE
@@ -143,6 +150,32 @@ do {
         try encoder.encode(plan).write(to: output, options: .withoutOverwriting)
         print("Saved offline Duo request plan; no requests, uploads or qualification changes were performed")
 
+    case "build-selected-handoff":
+        let v = try arguments.require("--release", "--snapshot", "--selected-import", "--expected-import-sha256",
+            "--expected-selection-sha256", "--evidence-acceptance", "--expected-acceptance-sha256",
+            "--inspection", "--expected-inspection-sha256", "--integrity-report", "--expected-integrity-sha256", "--output")
+        let output = fileURL(v[11])
+        guard !FileManager.default.fileExists(atPath: output.path) else {
+            throw ReleaseToolError.validation("Selected handoff output already exists")
+        }
+        let release = try ManifestBuilder.decode(NormalizedRelease.self, at: fileURL(v[0]))
+        let snapshot = try ManifestBuilder.decode(RemoteSnapshot.self, at: fileURL(v[1]))
+        try SnapshotPreflight.validate(release: release, snapshot: snapshot)
+        let handoff = try SelectedReleaseHandoff.build(
+            importFile: HandoffFileBinding(path: fileURL(v[2]).path, sha256: v[3]), selectionSHA256: v[4],
+            acceptance: HandoffFileBinding(path: fileURL(v[5]).path, sha256: v[6]),
+            integrityVerification: HandoffFileBinding(path: fileURL(v[9]).path, sha256: v[10]),
+            inspection: HandoffFileBinding(path: fileURL(v[7]).path, sha256: v[8]), release: release, snapshot: snapshot)
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try encoder.encode(handoff).write(to: output, options: .withoutOverwriting)
+        print("Saved admitted selected handoff with actual target IDs; publishing remains separately authorized")
+
+    case "verify-manifest":
+        let v = try arguments.require("--manifest")
+        let manifest = try ManifestBuilder.decode(PublishManifest.self, at: fileURL(v[0]))
+        try ManifestBuilder.verify(manifest)
+        print("Verified handoff \(manifest.manifestDigest) offline; no credentials, journal or network used")
+
     case "build-manifest":
         let values = try arguments.require(
             "--release", "--locales-config", "--screenshots-root", "--capture-metadata",
@@ -192,15 +225,32 @@ do {
         print("Verified metadata-only manifest \(manifest.manifestDigest)")
 
     case "publish":
-        let values = try arguments.require("--manifest", "--confirm-version", "--journal")
+        let values = try arguments.require("--manifest", "--confirm-version", "--journal",
+            optional: ["--confirm-manifest-digest", "--dry-run"])
         let manifest = try ManifestBuilder.decode(PublishManifest.self, at: fileURL(values[0]))
+        try ManifestBuilder.verify(manifest)
+        guard values[1] == manifest.release.version else { throw ReleaseToolError.validation("Version confirmation differs from manifest") }
+        if let digest = arguments.options["--confirm-manifest-digest"], digest != manifest.manifestDigest {
+            throw ReleaseToolError.validation("Manifest digest confirmation differs from reviewed contents")
+        }
+        if manifest.captureMetadata["mode"] == .string(SelectedReleaseHandoff.mode) {
+            guard arguments.options["--confirm-manifest-digest"] == manifest.manifestDigest else {
+                throw ReleaseToolError.validation("Selected release requires its reviewed aggregate manifest digest")
+            }
+        }
+        if let dryRun = arguments.options["--dry-run"] {
+            guard dryRun == "true" else { throw ReleaseToolError.usage("--dry-run accepts only true") }
+            print("Dry run verified \(manifest.manifestDigest); no credentials, journal, requests or mutations")
+            exit(EXIT_SUCCESS)
+        }
         let credentials = try ASCCredentials.fromEnvironment()
         let publisher = try Publisher(
             client: ASCAPIClient(credentials: credentials),
             journalURL: fileURL(values[2]),
             manifest: manifest
         )
-        try publisher.publish(manifest: manifest, confirmedVersion: values[1])
+        try publisher.publish(manifest: manifest, confirmedVersion: values[1],
+                              confirmedManifestDigest: arguments.options["--confirm-manifest-digest"])
         print("Published and verified App Store metadata for version \(manifest.release.version)")
 
     case "publish-metadata-only":

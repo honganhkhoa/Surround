@@ -256,6 +256,105 @@ final class DuoPublishingExecutorTests: XCTestCase {
     }
 }
 
+extension DuoPublishingExecutorTests {
+    private func coordinator(_ fixture: DuoExecutorFixture) -> DuoReleaseCoordinator {
+        let binding = HandoffFileBinding(path: "/unused-test-binding", sha256: String(repeating: "a", count: 64))
+        let handoff = SelectedReleaseHandoff(schemaVersion: 1, mode: "selected-release-handoff",
+            selectedImport: binding, selectionSHA256: binding.sha256, evidenceAcceptance: binding,
+            integrityVerification: binding, duoInspection: binding, qualificationLimits: .object([:]), sets: [fixture.set])
+        return DuoReleaseCoordinator(handoff: handoff, service: fixture.service, journalDirectory: fixture.directory)
+    }
+
+    func testAggregateCoordinatorPreflightsAndCompletedReadbackNeverMutates() throws {
+        let fixture = try DuoExecutorFixture(); defer { fixture.clean() }
+        let value = coordinator(fixture)
+        try value.preflight()
+        XCTAssertTrue(fixture.service.events.isEmpty)
+        try value.publish()
+        let count = fixture.service.events.count
+        try value.verifyCompleted()
+        try value.preflight()
+        try value.publish()
+        XCTAssertEqual(fixture.service.events.count, count)
+    }
+
+    func testAggregateCoordinatorCompletedDriftStopsBeforeFurtherWrites() throws {
+        let fixture = try DuoExecutorFixture(); defer { fixture.clean() }
+        let value = coordinator(fixture)
+        try value.publish()
+        fixture.service.rows.reverse()
+        let count = fixture.service.events.count
+        XCTAssertThrowsError(try value.preflight())
+        XCTAssertEqual(fixture.service.events.count, count)
+    }
+
+    func testAggregateCoordinatorReadbackRejectsChangedStagedCloudImage() throws {
+        let fixture = try DuoExecutorFixture(); defer { fixture.clean() }
+        let value = coordinator(fixture)
+        fixture.service.fault = { label, after in
+            if label == "delete:old-placement-1" && !after {
+                fixture.service.fault = nil
+                throw DuoExecutionFailure.uncertain("interrupted before delete")
+            }
+        }
+        XCTAssertThrowsError(try value.publish())
+        var image = fixture.service.images["image-1"]!.objectValue!
+        var attributes = image["attributes"]!.objectValue!
+        attributes["state"] = .string("FAILED"); image["attributes"] = .object(attributes)
+        fixture.service.images["image-1"] = .object(image)
+        let count = fixture.service.events.count
+        XCTAssertThrowsError(try value.preflight()) { XCTAssertTrue($0.localizedDescription.contains("processing failed")) }
+        XCTAssertEqual(fixture.service.events.count, count)
+    }
+
+    func testAggregateCoordinatorReconcilesLostOrderWithoutAnotherOrderWrite() throws {
+        let fixture = try DuoExecutorFixture(); defer { fixture.clean() }
+        let value = coordinator(fixture)
+        fixture.service.fault = { label, after in
+            if label == "order" && after {
+                fixture.service.fault = nil; throw DuoExecutionFailure.uncertain("lost order response")
+            }
+        }
+        XCTAssertThrowsError(try value.publish())
+        let count = fixture.service.events.count
+        try value.preflight()
+        XCTAssertEqual(fixture.service.events.count, count)
+        try value.publish()
+        XCTAssertEqual(fixture.service.events.count, count)
+    }
+
+    func testAggregateCoordinatorResumesRollbackBeforeAnyNewGroupWork() throws {
+        let fixture = try DuoExecutorFixture(); defer { fixture.clean() }
+        let value = coordinator(fixture)
+        var rejected = false
+        fixture.service.fault = { label, after in
+            if label == "place:3.png" && !after && !rejected {
+                rejected = true; throw DuoExecutionFailure.rejected("known placement failure")
+            }
+            if label == "order" && after && rejected {
+                fixture.service.fault = nil; throw DuoExecutionFailure.uncertain("lost rollback order")
+            }
+        }
+        XCTAssertThrowsError(try value.publish())
+        let count = fixture.service.events.count
+        XCTAssertThrowsError(try value.preflight())
+        XCTAssertEqual(fixture.service.events.count, count)
+        XCTAssertThrowsError(try value.recoverPendingRollback()) { error in
+            guard case DuoExecutionFailure.restored = error else { return XCTFail("Unexpected \(error)") }
+        }
+        XCTAssertEqual(fixture.service.events.count, count)
+    }
+
+    func testAggregateCoordinatorRejectsForeignBaselineBeforeAnyMutation() throws {
+        let fixture = try DuoExecutorFixture(); defer { fixture.clean() }
+        fixture.service.rows.reverse()
+        XCTAssertThrowsError(try coordinator(fixture).preflight())
+        XCTAssertTrue(fixture.service.events.isEmpty)
+        XCTAssertThrowsError(try coordinator(fixture).verifyCompleted())
+        XCTAssertTrue(fixture.service.events.isEmpty)
+    }
+}
+
 private final class DuoExecutorFixture {
     let directory: URL, journal: URL, set: DuoPublishSet
     let service: DuoMemoryService

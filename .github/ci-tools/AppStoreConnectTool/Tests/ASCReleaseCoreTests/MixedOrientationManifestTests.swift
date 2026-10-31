@@ -1,4 +1,5 @@
 import CoreGraphics
+import CryptoKit
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
@@ -73,6 +74,56 @@ final class MixedOrientationManifestTests: XCTestCase {
         config["screenshotFamilies"] = .array(families)
         try FileIO.writeJSONValue(.object(config), to: url)
         XCTAssertThrowsError(try LocaleConfiguration.load(from: url))
+    }
+
+    func testPublishDryRunNeedsNoCredentialsOrJournalAndRejectsWrongSuppliedDigest() throws {
+        try fixture(second: (10, 20), optIn: nil) { manifest in
+            let directory = try temporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let path = directory.appendingPathComponent("manifest.json")
+            let journal = directory.appendingPathComponent("never-created.json")
+            try FileIO.writeJSON(manifest, to: path)
+            let executable = Bundle(for: Self.self).bundleURL.deletingLastPathComponent().appendingPathComponent("app-store-connect-tool")
+            XCTAssertTrue(FileManager.default.isExecutableFile(atPath: executable.path))
+            func command(_ digest: String) throws -> (Int32, String) {
+                let process = Process(), pipe = Pipe()
+                process.executableURL = executable
+                process.arguments = ["publish", "--manifest", path.path, "--confirm-version", "3.0",
+                    "--confirm-manifest-digest", digest, "--journal", journal.path, "--dry-run", "true"]
+                var environment = ProcessInfo.processInfo.environment
+                environment["ASC_KEY_ID"] = "test-unused"
+                environment["ASC_ISSUER_ID"] = "test-unused"
+                environment["ASC_PRIVATE_KEY_PATH"] = "/nonexistent-test-only-unused-key.p8"
+                process.environment = environment; process.standardOutput = pipe; process.standardError = pipe
+                try process.run(); process.waitUntilExit()
+                return (process.terminationStatus, String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))
+            }
+            let successful = try command(manifest.manifestDigest)
+            XCTAssertEqual(successful.0, 0, successful.1)
+            XCTAssertTrue(successful.1.contains("no credentials, journal, requests or mutations"))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: journal.path))
+            let refused = try command(String(repeating: "0", count: 64))
+            XCTAssertNotEqual(refused.0, 0)
+            XCTAssertTrue(refused.1.contains("digest confirmation differs"))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: journal.path))
+        }
+    }
+
+    func testPublisherRejectsWrongOptionalLegacyDigestBeforeLiveSnapshot() throws {
+        try fixture(second: (10, 20), optIn: nil) { manifest in
+            let directory = try temporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let client = ASCAPIClient(credentials: ASCCredentials(keyId: "test", issuerId: "test",
+                privateKeyPEM: P256.Signing.PrivateKey().pemRepresentation))
+            var snapshots = 0
+            let publisher = try Publisher(client: client, journalURL: directory.appendingPathComponent("journal.json"),
+                manifest: manifest, snapshotProvider: { _ in
+                    snapshots += 1; throw ReleaseToolError.validation("Unexpected live snapshot")
+                })
+            XCTAssertThrowsError(try publisher.publish(manifest: manifest, confirmedVersion: "3.0",
+                confirmedManifestDigest: String(repeating: "0", count: 64)))
+            XCTAssertEqual(snapshots, 0)
+        }
     }
 
     private func fixture(

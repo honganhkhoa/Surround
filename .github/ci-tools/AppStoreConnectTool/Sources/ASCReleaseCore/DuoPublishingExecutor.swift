@@ -1,8 +1,7 @@
 import Foundation
 
-/// Per-localization, per-group execution for a future qualified handoff. There
-/// is intentionally no command-line entry point and no conversion from the
-/// currently unqualified selected-import plan. Tests use only a mock service.
+/// Per-localization execution for an admitted, digest-confirmed selected handoff.
+/// Historical capture limitations remain recorded independently of admission.
 public final class DuoPublishingExecutor {
     private let set: DuoPublishSet
     private let adapter: DuoAssetLibraryAdapter
@@ -32,6 +31,82 @@ public final class DuoPublishingExecutor {
             journal = DuoExecutionJournal(setDigest: digest, version: set.version,
                 rollbackStrategy: "verified-png-backup-reupload-v1", activeBaseline: set.reviewedBaseline)
             try file.save(journal)
+        }
+    }
+
+    /// GET-only remote reconciliation before the aggregate publisher may write.
+    /// Known readbacks may update the local journal; an offline dry run never calls this.
+    func preflight() throws {
+        for image in set.images { _ = try validatedBytes(image) }
+        try service.verifyEditableTarget(set)
+        if journal.phase == "complete" {
+            try requireExactGroup(journal.completedPlacements)
+            for image in set.images { _ = try processedImage(id: try reservedID("desired:\(image.position)"), file: image) }
+            return
+        }
+        guard ["preparing", "switching", "rollingBack", "rolledBack"].contains(journal.phase) else {
+            throw DuoExecutionFailure.uncertain("Unknown Duo journal phase before aggregate publishing")
+        }
+        guard journal.phase != "rollingBack" else {
+            throw DuoExecutionFailure.uncertain("Pending Duo rollback must finish before other aggregate writes")
+        }
+        try sealAndVerifyBackup()
+        for image in set.images { try preflightStagedImage(image, key: "desired:\(image.position)") }
+        for backup in journal.backups {
+            try preflightStagedImage(backup.file, key: "restore:\(journal.epoch):\(backup.file.position)")
+        }
+        if ["switching", "rollingBack"].contains(journal.phase) {
+            try reconcilePendingPlacementCreates()
+            for stage in ["switch", "restore"] {
+                let key = "\(stage):\(journal.epoch):order"
+                guard let pending = latest(key), ["intent", "uncertain", "responseKnown"].contains(pending.status) else { continue }
+                let count = stage == "switch" ? set.images.count : journal.backups.count
+                let ids = (1...max(1, count)).prefix(count).compactMap { latest("\(stage):\(journal.epoch):place:\($0)")?.resourceID }
+                let current = try group()
+                guard ids.count == count, current.map(\.id) == ids else {
+                    throw DuoExecutionFailure.uncertain("Pending ordering has no exact whole-group readback before aggregate writes")
+                }
+                journal.expectedGraph = current
+                try entry(key, "verified", digest: pending.requestDigest)
+            }
+            try guardOwnedGraph()
+        } else {
+            try requireExactGroup(journal.activeBaseline)
+        }
+        let keys = Set(journal.entries.map(\.key))
+        guard keys.allSatisfy({ key in
+            latest(key).map { ["verified", "rejected"].contains($0.status) } ?? false
+        }) else {
+            throw DuoExecutionFailure.uncertain("Unresolved Duo reservation/upload intent stops aggregate writes")
+        }
+    }
+
+    private func preflightStagedImage(_ image: DuoPublishImage, key: String) throws {
+        guard let reservation = latest(key + ":reserve") else { return }
+        guard ["verified", "responseKnown"].contains(reservation.status), let id = reservation.resourceID else {
+            throw DuoExecutionFailure.uncertain("Pending reservation has no exact known image identity")
+        }
+        let raw = try basicImage(id, file: image)
+        if reservation.status != "verified" {
+            try entry(key + ":reserve", "verified", digest: reservation.requestDigest, id: id)
+        }
+        let upload = latest(key + ":upload"), commit = latest(key + ":commit")
+        guard raw["attributes"]?["state"] != .string("PREPARE_FOR_SUBMISSION") || commit != nil else {
+            throw DuoExecutionFailure.drift("Staged image was committed outside this journal")
+        }
+        if commit?.status == "verified" || [upload, commit].contains(where: {
+            $0.map { ["intent", "uncertain", "responseKnown"].contains($0.status) } ?? false
+        }) {
+            _ = try processedImage(id: id, file: image)
+            for suffix in [":upload", ":commit"] {
+                if let pending = latest(key + suffix), ["intent", "uncertain", "responseKnown"].contains(pending.status) {
+                    try entry(key + suffix, "verified", digest: pending.requestDigest, id: id)
+                }
+            }
+        } else {
+            guard raw["attributes"]?["state"] == .string("AWAITING_UPLOAD") else {
+                throw DuoExecutionFailure.drift("Staged image no longer matches its uncommitted journal state")
+            }
         }
     }
 
