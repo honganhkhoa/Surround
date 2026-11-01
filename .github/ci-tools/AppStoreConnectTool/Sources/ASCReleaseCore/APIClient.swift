@@ -69,6 +69,20 @@ public struct ASCHTTPResponseError: Error, LocalizedError {
     public var errorDescription: String? { "\(method) \(path) returned HTTP \(statusCode)" }
 }
 
+/// A known read response requested a cooldown longer than this invocation's
+/// short retry budget. The caller preserves its checkpoint before resuming.
+public struct ASCRateLimitCooldown: Error, LocalizedError {
+    public let method: String
+    public let path: String
+    public let notBefore: Date
+    public let serverSpecified: Bool
+    public var errorDescription: String? {
+        "\(method) \(path) requires rate-limit cooldown until \(ISO8601DateFormatter.releaseTool.string(from: notBefore)); "
+            + (serverSpecified ? "server Retry-After was preserved" : "minimum backoff; server reset time is unknown")
+            + ". No automatic retry was sent."
+    }
+}
+
 public final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
     private let session: URLSession
 
@@ -106,21 +120,27 @@ public final class ASCAPIClient: @unchecked Sendable {
     private let transport: HTTPTransport
     private let maxRetries: Int
     private let now: () -> Date
+    private let sleeper: (TimeInterval) -> Void
     private var cachedToken: (value: String, expires: Date)?
     private let lock = NSLock()
+    private let pacingLock = NSLock()
+    private var apiInterval: TimeInterval = 0
+    private var lastAPIStart: Date?
 
     public init(
         credentials: ASCCredentials,
         baseURL: URL = URL(string: "https://api.appstoreconnect.apple.com")!,
         transport: HTTPTransport = URLSessionTransport(),
         maxRetries: Int = 4,
-        now: @escaping () -> Date = Date.init
+        now: @escaping () -> Date = Date.init,
+        sleeper: @escaping (TimeInterval) -> Void = Thread.sleep
     ) {
         self.credentials = credentials
         self.baseURL = baseURL
         self.transport = transport
         self.maxRetries = maxRetries
         self.now = now
+        self.sleeper = sleeper
     }
 
     public func request(
@@ -145,7 +165,7 @@ public final class ASCAPIClient: @unchecked Sendable {
             request.httpBody = try JSONSerialization.data(withJSONObject: body.any, options: [])
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
-        let response = try sendWithRetry(request, retryPolicy: retryPolicy)
+        let response = try sendWithRetry(request, retryPolicy: retryPolicy, authenticatedAPI: true)
         guard expectedStatus.contains(response.statusCode) else {
             if reportHTTPStatus {
                 throw ASCHTTPResponseError(statusCode: response.statusCode, method: method, path: url.path)
@@ -313,15 +333,26 @@ public final class ASCAPIClient: @unchecked Sendable {
 
     private func sendWithRetry(
         _ request: URLRequest,
-        retryPolicy: ASCRetryPolicy = .automatic
+        retryPolicy: ASCRetryPolicy = .automatic,
+        authenticatedAPI: Bool = false
     ) throws -> TransportResponse {
         let method = (request.httpMethod ?? "GET").uppercased()
         let retryLimit = retryPolicy == .singleAttempt ? 0 : maxRetries
         var lastError: Error?
         for attempt in 0...retryLimit {
+            var outgoing = request
+            let apiOrigin = origin(of: baseURL)
+            let isAuthenticatedAPI = authenticatedAPI && request.value(forHTTPHeaderField: "Authorization") != nil
+                && apiOrigin != nil && request.url.flatMap({ origin(of: $0) }) == apiOrigin
+            if isAuthenticatedAPI {
+                paceAPI()
+                // Pace before refreshing auth: a cooldown must not replay an
+                // already expired JWT. CDN/upload requests never enter here.
+                outgoing.setValue("Bearer \(try token())", forHTTPHeaderField: "Authorization")
+            }
             let response: TransportResponse
             do {
-                response = try transport.send(request)
+                response = try transport.send(outgoing)
             } catch {
                 lastError = error
                 if method == "POST" || retryPolicy == .singleAttempt {
@@ -332,9 +363,10 @@ public final class ASCAPIClient: @unchecked Sendable {
                     )
                 }
                 if attempt == retryLimit { break }
-                sleepBeforeRetry(attempt: attempt, headers: [:])
+                try sleepBeforeRetry(attempt: attempt, headers: [:], request: request, rateLimited: false)
                 continue
             }
+            if isAuthenticatedAPI { observeRateLimit(response.headers) }
             if response.statusCode == 429 || response.statusCode >= 500 {
                 if method == "POST" || retryPolicy == .singleAttempt {
                     let responseError = apiError(
@@ -347,8 +379,13 @@ public final class ASCAPIClient: @unchecked Sendable {
                             + "its outcome is ambiguous; inspect App Store Connect before resuming."
                     )
                 }
+                if response.statusCode == 429 && attempt == retryLimit {
+                    try sleepBeforeRetry(attempt: attempt, headers: response.headers, request: request,
+                                         rateLimited: true, forcePause: true)
+                }
                 if attempt < retryLimit {
-                    sleepBeforeRetry(attempt: attempt, headers: response.headers)
+                    try sleepBeforeRetry(attempt: attempt, headers: response.headers, request: request,
+                                         rateLimited: response.statusCode == 429)
                     continue
                 }
             }
@@ -359,10 +396,58 @@ public final class ASCAPIClient: @unchecked Sendable {
         )
     }
 
-    private func sleepBeforeRetry(attempt: Int, headers: [String: String]) {
-        let delay = headers["retry-after"].flatMap(TimeInterval.init)
-            ?? min(pow(2, Double(attempt)), 8)
-        Thread.sleep(forTimeInterval: max(0, min(delay, 30)))
+    private func observeRateLimit(_ headers: [String: String]) {
+        guard let value = headers.first(where: { $0.key.lowercased() == "x-rate-limit" })?.value else { return }
+        var fields: [String: Int] = [:]
+        for part in value.split(separator: ";") {
+            let pair = part.split(separator: ":", maxSplits: 1)
+            if pair.count == 2, let count = Int(pair[1].trimmingCharacters(in: .whitespaces)) {
+                fields[pair[0].trimmingCharacters(in: .whitespaces).lowercased()] = count
+            }
+        }
+        guard let limit = fields["user-hour-lim"], let remaining = fields["user-hour-rem"],
+              limit > 0, remaining <= limit else { return }
+        pacingLock.lock(); defer { pacingLock.unlock() }
+        // Leave headroom for response accounting and other authorized readers.
+        // Negative remaining values mean exhausted capacity. The header still
+        // supplies the limit, not a reset deadline.
+        apiInterval = 3600 / (Double(limit) * 0.8)
+    }
+
+    private func paceAPI() {
+        pacingLock.lock()
+        let current = now(), start = max(current, (lastAPIStart ?? current).addingTimeInterval(apiInterval))
+        lastAPIStart = start
+        pacingLock.unlock()
+        sleepInChunks(max(0, start.timeIntervalSince(current)))
+    }
+
+    private func sleepInChunks(_ delay: TimeInterval) {
+        var remaining = delay
+        while remaining > 0 {
+            let chunk = min(30, remaining); sleeper(chunk); remaining -= chunk
+        }
+    }
+
+    private func sleepBeforeRetry(attempt: Int, headers: [String: String], request: URLRequest,
+                                  rateLimited: Bool, forcePause: Bool = false) throws {
+        let value = headers.first(where: { $0.key.lowercased() == "retry-after" })?.value
+        var requested: TimeInterval?
+        if let value {
+            if let seconds = TimeInterval(value.trimmingCharacters(in: .whitespaces)), seconds.isFinite, seconds >= 0 {
+                requested = seconds
+            } else {
+                let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.timeZone = TimeZone(secondsFromGMT: 0); formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss z"
+                if let date = formatter.date(from: value) { requested = max(0, date.timeIntervalSince(now())) }
+            }
+        }
+        let delay = requested ?? (rateLimited ? 60 : min(pow(2, Double(attempt)), 8))
+        if delay > 30 || forcePause {
+            throw ASCRateLimitCooldown(method: request.httpMethod ?? "GET", path: request.url?.path ?? "<unknown>",
+                notBefore: now().addingTimeInterval(delay), serverSpecified: requested != nil)
+        }
+        sleepInChunks(delay)
     }
 
     private func apiError(method: String, url: URL, response: TransportResponse) -> ReleaseToolError {

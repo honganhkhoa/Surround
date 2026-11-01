@@ -1151,3 +1151,27 @@ extension DuoPublishingExecutorTests {
         XCTAssertEqual(fixture.service.events.count, writes)
     }
 }
+
+extension DuoPublishingExecutorTests {
+    func testRateCooldownMidPlacementPreservesCheckpointAndResumesWithoutReplay() throws {
+        let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }
+        var stopped = false
+        fixture.service.beforeImageRead = { id in
+            if fixture.service.rows.count < 10 && id == "old-image-2" && !stopped {
+                stopped = true
+                throw ASCRateLimitCooldown(method: "GET", path: "/v1/appAssetLibraryImages/old-image-2", notBefore: Date().addingTimeInterval(120), serverSpecified: true)
+            }
+        }
+        XCTAssertThrowsError(try fixture.run()) { XCTAssertTrue($0 is ASCRateLimitCooldown) }
+        let checkpoint = try fixture.state()
+        XCTAssertEqual(checkpoint.phase, "switching")
+        XCTAssertEqual(fixture.service.rows.count, 9)
+        XCTAssertEqual(checkpoint.entries.last?.status, "verified")
+        XCTAssertFalse(checkpoint.entries.contains { $0.status == "uncertain" })
+        try fixture.run()
+        XCTAssertEqual(try fixture.state().phase, "complete")
+        XCTAssertEqual(fixture.service.events.filter { $0 == "delete:old-placement-1" }.count, 1)
+        XCTAssertEqual(fixture.service.events.filter { $0.hasPrefix("reserve:") }.count, 10)
+        XCTAssertTrue(fixture.originalImagesPreserved())
+    }
+}

@@ -824,7 +824,9 @@ final class ASCReleaseCoreTests: XCTestCase {
     private func makeAPIClient(
         baseURL: URL = URL(string: "https://example.test")!,
         transport: HTTPTransport,
-        maxRetries: Int
+        maxRetries: Int,
+        now: @escaping () -> Date = Date.init,
+        sleeper: @escaping (TimeInterval) -> Void = Thread.sleep
     ) -> ASCAPIClient {
         ASCAPIClient(
             credentials: ASCCredentials(
@@ -834,7 +836,9 @@ final class ASCReleaseCoreTests: XCTestCase {
             ),
             baseURL: baseURL,
             transport: transport,
-            maxRetries: maxRetries
+            maxRetries: maxRetries,
+            now: now,
+            sleeper: sleeper
         )
     }
 
@@ -911,5 +915,189 @@ private extension TransportResponse {
             data: Data(string.utf8), statusCode: statusCode,
             headers: ["content-type": "application/json"]
         )
+    }
+}
+
+extension ASCReleaseCoreTests {
+    func testRateHeaderPacesAuthenticatedAPIAtObservedCapacity() throws {
+        var clock = Date(timeIntervalSince1970: 1_800_000_000), starts: [Date] = [], sleeps: [TimeInterval] = []
+        let transport = MockTransport { request in
+            XCTAssertNotNil(request.value(forHTTPHeaderField: "Authorization")); starts.append(clock)
+            return TransportResponse(data: Data(), statusCode: 200, headers: ["X-Rate-Limit": "user-hour-lim:3600;user-hour-rem:3592;"])
+        }
+        let client = makeAPIClient(transport: transport, maxRetries: 0, now: { clock }, sleeper: { sleeps.append($0); clock.addTimeInterval($0) })
+        _ = try client.request(method: "GET", path: "/v1/one")
+        _ = try client.request(method: "GET", path: "/v1/two")
+        _ = try client.request(method: "PATCH", path: "/v1/three", retryPolicy: .singleAttempt)
+        XCTAssertEqual(starts.count, 3); XCTAssertEqual(sleeps, [1.25, 1.25])
+        XCTAssertEqual(starts[2].timeIntervalSince(starts[0]), 2.5, accuracy: 0.001)
+    }
+
+    func testRateMissingOrMalformedHeadersDoNotEraseKnownPacing() throws {
+        for malformed in ["", "user-hour-lim:0;user-hour-rem:0;", "user-hour-lim:3600;user-hour-rem:4000;", "user-hour-lim:nope;"] {
+            var clock = Date(), calls = 0, sleeps: [TimeInterval] = []
+            let transport = MockTransport { _ in
+                calls += 1
+                return TransportResponse(data: Data(), statusCode: 200,
+                    headers: ["x-rate-limit": calls == 1 ? " USER-HOUR-LIM :3600; user-hour-rem:3000;" : malformed])
+            }
+            let client = makeAPIClient(transport: transport, maxRetries: 0, now: { clock }, sleeper: { sleeps.append($0); clock.addTimeInterval($0) })
+            for _ in 0..<3 { _ = try client.request(method: "GET", path: "/v1/read") }
+            XCTAssertEqual(sleeps, [1.25, 1.25])
+        }
+    }
+
+    func testRatePacingAndBearerAreIsolatedFromCDNAndUploadHosts() throws {
+        var clock = Date(), sleeps: [TimeInterval] = []
+        let transport = MockTransport { request in
+            let sameHostUpload = request.url?.path == "/upload-part"
+            let api = request.url?.host == "example.test" && !sameHostUpload
+            if sameHostUpload { XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "upload-scope") }
+            else if !api { XCTAssertNil(request.value(forHTTPHeaderField: "Authorization")) }
+            return TransportResponse(data: Data(), statusCode: 200,
+                headers: ["x-rate-limit": api ? "user-hour-lim:3600;user-hour-rem:3000;" : "user-hour-lim:1;user-hour-rem:0;"])
+        }
+        let client = makeAPIClient(transport: transport, maxRetries: 0, now: { clock }, sleeper: { sleeps.append($0); clock.addTimeInterval($0) })
+        _ = try client.request(method: "GET", path: "/v1/one")
+        _ = try client.download(url: URL(string: "https://cdn.example/image.png")!)
+        try client.upload(operation: UploadOperation(method: "PUT", url: "https://upload.example/part", offset: 0, length: 1, requestHeaders: []), fileData: Data([1]), retryPolicy: .singleAttempt)
+        try client.upload(operation: UploadOperation(method: "PUT", url: "https://example.test/upload-part", offset: 0, length: 1,
+            requestHeaders: [UploadHeader(name: "Authorization", value: "upload-scope")]), fileData: Data([1]), retryPolicy: .singleAttempt)
+        XCTAssertTrue(sleeps.isEmpty)
+        _ = try client.request(method: "GET", path: "/v1/two")
+        XCTAssertEqual(sleeps, [1.25])
+    }
+
+    func testRateNumericAndHTTPDateRetryAfterAreHonored() throws {
+        for header in ["20", "Fri, 15 Jan 2027 08:00:20 GMT"] {
+            let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0); formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss z"
+            var clock = formatter.date(from: "Fri, 15 Jan 2027 08:00:00 GMT")!, calls = 0, sleeps: [TimeInterval] = []
+            let transport = MockTransport { _ in
+                calls += 1
+                return TransportResponse(data: Data(), statusCode: calls == 1 ? 429 : 200, headers: calls == 1 ? ["Retry-After": header] : [:])
+            }
+            let client = makeAPIClient(transport: transport, maxRetries: 2, now: { clock }, sleeper: { sleeps.append($0); clock.addTimeInterval($0) })
+            _ = try client.request(method: "GET", path: "/v1/read")
+            XCTAssertEqual(calls, 2); XCTAssertEqual(sleeps.reduce(0, +), 20)
+        }
+    }
+
+    func testRateLongCooldownPreservesDeadlineWithoutRetryOrClamp() throws {
+        for header in ["120", "Fri, 15 Jan 2027 08:02:00 GMT"] {
+            let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0); formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss z"
+            let clock = formatter.date(from: "Fri, 15 Jan 2027 08:00:00 GMT")!
+            let transport = MockTransport { _ in TransportResponse(data: Data(), statusCode: 429, headers: ["RETRY-AFTER": header]) }
+            let client = makeAPIClient(transport: transport, maxRetries: 4, now: { clock }, sleeper: { _ in XCTFail("Long server cooldown must return a deadline") })
+            XCTAssertThrowsError(try client.request(method: "GET", path: "/v1/read")) { error in
+                guard let cooldown = error as? ASCRateLimitCooldown else { return XCTFail("\(error)") }
+                XCTAssertEqual(cooldown.notBefore.timeIntervalSince(clock), 120, accuracy: 0.001)
+                XCTAssertTrue(cooldown.serverSpecified)
+            }
+            XCTAssertEqual(transport.requests.count, 1)
+        }
+    }
+
+    func testRateAbsentOrInvalidRetryAfterDefersWithoutInventingReset() throws {
+        for value in [nil, "nonsense", "nan", "-1"] as [String?] {
+            let clock = Date(), transport = MockTransport { _ in
+                TransportResponse(data: Data(), statusCode: 429, headers: value.map { ["retry-after": $0] } ?? [:])
+            }
+            let client = makeAPIClient(transport: transport, maxRetries: 4, now: { clock }, sleeper: { _ in XCTFail("Unknown reset should pause") })
+            XCTAssertThrowsError(try client.request(method: "GET", path: "/v1/read")) { error in
+                guard let cooldown = error as? ASCRateLimitCooldown else { return XCTFail("\(error)") }
+                XCTAssertEqual(cooldown.notBefore.timeIntervalSince(clock), 60, accuracy: 0.001)
+                XCTAssertFalse(cooldown.serverSpecified)
+            }
+            XCTAssertEqual(transport.requests.count, 1)
+        }
+    }
+
+    func testRateSingleAttemptMutationsNeverRetryEvenWithCooldownHeaders() throws {
+        for method in ["POST", "PATCH", "DELETE", "PUT"] {
+            let transport = MockTransport { _ in TransportResponse(data: Data(), statusCode: 429,
+                headers: ["retry-after": "120", "x-rate-limit": "user-hour-lim:3600;user-hour-rem:0;"]) }
+            let client = makeAPIClient(transport: transport, maxRetries: 4, sleeper: { _ in XCTFail("No mutation retry") })
+            XCTAssertThrowsError(try client.request(method: method, path: "/v1/one", retryPolicy: .singleAttempt))
+            XCTAssertEqual(transport.requests.count, 1)
+        }
+    }
+
+    func testRateLongPacingRefreshesJWTAndSleepsInBoundedChunks() throws {
+        var clock = Date(), sleeps: [TimeInterval] = [], tokens: [String] = []
+        let transport = MockTransport { request in
+            tokens.append(request.value(forHTTPHeaderField: "Authorization")!)
+            return TransportResponse(data: Data(), statusCode: 200, headers: ["x-rate-limit": "user-hour-lim:1;user-hour-rem:0;"])
+        }
+        let client = makeAPIClient(transport: transport, maxRetries: 0, now: { clock }, sleeper: { sleeps.append($0); clock.addTimeInterval($0) })
+        _ = try client.request(method: "GET", path: "/v1/one")
+        _ = try client.request(method: "GET", path: "/v1/two")
+        XCTAssertEqual(sleeps.reduce(0, +), 4500, accuracy: 0.001)
+        XCTAssertTrue(sleeps.allSatisfy { $0 <= 30 }); XCTAssertNotEqual(tokens[0], tokens[1])
+    }
+}
+
+extension ASCReleaseCoreTests {
+    func testRateExhaustedNegativeRemainingRetainsObservedCadenceAfterCooldown() throws {
+        var clock = Date(), calls = 0, sleeps: [TimeInterval] = []
+        let transport = MockTransport { _ in
+            calls += 1
+            return TransportResponse(data: Data(), statusCode: calls == 1 ? 429 : 200,
+                headers: calls == 1 ? ["x-rate-limit": "user-hour-lim:3600;user-hour-rem:-1;", "retry-after": "54"] : [:])
+        }
+        let client = makeAPIClient(transport: transport, maxRetries: 1, now: { clock }, sleeper: { sleeps.append($0); clock.addTimeInterval($0) })
+        XCTAssertThrowsError(try client.request(method: "GET", path: "/v1/read")) { error in
+            guard let cooldown = error as? ASCRateLimitCooldown else { return XCTFail("\(error)") }
+            XCTAssertEqual(cooldown.notBefore.timeIntervalSince(clock), 54, accuracy: 0.001)
+        }
+        XCTAssertEqual(calls, 1); XCTAssertTrue(sleeps.isEmpty)
+        clock.addTimeInterval(54)
+        _ = try client.request(method: "GET", path: "/v1/read")
+        _ = try client.request(method: "GET", path: "/v1/read")
+        XCTAssertEqual(calls, 3); XCTAssertEqual(sleeps, [1.25])
+    }
+}
+
+extension ASCReleaseCoreTests {
+    func testRateZeroRetryBudgetStillReturnsServerCooldownDeadline() throws {
+        let clock = Date(), transport = MockTransport { _ in
+            TransportResponse(data: Data(), statusCode: 429, headers: ["Retry-After": "20"])
+        }
+        let client = makeAPIClient(transport: transport, maxRetries: 0, now: { clock }, sleeper: { _ in XCTFail("No retry budget") })
+        XCTAssertThrowsError(try client.request(method: "GET", path: "/v1/read")) { error in
+            guard let cooldown = error as? ASCRateLimitCooldown else { return XCTFail("\(error)") }
+            XCTAssertEqual(cooldown.notBefore.timeIntervalSince(clock), 20, accuracy: 0.001)
+            XCTAssertTrue(cooldown.serverSpecified)
+        }
+        XCTAssertEqual(transport.requests.count, 1)
+    }
+
+    func testRateFinalAttemptStillReturnsCooldownAfterTransientRetry() throws {
+        var clock = Date(), calls = 0, sleeps: [TimeInterval] = []
+        let transport = MockTransport { _ in
+            calls += 1
+            return TransportResponse(data: Data(), statusCode: calls == 1 ? 503 : 429,
+                headers: calls == 1 ? [:] : ["retry-after": "54"])
+        }
+        let client = makeAPIClient(transport: transport, maxRetries: 1, now: { clock }, sleeper: { sleeps.append($0); clock.addTimeInterval($0) })
+        XCTAssertThrowsError(try client.request(method: "GET", path: "/v1/read")) { error in
+            guard let cooldown = error as? ASCRateLimitCooldown else { return XCTFail("\(error)") }
+            XCTAssertEqual(cooldown.notBefore.timeIntervalSince(clock), 54, accuracy: 0.001)
+        }
+        XCTAssertEqual(calls, 2); XCTAssertEqual(sleeps, [1])
+    }
+
+    func testRateNormalizedExplicitHTTPSPortStillPacesAndRefreshesAuth() throws {
+        var clock = Date(), sleeps: [TimeInterval] = [], tokens: [String] = []
+        let transport = MockTransport { request in
+            tokens.append(request.value(forHTTPHeaderField: "Authorization")!)
+            return TransportResponse(data: Data(), statusCode: 200, headers: ["x-rate-limit": "user-hour-lim:1;user-hour-rem:0;"])
+        }
+        let client = makeAPIClient(transport: transport, maxRetries: 0, now: { clock }, sleeper: { sleeps.append($0); clock.addTimeInterval($0) })
+        _ = try client.request(method: "GET", path: "/v1/one")
+        _ = try client.request(method: "GET", path: "https://EXAMPLE.TEST:443/v1/two")
+        XCTAssertEqual(sleeps.reduce(0, +), 4500, accuracy: 0.001)
+        XCTAssertNotEqual(tokens[0], tokens[1])
     }
 }
