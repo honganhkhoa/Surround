@@ -292,6 +292,19 @@ final class DuoReleaseCoordinator {
         journalDirectory.appendingPathComponent("duo-\(set.locale)-journal.json")
     }
 
+    func requireSingleRetryCheckpoint(locale: String) throws {
+        guard handoff.sets.contains(where: { $0.locale == locale }) else {
+            throw ReleaseToolError.validation("Unknown single-image retry locale")
+        }
+        for set in handoff.sets {
+            let state = try ManifestBuilder.decode(DuoExecutionJournal.self, at: journal(set))
+            guard state.setDigest == (try set.digest()),
+                  set.locale == locale ? (state.phase == "preparing" && state.epoch == 0) : state.phase == "complete" else {
+                throw ReleaseToolError.validation("Single-image retry requires all other Duo locales complete; rollback or other progress takes priority")
+            }
+        }
+    }
+
     func preflight() throws {
         for set in handoff.sets {
             _ = try duoIdentifier(set.locale)
@@ -304,13 +317,24 @@ final class DuoReleaseCoordinator {
 
     /// Establish target-only compatibility before generic reconciliation; no
     /// cloud mutation is permitted here, including while rollback is pending.
-    func prepareForReconciliation() throws {
+    func prepareForReconciliation(allowPendingRetryLocale: String? = nil) throws {
         provenViews.removeAll()
         for set in handoff.sets {
             let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
-            try executor.preflight(allowRollbackProof: true, allowKnownProcessing: true)
+            try executor.preflight(allowRollbackProof: true, allowKnownProcessing: true,
+                allowPendingRetry: set.locale == allowPendingRetryLocale)
             provenViews[set.locale] = executor.provenLegacyView
         }
+    }
+
+    func retryImage(locale: String, position: Int, originalImageID: String,
+                    sourceSHA256: String) throws -> DuoSingleImageRetryResult {
+        guard let set = handoff.sets.first(where: { $0.locale == locale }) else {
+            throw ReleaseToolError.validation("Retry locale is absent from the approved handoff")
+        }
+        let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
+        return try executor.retrySingleImage(position: position, originalImageID: originalImageID,
+            confirmedSourceSHA256: sourceSHA256)
     }
 
     func requireSnapshotProjection(locale: String, sets: [RemoteScreenshotSet]) throws {

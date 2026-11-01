@@ -70,6 +70,9 @@ private struct Arguments {
         --expected-source-version V
       publish --manifest FILE --confirm-version V --journal FILE \\
         [--confirm-manifest-digest SHA256] [--dry-run true]
+      retry-duo-image --manifest FILE --confirm-version V --confirm-manifest-digest SHA256 \\
+        --journal FILE --locale LOCALE --position N --original-image-id ID \\
+        --source-sha256 SHA256 --output NEW_FILE [--dry-run true]
       publish-metadata-only --manifest FILE --locales-config FILE \\
         --expected-source-version V --confirm-version V \\
         --confirm-manifest-digest SHA256 --journal FILE
@@ -263,6 +266,43 @@ do {
             expectedSourceVersion: values[2]
         )
         print("Verified metadata-only manifest \(manifest.manifestDigest)")
+
+    case "retry-duo-image":
+        let values = try arguments.require("--manifest", "--confirm-version", "--confirm-manifest-digest",
+            "--journal", "--locale", "--position", "--original-image-id", "--source-sha256", "--output",
+            optional: ["--dry-run"])
+        let manifest = try ManifestBuilder.decode(PublishManifest.self, at: fileURL(values[0]))
+        try ManifestBuilder.verify(manifest)
+        guard values[1] == manifest.release.version, values[2] == manifest.manifestDigest,
+              let position = Int(values[5]), (1...10).contains(position),
+              let selected = try SelectedReleaseHandoff.load(manifest: manifest),
+              selected.sets.contains(where: { $0.locale == values[4] && $0.images.contains(where: {
+                  $0.position == position && $0.sha256 == values[7]
+              }) }), FileManager.default.fileExists(atPath: fileURL(values[3]).path),
+              !FileManager.default.fileExists(atPath: fileURL(values[8]).path) else {
+            throw ReleaseToolError.validation("Retry scope, existing journal or new output differs from confirmation")
+        }
+        let set = selected.sets.first { $0.locale == values[4] }!
+        let localeJournalURL = fileURL(values[3]).deletingLastPathComponent().appendingPathComponent("duo-\(values[4])-journal.json")
+        _ = try DuoJournalEvidence.desiredImageID(set: set, journalURL: localeJournalURL, position: position)
+        let local = try ManifestBuilder.decode(JSONValue.self, at: localeJournalURL)
+        guard local["phase"] == .string("preparing"), local["epoch"]?.intValue == 0,
+              local["entries"]?.arrayValue?.last(where: { $0["key"] == .string("desired:\(position):reserve") })?["resourceID"] == .string(values[6]) else {
+            throw ReleaseToolError.validation("Retry original identity or preparing journal differs from confirmation")
+        }
+        if let dryRun = arguments.options["--dry-run"] {
+            guard dryRun == "true" else { throw ReleaseToolError.usage("--dry-run accepts only true") }
+            print("Verified single-image retry inputs offline; no journal changes or network")
+            exit(EXIT_SUCCESS)
+        }
+        let credentials = try ASCCredentials.fromEnvironment()
+        let publisher = try Publisher(client: ASCAPIClient(credentials: credentials),
+            journalURL: fileURL(values[3]), manifest: manifest)
+        let result = try publisher.retryDuoImage(manifest: manifest, confirmedVersion: values[1],
+            confirmedManifestDigest: values[2], locale: values[4], position: position,
+            originalImageID: values[6], sourceSHA256: values[7])
+        try FileIO.writeJSON(result, to: fileURL(values[8]))
+        print("Single-image retry result: \(result.state), image \(result.imageID); full publication is not claimed")
 
     case "publish":
         let values = try arguments.require("--manifest", "--confirm-version", "--journal",

@@ -7,11 +7,22 @@ struct DuoBackupImage: Codable, Equatable {
     let file: DuoPublishImage
 }
 
-struct DuoExecutionEntry: Codable {
+struct DuoExecutionEntry: Codable, Equatable {
     let key: String
     let status: String
     let requestDigest: String
     let resourceID: String?
+}
+
+struct DuoSingleImageRetry: Codable {
+    let position: Int
+    let originalImageID: String
+    let sourceSHA256: String
+    let originalEntries: [DuoExecutionEntry]
+    var state: String = "pending"
+    var attemptStarted = false
+    var adoptedEntries: [DuoExecutionEntry]?
+    var attemptJournalSHA256: String?
 }
 
 struct DuoExecutionJournal: Codable {
@@ -30,6 +41,97 @@ struct DuoExecutionJournal: Codable {
     var entries: [DuoExecutionEntry] = []
     var activeCompatibility: DuoCompatibilityBaseline?
     var compatibilityCheckpoint: DuoCompatibilityBaseline?
+    var singleImageRetry: DuoSingleImageRetry?
+
+    func latest(_ key: String) -> DuoExecutionEntry? {
+        if let retry = singleImageRetry, retry.state == "adopted",
+           key.hasPrefix("desired:\(retry.position):") {
+            return retry.adoptedEntries?.last { $0.key == key }
+        }
+        return entries.last { $0.key == key }
+    }
+
+    static func retryURL(_ url: URL, position: Int) -> URL {
+        url.appendingPathExtension("single-image-retry-\(position).json")
+    }
+
+    func validateRetry(set: DuoPublishSet, url: URL) throws {
+        guard (schemaVersion == 1 && singleImageRetry == nil) || (schemaVersion == 2 && singleImageRetry != nil) else {
+            throw ReleaseToolError.validation("Unknown Duo journal schema or missing retry fence")
+        }
+        guard let retry = singleImageRetry else { return }
+        guard let image = set.images.first(where: { $0.position == retry.position }),
+              retry.sourceSHA256 == image.sha256,
+              entries.last(where: { $0.key == "desired:\(retry.position):reserve" })?.resourceID == retry.originalImageID,
+              ["pending", "original", "adopted"].contains(retry.state),
+              retry.state != "pending" || (phase == "preparing" && epoch == 0) else {
+            throw ReleaseToolError.validation("Retry scope, original identity or phase changed")
+        }
+        let prefix = "desired:\(retry.position):"
+        let original = entries.filter { $0.key.hasPrefix(prefix) }
+        guard !retry.originalEntries.isEmpty,
+              Array(original.prefix(retry.originalEntries.count)) == retry.originalEntries,
+              retry.originalEntries.last(where: { $0.key == prefix + "reserve" })?.status == "verified",
+              retry.originalEntries.last(where: { $0.key == prefix + "upload" })?.status == "verified",
+              retry.originalEntries.last(where: { $0.key == prefix + "commit" })?.status == "responseKnown",
+              retry.state == "original" || original == retry.originalEntries else {
+            throw ReleaseToolError.validation("Original known retry history changed")
+        }
+        if retry.state == "adopted" {
+            let bytes = try Data(contentsOf: Self.retryURL(url, position: retry.position))
+            let attempt = try JSONDecoder().decode(DuoExecutionJournal.self, from: bytes)
+            guard retry.attemptJournalSHA256 == FileIO.sha256(bytes),
+                  attempt.schemaVersion == 1, attempt.singleImageRetry == nil,
+                  attempt.setDigest == setDigest, attempt.version == version,
+                  attempt.rollbackStrategy == rollbackStrategy,
+                  attempt.phase == "preparing", attempt.epoch == 0,
+                  attempt.entries == retry.adoptedEntries,
+                  Set(attempt.entries.map(\.key)) == Set([prefix + "reserve", prefix + "upload", prefix + "commit"]),
+                  ["reserve", "upload", "commit"].allSatisfy({ attempt.latest(prefix + $0)?.status == "verified" }),
+                  let id = attempt.latest(prefix + "reserve")?.resourceID, id != retry.originalImageID else {
+                throw ReleaseToolError.validation("Adopted retry is not bound to its sealed one-attempt journal")
+            }
+        } else {
+            guard retry.adoptedEntries == nil,
+                  FileManager.default.fileExists(atPath: Self.retryURL(url, position: retry.position).path) else {
+                throw ReleaseToolError.validation("Unadopted retry contains an active replacement binding")
+            }
+            if retry.state == "pending" {
+                guard retry.attemptJournalSHA256 == nil else { throw ReleaseToolError.validation("Pending attempt is prematurely sealed") }
+            } else {
+                let bytes = try Data(contentsOf: Self.retryURL(url, position: retry.position))
+                let attempt = try JSONDecoder().decode(DuoExecutionJournal.self, from: bytes)
+                guard retry.attemptJournalSHA256 == FileIO.sha256(bytes), attempt.setDigest == setDigest,
+                      attempt.schemaVersion == 1, attempt.singleImageRetry == nil,
+                      attempt.version == version, attempt.phase == "preparing", attempt.epoch == 0,
+                      Set(attempt.entries.map(\.key)).isSubset(of: [prefix + "reserve"]),
+                      attempt.entries.isEmpty || (attempt.latest(prefix + "reserve")?.status == "verified" &&
+                          attempt.latest(prefix + "reserve")?.resourceID != nil) else {
+                    throw ReleaseToolError.validation("Unused retry reservation is not sealed at original preference")
+                }
+            }
+        }
+    }
+}
+
+/// Offline readers use the same desired-ID resolution as live execution.
+public enum DuoJournalEvidence {
+    public static func resolvedEntries(set: DuoPublishSet, journalURL: URL) throws -> [JSONValue] {
+        let journal = try ManifestBuilder.decode(DuoExecutionJournal.self, at: journalURL)
+        guard journal.setDigest == (try set.digest()) else { throw ReleaseToolError.validation("Duo evidence set changed") }
+        try journal.validateRetry(set: set, url: journalURL)
+        let entries = Set(journal.entries.map(\.key)).sorted().compactMap { journal.latest($0) }
+        return try JSONDecoder().decode([JSONValue].self, from: JSONEncoder().encode(entries))
+    }
+    public static func desiredImageID(set: DuoPublishSet, journalURL: URL, position: Int) throws -> String {
+        let journal = try ManifestBuilder.decode(DuoExecutionJournal.self, at: journalURL)
+        guard journal.setDigest == (try set.digest()) else { throw ReleaseToolError.validation("Duo evidence set changed") }
+        try journal.validateRetry(set: set, url: journalURL)
+        guard let id = journal.latest("desired:\(position):reserve")?.resourceID else {
+            throw ReleaseToolError.validation("Duo evidence has no owned desired image")
+        }
+        return id
+    }
 }
 
 /// Exclusive ownership plus fsync-before-rename journal writes. Temporary files

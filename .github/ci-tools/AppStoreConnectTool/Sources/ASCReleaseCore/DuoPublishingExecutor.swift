@@ -6,6 +6,13 @@ enum DuoDesiredReadiness: Equatable {
     case ready(String)
 }
 
+public struct DuoSingleImageRetryResult: Codable {
+    public let state: String
+    public let imageID: String
+}
+
+private enum DuoRetryControl: Error { case preferOriginal }
+
 /// Per-localization execution for an admitted, digest-confirmed selected handoff.
 /// Historical capture limitations remain recorded independently of admission.
 public final class DuoPublishingExecutor {
@@ -18,15 +25,18 @@ public final class DuoPublishingExecutor {
     private let sleeper: (TimeInterval) -> Void
     private let backupWriter: (Data, URL) throws -> Void
     private let compatibilityVerifier: DuoCompatibilityVerifier?
+    private let singleAttemptOnly: Bool
     private var localPixelCache: [String: String] = [:]
 
     public init(set: DuoPublishSet, journalURL: URL, service: DuoPublishingService,
                 pollAttempts: Int = 120, compatibilityPollAttempts: Int = 12,
                 sleeper: @escaping (TimeInterval) -> Void = Thread.sleep,
                 journalWriter: ((Data, URL) throws -> Void)? = nil,
-                backupWriter: ((Data, URL) throws -> Void)? = nil) throws {
+                backupWriter: ((Data, URL) throws -> Void)? = nil,
+                singleAttemptOnly: Bool = false) throws {
         self.set = set; self.service = service; self.attempts = max(1, pollAttempts); self.sleeper = sleeper
         self.backupWriter = backupWriter ?? DuoJournalFile.writeNewDataDurably
+        self.singleAttemptOnly = singleAttemptOnly
         let resolvedAdapter = try DuoAssetLibraryAdapter(catalog: set.catalog, assetLibraryID: set.assetLibraryID)
         adapter = resolvedAdapter
         compatibilityVerifier = set.compatibilityBaseline.map { _ in
@@ -38,7 +48,7 @@ public final class DuoPublishingExecutor {
         let digest = try set.digest()
         if FileManager.default.fileExists(atPath: journalURL.path) {
             journal = try ManifestBuilder.decode(DuoExecutionJournal.self, at: journalURL)
-            guard journal.schemaVersion == 1, journal.setDigest == digest, journal.version == set.version,
+            guard journal.setDigest == digest, journal.version == set.version,
                   journal.rollbackStrategy == "verified-png-backup-reupload-v1" else {
                 throw ReleaseToolError.validation("Duo journal belongs to a different reviewed set or recovery strategy")
             }
@@ -48,6 +58,7 @@ public final class DuoPublishingExecutor {
                 activeCompatibility: set.compatibilityBaseline, compatibilityCheckpoint: set.compatibilityBaseline)
             try file.save(journal)
         }
+        try journal.validateRetry(set: set, url: journalURL)
         if let baseline = set.compatibilityBaseline {
             try baseline.validate()
             guard baseline.placements == set.reviewedBaseline,
@@ -63,7 +74,9 @@ public final class DuoPublishingExecutor {
 
     /// GET-only remote reconciliation before the aggregate publisher may write.
     /// Known readbacks may update the local journal; an offline dry run never calls this.
-    func preflight(allowRollbackProof: Bool = false, allowKnownProcessing: Bool = false) throws {
+    func preflight(allowRollbackProof: Bool = false, allowKnownProcessing: Bool = false,
+                   allowPendingRetry: Bool = false) throws {
+        try requireRetryResolved(allowPending: allowPendingRetry)
         for image in set.images { _ = try validatedBytes(image) }
         try service.verifyEditableTarget(set)
         if journal.phase == "complete" {
@@ -124,7 +137,10 @@ public final class DuoPublishingExecutor {
         guard Set(journal.entries.map(\.key)).allSatisfy({ key in
             guard let status = latest(key)?.status else { return false }
             return ["verified", "rejected"].contains(status) ||
-                (processingKeys.contains(key) && status == "responseKnown")
+                (processingKeys.contains(key) && status == "responseKnown") ||
+                (journal.singleImageRetry?.state == "pending" && status == "responseKnown" &&
+                 key == "desired:\(journal.singleImageRetry!.position):commit" &&
+                 latest(key) == journal.singleImageRetry?.originalEntries.last(where: { $0.key == key }))
         }) else { throw DuoExecutionFailure.uncertain("Unresolved Duo reservation/upload intent stops aggregate writes") }
     }
 
@@ -183,6 +199,9 @@ public final class DuoPublishingExecutor {
                 throw DuoExecutionFailure.uncertain("Processed image lacks its exact owned upload and commit dependencies")
             }
             try validateProcessedImage(raw, file: image)
+            if journal.singleImageRetry?.state == "pending", journal.singleImageRetry?.position == image.position {
+                return .ready(id) // Retain exact original response history until the attempt is resolved.
+            }
             for pending in [upload, commit] where pending.status != "verified" {
                 try entry(pending.key, "verified", digest: pending.requestDigest, id: id)
             }
@@ -212,6 +231,151 @@ public final class DuoPublishingExecutor {
         }
     }
 
+    private func requireRetryResolved(allowPending: Bool = false) throws {
+        if journal.singleImageRetry?.state == "pending" && !allowPending {
+            throw DuoExecutionFailure.uncertain("One-image retry is pending; reconcile its single attempt before ordinary publishing")
+        }
+    }
+
+    private func proveNative(_ image: DuoPublishImage, id: String) throws {
+        let before = try basicImage(id, file: image)
+        guard before["attributes"]?["state"] == .string("PREPARE_FOR_SUBMISSION"),
+              let rawAsset = before["attributes"]?["imageAsset"] else {
+            throw DuoExecutionFailure.uncertain("Retry adoption requires a processed image")
+        }
+        try validateProcessedImage(before, file: image)
+        let asset = try DuoImageAsset.read(rawAsset)
+        let served = try service.download(asset.1)
+        let decoded = try ImageValidation.decodePNG(served, context: "one-image retry native rendition")
+        guard decoded.pixelWidth == image.pixelWidth, decoded.pixelHeight == image.pixelHeight,
+              try ImageValidation.pixelSHA256(served, context: "retry served pixels") ==
+                  ImageValidation.pixelSHA256(validatedBytes(image), context: "retry selected pixels"),
+              try basicImage(id, file: image)["attributes"] == before["attributes"] else {
+            throw DuoExecutionFailure.drift("Retry native content or metadata changed; binding was not adopted")
+        }
+    }
+
+    /// Exactly one extra candidate, with a separate fsynced journal and a
+    /// schema-2 fence before its first POST. Never deletes or recommits the old ID.
+    public func retrySingleImage(position: Int, originalImageID: String,
+                                 confirmedSourceSHA256: String) throws -> DuoSingleImageRetryResult {
+        guard journal.phase == "preparing", journal.epoch == 0,
+              let image = set.images.first(where: { $0.position == position }),
+              image.sha256 == confirmedSourceSHA256,
+              journal.entries.last(where: { $0.key == "desired:\(position):reserve" })?.resourceID == originalImageID else {
+            throw ReleaseToolError.validation("Single retry requires the exact preparing image, source hash and original reservation")
+        }
+        if let binding = journal.singleImageRetry {
+            guard binding.position == position, binding.originalImageID == originalImageID,
+                  binding.sourceSHA256 == confirmedSourceSHA256 else {
+                throw ReleaseToolError.validation("A different image retry already owns this journal")
+            }
+            if binding.state == "adopted" {
+                let id = try reservedID("desired:\(position)")
+                try proveNative(image, id: id)
+                return DuoSingleImageRetryResult(state: "adopted", imageID: id)
+            }
+        }
+        try preflight(allowKnownProcessing: true, allowPendingRetry: true)
+        let states = try pollDesiredReadiness()
+        for other in set.images where other.position != position {
+            guard case .ready = states[other.position] else {
+                throw DuoExecutionFailure.uncertain("Only one desired image may need retry")
+            }
+        }
+
+        func preferOriginal() throws {
+            let raw = try basicImage(originalImageID, file: image)
+            if raw["attributes"]?["state"] == .string("PREPARE_FOR_SUBMISSION") {
+                try proveNative(image, id: originalImageID)
+                throw DuoRetryControl.preferOriginal
+            }
+            guard raw["attributes"]?["state"] == .string("UPLOAD_COMPLETE") else {
+                throw DuoExecutionFailure.uncertain("Original retry target changed processing state")
+            }
+        }
+        let attemptURL = DuoExecutionJournal.retryURL(file.url, position: position)
+        var attempt: DuoPublishingExecutor
+        func openAttempt() throws -> DuoPublishingExecutor {
+            try DuoPublishingExecutor(set: set, journalURL: attemptURL, service: service,
+                pollAttempts: attempts, sleeper: sleeper, singleAttemptOnly: true)
+        }
+        // Prefer a completed original before even creating the retry fence.
+        if journal.singleImageRetry == nil {
+            do { try preferOriginal() }
+            catch DuoRetryControl.preferOriginal {
+                return DuoSingleImageRetryResult(state: "original", imageID: originalImageID)
+            }
+            guard case .processing(let id) = states[position], id == originalImageID else {
+                throw DuoExecutionFailure.uncertain("Retry requires one exact known processing image")
+            }
+            attempt = try openAttempt()
+            guard attempt.journal.entries.isEmpty else { throw DuoExecutionFailure.uncertain("Unfenced attempt already has mutation history") }
+            journal.singleImageRetry = DuoSingleImageRetry(position: position,
+                originalImageID: originalImageID, sourceSHA256: image.sha256,
+                originalEntries: journal.entries.filter { $0.key.hasPrefix("desired:\(position):") })
+            journal.schemaVersion = 2
+            try save()
+        } else {
+            guard FileManager.default.fileExists(atPath: attemptURL.path) else {
+                throw DuoExecutionFailure.uncertain("The one-attempt journal is missing; never initialize a replacement attempt")
+            }
+            attempt = try openAttempt()
+        }
+        if journal.singleImageRetry?.state == "original" {
+            try proveNative(image, id: originalImageID)
+            return DuoSingleImageRetryResult(state: "original", imageID: originalImageID)
+        }
+        guard attempt.journal.schemaVersion == 1, attempt.journal.singleImageRetry == nil,
+              attempt.journal.phase == "preparing", attempt.journal.epoch == 0,
+              attempt.journal.entries.allSatisfy({ $0.key.hasPrefix("desired:\(position):") }) else {
+            throw DuoExecutionFailure.drift("The separate one-image attempt has unreviewed state")
+        }
+        if journal.singleImageRetry?.attemptStarted == true && attempt.journal.entries.isEmpty {
+            throw DuoExecutionFailure.uncertain("Started retry has lost its mutation intent; no new reservation is permitted")
+        }
+        do { _ = try attempt.submitDesired(position: position, preferOriginal: {
+            try preferOriginal()
+            if attempt.latest("desired:\(position):reserve") == nil {
+                guard self.journal.singleImageRetry?.attemptStarted == false else {
+                    throw DuoExecutionFailure.uncertain("The single reservation attempt has already started")
+                }
+                self.journal.singleImageRetry?.attemptStarted = true
+                try self.save()
+            }
+        }) }
+        catch DuoRetryControl.preferOriginal {
+            // Only called before POST, or before upload intent with a known
+            // reservation. An uncertain attempt never reaches this branch.
+            journal.singleImageRetry?.state = "original"
+            journal.singleImageRetry?.attemptJournalSHA256 = FileIO.sha256(try Data(contentsOf: attemptURL))
+            try save()
+            return DuoSingleImageRetryResult(state: "original", imageID: originalImageID)
+        }
+        let id = try attempt.reservedID("desired:\(position)")
+        for index in 0..<attempts {
+            let state = try attempt.preflightStagedImage(image, key: "desired:\(position)", allowKnownProcessing: true)
+            if case .ready = state {
+                try attempt.proveNative(image, id: id)
+                try requireExactGroup(journal.activeBaseline)
+                try verifyBaselineImageIdentities()
+                try proveCompatibility(try group())
+                let bytes = try Data(contentsOf: attemptURL)
+                guard try JSONDecoder().decode(DuoExecutionJournal.self, from: bytes).entries == attempt.journal.entries else {
+                    throw DuoExecutionFailure.persistence("Retry journal changed before atomic adoption")
+                }
+                journal.singleImageRetry?.adoptedEntries = attempt.journal.entries
+                journal.singleImageRetry?.attemptJournalSHA256 = FileIO.sha256(bytes)
+                journal.singleImageRetry?.state = "adopted"
+                try save()
+                return DuoSingleImageRetryResult(state: "adopted", imageID: id)
+            }
+            guard case .processing = state else { throw DuoExecutionFailure.uncertain("Retry candidate is not a known processing image") }
+            if index + 1 < attempts { sleeper(5) }
+        }
+        return DuoSingleImageRetryResult(state: "processing", imageID: id)
+    }
+
     public func publish(confirmedVersion: String, confirmedSetDigest: String) throws {
         if try prepareQueuedStaging(confirmedVersion: confirmedVersion, confirmedSetDigest: confirmedSetDigest) { return }
         var desiredImages: [Int: String] = [:]
@@ -223,6 +387,7 @@ public final class DuoPublishingExecutor {
     /// may overlap Apple's asynchronous processing without sharing this state.
     @discardableResult
     func prepareQueuedStaging(confirmedVersion: String, confirmedSetDigest: String) throws -> Bool {
+        try requireRetryResolved()
         guard confirmedVersion == set.version, try set.digest() == confirmedSetDigest,
               set.sourceManifestSHA256.range(of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil,
               set.images.map(\.position) == Array(1...10), set.reviewedBaseline.count <= 10 else {
@@ -267,13 +432,13 @@ public final class DuoPublishingExecutor {
         return result
     }
 
-    func submitDesired(position: Int) throws -> DuoDesiredReadiness {
+    func submitDesired(position: Int, preferOriginal: (() throws -> Void)? = nil) throws -> DuoDesiredReadiness {
         guard journal.phase == "preparing", let image = set.images.first(where: { $0.position == position }) else {
             throw DuoExecutionFailure.uncertain("New image submission requires a preparing owned locale")
         }
         try service.verifyEditableTarget(set)
         try requireExactGroup(journal.activeBaseline)
-        _ = try submit(image, key: "desired:\(position)")
+        _ = try submit(image, key: "desired:\(position)", preferOriginal: preferOriginal)
         return try preflightStagedImage(image, key: "desired:\(position)", allowKnownProcessing: true)
     }
 
@@ -335,8 +500,16 @@ public final class DuoPublishingExecutor {
         journal.completedPlacements = current; journal.phase = "complete"; try save()
     }
     private func save() throws { try file.save(journal) }
-    private func latest(_ key: String) -> DuoExecutionEntry? { journal.entries.last { $0.key == key } }
+    private func latest(_ key: String) -> DuoExecutionEntry? { journal.latest(key) }
     private func entry(_ key: String, _ status: String, digest: String, id: String? = nil) throws {
+        if let retry = journal.singleImageRetry, retry.state == "adopted",
+           key.hasPrefix("desired:\(retry.position):") {
+            guard let sealed = latest(key), status == "verified", sealed.status == status,
+                  sealed.requestDigest == digest, sealed.resourceID == id else {
+                throw DuoExecutionFailure.uncertain("An adopted retry binding is sealed; no mutation or journal rewrite is permitted")
+            }
+            return
+        }
         journal.entries.append(DuoExecutionEntry(key: key, status: status, requestDigest: digest, resourceID: id))
         try save()
     }
@@ -356,6 +529,9 @@ public final class DuoPublishingExecutor {
         let hash = try digest(request)
         if let previous = latest(key) {
             guard previous.requestDigest == hash else { throw DuoExecutionFailure.drift("Journaled request changed") }
+            if singleAttemptOnly && previous.status == "rejected" {
+                throw DuoExecutionFailure.rejected("The single retry attempt was rejected; no request replay is permitted")
+            }
             if ["verified", "responseKnown"].contains(previous.status) { return previous.resourceID }
             if ["intent", "uncertain"].contains(previous.status) {
                 let (matches, id) = try reconcile()
@@ -525,9 +701,11 @@ public final class DuoPublishingExecutor {
         return id
     }
 
-    private func submit(_ image: DuoPublishImage, key: String) throws -> String {
+    private func submit(_ image: DuoPublishImage, key: String,
+                        preferOriginal: (() throws -> Void)? = nil) throws -> String {
         let bytes = try validatedBytes(image), reserveKey = key + ":reserve"
         let reservation = try adapter.reserveImage(fileName: image.fileName, fileSize: image.byteCount)
+        if latest(reserveKey) == nil { try preferOriginal?() }
         guard let id = try mutate(reserveKey, request: reservation, reconcile: { (false, nil) }, expectsID: "appAssetLibraryImages") else {
             throw DuoExecutionFailure.uncertain("Reservation did not identify an image")
         }
@@ -553,6 +731,7 @@ public final class DuoPublishingExecutor {
                 }
                 guard end == bytes.count else { throw DuoExecutionFailure.rejected("Upload operations do not cover the reviewed image") }
                 let hash = try digest(.object(["imageID": .string(id), "sha256": .string(image.sha256), "bytes": .number(Double(bytes.count))]) as JSONValue)
+                try preferOriginal?()
                 try entry(uploadKey, "intent", digest: hash, id: id)
                 do {
                     for operation in operations { try service.upload(operation, bytes: bytes) }

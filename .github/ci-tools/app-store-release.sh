@@ -56,6 +56,11 @@ Options:
                              publish-metadata-only and selected-lineup publish.
   --dry-run                  Verify publish offline without credentials,
                              network requests or journal creation.
+  --retry-duo-locale LOCALE --retry-duo-position N
+  --retry-original-image-id ID --retry-source-sha256 SHA256
+                             Together, publish performs only one separately
+                             approved exact-byte candidate retry; it does not
+                             claim complete metadata publication.
   -h, --help                 Show this help.
 
 Authentication for both prepare and publish modes:
@@ -752,6 +757,8 @@ command_publish() {
   local confirmed_manifest_digest=""
   local dry_run=0
   local -a publish_arguments=(publish)
+  local retry_locale="" retry_position="" retry_original="" retry_sha=""
+  local retry_requested=0
   local manifest_version
   local journal_path
 
@@ -775,6 +782,17 @@ command_publish() {
       --dry-run)
         dry_run=1
         shift
+        ;;
+      --retry-duo-locale|--retry-duo-position|--retry-original-image-id|--retry-source-sha256)
+        retry_requested=1
+        (( $# >= 2 )) || usage_error "$1 requires a value."
+        case "$1" in
+          --retry-duo-locale) retry_locale="$2" ;;
+          --retry-duo-position) retry_position="$2" ;;
+          --retry-original-image-id) retry_original="$2" ;;
+          --retry-source-sha256) retry_sha="$2" ;;
+        esac
+        shift 2
         ;;
       -h|--help)
         usage
@@ -817,6 +835,15 @@ command_publish() {
     [[ -n "$confirmed_manifest_digest" ]] || fail "Selected lineup publish requires --confirm-manifest-digest."
   fi
   journal_path="$(dirname "$manifest_path")/publish-journal.json"
+  if [[ "$retry_requested" == 1 ]]; then
+    [[ -n "$retry_locale" && "$retry_position" =~ ^([1-9]|10)$ && -n "$retry_original" && -n "$retry_sha" && -n "$confirmed_manifest_digest" ]] \
+      || usage_error "Single-image retry requires locale, position1–10, original image ID, source SHA256 and exact manifest digest."
+    validate_sha256_string "$retry_sha"
+    require_readable_file "Existing publication journal" "$journal_path"
+    publish_arguments=(retry-duo-image --confirm-manifest-digest "$confirmed_manifest_digest"
+      --locale "$retry_locale" --position "$retry_position" --original-image-id "$retry_original"
+      --source-sha256 "$retry_sha" --output "$(dirname "$manifest_path")/duo-single-retry-result-$(date -u '+%Y%m%dT%H%M%SZ')-$$.json")
+  fi
   publish_arguments+=(--manifest "$manifest_path" --confirm-version "$confirmed_version" --journal "$journal_path")
   if [[ "$dry_run" == 1 ]]; then
     unset ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY_PATH
@@ -828,7 +855,11 @@ command_publish() {
 
   run_app_store_connect_tool "${publish_arguments[@]}"
 
-  echo "App Store release ${confirmed_version} was published and verified."
+  if [[ -n "$retry_locale" ]]; then
+    echo "Single-image retry checked; full publication is not claimed."
+  else
+    echo "App Store release ${confirmed_version} was published and verified."
+  fi
   echo "Publish journal: ${journal_path}"
 }
 

@@ -41,6 +41,42 @@ public final class Publisher {
         }
     }
 
+    /// Performs only the explicitly confirmed single-candidate recovery. The
+    /// normal publication command remains a separate same-journal continuation.
+    public func retryDuoImage(manifest: PublishManifest, confirmedVersion: String,
+                              confirmedManifestDigest: String, locale: String, position: Int,
+                              originalImageID: String, sourceSHA256: String) throws -> DuoSingleImageRetryResult {
+        try ManifestBuilder.verify(manifest)
+        guard confirmedVersion == manifest.release.version,
+              confirmedManifestDigest == manifest.manifestDigest,
+              let selected = try SelectedReleaseHandoff.load(manifest: manifest),
+              selected.sets.contains(where: { $0.locale == locale && $0.images.contains(where: {
+                  $0.position == position && $0.sha256 == sourceSHA256
+              }) }), !journal.operations.isEmpty, journal.completedAt == nil,
+              manifest.localizations.allSatisfy({ locale in locale.screenshotSets.allSatisfy {
+                  isDone("screenshots:\(locale.appStoreLocale):\($0.family):complete")
+              } }) else {
+            throw ReleaseToolError.validation("Retry requires an exact selected manifest and existing incomplete publication")
+        }
+        let lock = try MetadataOnlyReleaseLock(bundleId: manifest.release.bundleId,
+            platform: manifest.release.platform, version: manifest.release.version)
+        defer { lock.release() }
+        let duo = DuoReleaseCoordinator(handoff: selected, service: duoService,
+            journalDirectory: journalURL.deletingLastPathComponent())
+        managedDuo = duo
+        defer { managedDuo = nil }
+        try duo.requireSingleRetryCheckpoint(locale: locale)
+        try duo.prepareForReconciliation(allowPendingRetryLocale: locale)
+        let live = try snapshotProvider(manifest.release)
+        guard live.targetVersion?.state == "PREPARE_FOR_SUBMISSION",
+              live.targetVersion?.id == manifest.remoteSnapshot.targetVersion?.id else {
+            throw ReleaseToolError.remoteDrift("Retry requires the exact existing editable target")
+        }
+        try reconcileLiveState(manifest: manifest, live: live)
+        return try duo.retryImage(locale: locale, position: position,
+            originalImageID: originalImageID, sourceSHA256: sourceSHA256)
+    }
+
     public func publish(manifest: PublishManifest, confirmedVersion: String,
                         confirmedManifestDigest: String? = nil) throws {
         guard manifest.captureMetadata["mode"]?.stringValue

@@ -1175,3 +1175,190 @@ extension DuoPublishingExecutorTests {
         XCTAssertTrue(fixture.originalImagesPreserved())
     }
 }
+
+extension DuoPublishingExecutorTests {
+    private func singleRetryFixture() throws -> DuoExecutorFixture {
+        let f = try DuoExecutorFixture(compatibility: true)
+        f.service.holdProcessingNames = ["6.png"]
+        do {
+            let e = try DuoPublishingExecutor(set: f.set, journalURL: f.journal, service: f.service, sleeper: { _ in })
+            try e.prepareQueuedStaging(confirmedVersion: f.set.version, confirmedSetDigest: f.set.digest())
+            for p in 1...10 { _ = try e.submitDesired(position: p) }
+        }
+        f.service.holdProcessingNames.removeAll()
+        return f
+    }
+    private func retry(_ f: DuoExecutorFixture, writer: ((Data, URL) throws -> Void)? = nil) throws -> DuoSingleImageRetryResult {
+        let e = try DuoPublishingExecutor(set: f.set, journalURL: f.journal, service: f.service,
+            pollAttempts: 2, sleeper: { _ in }, journalWriter: writer)
+        return try e.retrySingleImage(position: 6, originalImageID: "image-6", confirmedSourceSHA256: f.set.images[5].sha256)
+    }
+    func testSingleRetryAdoptsExactCandidateAndReusesItThroughCompletedResume() throws {
+        let f = try singleRetryFixture(); defer { f.clean() }
+        let old = f.service.images["image-6"], originalEntries = try f.state().entries
+        let result = try retry(f)
+        XCTAssertEqual(result.state, "adopted"); XCTAssertEqual(result.imageID, "image-11")
+        XCTAssertEqual(try f.state().schemaVersion, 2)
+        XCTAssertEqual(try f.state().entries, originalEntries)
+        let sidecar = DuoExecutionJournal.retryURL(f.journal, position: 6)
+        let sealed = try Data(contentsOf: sidecar)
+        XCTAssertEqual(try retry(f).imageID, "image-11")
+        try f.run(); try f.run()
+        XCTAssertEqual(try Data(contentsOf: sidecar), sealed)
+        XCTAssertEqual(f.service.events.filter { $0.hasPrefix("reserve:") }.count, 11)
+        XCTAssertTrue(f.service.rows.contains { $0.imageID == "image-11" })
+        XCTAssertFalse(f.service.rows.contains { $0.imageID == "image-6" })
+        XCTAssertEqual(f.service.images["image-6"], old)
+        XCTAssertTrue(f.originalImagesPreserved())
+        XCTAssertEqual(try DuoJournalEvidence.desiredImageID(set: f.set, journalURL: f.journal, position: 6), "image-11")
+    }
+    func testSingleRetryPrefersOriginalBeforeReservationAndBeforeUpload() throws {
+        for late in [false, true] {
+            let f = try singleRetryFixture(); defer { f.clean() }
+            let uploads = f.service.events.filter { $0.hasPrefix("upload:") }.count
+            if late {
+                f.service.fault = { label, after in
+                    if label == "reserve:6.png" && after { f.service.fault = nil; try f.service.finishProcessing() }
+                }
+            } else { try f.service.finishProcessing() }
+            XCTAssertEqual(try retry(f).state, "original")
+            XCTAssertEqual(f.service.events.filter { $0.hasPrefix("upload:") }.count, uploads)
+            try f.run()
+            XCTAssertTrue(f.service.rows.contains { $0.imageID == "image-6" })
+        }
+    }
+    func testSingleRetryUnknownReserveAndUploadNeverReplayOrPublish() throws {
+        for prefix in ["reserve:", "upload:"] {
+            let f = try singleRetryFixture(); defer { f.clean() }
+            f.service.fault = { label, after in
+                if label.hasPrefix(prefix) && after { f.service.fault = nil; throw DuoExecutionFailure.uncertain("lost retry response") }
+            }
+            XCTAssertThrowsError(try retry(f))
+            let events = f.service.events
+            XCTAssertThrowsError(try retry(f)); XCTAssertThrowsError(try f.run())
+            XCTAssertEqual(f.service.events, events)
+            XCTAssertEqual(f.service.rows, f.set.reviewedBaseline)
+        }
+    }
+    func testSingleRetryLostCommitResponseUsesExactReadbackWithoutPATCHReplay() throws {
+        let f = try singleRetryFixture(); defer { f.clean() }
+        f.service.fault = { label, after in
+            if label == "commit:image-11" && after { f.service.fault = nil; throw DuoExecutionFailure.uncertain("lost retry commit") }
+        }
+        XCTAssertThrowsError(try retry(f))
+        XCTAssertEqual(try retry(f).state, "adopted")
+        XCTAssertEqual(f.service.events.filter { $0 == "commit:image-11" }.count, 1)
+        XCTAssertEqual(f.service.events.filter { $0.hasPrefix("reserve:") }.count, 11)
+    }
+    func testSingleRetryPendingCandidateDoesNotCreateSecondAttemptAndAllowsLateOriginal() throws {
+        let f = try singleRetryFixture(); defer { f.clean() }
+        f.service.holdProcessingNames = ["6.png"]
+        XCTAssertEqual(try retry(f).state, "processing")
+        let events = f.service.events
+        XCTAssertEqual(try retry(f).state, "processing"); XCTAssertEqual(f.service.events, events)
+        XCTAssertThrowsError(try f.run())
+        try f.service.finishProcessing()
+        XCTAssertEqual(try retry(f).state, "adopted")
+        XCTAssertEqual(f.service.events, events)
+    }
+    func testSingleRetryWrongPixelsSpecificationAndFailureNeverAdoptOrDelete() throws {
+        for defect in ["pixels", "spec", "failed"] {
+            let f = try singleRetryFixture(); defer { f.clean() }
+            f.service.wrongSpecification = defect == "spec"; f.service.failProcessing = defect == "failed"
+            if defect == "pixels" {
+                f.service.fault = { label, after in
+                    if label == "commit:image-11" && after { f.service.data["image-11"] = f.service.data["old-image-6"] }
+                }
+            }
+            XCTAssertThrowsError(try retry(f))
+            XCTAssertEqual(try f.state().singleImageRetry?.state, "pending")
+            XCTAssertEqual(f.service.rows, f.set.reviewedBaseline)
+            XCTAssertFalse(f.service.events.contains { $0.hasPrefix("delete:") })
+        }
+    }
+    func testSingleRetryAdoptionPersistenceFailureResumesWithoutNewUpload() throws {
+        let f = try singleRetryFixture(); defer { f.clean() }
+        let writer: (Data, URL) throws -> Void = { data, url in
+            let value = try JSONDecoder().decode(DuoExecutionJournal.self, from: data)
+            if value.singleImageRetry?.state == "adopted" { throw CocoaError(.fileWriteOutOfSpace) }
+            try data.write(to: url, options: .atomic)
+        }
+        XCTAssertThrowsError(try retry(f, writer: writer))
+        XCTAssertEqual(try f.state().singleImageRetry?.state, "pending")
+        let events = f.service.events
+        XCTAssertEqual(try retry(f).state, "adopted"); XCTAssertEqual(f.service.events, events)
+    }
+    func testSingleRetryFenceAndSealedSidecarRejectInvalidStateBeforeHTTP() throws {
+        let f = try singleRetryFixture(); defer { f.clean() }
+        _ = try retry(f)
+        let events = f.service.events
+        let sidecar = DuoExecutionJournal.retryURL(f.journal, position: 6)
+        var bytes = try Data(contentsOf: sidecar); bytes.append(32); try bytes.write(to: sidecar)
+        XCTAssertThrowsError(try f.run()); XCTAssertEqual(f.service.events, events)
+        var journal = try f.state(); journal.singleImageRetry = nil
+        try FileIO.writeJSON(journal, to: f.journal)
+        XCTAssertThrowsError(try f.run()); XCTAssertEqual(f.service.events, events)
+    }
+    func testSingleRetryExactScopeAndFencePersistencePrecedeAnyNewMutation() throws {
+        let f = try singleRetryFixture(); defer { f.clean() }
+        let events = f.service.events
+        do {
+            let e = try DuoPublishingExecutor(set: f.set, journalURL: f.journal, service: f.service)
+            XCTAssertThrowsError(try e.retrySingleImage(position: 5, originalImageID: "image-6", confirmedSourceSHA256: f.set.images[5].sha256))
+            XCTAssertThrowsError(try e.retrySingleImage(position: 6, originalImageID: "foreign", confirmedSourceSHA256: f.set.images[5].sha256))
+            XCTAssertThrowsError(try e.retrySingleImage(position: 6, originalImageID: "image-6", confirmedSourceSHA256: String(repeating: "0", count: 64)))
+        }
+        let writer: (Data, URL) throws -> Void = { _, _ in throw CocoaError(.fileWriteOutOfSpace) }
+        XCTAssertThrowsError(try retry(f, writer: writer))
+        XCTAssertEqual(f.service.events, events)
+    }
+}
+
+extension DuoPublishingExecutorTests {
+    func testSingleRetryKnownRejectionDoesNotReplayReservationOrCommit() throws {
+        for prefix in ["reserve:", "commit:"] {
+            let f = try singleRetryFixture(); defer { f.clean() }
+            f.service.fault = { label, after in
+                if label.hasPrefix(prefix) && !after { f.service.fault = nil; throw DuoExecutionFailure.rejected("known retry rejection") }
+            }
+            XCTAssertThrowsError(try retry(f)); let events = f.service.events
+            XCTAssertThrowsError(try retry(f)); XCTAssertEqual(f.service.events, events)
+            XCTAssertEqual(f.service.rows, f.set.reviewedBaseline)
+        }
+    }
+    func testSingleRetryMissingOrLostStartedAttemptNeverCreatesAnotherReservation() throws {
+        for missing in [false, true] {
+            let f = try singleRetryFixture(); defer { f.clean() }
+            f.service.holdProcessingNames = ["6.png"]
+            _ = try retry(f); let events = f.service.events
+            let sidecar = DuoExecutionJournal.retryURL(f.journal, position: 6)
+            if missing { try FileManager.default.removeItem(at: sidecar) }
+            else {
+                var state = try ManifestBuilder.decode(DuoExecutionJournal.self, at: sidecar)
+                state.entries = []; try FileIO.writeJSON(state, to: sidecar)
+            }
+            XCTAssertThrowsError(try retry(f)); XCTAssertEqual(f.service.events, events)
+        }
+    }
+    func testSingleRetryAdoptedBindingSurvivesRollbackAndReusesItsCandidate() throws {
+        let f = try singleRetryFixture(); defer { f.clean() }; _ = try retry(f)
+        f.service.fault = { label, after in
+            if label == "place:3.png" && !after { f.service.fault = nil; throw DuoExecutionFailure.rejected("placement rejected") }
+        }
+        XCTAssertThrowsError(try f.run()); XCTAssertEqual(try f.state().phase, "rolledBack")
+        let candidates = f.service.events.filter { $0 == "reserve:6.png" }.count
+        try f.run(); XCTAssertEqual(try f.state().phase, "complete")
+        XCTAssertEqual(f.service.events.filter { $0 == "reserve:6.png" }.count, candidates)
+        XCTAssertTrue(f.service.rows.contains { $0.imageID == "image-11" })
+    }
+    func testSingleRetryOtherLocaleRollbackBlocksBeforeAnyHTTPOrMutation() throws {
+        let first = try DuoExecutorFixture(namespace: "a-"), second = try DuoExecutorFixture(namespace: "b-", locale: "fr-FR")
+        defer { first.clean(); second.clean() }
+        let value = queuedCoordinator([first, second]); try value.preflight()
+        let path = first.directory.appendingPathComponent("duo-fr-FR-journal.json")
+        var state = try ManifestBuilder.decode(DuoExecutionJournal.self, at: path)
+        state.phase = "rollingBack"; try FileIO.writeJSON(state, to: path)
+        XCTAssertThrowsError(try value.requireSingleRetryCheckpoint(locale: "en-US"))
+        XCTAssertTrue(first.service.events.isEmpty && second.service.events.isEmpty)
+    }
+}
