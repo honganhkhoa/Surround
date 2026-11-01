@@ -138,6 +138,15 @@ they omit rendition URLs, raw filenames, credentials and upload headers. These
 diagnostics do not admit unknown rows or change ownership/content checks. A
 later coherent read does not establish the cause of an earlier mismatch.
 
+After exactly one current-epoch journal-verified deletion, a legacy projection
+may temporarily append that deleted row with a changed rendition template.
+The verifier waits boundedly only when every survivor retains its complete
+proven identity, metadata and relative order, and the deleted row retains its
+ID, name, checksum, size and dimensions. This projection is never accepted or
+saved as a checkpoint. Another mutation requires the normal strict current
+graph, native-pixel and stable dual-view proof; unresolved deletion projection
+times out without replaying writes. Unknown rows and other drift still stop.
+
 Only the explicitly proven target Duo projection participates in compatibility
 comparison. Both full raw views remain in the stored snapshots; released-source,
 metadata, unrelated locale and screenshot-set checks stay strict. This also

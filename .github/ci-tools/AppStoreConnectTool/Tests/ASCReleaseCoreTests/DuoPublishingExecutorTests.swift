@@ -463,6 +463,168 @@ extension DuoPublishingExecutorTests {
         XCTAssertEqual(fixture.service.downloads, 0)
     }
 
+    private func appendedDeletingRow(_ original: RemoteScreenshotSet) throws -> RemoteScreenshotSet {
+        let deleted = try XCTUnwrap(original.screenshots.first)
+        var attributes = deleted.attributes
+        var asset = try XCTUnwrap(attributes["imageAsset"]?.objectValue)
+        asset["templateUrl"] = .string("https://pending.example/deleted-row.png")
+        attributes["imageAsset"] = .object(asset)
+        let pending = RemoteScreenshot(id: deleted.id, fileName: deleted.fileName,
+            checksum: deleted.checksum, attributes: attributes)
+        return RemoteScreenshotSet(id: original.id, displayType: original.displayType,
+            screenshots: Array(original.screenshots.dropFirst()) + [pending])
+    }
+
+    func testVerifiedDeletionAppendedLegacyRowWaitsForStrictCurrentPixelsIncludingEmptyGroup() throws {
+        for count in [5, 1] {
+            let fixture = try DuoExecutorFixture(baselineCount: count, compatibility: true); defer { fixture.clean() }
+            let previous = try XCTUnwrap(fixture.set.compatibilityBaseline)
+            let lagging = try appendedDeletingRow(XCTUnwrap(fixture.service.makeLegacy()))
+            let graph = Array(previous.placements.dropFirst())
+            fixture.service.rows = graph
+            var reads = 0, waits = 0
+            fixture.service.legacyOverride = {
+                reads += 1
+                return reads == 1 ? lagging : try fixture.service.makeLegacy()
+            }
+            let expected = zip(previous.content.dropFirst(), previous.legacy.images.dropFirst()).map { proof, old in
+                DuoExpectedContent(fileName: proof.fileName, byteCount: proof.byteCount, width: proof.asset.width,
+                    height: proof.asset.height, pixels: proof.pixelSHA256, checksum: old.checksum,
+                    pinnedAsset: proof.asset, pinnedLegacyID: old.id)
+            }
+            let verifier = DuoCompatibilityVerifier(service: fixture.service, localizationID: fixture.set.localizationID,
+                group: "test-duo-group", attempts: 2, sleeper: { _ in waits += 1 })
+            let result = try verifier.prove(graph: graph, expected: expected, previous: previous,
+                verifiedDeletionID: previous.placements[0].id)
+            XCTAssertEqual(waits, 1)
+            XCTAssertEqual(result.placements, graph)
+            XCTAssertEqual(result.legacy.images, Array(previous.legacy.images.dropFirst()))
+            XCTAssertEqual(result.content, Array(previous.content.dropFirst()))
+            XCTAssertEqual(fixture.service.downloads, count - 1)
+            XCTAssertTrue(fixture.service.events.isEmpty)
+        }
+    }
+
+    func testAppendedDeletingLegacyRowRejectsMissingContextAndUnownedOrChangedContent() throws {
+        for fault in ["missing-context", "wrong-context", "foreign", "duplicate", "survivor-order", "survivor-template", "survivor-name", "deleted-checksum", "deleted-size", "deleted-dimensions", "deleted-middle"] {
+            let fixture = try DuoExecutorFixture(baselineCount: 5, compatibility: true); defer { fixture.clean() }
+            let previous = try XCTUnwrap(fixture.set.compatibilityBaseline)
+            let original = try appendedDeletingRow(XCTUnwrap(fixture.service.makeLegacy()))
+            var rows = original.screenshots
+            if fault == "survivor-order" { rows.swapAt(0, 1) }
+            else if fault == "duplicate" { rows[4] = rows[0] }
+            else if fault == "deleted-middle" { rows.insert(rows.removeLast(), at: 1) }
+            else if !["missing-context", "wrong-context"].contains(fault) {
+                let index = fault.hasPrefix("survivor") ? 0 : 4
+                let old = rows[index]; var attributes = old.attributes
+                var name = old.fileName, checksum = old.checksum, id = old.id
+                if fault == "foreign" { id = "unknown-legacy-row" }
+                if fault == "survivor-name" { name = "changed.png" }
+                if fault == "deleted-checksum" { checksum = String(repeating: "0", count: 32) }
+                if fault == "deleted-size" { attributes["fileSize"] = .number(1) }
+                if ["survivor-template", "deleted-dimensions"].contains(fault) {
+                    var asset = try XCTUnwrap(attributes["imageAsset"]?.objectValue)
+                    asset[fault == "survivor-template" ? "templateUrl" : "width"] = fault == "survivor-template" ? .string("https://changed.example/survivor.png") : .number(1)
+                    attributes["imageAsset"] = .object(asset)
+                }
+                rows[index] = RemoteScreenshot(id: id, fileName: name, checksum: checksum, attributes: attributes)
+            }
+            fixture.service.rows = Array(previous.placements.dropFirst())
+            fixture.service.legacyOverride = { RemoteScreenshotSet(id: original.id, displayType: original.displayType, screenshots: rows) }
+            let expected = zip(previous.content.dropFirst(), previous.legacy.images.dropFirst()).map { proof, old in
+                DuoExpectedContent(fileName: proof.fileName, byteCount: proof.byteCount, width: proof.asset.width,
+                    height: proof.asset.height, pixels: proof.pixelSHA256, checksum: old.checksum,
+                    pinnedAsset: proof.asset, pinnedLegacyID: old.id)
+            }
+            var waits = 0
+            let verifier = DuoCompatibilityVerifier(service: fixture.service, localizationID: fixture.set.localizationID,
+                group: "test-duo-group", attempts: 2, sleeper: { _ in waits += 1 })
+            let deletionID = fault == "missing-context" ? nil : (fault == "wrong-context" ? "wrong-placement" : previous.placements[0].id)
+            XCTAssertThrowsError(try verifier.prove(graph: fixture.service.rows, expected: expected,
+                previous: previous, verifiedDeletionID: deletionID), fault) { error in
+                guard case DuoExecutionFailure.drift = error else { return XCTFail("\(fault): \(error)") }
+            }
+            XCTAssertEqual(waits, 0, fault)
+            XCTAssertEqual(fixture.service.downloads, 0, fault)
+            XCTAssertTrue(fixture.service.events.isEmpty, fault)
+        }
+    }
+
+    func testAppendedDeletingRowTimeoutKeepsCheckpointAndResumesWithoutWriteReplay() throws {
+        let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }
+        var remaining = 100, lagging: RemoteScreenshotSet?
+        fixture.service.beforeMutation = { label in
+            if label == "delete:old-placement-1" && lagging == nil {
+                lagging = try self.appendedDeletingRow(XCTUnwrap(fixture.service.makeLegacy()))
+                fixture.service.legacyOverride = {
+                    if remaining > 0 { remaining -= 1; return lagging }
+                    return try fixture.service.makeLegacy()
+                }
+            }
+            if label == "delete:old-placement-2" { XCTAssertEqual(remaining, 0) }
+        }
+        XCTAssertThrowsError(try fixture.run()) { error in
+            guard case DuoExecutionFailure.uncertain = error else { return XCTFail("Unexpected \(error)") }
+        }
+        let paused = try fixture.state()
+        XCTAssertEqual(paused.compatibilityCheckpoint?.placements.count, 10)
+        XCTAssertEqual(paused.expectedGraph?.count, 9)
+        XCTAssertEqual(fixture.service.events.filter { $0.hasPrefix("delete:") }.count, 1)
+        let writes = fixture.service.events.count
+        XCTAssertThrowsError(try fixture.run())
+        XCTAssertEqual(fixture.service.events.count, writes)
+        // A different epoch's verified DELETE cannot authorize waiting.
+        let validJournal = try Data(contentsOf: fixture.journal)
+        var object = try XCTUnwrap(FileIO.readJSON(at: fixture.journal).objectValue)
+        object["entries"] = .array(try XCTUnwrap(object["entries"]?.arrayValue).map { value in
+            guard value["key"] == .string("switch:0:delete:old-placement-1") else { return value }
+            var entry = value.objectValue!
+            entry["key"] = .string("switch:99:delete:old-placement-1")
+            return .object(entry)
+        })
+        try FileIO.writeJSON(JSONValue.object(object), to: fixture.journal)
+        XCTAssertThrowsError(try fixture.run()) { error in
+            guard case DuoExecutionFailure.drift = error else { return XCTFail("Unexpected \(error)") }
+        }
+        XCTAssertEqual(fixture.service.events.count, writes)
+        try validJournal.write(to: fixture.journal)
+        remaining = 0
+        try fixture.run()
+        XCTAssertEqual(try fixture.state().phase, "complete")
+        XCTAssertEqual(fixture.service.events.filter { $0 == "delete:old-placement-1" }.count, 1)
+        XCTAssertEqual(fixture.service.events.filter { $0.hasPrefix("upload:") }.count, 10)
+    }
+
+    func testPendingDeletionStillRejectsChangedModernGraphAndConvergedWrongPixels() throws {
+        for fault in ["modern-order", "served-pixels"] {
+            let fixture = try DuoExecutorFixture(baselineCount: 5, compatibility: true); defer { fixture.clean() }
+            let previous = try XCTUnwrap(fixture.set.compatibilityBaseline)
+            let lagging = try appendedDeletingRow(XCTUnwrap(fixture.service.makeLegacy()))
+            let graph = Array(previous.placements.dropFirst())
+            fixture.service.rows = graph
+            var reads = 0
+            fixture.service.legacyOverride = {
+                reads += 1
+                return reads == 1 ? lagging : try fixture.service.makeLegacy()
+            }
+            let expected = zip(previous.content.dropFirst(), previous.legacy.images.dropFirst()).map { proof, old in
+                DuoExpectedContent(fileName: proof.fileName, byteCount: proof.byteCount, width: proof.asset.width,
+                    height: proof.asset.height, pixels: proof.pixelSHA256, checksum: old.checksum,
+                    pinnedAsset: proof.asset, pinnedLegacyID: old.id)
+            }
+            let verifier = DuoCompatibilityVerifier(service: fixture.service, localizationID: fixture.set.localizationID,
+                group: "test-duo-group", attempts: 2, sleeper: { _ in
+                    if fault == "modern-order" { fixture.service.rows.reverse() }
+                    else { fixture.service.data[graph[0].imageID] = try! Data(contentsOf: URL(fileURLWithPath: fixture.set.images[1].path)) }
+                })
+            XCTAssertThrowsError(try verifier.prove(graph: graph, expected: expected, previous: previous,
+                verifiedDeletionID: previous.placements[0].id)) { error in
+                guard case DuoExecutionFailure.drift = error else { return XCTFail("\(fault): \(error)") }
+            }
+            XCTAssertTrue(fixture.service.events.isEmpty)
+        }
+    }
+
     func testDualViewUnknownLegacyRowOrOrderStopsBeforeAnyCloudMutation() throws {
         for fault in ["identity", "order", "processing"] {
             let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }

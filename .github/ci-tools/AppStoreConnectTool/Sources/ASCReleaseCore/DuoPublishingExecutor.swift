@@ -680,8 +680,15 @@ public final class DuoPublishingExecutor {
     private func proveCompatibility(_ graph: [DuoRemotePlacement]) throws {
         guard let compatibilityVerifier else { return }
         let expected = try graph.map(expectedContent)
+        let removed = journal.compatibilityCheckpoint?.placements.filter { previous in
+            !graph.contains { $0.id == previous.id }
+        } ?? []
+        let verifiedDeletionID = removed.count == 1 &&
+            ["switch:\(journal.epoch):delete:\(removed[0].id)", "restore:\(journal.epoch):remove:\(removed[0].id)"].contains(where: {
+                latest($0)?.status == "verified"
+            }) ? removed[0].id : nil
         let checkpoint = try compatibilityVerifier.prove(graph: graph, expected: expected,
-            previous: journal.compatibilityCheckpoint)
+            previous: journal.compatibilityCheckpoint, verifiedDeletionID: verifiedDeletionID)
         if checkpoint != journal.compatibilityCheckpoint {
             journal.compatibilityCheckpoint = checkpoint
             try save()
