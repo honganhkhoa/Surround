@@ -1,5 +1,11 @@
 import Foundation
 
+enum DuoDesiredReadiness: Equatable {
+    case needsSubmission
+    case processing(String)
+    case ready(String)
+}
+
 /// Per-localization execution for an admitted, digest-confirmed selected handoff.
 /// Historical capture limitations remain recorded independently of admission.
 public final class DuoPublishingExecutor {
@@ -57,7 +63,7 @@ public final class DuoPublishingExecutor {
 
     /// GET-only remote reconciliation before the aggregate publisher may write.
     /// Known readbacks may update the local journal; an offline dry run never calls this.
-    func preflight(allowRollbackProof: Bool = false) throws {
+    func preflight(allowRollbackProof: Bool = false, allowKnownProcessing: Bool = false) throws {
         for image in set.images { _ = try validatedBytes(image) }
         try service.verifyEditableTarget(set)
         if journal.phase == "complete" {
@@ -73,9 +79,16 @@ public final class DuoPublishingExecutor {
             throw DuoExecutionFailure.uncertain("Pending Duo rollback must finish before other aggregate writes")
         }
         try sealAndVerifyBackup()
-        for image in set.images { try preflightStagedImage(image, key: "desired:\(image.position)") }
+        var processingKeys: Set<String> = []
+        for image in set.images {
+            let key = "desired:\(image.position)"
+            if case .processing = try preflightStagedImage(image, key: key,
+                allowKnownProcessing: allowKnownProcessing && journal.phase == "preparing") {
+                processingKeys.insert(key + ":commit")
+            }
+        }
         for backup in journal.backups {
-            try preflightStagedImage(backup.file, key: "restore:\(journal.epoch):\(backup.file.position)")
+            _ = try preflightStagedImage(backup.file, key: "restore:\(journal.epoch):\(backup.file.position)")
         }
         if ["switching", "rollingBack"].contains(journal.phase) {
             try reconcilePendingPlacementCreates()
@@ -104,16 +117,30 @@ public final class DuoPublishingExecutor {
             try requireExactGroup(journal.activeBaseline)
             try proveCompatibility(try group())
         }
-        let keys = Set(journal.entries.map(\.key))
-        guard keys.allSatisfy({ key in
-            latest(key).map { ["verified", "rejected"].contains($0.status) } ?? false
-        }) else {
-            throw DuoExecutionFailure.uncertain("Unresolved Duo reservation/upload intent stops aggregate writes")
-        }
+        try requireKnownEntries(processingKeys: processingKeys)
     }
 
-    private func preflightStagedImage(_ image: DuoPublishImage, key: String) throws {
-        guard let reservation = latest(key + ":reserve") else { return }
+    private func requireKnownEntries(processingKeys: Set<String>) throws {
+        guard Set(journal.entries.map(\.key)).allSatisfy({ key in
+            guard let status = latest(key)?.status else { return false }
+            return ["verified", "rejected"].contains(status) ||
+                (processingKeys.contains(key) && status == "responseKnown")
+        }) else { throw DuoExecutionFailure.uncertain("Unresolved Duo reservation/upload intent stops aggregate writes") }
+    }
+
+    private func preflightStagedImage(_ image: DuoPublishImage, key: String,
+                                     allowKnownProcessing: Bool = false) throws -> DuoDesiredReadiness {
+        guard let reservation = latest(key + ":reserve") else {
+            guard latest(key + ":upload") == nil, latest(key + ":commit") == nil else {
+                throw DuoExecutionFailure.uncertain("Staged image has no owned reservation")
+            }
+            return .needsSubmission
+        }
+        guard reservation.requestDigest == (try digest(adapter.reserveImage(fileName: image.fileName, fileSize: image.byteCount))) else {
+            throw DuoExecutionFailure.drift("Staged reservation request changed")
+        }
+        if reservation.status == "rejected", reservation.resourceID == nil,
+           latest(key + ":upload") == nil, latest(key + ":commit") == nil { return .needsSubmission }
         guard ["verified", "responseKnown"].contains(reservation.status), let id = reservation.resourceID else {
             throw DuoExecutionFailure.uncertain("Pending reservation has no exact known image identity")
         }
@@ -122,8 +149,50 @@ public final class DuoPublishingExecutor {
             try entry(key + ":reserve", "verified", digest: reservation.requestDigest, id: id)
         }
         let upload = latest(key + ":upload"), commit = latest(key + ":commit")
+        if let upload {
+            let expected = try digest(.object(["imageID": .string(id), "sha256": .string(image.sha256),
+                "bytes": .number(Double(image.byteCount))]) as JSONValue)
+            guard upload.requestDigest == expected, upload.resourceID == id else {
+                throw DuoExecutionFailure.drift("Staged upload identity or bytes changed")
+            }
+        }
+        if let commit {
+            guard commit.requestDigest == (try digest(adapter.commitImage(imageID: id))),
+                  commit.resourceID == nil || commit.resourceID == id else {
+                throw DuoExecutionFailure.drift("Staged commit request changed")
+            }
+        }
+        if allowKnownProcessing, raw["attributes"]?["state"] == .string("UPLOAD_COMPLETE") {
+            guard key == "desired:\(image.position)", journal.phase == "preparing",
+                  upload?.status == "verified", commit?.status == "responseKnown" else {
+                throw DuoExecutionFailure.uncertain("Processing image lacks an exact known upload and commit response")
+            }
+            return .processing(id)
+        }
+        if allowKnownProcessing, [upload, commit].contains(where: {
+            $0.map { ["intent", "uncertain"].contains($0.status) } ?? false
+        }), raw["attributes"]?["state"] != .string("PREPARE_FOR_SUBMISSION") {
+            throw DuoExecutionFailure.uncertain("Unknown staged mutation must resolve before queue writes")
+        }
         guard raw["attributes"]?["state"] != .string("PREPARE_FOR_SUBMISSION") || commit != nil else {
             throw DuoExecutionFailure.drift("Staged image was committed outside this journal")
+        }
+        if raw["attributes"]?["state"] == .string("PREPARE_FOR_SUBMISSION") {
+            guard let upload, let commit, ["verified", "intent", "uncertain"].contains(upload.status),
+                  ["verified", "intent", "uncertain", "responseKnown"].contains(commit.status) else {
+                throw DuoExecutionFailure.uncertain("Processed image lacks its exact owned upload and commit dependencies")
+            }
+            try validateProcessedImage(raw, file: image)
+            for pending in [upload, commit] where pending.status != "verified" {
+                try entry(pending.key, "verified", digest: pending.requestDigest, id: id)
+            }
+            return .ready(id)
+        }
+        if allowKnownProcessing, let commit, commit.status != "rejected" {
+            if raw["attributes"]?["state"] == .string("FAILED") {
+                throw DuoExecutionFailure.rejected("Duo image processing failed")
+            }
+            throw DuoExecutionFailure.uncertain("Known commit has an unexpected or regressed processing state")
         }
         if commit?.status == "verified" || [upload, commit].contains(where: {
             $0.map { ["intent", "uncertain", "responseKnown"].contains($0.status) } ?? false
@@ -134,14 +203,26 @@ public final class DuoPublishingExecutor {
                     try entry(key + suffix, "verified", digest: pending.requestDigest, id: id)
                 }
             }
+            return .ready(id)
         } else {
             guard raw["attributes"]?["state"] == .string("AWAITING_UPLOAD") else {
                 throw DuoExecutionFailure.drift("Staged image no longer matches its uncommitted journal state")
             }
+            return .needsSubmission
         }
     }
 
     public func publish(confirmedVersion: String, confirmedSetDigest: String) throws {
+        if try prepareQueuedStaging(confirmedVersion: confirmedVersion, confirmedSetDigest: confirmedSetDigest) { return }
+        var desiredImages: [Int: String] = [:]
+        for image in set.images { desiredImages[image.position] = try stage(image, key: "desired:\(image.position)") }
+        try switchPlacements(desiredImages: desiredImages)
+    }
+
+    /// Submission and placement remain single-owner operations. The coordinator
+    /// may overlap Apple's asynchronous processing without sharing this state.
+    @discardableResult
+    func prepareQueuedStaging(confirmedVersion: String, confirmedSetDigest: String) throws -> Bool {
         guard confirmedVersion == set.version, try set.digest() == confirmedSetDigest,
               set.sourceManifestSHA256.range(of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil,
               set.images.map(\.position) == Array(1...10), set.reviewedBaseline.count <= 10 else {
@@ -154,7 +235,7 @@ public final class DuoPublishingExecutor {
             try requireExactGroup(journal.completedPlacements)
             for image in set.images { _ = try processedImage(id: try reservedID("desired:\(image.position)"), file: image) }
             try proveCompatibility(try group())
-            return
+            return true
         }
         if journal.phase == "rollingBack" {
             try rollback()
@@ -166,8 +247,39 @@ public final class DuoPublishingExecutor {
         }
         if journal.phase == "preparing" { try proveCompatibility(try group()) }
         try sealAndVerifyBackup()
-        var desiredImages: [Int: String] = [:]
-        for image in set.images { desiredImages[image.position] = try stage(image, key: "desired:\(image.position)") }
+        return false
+    }
+
+    func pollDesiredReadiness(previous: [Int: DuoDesiredReadiness] = [:]) throws -> [Int: DuoDesiredReadiness] {
+        var result: [Int: DuoDesiredReadiness] = [:], processingKeys: Set<String> = []
+        for image in set.images {
+            // Cached readiness only schedules work. publish() reads every image
+            // again before entering its unchanged placement transaction.
+            if case .ready = previous[image.position] {
+                result[image.position] = previous[image.position]; continue
+            }
+            let key = "desired:\(image.position)"
+            let readiness = try preflightStagedImage(image, key: key, allowKnownProcessing: journal.phase == "preparing")
+            result[image.position] = readiness
+            if case .processing = readiness { processingKeys.insert(key + ":commit") }
+        }
+        try requireKnownEntries(processingKeys: processingKeys)
+        return result
+    }
+
+    func submitDesired(position: Int) throws -> DuoDesiredReadiness {
+        guard journal.phase == "preparing", let image = set.images.first(where: { $0.position == position }) else {
+            throw DuoExecutionFailure.uncertain("New image submission requires a preparing owned locale")
+        }
+        try service.verifyEditableTarget(set)
+        try requireExactGroup(journal.activeBaseline)
+        _ = try submit(image, key: "desired:\(position)")
+        return try preflightStagedImage(image, key: "desired:\(position)", allowKnownProcessing: true)
+    }
+
+    var isPreparing: Bool { journal.phase == "preparing" }
+
+    private func switchPlacements(desiredImages: [Int: String]) throws {
         if journal.phase == "preparing" {
             try requireExactGroup(journal.activeBaseline)
             try verifyBaselineImageIdentities()
@@ -389,11 +501,7 @@ public final class DuoPublishingExecutor {
         for index in 0..<attempts {
             let raw = try basicImage(id, file: image)
             if raw["attributes"]?["state"] == .string("PREPARE_FOR_SUBMISSION") {
-                guard raw["attributes"]?["specId"] == .string(image.specID),
-                      raw["attributes"]?["imageAsset"]?["width"]?.intValue == image.pixelWidth,
-                      raw["attributes"]?["imageAsset"]?["height"]?.intValue == image.pixelHeight else {
-                    throw DuoExecutionFailure.rejected("Processed image does not match the intended Duo specification")
-                }
+                try validateProcessedImage(raw, file: image)
                 return raw
             }
             if raw["attributes"]?["state"] == .string("FAILED") { throw DuoExecutionFailure.rejected("Duo image processing failed") }
@@ -402,7 +510,22 @@ public final class DuoPublishingExecutor {
         throw DuoExecutionFailure.uncertain("Duo image processing did not finish within the bounded poll")
     }
 
+    private func validateProcessedImage(_ raw: JSONValue, file image: DuoPublishImage) throws {
+        guard raw["attributes"]?["specId"] == .string(image.specID),
+              raw["attributes"]?["imageAsset"]?["width"]?.intValue == image.pixelWidth,
+              raw["attributes"]?["imageAsset"]?["height"]?.intValue == image.pixelHeight else {
+            throw DuoExecutionFailure.rejected("Processed image does not match the intended Duo specification")
+        }
+    }
+
     private func stage(_ image: DuoPublishImage, key: String) throws -> String {
+        let id = try submit(image, key: key)
+        _ = try processedImage(id: id, file: image)
+        try verify(key + ":commit")
+        return id
+    }
+
+    private func submit(_ image: DuoPublishImage, key: String) throws -> String {
         let bytes = try validatedBytes(image), reserveKey = key + ":reserve"
         let reservation = try adapter.reserveImage(fileName: image.fileName, fileSize: image.byteCount)
         guard let id = try mutate(reserveKey, request: reservation, reconcile: { (false, nil) }, expectsID: "appAssetLibraryImages") else {
@@ -450,7 +573,6 @@ public final class DuoPublishingExecutor {
             _ = try mutate(commitKey, request: commit, reconcile: { [self] in
                 _ = try processedImage(id: id, file: image); return (true, id)
             })
-            _ = try processedImage(id: id, file: image); try verify(commitKey)
         }
         return id
     }

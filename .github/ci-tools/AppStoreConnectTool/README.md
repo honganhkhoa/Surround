@@ -182,6 +182,10 @@ creates a checkpoint for resuming the same reviewed set in a new epoch; complete
 groups are read back before reuse. Upload URLs, headers and credentials are not
 journaled. Mutation requests and upload operations use a single attempt.
 
+The selected-release coordinator queues desired image submissions across locales in round-robin order, with at most ten known processing images across the release. Reserve, PUT, commit, journal persistence and placement reconciliation remain serial under one owner; only Apple's asynchronous processing overlaps. Existing pending image IDs consume window slots after restart and are never reserved or uploaded again. Each polling round checks waiting images once, then waits fifteen seconds; forty rounds without new submissions, readiness changes or completed locales pause at a preserved checkpoint. Ready locales can finish while another locale has a delayed image, but all ten images must pass fresh processing/specification checks before that locale's original placements are changed. Cached readiness only schedules work and never authorizes placement writes.
+
+This queue admits only an exact owned desired image in `UPLOAD_COMPLETE` with a verified reservation and upload, a known successful commit response, and matching request digests, identity, filename, size and category. Unknown mutation outcomes, unexpected or regressed states, terminal processing failure, target drift and rollback retain their existing stop/recovery rules. GET rate-limit backoff and single-attempt mutation behavior are unchanged. The queue does not add parallel HTTP writers or bypass either view's native-content proof. Localized notes remain after all screenshot groups complete.
+
 This component is tested with injected fixtures, including recovery and existing
 legacy retry/rollback compatibility. The current selected capture remains gated;
 local execution tests do not establish server write acceptance, storefront

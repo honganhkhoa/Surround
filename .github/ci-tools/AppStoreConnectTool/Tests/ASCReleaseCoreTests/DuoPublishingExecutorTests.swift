@@ -772,7 +772,7 @@ private final class DuoExecutorFixture {
     let service: DuoMemoryService
     let originalPixels: [Data]
 
-    init(baselineCount: Int = 10, compatibility: Bool = false) throws {
+    init(baselineCount: Int = 10, compatibility: Bool = false, namespace: String = "", locale: String = "en-US") throws {
         directory = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("duo-executor-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         journal = directory.appendingPathComponent("journal.json")
@@ -790,7 +790,7 @@ private final class DuoExecutorFixture {
         let oldOuter = try Self.png(1398, 2034, byte: 32), oldInner = try Self.png(2853, 2007, byte: 48)
         let newOuter = try Self.png(1398, 2034, byte: 96), newInner = try Self.png(2853, 2007, byte: 112)
         var desired: [DuoPublishImage] = [], baseline: [DuoRemotePlacement] = [], originals: [Data] = []
-        service = DuoMemoryService()
+        service = DuoMemoryService(); service.namespace = namespace
         for position in 1...10 {
             let inner = (2...7).contains(position), size = inner ? sizes[2] : sizes[0]
             let data = inner ? newInner : newOuter, file = directory.appendingPathComponent("\(position).png")
@@ -799,10 +799,10 @@ private final class DuoExecutorFixture {
                 sha256: FileIO.sha256(data), pixelWidth: size.0, pixelHeight: size.1, specID: inner ? "spec-2" : "spec-0",
                 origin: .object(["kind": .string("synthetic-unit-fixture")])) )
             if position <= baselineCount {
-                let old = inner ? oldInner : oldOuter, id = "old-image-\(position)"
+                let old = inner ? oldInner : oldOuter, id = namespace + "old-image-\(position)"
                 service.data[id] = old; originals.append(old)
                 service.images[id] = Self.resource(id: id, name: "old-\(position).png", data: old, size: size, spec: inner ? "spec-2" : "spec-0", state: "APPROVED")
-                baseline.append(DuoRemotePlacement(id: "old-placement-\(position)", imageID: id, group: "test-duo-group", state: "ACTIVE"))
+                baseline.append(DuoRemotePlacement(id: namespace + "old-placement-\(position)", imageID: id, group: "test-duo-group", state: "ACTIVE"))
             }
         }
         service.rows = baseline; originalPixels = originals
@@ -819,8 +819,8 @@ private final class DuoExecutorFixture {
             paired = DuoCompatibilityBaseline(policy: DuoCompatibilityBaseline.policyName,
                 legacy: legacy, placements: baseline, content: content)
         } else { paired = nil }
-        set = DuoPublishSet(version: "3.0", bundleID: "com.example.App", appID: "app", assetLibraryID: "library", versionID: "target3",
-            localizationID: "target3-locale", locale: "en-US", sourceManifestSHA256: String(repeating: "a", count: 64),
+        set = DuoPublishSet(version: "3.0", bundleID: "com.example.App", appID: "app", assetLibraryID: namespace + "library", versionID: "target3",
+            localizationID: namespace + "target3-locale", locale: locale, sourceManifestSHA256: String(repeating: "a", count: 64),
             catalog: catalog, images: desired, reviewedBaseline: baseline, compatibilityBaseline: paired)
     }
     func clean() { service.fault = nil; service.beforeMutation = nil; try? FileManager.default.removeItem(at: directory) }
@@ -858,6 +858,9 @@ private final class DuoMemoryService: DuoPublishingService {
     var legacyOverride: (() throws -> RemoteScreenshotSet?)?
     var legacyReads = 0
     var downloads = 0
+    var namespace = ""
+    var holdProcessingNames: Set<String> = []
+    var beforeImageRead: ((String) throws -> Void)?
     private var nextImage = 0, nextPlacement = 0
     func makeLegacy() throws -> RemoteScreenshotSet? {
         if rows.isEmpty { return nil }
@@ -880,11 +883,20 @@ private final class DuoMemoryService: DuoPublishingService {
     func verifyEditableTarget(_ set: DuoPublishSet) throws {}
     func placements(localizationID: String, group: String) throws -> [DuoRemotePlacement] { rows }
     func image(id: String) throws -> JSONValue {
+        try beforeImageRead?(id)
         var row = try XCTUnwrap(images[id]).objectValue!
         if wrongOriginalResponseID && id.hasPrefix("old-image-") { row["id"] = .string("another-resource") }
         return .object(row)
     }
     func download(_ url: URL) throws -> Data { downloads += 1; return try XCTUnwrap(data[url.deletingPathExtension().lastPathComponent]) }
+    func finishProcessing() throws {
+        holdProcessingNames.removeAll()
+        for (id, row) in images where row["attributes"]?["state"] == .string("UPLOAD_COMPLETE") {
+            let bytes = try XCTUnwrap(data[id]), size = try ImageValidation.decodePNG(bytes, context: "queue fixture")
+            images[id] = DuoExecutorFixture.resource(id: id, name: row["attributes"]!["fileName"]!.stringValue!, data: bytes,
+                size: (size.pixelWidth, size.pixelHeight), spec: size.pixelWidth == 1398 ? "spec-0" : "spec-2", state: "PREPARE_FOR_SUBMISSION")
+        }
+    }
     private func begin(_ label: String) throws { try beforeMutation?(label); events.append(label); try fault?(label, false) }
     private func end(_ label: String) throws { try fault?(label, true) }
     func upload(_ operation: UploadOperation, bytes: Data) throws {
@@ -895,7 +907,7 @@ private final class DuoMemoryService: DuoPublishingService {
     func send(_ request: DuoAssetLibraryRequest) throws -> JSONValue? {
         if request.path == "/v1/appAssetLibraryImages" {
             let attrs = request.body["data"]!["attributes"]!, name = attrs["fileName"]!.stringValue!, size = attrs["fileSize"]!.intValue!
-            let label = "reserve:" + name; try begin(label); nextImage += 1; let id = "image-\(nextImage)"
+            let label = "reserve:" + name; try begin(label); nextImage += 1; let id = namespace + "image-\(nextImage)"
             images[id] = .object(["type": .string("appAssetLibraryImages"), "id": .string(id), "attributes": .object([
                 "fileName": .string(name), "fileSize": .number(Double(size)), "category": .string("APP_SCREENSHOTS_AND_PREVIEWS"),
                 "state": .string("AWAITING_UPLOAD"), "uploadOperations": .array([.object([
@@ -910,6 +922,11 @@ private final class DuoMemoryService: DuoPublishingService {
             images[id] = DuoExecutorFixture.resource(id: id, name: old["attributes"]!["fileName"]!.stringValue!, data: bytes,
                 size: (decoded.pixelWidth, decoded.pixelHeight), spec: wrongSpecification ? "wrong" : (decoded.pixelWidth == 1398 ? "spec-0" : "spec-2"),
                 state: failProcessing ? "FAILED" : "PREPARE_FOR_SUBMISSION")
+            if holdProcessingNames.contains(old["attributes"]!["fileName"]!.stringValue!) {
+                var attrs = images[id]!["attributes"]!.objectValue!
+                attrs["state"] = .string("UPLOAD_COMPLETE"); attrs["imageAsset"] = .null; attrs["specId"] = .null
+                var row = images[id]!.objectValue!; row["attributes"] = .object(attrs); images[id] = .object(row)
+            }
             try end(label); return .object(["data": images[id]!])
         }
         if request.method == "DELETE" {
@@ -920,7 +937,7 @@ private final class DuoMemoryService: DuoPublishingService {
         if request.path == "/v1/appAssetLibraryPlacements" {
             let imageID = request.body["data"]!["relationships"]!["image"]!["data"]!["id"]!.stringValue!
             let label = "place:" + images[imageID]!["attributes"]!["fileName"]!.stringValue!
-            try begin(label); XCTAssertLessThan(rows.count, 10); nextPlacement += 1; let id = "placement-\(nextPlacement)"
+            try begin(label); XCTAssertLessThan(rows.count, 10); nextPlacement += 1; let id = namespace + "placement-\(nextPlacement)"
             rows.insert(DuoRemotePlacement(id: id, imageID: imageID, group: "test-duo-group", state: "PARENT_PREPARE_FOR_SUBMISSION"), at: 0)
             try end(label); return .object(["data": .object(["type": .string("appAssetLibraryPlacements"), "id": .string(id)])])
         }
@@ -949,4 +966,188 @@ private final class TwoLocaleDuoService: DuoPublishingService {
     func download(_ url: URL) throws -> Data { try first.download(url) }
     func send(_ request: DuoAssetLibraryRequest) throws -> JSONValue? { writes += 1; throw ReleaseToolError.validation("Unexpected multi-locale mutation") }
     func upload(_ operation: UploadOperation, bytes: Data) throws { writes += 1; throw ReleaseToolError.validation("Unexpected multi-locale upload") }
+}
+
+private final class QueueDuoService: DuoPublishingService {
+    let fixtures: [DuoExecutorFixture]
+    init(_ fixtures: [DuoExecutorFixture]) { self.fixtures = fixtures }
+    private func forImage(_ id: String) throws -> DuoMemoryService {
+        try XCTUnwrap(fixtures.first { $0.service.images[id] != nil }?.service)
+    }
+    private func forLocalization(_ id: String) throws -> DuoMemoryService {
+        try XCTUnwrap(fixtures.first { $0.set.localizationID == id }?.service)
+    }
+    func verifyEditableTarget(_ set: DuoPublishSet) throws {}
+    func image(id: String) throws -> JSONValue { try forImage(id).image(id: id) }
+    func placements(localizationID: String, group: String) throws -> [DuoRemotePlacement] {
+        try forLocalization(localizationID).placements(localizationID: localizationID, group: group)
+    }
+    func legacyDuoSet(localizationID: String) throws -> RemoteScreenshotSet? {
+        try forLocalization(localizationID).legacyDuoSet(localizationID: localizationID)
+    }
+    func download(_ url: URL) throws -> Data { try forImage(url.deletingPathExtension().lastPathComponent).download(url) }
+    func upload(_ operation: UploadOperation, bytes: Data) throws {
+        try forImage(URL(string: operation.url)!.lastPathComponent).upload(operation, bytes: bytes)
+    }
+    func send(_ request: DuoAssetLibraryRequest) throws -> JSONValue? {
+        let relations = request.body["data"]?["relationships"]
+        let owner: DuoMemoryService
+        if request.path == "/v1/appAssetLibraryImages" {
+            let library = relations?["assetLibrary"]?["data"]?["id"]?.stringValue
+            owner = try XCTUnwrap(fixtures.first { $0.set.assetLibraryID == library }?.service)
+        } else if let locale = relations?["appStoreVersionLocalization"]?["data"]?["id"]?.stringValue {
+            owner = try forLocalization(locale)
+        } else if request.method == "DELETE" {
+            let id = String(request.path.split(separator: "/").last!)
+            owner = try XCTUnwrap(fixtures.first { $0.service.rows.contains { $0.id == id } }?.service)
+        } else { owner = try forImage(String(request.path.split(separator: "/").last!)) }
+        return try owner.send(request)
+    }
+}
+
+extension DuoPublishingExecutorTests {
+    private func queuedCoordinator(_ fixtures: [DuoExecutorFixture], window: Int = 3, idle: Int = 2,
+                                   sleep: @escaping (TimeInterval) -> Void = { _ in }) -> DuoReleaseCoordinator {
+        let binding = HandoffFileBinding(path: "/unused-test-binding", sha256: String(repeating: "a", count: 64))
+        let handoff = SelectedReleaseHandoff(schemaVersion: 1, mode: "selected-release-handoff", selectedImport: binding,
+            selectionSHA256: binding.sha256, evidenceAcceptance: binding, integrityVerification: binding,
+            duoInspection: binding, duoCompatibility: binding, qualificationLimits: .object([:]), sets: fixtures.map(\.set))
+        return DuoReleaseCoordinator(handoff: handoff, service: QueueDuoService(fixtures), journalDirectory: fixtures[0].directory,
+            processingWindow: window, idlePollLimit: idle, queueSleep: sleep)
+    }
+    private func queuedState(_ fixture: DuoExecutorFixture, in root: DuoExecutorFixture) throws -> DuoExecutionJournal {
+        try ManifestBuilder.decode(DuoExecutionJournal.self, at: root.directory.appendingPathComponent("duo-\(fixture.set.locale)-journal.json"))
+    }
+    func testQueuedSlowFirstLocaleDoesNotBlockReadyLocaleAndResumeReusesAllIDs() throws {
+        let first = try DuoExecutorFixture(compatibility: true, namespace: "a-"), second = try DuoExecutorFixture(compatibility: true, namespace: "b-", locale: "fr-FR")
+        defer { first.clean(); second.clean() }
+        first.service.holdProcessingNames = ["1.png"]
+        XCTAssertThrowsError(try queuedCoordinator([first, second]).publish())
+        let before = try queuedState(first, in: first), secondState = try queuedState(second, in: first)
+        XCTAssertEqual(before.phase, "preparing"); XCTAssertEqual(secondState.phase, "complete")
+        XCTAssertEqual(first.service.rows, first.set.reviewedBaseline)
+        XCTAssertEqual(first.service.events.filter { $0.hasPrefix("reserve:") }.count, 10)
+        XCTAssertEqual(second.service.events.filter { $0.hasPrefix("reserve:") }.count, 10)
+        XCTAssertEqual(before.entries.last { $0.key == "desired:1:commit" }?.status, "responseKnown")
+        let pendingID = before.entries.last { $0.key == "desired:1:reserve" }?.resourceID
+        let writes = first.service.events.count + second.service.events.count
+        try queuedCoordinator([first, second]).preflight()
+        XCTAssertEqual(first.service.events.count + second.service.events.count, writes)
+        try first.service.finishProcessing()
+        try queuedCoordinator([first, second]).publish()
+        let after = try queuedState(first, in: first)
+        XCTAssertEqual(after.phase, "complete")
+        XCTAssertEqual(after.entries.last { $0.key == "desired:1:reserve" }?.resourceID, pendingID)
+        XCTAssertEqual(first.service.events.filter { $0.hasPrefix("reserve:") }.count, 10)
+        XCTAssertEqual(second.service.events.filter { $0.hasPrefix("reserve:") }.count, 10)
+        XCTAssertTrue(first.originalImagesPreserved()); XCTAssertTrue(second.originalImagesPreserved())
+    }
+    func testQueuedWindowCountsExistingPendingAndRoundRobinIsFairOnRestart() throws {
+        let first = try DuoExecutorFixture(namespace: "a-"), second = try DuoExecutorFixture(namespace: "b-", locale: "fr-FR")
+        defer { first.clean(); second.clean() }
+        first.service.holdProcessingNames = Set((1...10).map { "\($0).png" }); second.service.holdProcessingNames = first.service.holdProcessingNames
+        var sleeps: [TimeInterval] = []
+        XCTAssertThrowsError(try queuedCoordinator([first, second], sleep: { sleeps.append($0) }).publish())
+        XCTAssertEqual(first.service.events.filter { $0.hasPrefix("reserve:") }.count, 2)
+        XCTAssertEqual(second.service.events.filter { $0.hasPrefix("reserve:") }.count, 1)
+        XCTAssertTrue(sleeps.allSatisfy { $0 == 15 }); XCTAssertEqual(sleeps.count, 2)
+        let events = first.service.events + second.service.events
+        XCTAssertFalse(events.contains { $0.hasPrefix("delete:") })
+        XCTAssertThrowsError(try queuedCoordinator([first, second]).publish())
+        XCTAssertEqual(first.service.events + second.service.events, events)
+        try first.service.finishProcessing(); try second.service.finishProcessing()
+        try queuedCoordinator([first, second]).publish()
+        XCTAssertEqual(try queuedState(first, in: first).phase, "complete")
+        XCTAssertEqual(try queuedState(second, in: first).phase, "complete")
+    }
+    func testQueuedUnknownReserveUploadOrCommitStopsAllOtherLocalesWithoutReplay() throws {
+        for prefix in ["reserve:", "upload:", "commit:"] {
+            let first = try DuoExecutorFixture(namespace: "a-"), second = try DuoExecutorFixture(namespace: "b-", locale: "fr-FR")
+            defer { first.clean(); second.clean() }
+            first.service.holdProcessingNames = ["1.png"]
+            first.service.fault = { label, after in
+                if label.hasPrefix(prefix) && after { first.service.fault = nil; throw DuoExecutionFailure.uncertain("lost response") }
+            }
+            XCTAssertThrowsError(try queuedCoordinator([first, second]).publish())
+            XCTAssertTrue(second.service.events.isEmpty)
+            let events = first.service.events
+            XCTAssertThrowsError(try queuedCoordinator([first, second]).preflight())
+            XCTAssertThrowsError(try queuedCoordinator([first, second]).publish())
+            XCTAssertEqual(first.service.events, events); XCTAssertTrue(second.service.events.isEmpty)
+            XCTAssertEqual(first.service.rows, first.set.reviewedBaseline)
+        }
+    }
+    func testQueuedRateLimitedReadStopsWithoutRepeatingOrExpandingWrites() throws {
+        let fixture = try DuoExecutorFixture(); defer { fixture.clean() }
+        fixture.service.holdProcessingNames = ["1.png"]
+        var pendingReads = 0
+        fixture.service.beforeImageRead = { id in
+            if id == "image-1", fixture.service.images[id]?["attributes"]?["state"] == .string("UPLOAD_COMPLETE") {
+                pendingReads += 1
+                if pendingReads == 2 { throw DuoExecutionFailure.uncertain("HTTP 429 read quota exhausted") }
+            }
+        }
+        XCTAssertThrowsError(try queuedCoordinator([fixture], window: 1).publish())
+        XCTAssertEqual(fixture.service.events.filter { $0.hasPrefix("reserve:") }.count, 1)
+        XCTAssertFalse(fixture.service.events.contains { $0.hasPrefix("delete:") })
+        let events = fixture.service.events
+        fixture.service.beforeImageRead = { _ in throw DuoExecutionFailure.uncertain("HTTP 429") }
+        XCTAssertThrowsError(try queuedCoordinator([fixture]).preflight())
+        XCTAssertEqual(fixture.service.events, events)
+    }
+    func testQueuedUnexpectedCommittedStateDoesNotEnterPerImageWait() throws {
+        for state in ["AWAITING_UPLOAD", "UNKNOWN", "FAILED"] {
+            let fixture = try DuoExecutorFixture(); defer { fixture.clean() }
+            fixture.service.holdProcessingNames = ["1.png"]
+            do {
+                let executor = try DuoPublishingExecutor(set: fixture.set, journalURL: fixture.journal, service: fixture.service,
+                    sleeper: { _ in XCTFail("Queue inspection must not enter a per-image wait") })
+                try executor.prepareQueuedStaging(confirmedVersion: fixture.set.version, confirmedSetDigest: fixture.set.digest())
+                _ = try executor.submitDesired(position: 1)
+                var row = fixture.service.images["image-1"]!.objectValue!, attrs = row["attributes"]!.objectValue!
+                attrs["state"] = .string(state); row["attributes"] = .object(attrs); fixture.service.images["image-1"] = .object(row)
+                XCTAssertThrowsError(try executor.pollDesiredReadiness())
+            }
+            XCTAssertFalse(fixture.service.events.contains { $0.hasPrefix("delete:") })
+        }
+    }
+    func testQueuedReadyCacheCannotAuthorizeChangedSpecificationOrForeignGraph() throws {
+        for defect in ["spec", "graph", "state"] {
+            let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }
+            fixture.service.holdProcessingNames = ["10.png"]
+            var changed = false
+            let queue = queuedCoordinator([fixture], sleep: { _ in
+                guard !changed else { return }; changed = true
+                try! fixture.service.finishProcessing()
+                if defect != "graph" {
+                    var row = fixture.service.images["image-1"]!.objectValue!, attrs = row["attributes"]!.objectValue!
+                    if defect == "spec" { attrs["specId"] = .string("foreign-spec") }
+                    else { attrs["state"] = .string("UPLOAD_COMPLETE") }
+                    row["attributes"] = .object(attrs); fixture.service.images["image-1"] = .object(row)
+                } else { fixture.service.rows.reverse() }
+            })
+            XCTAssertThrowsError(try queue.publish())
+            XCTAssertFalse(fixture.service.events.contains { $0.hasPrefix("delete:") })
+        }
+    }
+}
+
+extension DuoPublishingExecutorTests {
+    func testQueuedProcessedImageCannotAdmitMissingUploadDependency() throws {
+        let fixture = try DuoExecutorFixture(); defer { fixture.clean() }
+        fixture.service.holdProcessingNames = ["1.png"]
+        do {
+            let executor = try DuoPublishingExecutor(set: fixture.set, journalURL: fixture.journal, service: fixture.service)
+            try executor.prepareQueuedStaging(confirmedVersion: fixture.set.version, confirmedSetDigest: fixture.set.digest())
+            _ = try executor.submitDesired(position: 1)
+        }
+        try fixture.service.finishProcessing()
+        var state = try fixture.state()
+        state.entries.removeAll { $0.key == "desired:1:upload" }
+        try JSONEncoder().encode(state).write(to: fixture.journal)
+        let writes = fixture.service.events.count
+        let executor = try DuoPublishingExecutor(set: fixture.set, journalURL: fixture.journal, service: fixture.service)
+        XCTAssertThrowsError(try executor.preflight(allowKnownProcessing: true))
+        XCTAssertEqual(fixture.service.events.count, writes)
+    }
 }

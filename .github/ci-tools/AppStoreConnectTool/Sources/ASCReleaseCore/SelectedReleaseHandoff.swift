@@ -276,9 +276,16 @@ final class DuoReleaseCoordinator {
     let service: DuoPublishingService
     let journalDirectory: URL
     private var provenViews: [String: DuoLegacyView] = [:]
+    private let processingWindow: Int
+    private let idlePollLimit: Int
+    private let queueSleep: (TimeInterval) -> Void
 
-    init(handoff: SelectedReleaseHandoff, service: DuoPublishingService, journalDirectory: URL) {
+    init(handoff: SelectedReleaseHandoff, service: DuoPublishingService, journalDirectory: URL,
+         processingWindow: Int = 10, idlePollLimit: Int = 40,
+         queueSleep: @escaping (TimeInterval) -> Void = Thread.sleep) {
         self.handoff = handoff; self.service = service; self.journalDirectory = journalDirectory
+        self.processingWindow = max(1, processingWindow)
+        self.idlePollLimit = max(1, idlePollLimit); self.queueSleep = queueSleep
     }
 
     private func journal(_ set: DuoPublishSet) -> URL {
@@ -290,7 +297,7 @@ final class DuoReleaseCoordinator {
             _ = try duoIdentifier(set.locale)
             try service.verifyEditableTarget(set)
             let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
-            try executor.preflight()
+            try executor.preflight(allowKnownProcessing: true)
             provenViews[set.locale] = executor.provenLegacyView
         }
     }
@@ -301,7 +308,7 @@ final class DuoReleaseCoordinator {
         provenViews.removeAll()
         for set in handoff.sets {
             let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
-            try executor.preflight(allowRollbackProof: true)
+            try executor.preflight(allowRollbackProof: true, allowKnownProcessing: true)
             provenViews[set.locale] = executor.provenLegacyView
         }
     }
@@ -346,10 +353,81 @@ final class DuoReleaseCoordinator {
     }
 
     func publish() throws {
+        // A single owner holds every per-locale journal lock. Only Apple's
+        // processing overlaps; submissions, journal saves and placements never do.
+        var jobs: [(set: DuoPublishSet, executor: DuoPublishingExecutor)] = []
         for set in handoff.sets {
             let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
-            try executor.publish(confirmedVersion: set.version, confirmedSetDigest: set.digest())
-            provenViews[set.locale] = executor.provenLegacyView
+            if try executor.prepareQueuedStaging(confirmedVersion: set.version, confirmedSetDigest: set.digest()) {
+                provenViews[set.locale] = executor.provenLegacyView
+            } else if !executor.isPreparing {
+                // A prior placement transaction retains strict, serial recovery
+                // priority; it is never admitted as ordinary processing work.
+                try executor.publish(confirmedVersion: set.version, confirmedSetDigest: set.digest())
+                provenViews[set.locale] = executor.provenLegacyView
+            } else { jobs.append((set, executor)) }
+        }
+        var states: [String: [Int: DuoDesiredReadiness]] = [:]
+        var cursor = 0, idlePolls = 0
+        while !jobs.isEmpty {
+            let previous = states
+            // Visit every waiting image once, rather than blocking inside a
+            // per-image processing loop. Unknown outcomes still stop all writes.
+            for job in jobs {
+                states[job.set.locale] = try job.executor.pollDesiredReadiness(previous: states[job.set.locale] ?? [:])
+            }
+            var pending = states.values.flatMap(\.values).filter {
+                if case .processing = $0 { return true }; return false
+            }.count
+            var submitted = false
+            // Round-robin by locale, retaining the cursor when the global
+            // processing window fills. Existing pending IDs consume slots too.
+            while pending < processingWindow {
+                var candidate: (Int, Int)?
+                for offset in 0..<jobs.count {
+                    let index = (cursor + offset) % jobs.count, locale = jobs[index].set.locale
+                    if let position = jobs[index].set.images.first(where: { states[locale]?[$0.position] == .needsSubmission })?.position {
+                        candidate = (index, position); break
+                    }
+                }
+                guard let (index, position) = candidate else { break }
+                // Reserve the in-flight slot before the single remote operation.
+                pending += 1
+                let job = jobs[index]
+                let result = try job.executor.submitDesired(position: position)
+                states[job.set.locale]?[position] = result
+                if case .processing = result {} else { pending -= 1 }
+                cursor = (index + 1) % jobs.count; submitted = true
+            }
+            var completed: Set<String> = []
+            for job in jobs where states[job.set.locale]?.count == 10 && states[job.set.locale]?.values.allSatisfy({
+                if case .ready = $0 { return true }; return false
+            }) == true {
+                // This path revalidates current readiness, target, ownership,
+                // both views and content before/through the serial replacement.
+                let fresh = try job.executor.pollDesiredReadiness()
+                guard fresh.count == 10, fresh.values.allSatisfy({
+                    if case .ready = $0 { return true }; return false
+                }) else { throw DuoExecutionFailure.uncertain("Locale readiness changed before its placement transaction") }
+                try job.executor.publish(confirmedVersion: job.set.version, confirmedSetDigest: job.set.digest())
+                provenViews[job.set.locale] = job.executor.provenLegacyView
+                completed.insert(job.set.locale)
+            }
+            jobs.removeAll { completed.contains($0.set.locale) }
+            for locale in completed { states.removeValue(forKey: locale) }
+            guard !jobs.isEmpty else { return }
+            cursor %= jobs.count
+            if submitted || !completed.isEmpty || states != previous { idlePolls = 0 }
+            else { idlePolls += 1 }
+            if idlePolls >= idlePollLimit {
+                let waiting = states.keys.sorted().flatMap { locale in
+                    (states[locale] ?? [:]).sorted { $0.key < $1.key }.compactMap { position, state -> String? in
+                        if case .processing(let id) = state { return "\(locale)/\(position):\(id)" }; return nil
+                    }
+                }
+                throw DuoExecutionFailure.uncertain("Bounded queue paused with known processing images: " + waiting.joined(separator: ", "))
+            }
+            queueSleep(15)
         }
     }
 
