@@ -463,6 +463,190 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    func testFrostPineShadowProjectsDownRightAndReachesGameplay() {
+        for size in [CGSize(width: 320, height: 568), CGSize(width: 402, height: 874),
+                     CGSize(width: 874, height: 402), CGSize(width: 820, height: 1180),
+                     CGSize(width: 1180, height: 820), CGSize(width: 2500, height: 1500)] {
+            let shadow = FrostPineShadowLayout(size: size)
+            let pine = FrostPineDecorationLayout(size: size).pine
+            XCTAssertGreaterThan(shadow.canopy.width, pine.width)
+            XCTAssertGreaterThan(shadow.canopy.midX, pine.midX,
+                                 "The upper-left light casts toward the right")
+            XCTAssertGreaterThan(shadow.canopy.midY, pine.midY)
+            XCTAssertFalse(shadow.canopy.intersection(CGRect(origin: .zero, size: size)).isEmpty)
+            XCTAssertLessThanOrEqual(shadow.canopy.width, 840)
+            XCTAssertGreaterThan(shadow.blurRadius, 0)
+            XCTAssertLessThanOrEqual(shadow.blurRadius, 5)
+            XCTAssertGreaterThan(shadow.topFadeHeight, 0)
+            XCTAssertLessThanOrEqual(shadow.topFadeHeight, 92)
+        }
+        let phone = FrostPineShadowLayout(size: CGSize(width: 402, height: 874))
+        XCTAssertTrue(phone.canopy.contains(CGPoint(x: 200, y: 350)),
+                      "The projected canopy must reach the portrait board, not just the ornament")
+        XCTAssertTrue(phone.canopy.contains(CGPoint(x: 180, y: 180)),
+                      "The upper player and clock area also receives the cast")
+        let landscape = FrostPineShadowLayout(size: CGSize(width: 874, height: 402))
+        XCTAssertTrue(landscape.canopy.contains(CGPoint(x: 440, y: 180)))
+        let tablet = FrostPineShadowLayout(size: CGSize(width: 820, height: 1180))
+        XCTAssertTrue(tablet.canopy.contains(CGPoint(x: 450, y: 450)))
+    }
+
+    func testFrostPineShadowResizesContinuouslyAndHandlesInvalidViewports() {
+        func metrics(_ layout: FrostPineShadowLayout) -> [CGFloat] {
+            [layout.size.width, layout.size.height, layout.canopy.minX, layout.canopy.minY,
+             layout.canopy.width, layout.canopy.height, layout.blurRadius, layout.topFadeHeight]
+        }
+        let sweeps = [(300...1600).map { CGSize(width: CGFloat($0), height: 600) },
+                      (300...1600).map { CGSize(width: 900, height: CGFloat($0)) }]
+        for sizes in sweeps {
+            let layouts = sizes.map { FrostPineShadowLayout(size: $0) }
+            for (before, after) in zip(layouts, layouts.dropFirst()) {
+                for (a, b) in zip(metrics(before), metrics(after)) {
+                    XCTAssertLessThanOrEqual(abs(b - a), 1.5,
+                                             "A one-point resize cannot jump the viewport-anchored shadow")
+                }
+            }
+        }
+        for size in [CGSize.zero, CGSize(width: 0, height: 320), CGSize(width: -10, height: 400),
+                     CGSize(width: CGFloat.infinity, height: 400), CGSize(width: 400, height: CGFloat.nan)] {
+            let layout = FrostPineShadowLayout(size: size)
+            XCTAssertTrue(metrics(layout).allSatisfy { $0.isFinite && $0 >= 0 })
+            XCTAssertEqual(layout.canopy.size, .zero)
+            XCTAssertEqual(layout.blurRadius, 0)
+        }
+    }
+
+    @MainActor
+    func testFrostPineShadowMaskUnionsBoardExclusionsAndProtectsTopChrome() throws {
+        let holes = [CGRect(x: 20, y: 40, width: 70, height: 50),
+                     CGRect(x: 70, y: 60, width: 60, height: 40),
+                     CGRect(x: -8, y: 90, width: 20, height: 35)]
+        let size = CGSize(width: 160, height: 120)
+        let raster = try nativeMaterialPixels(Color.black
+            .mask(FrostPineShadowMask(excludedBoards: holes.map { BoardSceneShadowRegion(bounds: $0) }, topFadeHeight: 24))
+            .frame(width: size.width, height: size.height))
+        func alpha(_ x: Int, _ y: Int) -> UInt8 { raster.pixels[(y * raster.width + x) * 4 + 3] }
+        var holesAreClear = true
+        var fieldIsOpaque = true
+        for y in 0..<raster.height {
+            for x in 0..<raster.width {
+                let point = CGPoint(x: (CGFloat(x) + 0.5) / 3, y: (CGFloat(y) + 0.5) / 3)
+                // Keep a device-pixel margin around rasterized rectangle edges.
+                if holes.contains(where: { $0.insetBy(dx: 1.0 / 3, dy: 1.0 / 3).contains(point) }) {
+                    holesAreClear = holesAreClear && alpha(x, y) == 0
+                } else if point.y > 25 && !holes.contains(where: {
+                    $0.insetBy(dx: -1.0 / 3, dy: -1.0 / 3).contains(point)
+                }) {
+                    fieldIsOpaque = fieldIsOpaque && alpha(x, y) == 255
+                }
+            }
+        }
+        XCTAssertTrue(holesAreClear, "Overlapping boards must never expose the shadow again")
+        XCTAssertTrue(fieldIsOpaque, "Protecting boards must retain cast over other game elements")
+        XCTAssertLessThan(alpha(450, 1), 10, "The title's upper edge remains clear of the cast")
+        XCTAssertGreaterThan(alpha(450, 36), alpha(450, 1))
+        XCTAssertLessThan(alpha(450, 36), 200, "Chrome protection fades gradually, without a hard stripe")
+        let empty = try nativeMaterialPixels(Color.black.mask(FrostPineShadowMask())
+            .frame(width: size.width, height: size.height))
+        XCTAssertTrue(stride(from: 3, to: empty.pixels.count, by: 4).allSatisfy { empty.pixels[$0] == 255 },
+                      "An empty exclusion list leaves the complete silhouette available")
+    }
+
+    @MainActor
+    func testBoardSceneShadowAnchorsProtectAllOptedInBoards() throws {
+        // BoardView attaches this production modifier to the visible slab.
+        // Exercise the real preference, coordinate conversion and mask with
+        // synthetic white content, independently of the theme's image assets.
+        let cases: [(name: String, board: CGSize, origin: CGPoint, scene: CGSize, radius: CGFloat)] = [
+            ("compact", CGSize(width: 63, height: 63), CGPoint(x: 10, y: 10), CGSize(width: 83, height: 83), 0),
+            ("phone", CGSize(width: 180, height: 180), CGPoint(x: 12, y: 16), CGSize(width: 210, height: 220), 0),
+            ("iPad", CGSize(width: 360, height: 360), CGPoint(x: 20, y: 20), CGSize(width: 400, height: 400), 0),
+            ("offset rectangle", CGSize(width: 120, height: 75), CGPoint(x: 22, y: 11), CGSize(width: 170, height: 110), 0),
+            ("rounded slab with shadow reserve", CGSize(width: 120, height: 130), CGPoint(x: 14, y: 12), CGSize(width: 154, height: 160), 18),
+            ("cropped rounded preview", CGSize(width: 240, height: 180), CGPoint(x: 22, y: 22), CGSize(width: 100, height: 100), 18)
+        ]
+        func render(board: CGSize, origin: CGPoint, scene: CGSize, radius: CGFloat, enabled: Bool?) throws
+            -> (pixels: [UInt8], width: Int, height: Int) {
+            let content = ZStack(alignment: .topLeading) {
+                Color.clear
+                RoundedRectangle(cornerRadius: radius, style: .circular).fill(.white)
+                    .frame(width: board.width, height: board.height)
+                    .modifier(BoardSceneShadowExclusion(cornerRadius: radius))
+                    .offset(x: origin.x, y: origin.y)
+            }
+            .frame(width: scene.width, height: scene.height, alignment: .topLeading)
+            .overlayPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
+                GeometryReader { geometry in
+                    Color.black.mask(FrostPineShadowMask(excludedBoards: anchors.map {
+                        BoardSceneShadowRegion(bounds: geometry[$0.bounds], cornerRadius: $0.cornerRadius)
+                    }))
+                }
+            }
+            .clipped()
+            if let enabled {
+                return try nativeMaterialPixels(content.environment(\.excludesBoardsFromSceneShadows, enabled))
+            }
+            return try nativeMaterialPixels(content)
+        }
+        for fixture in cases {
+            let baseline = try render(board: fixture.board, origin: fixture.origin, scene: fixture.scene,
+                                      radius: fixture.radius, enabled: nil)
+            let disabled = try render(board: fixture.board, origin: fixture.origin, scene: fixture.scene,
+                                      radius: fixture.radius, enabled: false)
+            XCTAssertEqual(disabled.pixels, baseline.pixels,
+                           "Other scenes retain the default no-exclusion behavior: \(fixture.name)")
+            XCTAssertTrue(stride(from: 0, to: baseline.pixels.count, by: 4).allSatisfy {
+                baseline.pixels[$0] == 0 && baseline.pixels[$0 + 3] == 255
+            }, "The default foreground still casts over the complete scene")
+            let protected = try render(board: fixture.board, origin: fixture.origin, scene: fixture.scene,
+                                       radius: fixture.radius, enabled: true)
+            XCTAssertEqual(protected.width, Int(fixture.scene.width * 3))
+            XCTAssertEqual(protected.height, Int(fixture.scene.height * 3))
+            let boardRect = CGRect(origin: fixture.origin, size: fixture.board)
+            // Use geometric distance, not expanded Path.contains, to keep the
+            // guard exactly one device pixel around a circular rounded edge.
+            let margin: CGFloat = 1.0 / 3
+            var boardIsUnshaded = true
+            var surroundingCastRemains = true
+            var boardPixels = 0
+            var surroundingPixels = 0
+            var roundedCornerPixels = 0
+            var firstUnexpectedCast: String?
+            for y in 0..<protected.height {
+                for x in 0..<protected.width {
+                    let offset = (y * protected.width + x) * 4
+                    let point = CGPoint(x: (CGFloat(x) + 0.5) / 3, y: (CGFloat(y) + 0.5) / 3)
+                    let qx = abs(point.x - boardRect.midX) - (boardRect.width / 2 - fixture.radius)
+                    let qy = abs(point.y - boardRect.midY) - (boardRect.height / 2 - fixture.radius)
+                    let distance = hypot(max(qx, 0), max(qy, 0)) + min(max(qx, qy), 0) - fixture.radius
+                    if distance < -margin {
+                        boardPixels += 1
+                        boardIsUnshaded = boardIsUnshaded && (0..<4).allSatisfy { protected.pixels[offset + $0] == 255 }
+                    } else if distance > margin {
+                        surroundingPixels += 1
+                        if boardRect.contains(point) { roundedCornerPixels += 1 }
+                        let unchangedCast = protected.pixels[offset] == 0 && protected.pixels[offset + 1] == 0
+                            && protected.pixels[offset + 2] == 0 && protected.pixels[offset + 3] == 255
+                        surroundingCastRemains = surroundingCastRemains && unchangedCast
+                        if !unchangedCast && firstUnexpectedCast == nil {
+                            let rgba = Array(protected.pixels[offset..<(offset + 4)])
+                            firstUnexpectedCast = "(\(x),\(y)) rgba=\(rgba), distance=\(distance) pt"
+                        }
+                    }
+                }
+            }
+            XCTAssertGreaterThan(boardPixels, 0)
+            XCTAssertGreaterThan(surroundingPixels, 0)
+            if fixture.radius > 0 {
+                XCTAssertGreaterThan(roundedCornerPixels, 0, "Verify the corner cutouts, not only the outer rectangle")
+            }
+            XCTAssertTrue(boardIsUnshaded, "The complete slab keeps its original white: \(fixture.name)")
+            XCTAssertTrue(surroundingCastRemains,
+                          "Reserved margins and rounded corner cutouts must retain cast: \(fixture.name); "
+                          + "first unexpected pixel: \(firstUnexpectedCast ?? "none")")
+        }
+    }
+
     func testFrostPineAppearanceAndAnalysisStayReadable() throws {
         assertAdaptiveColorsFollowRepeatedTraitChanges(.frostPine)
         try assertNightAnalysisMarksRemainReadable(.frostPine)
@@ -513,6 +697,124 @@ final class SurroundThemeTests: XCTestCase {
             let cached = scheme == .light ? day : night
             for (actual, expected) in zip(resolved.black + resolved.white, cached.black + cached.white) {
                 XCTAssertTrue(actual === expected)
+            }
+        }
+    }
+
+    func testFrostPineSmallStoneInsetAddsCenteredRoomWithoutChangingCompactBoards() throws {
+        let defaults = StoneImages(black: [], white: [])
+        for scheme: ColorScheme in [.light, .dark] {
+            let images = try XCTUnwrap(SurroundTheme.frostPine.board(for: scheme).stoneImages)
+            XCTAssertGreaterThan(images.smallStoneInset, 0)
+            for theme in SurroundTheme.allCases where theme != .frostPine {
+                XCTAssertEqual(theme.board(for: scheme).stoneImages?.smallStoneInset ?? 0, 0,
+                               "Other themes keep their existing stone packing")
+            }
+            for cell: CGFloat in [7, 13.99, 14, 14.001, 15, 16, 20, 22, 27, 31.999, 32, 48] {
+                let padding: CGFloat = cell < 10 ? 0 : 1
+                let nominal = CGRect(x: 3 * cell + padding, y: 5 * cell + padding,
+                                     width: cell - 2 * padding, height: cell - 2 * padding)
+                let actual = images.displayRect(in: nominal, cellSize: cell)
+                XCTAssertEqual(defaults.displayRect(in: nominal, cellSize: cell), nominal)
+                XCTAssertEqual(actual.midX, nominal.midX, accuracy: 0.000001)
+                XCTAssertEqual(actual.midY, nominal.midY, accuracy: 0.000001)
+                XCTAssertEqual(actual.width, actual.height, accuracy: 0.000001)
+                XCTAssertTrue(nominal.contains(actual), "Only the visual silhouette may shrink")
+                if cell <= 14 || cell >= 32 {
+                    XCTAssertEqual(actual, nominal, "Compact and large stones keep their original footprint")
+                } else {
+                    XCTAssertLessThan(actual.width, nominal.width)
+                    XCTAssertLessThan(nominal.width - actual.width, 1,
+                                      "Spacing must remain a subtle physical gap, not undersized stones")
+                }
+                if cell == 14.001 || cell == 31.999 {
+                    XCTAssertLessThan(nominal.width - actual.width, 0.001,
+                                      "Crossing either end of the size range must not jump the silhouette")
+                }
+            }
+            let left = CGRect(x: 1, y: 1, width: 18, height: 18)
+            let right = left.offsetBy(dx: 20, dy: 0)
+            let visibleLeft = images.displayRect(in: left, cellSize: 20)
+            let visibleRight = images.displayRect(in: right, cellSize: 20)
+            let gap = visibleRight.minX - visibleLeft.maxX
+            XCTAssertGreaterThan(gap, right.minX - left.maxX + 0.5,
+                                 "Neighboring phone stones need a perceptible strip of board between them")
+            XCTAssertLessThan(gap, 3)
+            XCTAssertEqual(visibleRight.midX - visibleLeft.midX, 20, accuracy: 0.000001,
+                           "Playing intersections and marker centers remain fixed")
+            let halfGrown = images.displayRect(in: CGRect(x: 1, y: 1, width: 13, height: 13), cellSize: 15)
+            let grown = images.displayRect(in: CGRect(x: 1, y: 1, width: 14, height: 14), cellSize: 16)
+            XCTAssertGreaterThan(halfGrown.minX, 1)
+            XCTAssertLessThan(halfGrown.minX, grown.minX)
+            let fading = images.displayRect(in: CGRect(x: 1, y: 1, width: 25, height: 25), cellSize: 27)
+            XCTAssertGreaterThan(fading.minX, 1)
+            XCTAssertLessThan(fading.minX, visibleLeft.minX)
+        }
+    }
+
+    @MainActor
+    func testFrostPineIceEdgesPreserveFacesSilhouettesAndFlatStones() throws {
+        for scheme: ColorScheme in [.light, .dark] {
+            let board = SurroundTheme.frostPine.board(for: scheme)
+            XCTAssertEqual(board.imageStoneShading, .iceEdge)
+            let images = try XCTUnwrap(board.stoneImages)
+            XCTAssertFalse(images.black.isEmpty)
+            XCTAssertFalse(images.white.isEmpty)
+            for color: StoneColor in [.black, .white] {
+                for (diameter, shadow): (CGFloat, CGFloat) in [(7, 1), (13.99, 1), (14, 1),
+                                                               (20, 0), (20, 1), (28, 1), (32, 1), (44, 1)] {
+                    func render(_ shading: ImageStoneShading) throws -> (pixels: [UInt8], width: Int, height: Int) {
+                        var appearance = board
+                        appearance.imageStoneShading = shading
+                        return try nativeMaterialPixels(Stone(color: color, shadowRadius: shadow)
+                            .frame(width: diameter, height: diameter).padding(3)
+                            .environment(\.boardAppearance, appearance)
+                            .environment(\.colorScheme, scheme))
+                    }
+                    let actual = try render(.iceEdge), plain = try render(.artwork)
+                    let detail = "\(scheme) \(color), diameter \(diameter), shadow \(shadow)"
+                    XCTAssertEqual(actual.width, plain.width, detail)
+                    XCTAssertEqual(actual.height, plain.height, detail)
+                    if diameter < 14 || diameter >= 32 || shadow == 0 {
+                        XCTAssertEqual(actual.pixels, plain.pixels,
+                                       "Flat and large stones retain their original rendering: \(detail)")
+                        continue
+                    }
+                    XCTAssertGreaterThan(zip(actual.pixels, plain.pixels).filter { $0 != $1 }.count, 10,
+                                         "Both phone-size ice colors need a visible contour: \(detail)")
+                    let midX = Double(actual.width) / 2, midY = Double(actual.height) / 2
+                    let visible = images.displayRect(in: CGRect(x: 0, y: 0, width: diameter, height: diameter),
+                                                     cellSize: diameter)
+                    let radius = Double(visible.width) * 3 / 2
+                    var maximumCenterDelta = 0, maximumExteriorDelta = 0, maximumAlphaDelta = 0
+                    for y in 0..<actual.height {
+                        for x in 0..<actual.width {
+                            let offset = (y * actual.width + x) * 4
+                            let distance = hypot(Double(x) + 0.5 - midX, Double(y) + 0.5 - midY)
+                            if abs(distance - radius) > 2 {
+                                maximumAlphaDelta = max(maximumAlphaDelta,
+                                    abs(Int(actual.pixels[offset + 3]) - Int(plain.pixels[offset + 3])))
+                            }
+                            for channel in 0..<4 {
+                                let delta = abs(Int(actual.pixels[offset + channel]) - Int(plain.pixels[offset + channel]))
+                                if distance < radius * 0.65 {
+                                    maximumCenterDelta = max(maximumCenterDelta, delta)
+                                }
+                                // Exclude the rasterized boundary's subpixel fringe;
+                                // beyond it, neither silhouette nor cast may grow.
+                                if distance > radius + 2 {
+                                    maximumExteriorDelta = max(maximumExteriorDelta, delta)
+                                }
+                            }
+                        }
+                    }
+                    XCTAssertLessThanOrEqual(maximumCenterDelta, 1,
+                                             "Preserve the reflected face beneath markers: \(detail)")
+                    XCTAssertLessThanOrEqual(maximumExteriorDelta, 1,
+                                             "Keep the contour inside the existing silhouette: \(detail)")
+                    XCTAssertLessThanOrEqual(maximumAlphaDelta, 1,
+                                             "Preserve alpha away from the antialiased boundary: \(detail)")
+                }
             }
         }
     }
@@ -736,6 +1038,97 @@ final class SurroundThemeTests: XCTestCase {
                 XCTAssertTrue(overlay == plain, "Compact boards must render identically with frost configured")
             } else {
                 XCTAssertFalse(overlay == plain, "A visible detailed overlay is the positive control")
+            }
+        }
+    }
+
+    @MainActor
+    func testSurfaceFrostPerimeterFadeKeepsSquareAndRectangularFieldsClear() throws {
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4)).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        }
+        let fraction: CGFloat = 0.045
+        let rim = BoardSurfaceOverlay(image: image, perimeterFadeFraction: fraction)
+        let full = BoardSurfaceOverlay(image: image)
+
+        for size in [CGSize(width: 120, height: 120), CGSize(width: 180, height: 90),
+                     CGSize(width: 90, height: 180)] {
+            func render(_ surface: BoardSurfaceOverlay, cell: CGFloat) throws
+                -> (pixels: [UInt8], width: Int, height: Int) {
+                try nativeMaterialPixels(BoardSurfaceOverlayView(surface: surface, cellSize: cell)
+                    .frame(width: size.width, height: size.height))
+            }
+            for cell: CGFloat in [7, 13.99, 14, 20] {
+                let result = try render(rim, cell: cell)
+                func alpha(_ x: Int, _ y: Int) -> UInt8 {
+                    result.pixels[(y * result.width + x) * 4 + 3]
+                }
+                if cell < 14 {
+                    XCTAssertTrue(stride(from: 3, to: result.pixels.count, by: 4)
+                        .allSatisfy { result.pixels[$0] == 0 },
+                        "A configured perimeter mask draws nothing on a compact board")
+                    continue
+                }
+
+                // Check the actual native layer with fully opaque source art:
+                // every interior pixel must stay clear, not just its center.
+                // Leave one device pixel at the fade boundary for antialiasing.
+                let inset = Int(ceil(min(size.width, size.height) * fraction * 3)) + 1
+                var interiorIsClear = true
+                for y in inset..<(result.height - inset) {
+                    for x in inset..<(result.width - inset) where alpha(x, y) != 0 {
+                        interiorIsClear = false
+                    }
+                }
+                XCTAssertTrue(interiorIsClear, "The narrow rim cannot intrude into the playing field at \(size)")
+                for point in [(1, result.height / 2), (result.width - 2, result.height / 2),
+                              (result.width / 2, 1), (result.width / 2, result.height - 2)] {
+                    XCTAssertGreaterThan(alpha(point.0, point.1), 128,
+                                         "Each edge retains visible frost at \(size)")
+                }
+
+                let unmasked = try render(full, cell: cell)
+                let center = ((unmasked.height / 2) * unmasked.width + unmasked.width / 2) * 4 + 3
+                XCTAssertEqual(unmasked.pixels[center], 255,
+                               "The default nil mask must retain other overlays' complete artwork")
+            }
+        }
+    }
+
+    @MainActor
+    func testBoardTextureVisibilityPreservesSolidSmallBoards() throws {
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
+            UIColor.blue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        }
+        func render(opacity: Double, cell: CGFloat) throws -> [UInt8] {
+            // Exercise the production modifier used on the combined texture
+            // and bevel group, without compiling the interactive board here.
+            try nativeMaterialPixels(Color.black.overlay {
+                Image(uiImage: image).resizable()
+                    .modifier(BoardTextureVisibility(opacity: opacity, cellSize: cell))
+            }.frame(width: 48, height: 48)).pixels
+        }
+        for cell: CGFloat in [7, 13, 13.99, 14, 20] {
+            let plain = try render(opacity: 0, cell: cell)
+            let quiet = try render(opacity: 0.62, cell: cell)
+            let full = try render(opacity: 1, cell: cell)
+            if cell < 14 {
+                XCTAssertEqual(quiet, plain, "Reduced texture must disappear on solid boards at \(cell) pt")
+                XCTAssertEqual(full, plain, "Full-strength texture must disappear on solid boards at \(cell) pt")
+            } else {
+                XCTAssertNotEqual(quiet, plain, "Detailed boards retain visible material")
+                XCTAssertNotEqual(quiet, full, "Texture strength must visibly reduce board noise")
+                func colorTotal(_ pixels: [UInt8]) -> Int {
+                    stride(from: 0, to: pixels.count, by: 4).reduce(0) {
+                        $0 + Int(pixels[$1]) + Int(pixels[$1 + 1]) + Int(pixels[$1 + 2])
+                    }
+                }
+                XCTAssertGreaterThan(colorTotal(quiet), colorTotal(plain))
+                XCTAssertLessThan(colorTotal(quiet), colorTotal(full))
             }
         }
     }
@@ -1683,7 +2076,8 @@ final class SurroundThemeTests: XCTestCase {
         for scheme: ColorScheme in [.light, .dark] {
             for theme in SurroundTheme.allCases {
                 XCTAssertEqual(theme.board(for: scheme).imageStoneShading,
-                               theme == .surroundStudio ? .clamshellShoulder : .artwork)
+                               theme == .surroundStudio ? .clamshellShoulder
+                                   : (theme == .frostPine ? .iceEdge : .artwork))
             }
             var board = SurroundTheme.surroundStudio.board(for: scheme)
             let tint = board.stoneImages?.tint ?? .white
@@ -2067,6 +2461,7 @@ final class SurroundThemeTests: XCTestCase {
         let image = UIGraphicsImageRenderer(size: CGSize(width: 200, height: 100)).image { _ in }
         let texture = BoardTexture(image: image, tileSize: 320)
         XCTAssertEqual(texture.tint, .white, "Existing board textures must remain ungraded by default")
+        XCTAssertEqual(texture.opacity, 1, "Existing board textures retain their full strength by default")
         for size in [CGSize(width: 150, height: 150), CGSize(width: 1024, height: 1024)] {
             XCTAssertEqual(texture.paintScale(in: size), 1.6, accuracy: 0.0001)
         }
@@ -2095,6 +2490,323 @@ final class SurroundThemeTests: XCTestCase {
                 let scale = texture.paintScale(in: size)
                 XCTAssertTrue(scale.isFinite)
                 XCTAssertGreaterThan(scale, 0)
+            }
+        }
+    }
+
+    func testEngravedGridKeepsPlayingIntersectionsAndStandardStarPoints() {
+        for theme in SurroundTheme.allCases {
+            for scheme: ColorScheme in [.light, .dark] {
+                let style = theme.board(for: scheme).gridStyle
+                for cell: CGFloat in [7, 13, 13.99, 14, 20, 48] {
+                    XCTAssertEqual(style.usesEngraving(at: cell), theme == .frostPine && cell >= 14)
+                }
+            }
+        }
+        for (width, height) in [(2, 3), (9, 9), (13, 13), (19, 19), (9, 19), (19, 9)] {
+            for cell: CGFloat in [13.99, 14, 20, 48] {
+                let grid = EngravedGridGeometry(width: width, height: height, cellSize: cell)
+                let expected = CGRect(x: cell / 2, y: cell / 2,
+                                      width: CGFloat(width - 1) * cell, height: CGFloat(height - 1) * cell)
+                XCTAssertEqual(grid.gridRect, expected)
+                XCTAssertEqual(grid.outlinePath.boundingRect, expected)
+                let expectedStars = width == height ? (width == 19 ? 9 : 5) : 0
+                XCTAssertEqual(grid.starCenters.count, expectedStars)
+                for center in grid.starCenters {
+                    XCTAssertTrue(expected.contains(center))
+                    for coordinate in [center.x, center.y] {
+                        let index = coordinate / cell - 0.5
+                        XCTAssertEqual(index, index.rounded(), accuracy: 0.000001,
+                                       "Recessed stars remain centered on playing intersections")
+                    }
+                }
+                if expectedStars > 0 {
+                    XCTAssertTrue(grid.starCenters.contains(CGPoint(x: CGFloat(width) * cell / 2,
+                                                                    y: CGFloat(height) * cell / 2)))
+                    let inset = width == 9 ? 2 : 3
+                    XCTAssertTrue(grid.starCenters.contains(CGPoint(x: (CGFloat(inset) + 0.5) * cell,
+                                                                    y: (CGFloat(inset) + 0.5) * cell)))
+                }
+            }
+        }
+    }
+
+    func testEngravedGridChipsStayBoundedAndStableWhileResizing() {
+        for (width, height) in [(9, 19), (19, 9)] {
+            var prior: [[CGPoint]]?
+            var priorCell: CGFloat = 0
+            for cell: CGFloat in [14, 20, 40] {
+                let grid = EngravedGridGeometry(width: width, height: height, cellSize: cell)
+                let paths = polygons(in: grid.chippedPath)
+                XCTAssertFalse(paths.isEmpty)
+                XCTAssertEqual(paths, polygons(in: grid.chippedPath), "Redraws must not reseed ice chips")
+                XCTAssertTrue(grid.gridRect.insetBy(dx: -1.65, dy: -1.65).contains(grid.chippedPath.boundingRect),
+                              "Chips stay within a narrow strip of the playing grid")
+                let edges = paths.filter { $0.count > 4 }
+                XCTAssertFalse(edges.isEmpty, "The relief must contain irregular edges, not just clean rectangles")
+                let fineEdges = polygons(in: RaggedGridGeometry(width: width, height: height,
+                    cellSize: cell, lineScale: 1).path).filter { $0.count > 4 }
+                XCTAssertLessThan(edges.reduce(0) { $0 + $1.count }, fineEdges.reduce(0) { $0 + $1.count },
+                                  "Ice chips need longer facets than the fine scratched-grid texture")
+                for edge in edges {
+                    let spanX = edge.map(\.x).max()! - edge.map(\.x).min()!
+                    let spanY = edge.map(\.y).max()! - edge.map(\.y).min()!
+                    let horizontal = spanX > spanY
+                    let across = edge.map { horizontal ? $0.y : $0.x }
+                    let center = (across.min()! + across.max()!) / 2
+                    let distances = across.map { abs($0 - center) }
+                    XCTAssertGreaterThan(distances.max()! - distances.min()!, 0.1,
+                                         "Each cut needs visible edge variation around its straight core")
+                    XCTAssertLessThan(distances.max()!, 1.65)
+                    let gridCenter = ((center / cell - 0.5).rounded() + 0.5) * cell
+                    let asymmetricPairs = (0..<(edge.count / 2)).filter { index in
+                        let a = edge[index], b = edge[edge.count - 1 - index]
+                        let acrossA = horizontal ? a.y : a.x
+                        let acrossB = horizontal ? b.y : b.x
+                        return abs(acrossA + acrossB - 2 * gridCenter) > 0.08
+                    }.count
+                    XCTAssertGreaterThan(asymmetricPairs, edge.count / 8,
+                                         "Opposite ice-cut lips must not repeatedly form mirrored beads")
+                }
+                if let prior {
+                    XCTAssertEqual(prior.count, paths.count)
+                    for (before, after) in zip(prior, paths) where before.count > 4 {
+                        XCTAssertEqual(before.count, after.count)
+                        let horizontal = before.map(\.x).max()! - before.map(\.x).min()!
+                            > before.map(\.y).max()! - before.map(\.y).min()!
+                        if cell >= 40 {
+                            let oldAcross = before.map { horizontal ? $0.y : $0.x }
+                            let newAcross = after.map { horizontal ? $0.y : $0.x }
+                            let oldWidth = oldAcross.max()! - oldAcross.min()!
+                            let newWidth = newAcross.max()! - newAcross.min()!
+                            XCTAssertGreaterThan(newWidth, oldWidth + 0.4,
+                                                 "Large-board facets must retain a visibly wider cut than phone facets")
+                        }
+                        for (a, b) in zip(before, after) {
+                            // Path quantizes its stored points. Compare in
+                            // the resized board's points, allowing less than
+                            // one thousandth of a pixel even at 3x scale.
+                            XCTAssertEqual((horizontal ? a.x : a.y) * cell / priorCell,
+                                           horizontal ? b.x : b.y, accuracy: 0.0001,
+                                           "Chips stay attached to their cells while resizing")
+                        }
+                    }
+                }
+                prior = paths
+                priorCell = cell
+            }
+        }
+    }
+
+    @MainActor
+    func testEngravedGridNativeCoreIsContinuousAndCompactBoardsStayPlain() throws {
+        let background = Color(red: 0.72, green: 0.80, blue: 0.85)
+        let pigment = Color(red: 0.25, green: 0.35, blue: 0.42)
+        for (width, height) in [(9, 19), (19, 9)] {
+            for cell: CGFloat in [7, 13.99, 14, 20, 32] {
+                let grid = EngravedGridGeometry(width: width, height: height, cellSize: cell)
+                let result = try nativeMaterialPixels(background.overlay {
+                    EngravedGobanGrid(geometry: grid, color: pigment)
+                }.frame(width: CGFloat(width) * cell, height: CGFloat(height) * cell))
+                let base = Array(result.pixels[0..<4])
+                if cell < 14 {
+                    // A fractional frame can antialias its outer pixel row.
+                    // Compare the exact same native frame without engraving,
+                    // not an assumed uniformly filled pixel rectangle.
+                    let plain = try nativeMaterialPixels(background
+                        .frame(width: CGFloat(width) * cell, height: CGFloat(height) * cell))
+                    XCTAssertEqual(result.pixels, plain.pixels,
+                                   "The mounted engraving layer must be transparent below 14 pt")
+                    continue
+                }
+                func brightness(at x: Int, _ y: Int) -> Double {
+                    let offset = (y * result.width + x) * 4
+                    return (Double(result.pixels[offset]) + Double(result.pixels[offset + 1])
+                            + Double(result.pixels[offset + 2])) / 3
+                }
+                func darkestNear(_ point: CGPoint) -> Double {
+                    let x = Int(point.x * 3), y = Int(point.y * 3)
+                    return ((y - 1)...(y + 1)).flatMap { py in
+                        ((x - 1)...(x + 1)).map { brightness(at: $0, py) }
+                    }.min()!
+                }
+                let backgroundBrightness = (Double(base[0]) + Double(base[1]) + Double(base[2])) / 3
+                // Quarter-cell samples include every intersection and the
+                // spans between them, including all four outer edges.
+                for row in 0..<height {
+                    for sample in 0...((width - 1) * 4) {
+                        let point = CGPoint(x: (0.5 + CGFloat(sample) / 4) * cell,
+                                            y: (CGFloat(row) + 0.5) * cell)
+                        XCTAssertLessThan(darkestNear(point), backgroundBrightness - 25,
+                                          "A continuous core must survive its relief at \(cell) pt")
+                    }
+                }
+                for column in 0..<width {
+                    for sample in 0...((height - 1) * 4) {
+                        let point = CGPoint(x: (CGFloat(column) + 0.5) * cell,
+                                            y: (0.5 + CGFloat(sample) / 4) * cell)
+                        XCTAssertLessThan(darkestNear(point), backgroundBrightness - 25)
+                    }
+                }
+                for row in 0..<(height - 1) {
+                    for column in 0..<(width - 1) {
+                        let x = Int(CGFloat(column + 1) * cell * 3)
+                        let y = Int(CGFloat(row + 1) * cell * 3)
+                        let offset = (y * result.width + x) * 4
+                        XCTAssertEqual(Array(result.pixels[offset..<(offset + 4)]), base,
+                                       "Engraving leaves empty cell interiors untouched")
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testEngravedGridNativeReliefHasUpperShadeAndLowerLight() throws {
+        // Calibrate the bitmap row direction independently of engraving;
+        // ImageRenderer and the CGContext pixel reader may use opposite axes.
+        let orientation = try nativeMaterialPixels(VStack(spacing: 0) {
+            Color.white.frame(height: 6)
+            Color.black.frame(height: 6)
+        }.frame(width: 12, height: 12))
+        let firstHalfIsTop = orientation.pixels[(9 * orientation.width + 18) * 4] > 127
+        let background = Color(red: 0.72, green: 0.80, blue: 0.85)
+        let pigment = Color(red: 0.25, green: 0.35, blue: 0.42)
+
+        for cell: CGFloat in [14, 20, 40] {
+            // A rectangular board has no star dimples to contaminate the
+            // relief samples midway along horizontal and vertical cuts.
+            let grid = EngravedGridGeometry(width: 9, height: 10, cellSize: cell)
+            let result = try nativeMaterialPixels(background.overlay {
+                EngravedGobanGrid(geometry: grid, color: pigment)
+            }.frame(width: 9 * cell, height: 10 * cell))
+            func brightness(at point: CGPoint) -> Double {
+                let x = Int(point.x * 3), logicalY = Int(point.y * 3)
+                let y = firstHalfIsTop ? logicalY : result.height - 1 - logicalY
+                let offset = (y * result.width + x) * 4
+                return (Double(result.pixels[offset]) + Double(result.pixels[offset + 1])
+                        + Double(result.pixels[offset + 2])) / 3
+            }
+            let field = brightness(at: CGPoint(x: 3 * cell, y: 3 * cell))
+            for horizontal in [true, false] {
+                let middle = horizontal ? CGPoint(x: 3 * cell, y: 2.5 * cell)
+                                        : CGPoint(x: 2.5 * cell, y: 3 * cell)
+                func wall(_ sign: CGFloat) -> [Double] {
+                    (-3...3).flatMap { along in (0..<4).map { index in
+                        // Sample off the pigment core over a one-point band,
+                        // across several chips: a single chipped lip can be
+                        // narrow, but the cut must retain directional relief.
+                        let offset = sign * (0.5 + CGFloat(index) / 3)
+                        let advance = CGFloat(along) * cell / 12
+                        return brightness(at: CGPoint(x: middle.x + (horizontal ? advance : offset),
+                                                      y: middle.y + (horizontal ? offset : advance)))
+                    } }
+                }
+                XCTAssertLessThan(try XCTUnwrap(wall(-1).min()), field - 8,
+                                  "The upper/left recess wall must visibly shade the field at \(cell) pt")
+                XCTAssertGreaterThan(try XCTUnwrap(wall(1).max()), field + 8,
+                                     "The lower/right recess wall must catch light at \(cell) pt")
+                let edge = (0..<24).map { index in
+                    let advance = (CGFloat(index) / 24 - 0.5) * cell / 2
+                    return brightness(at: CGPoint(x: middle.x + (horizontal ? advance : 0.75),
+                                                  y: middle.y + (horizontal ? 0.75 : advance)))
+                }
+                XCTAssertGreaterThan(try XCTUnwrap(edge.max()) - XCTUnwrap(edge.min()), 5,
+                                     "Native relief must vary along the ice cut rather than form a clean rail")
+                if cell >= 40 {
+                    let wideLip = (1..<8).flatMap { span in (0..<24).map { index in
+                        // Sample between crossings, beyond the narrow phone
+                        // cut. Several spans prevent one seeded chip from
+                        // deciding the result, without counting intersections.
+                        let along = (CGFloat(span) + (CGFloat(index) / 24 - 0.5) / 2) * cell
+                        return brightness(at: CGPoint(x: horizontal ? along : middle.x + 1.5,
+                                                      y: horizontal ? middle.y + 1.5 : along))
+                    } }
+                    XCTAssertGreaterThan(try XCTUnwrap(wideLip.max()), field + 8,
+                                         "Large cuts need visible native relief beyond a hairline-width shoulder")
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testEngravedStarDimplesStaySmallAndCentered() throws {
+        for cell: CGFloat in [7, 13.99, 14, 20, 32] {
+            let grid = EngravedGridGeometry(width: 9, height: 9, cellSize: cell)
+            func render(height: Int) throws -> (pixels: [UInt8], width: Int, height: Int) {
+                try nativeMaterialPixels(Color(red: 0.72, green: 0.80, blue: 0.85).overlay {
+                    EngravedGobanGrid(geometry: EngravedGridGeometry(width: 9, height: height, cellSize: cell),
+                                      color: Color(red: 0.25, green: 0.35, blue: 0.42))
+                }.frame(width: 9 * cell, height: 9 * cell))
+            }
+            let dimples = try render(height: 9)
+            // The rectangular board has no stars but the same local grid
+            // through all five sampled centers. Its different border lies
+            // well outside these patches, isolating the actual dimple paint.
+            let plain = try render(height: 10)
+            XCTAssertEqual(dimples.width, plain.width)
+            XCTAssertEqual(dimples.height, plain.height)
+            if cell < 14 {
+                XCTAssertEqual(dimples.pixels, plain.pixels,
+                               "Small boards cannot acquire either a dimple core or relief")
+                continue
+            }
+            XCTAssertLessThan(grid.dimpleDiameter, cell / 3,
+                              "A visible star remains local to its intersection")
+            XCTAssertLessThanOrEqual(grid.dimpleDiameter, 5.5,
+                                     "The recessed footprint stays bounded on larger boards")
+            for center in grid.starCenters {
+                let centerX = Double(center.x * 3), centerY = Double(center.y * 3)
+                let radius = Double(grid.dimpleDiameter * 3 / 2)
+                let reach = Int(ceil(radius + 3))
+                var changed = 0, farthestChange = 0.0, darkestCore = 255.0
+                var solidCoreQuadrants = Set<Int>()
+                func brightness(_ pixels: [UInt8], offset: Int) -> Double {
+                    (Double(pixels[offset]) + Double(pixels[offset + 1]) + Double(pixels[offset + 2])) / 3
+                }
+                let centerOffset = (Int(centerY) * dimples.width + Int(centerX)) * 4
+                let centerBrightness = brightness(dimples.pixels, offset: centerOffset)
+                XCTAssertLessThan(centerBrightness, brightness(plain.pixels, offset: centerOffset) - 15,
+                                  "The hoshi center must be visibly darker than an ordinary grid crossing")
+                for y in (Int(centerY) - reach)...(Int(centerY) + reach) {
+                    for x in (Int(centerX) - reach)...(Int(centerX) + reach) {
+                        let offset = (y * dimples.width + x) * 4
+                        let dx = Double(x) + 0.5 - centerX, dy = Double(y) + 0.5 - centerY
+                        let distance = hypot(dx, dy)
+                        let delta = (0..<4).map {
+                            abs(Int(dimples.pixels[offset + $0]) - Int(plain.pixels[offset + $0]))
+                        }.max()!
+                        if delta > 1 {
+                            changed += 1
+                            farthestChange = max(farthestChange, distance)
+                        }
+                        if distance < radius * 0.45 {
+                            darkestCore = min(darkestCore, brightness(dimples.pixels, offset: offset))
+                        }
+                        // A plain crossing is already dark at its center.
+                        // Require a solid dark disc in all four diagonals,
+                        // beyond a 1.5 pt radius on phone-sized and larger
+                        // boards, and off both grid axes.
+                        // A small dark intersection or bright lip alone fails.
+                        let minimumRadius: Double = cell >= 20 ? 4.5 : 3
+                        let maximumRadius: Double = cell >= 20 ? 5.4 : 4.2
+                        let axisClearance: Double = cell >= 20 ? 3 : 2
+                        if distance >= minimumRadius, distance <= maximumRadius,
+                           abs(dx) >= axisClearance, abs(dy) >= axisClearance {
+                            let dark = brightness(dimples.pixels, offset: offset)
+                            if dark <= centerBrightness + 8,
+                               brightness(plain.pixels, offset: offset) - dark > 8 {
+                                solidCoreQuadrants.insert((dx > 0 ? 1 : 0) + (dy > 0 ? 2 : 0))
+                            }
+                        }
+                    }
+                }
+                XCTAssertGreaterThan(changed, 4, "A visible recess distinguishes a star from a plain intersection")
+                XCTAssertLessThan(darkestCore, 140, "The dimple keeps a dark center on its intersection")
+                XCTAssertEqual(solidCoreQuadrants.count, 4,
+                               "A hoshi must show a substantial round dark core beyond the ordinary crossing")
+                XCTAssertLessThanOrEqual(farthestChange, radius + 1.25,
+                                         "Recess relief stays inside the small footprint plus antialiasing")
             }
         }
     }
@@ -2365,6 +3077,11 @@ final class SurroundThemeTests: XCTestCase {
         let small = RaggedGridGeometry(width: 9, height: 13, cellSize: 20, lineScale: 1.6)
         let large = RaggedGridGeometry(width: 9, height: 13, cellSize: 48, lineScale: 1.6)
         let first = polygons(in: small.path)
+        let explicitDefaults = RaggedGridGeometry(width: 9, height: 13, cellSize: 20, lineScale: 1.6,
+                                                  edgeAmplitude: 0.38, edgeSamplesPerCell: 20,
+                                                  independentEdges: false)
+        XCTAssertEqual(first, polygons(in: explicitDefaults.path),
+                       "Configurable ice chips must not change the existing scratched-grid defaults")
         XCTAssertEqual(first, polygons(in: small.path), "Redrawing must not reseed the edge pattern")
         let resized = polygons(in: large.path)
         XCTAssertEqual(first.count, resized.count)

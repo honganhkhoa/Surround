@@ -126,12 +126,13 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         }
         if self == .frostPine, scheme == .dark {
             var night = board
-            night.boardColor = Color(themeHex: 0x9BAFB9)
+            night.boardColor = Color(themeHex: 0xB0C1CB)
             night.compactBoardColor = Color(themeHex: 0x9BAFB9)
             night.boardEdge = Color(themeHex: 0xBDD6E5).opacity(0.7)
             night.boardTexture?.tint = Color(themeHex: 0xA5B8C5)
+            night.boardTexture?.opacity = 0.4
             night.surfaceFrost?.tint = Color(themeHex: 0xA5B8C5)
-            night.surfaceFrost?.opacity = 0.62
+            night.surfaceFrost?.opacity = 0.56
             night.stoneImages?.tint = Color(themeHex: 0xD5E2EE)
             night.boardDepth = BoardDepth(
                 upperFace: Color(themeHex: 0xA6BCC9), lowerFace: Color(themeHex: 0x6C8596),
@@ -585,7 +586,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             )
         case .frostPine:
             return BoardAppearance(
-                boardColor: Color(themeHex: 0xDDE2E3),
+                boardColor: Color(themeHex: 0xD2DDE2),
                 // Small boards take the frosted board's lower face, so the
                 // flat ice stones read brighter than the board, not darker.
                 compactBoardColor: Color(themeHex: 0xB3C4CE),
@@ -599,14 +600,14 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                     shadow: Color(themeHex: 0x253F51).opacity(0.24),
                     thicknessRatio: 0.008, maximumThickness: 5, edgeStyle: .frosted),
                 surfaceFrost: FrostPineAssets.surfaceFrost,
-                // Cloudy ice sits beneath a separate layer of surface frost.
-                // Native geometry supplies the quiet slate-blue grid.
+                // Polished clear ice leaves the field quiet; recessed engraved
+                // cores and recessed hoshi remain native, aligned geometry.
                 gridLineScale: 1,
+                gridStyle: .engraved,
                 stoneImages: FrostPineAssets.stones,
                 stoneLightDirection: .upperLeft,
-                // A full-footprint cast and tight contact anchor the domed
-                // ice on the bright, textured board at playing size.
-                imageStoneShadow: .raised,
+                imageStoneShadow: .ice,
+                imageStoneShading: .iceEdge,
                 gridColor: Color(themeHex: 0x52616A),
                 coordinateColor: Color(themeHex: 0x344F62),
                 black: StonePalette(
@@ -824,7 +825,7 @@ private final class FrostPineAssets {
         let black = (0..<4).compactMap { UIImage(named: "FrostPineMidnight\($0)", in: bundle, compatibleWith: nil) }
         let white = (0..<4).compactMap { UIImage(named: "FrostPinePale\($0)", in: bundle, compatibleWith: nil) }
         guard black.count == 4, white.count == 4 else { return nil }
-        return StoneImages(black: black, white: white)
+        return StoneImages(black: black, white: white, smallStoneInset: 0.35)
     }()
 
     /// Lift the ice's middle tones against the bright daytime board without
@@ -854,9 +855,11 @@ private final class FrostPineAssets {
         return day
     }()
 
-    static let board = UIImage(named: "FrostPineBoard").map { BoardTexture(image: $0, mapping: .board) }
+    // Broad clear-ice depth stays quiet beneath the engraved grid. The
+    // crystalline perimeter is a separate, softer surface layer.
+    static let board = UIImage(named: "FrostPineBoard").map { BoardTexture(image: $0, mapping: .board, opacity: 0.48) }
     static let surfaceFrost = UIImage(named: "FrostPineBoardFrost").map {
-        BoardSurfaceOverlay(image: $0, opacity: 0.88)
+        BoardSurfaceOverlay(image: $0, opacity: 0.76, perimeterFadeFraction: 0.045)
     }
     static let snow = UIImage(named: "FrostPineSnow")
     static let pine = UIImage(named: "FrostPinePine")
@@ -2347,9 +2350,16 @@ private struct FrostPineSceneContent: View, Equatable {
         return true
     }
 
-    private var shortWideChromeWeight: CGFloat {
-        min(1, max(0, (size.width - size.height) / 160))
-            * min(1, max(0, (600 - size.height) / 120))
+    private var topFade: Gradient {
+        if #available(iOS 26.0, *) {
+            return Gradient(colors: [chrome.opacity(0.82), chrome.opacity(0.26), .clear])
+        }
+        // Match Raked Garden's support for older, unbacked navigation bars.
+        return Gradient(stops: [
+            .init(color: chrome.opacity(0.92), location: 0),
+            .init(color: chrome.opacity(0.92), location: 0.62),
+            .init(color: .clear, location: 1)
+        ])
     }
 
     var body: some View {
@@ -2366,18 +2376,15 @@ private struct FrostPineSceneContent: View, Equatable {
                     .clipped()
             }
             FrostPineDecoration(image: FrostPineAssets.pine, frame: layout.pine, scheme: scheme)
-            FrostPineDecoration(image: FrostPineAssets.pinecone, frame: layout.pinecone, scheme: scheme)
-            FrostPineDecoration(image: FrostPineAssets.twig, frame: layout.twig, scheme: scheme)
+            FrostPineDecoration(image: FrostPineAssets.pinecone, frame: layout.pinecone, scheme: scheme,
+                                groundContact: .pinecone)
+            FrostPineDecoration(image: FrostPineAssets.twig, frame: layout.twig, scheme: scheme,
+                                groundContact: .twig)
             // Clear the native title and toolbar bands without washing out
             // the snow across the whole game. Older bars have no glass.
             VStack(spacing: 0) {
-                LinearGradient(stops: [
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.96 : 0.90), location: 0),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.90
-                        : 0.35 + 0.45 * Double(shortWideChromeWeight)), location: 0.55),
-                    .init(color: .clear, location: 1)
-                ], startPoint: .top, endPoint: .bottom)
-                .frame(height: min(125, size.height * 0.22))
+                LinearGradient(gradient: topFade, startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(92, size.height * 0.16))
                 Spacer(minLength: 0)
                 LinearGradient(stops: [
                     .init(color: .clear, location: 0),
@@ -2393,19 +2400,48 @@ private struct FrostPineSceneContent: View, Equatable {
 }
 
 private struct FrostPineDecoration: View {
+    enum GroundContact { case pinecone, twig }
+
     let image: UIImage?
     let frame: CGRect
     let scheme: ColorScheme
+    var groundContact: GroundContact? = nil
 
     var body: some View {
         if let image {
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .saturation(scheme == .dark ? 0.5 : 1)
-                .colorMultiply(scheme == .dark ? Color(themeHex: 0x68869F) : .white)
-                .frame(width: frame.width, height: frame.height)
-                .position(x: frame.midX, y: frame.midY)
+            ZStack {
+                if let groundContact {
+                    let cone = groundContact == .pinecone
+                    let side = min(frame.width, frame.height)
+                    let silhouette = Image(uiImage: image)
+                        .renderingMode(.template)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .foregroundStyle(Color(themeHex: scheme == .dark ? 0x091522 : 0x253B49))
+                        .frame(width: frame.width, height: frame.height)
+
+                    // Keep the short down-right cast attached to the snow.
+                    // The twig lies flatter than the rounded cone.
+                    silhouette
+                        .blur(radius: side * (cone ? 0.03 : 0.008))
+                        .opacity(scheme == .dark ? (cone ? 0.32 : 0.28) : (cone ? 0.24 : 0.20))
+                        .offset(x: side * (cone ? 0.02 : 0.006), y: side * (cone ? 0.03 : 0.009))
+                    // Draw contact separately so its crisp edge never casts
+                    // another blurred shadow or lifts the ornament off the snow.
+                    silhouette
+                        .blur(radius: side * (cone ? 0.008 : 0.003))
+                        .opacity(scheme == .dark ? (cone ? 0.48 : 0.40) : (cone ? 0.38 : 0.30))
+                        .offset(x: side * (cone ? 0.003 : 0.0015), y: side * (cone ? 0.006 : 0.003))
+                }
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .saturation(scheme == .dark ? 0.5 : 1)
+                    .colorMultiply(scheme == .dark ? Color(themeHex: 0x68869F) : .white)
+                    .frame(width: frame.width, height: frame.height)
+            }
+            .frame(width: frame.width, height: frame.height)
+            .position(x: frame.midX, y: frame.midY)
         }
     }
 }
@@ -2572,6 +2608,7 @@ struct GameDetailSceneForeground: View {
     @Environment(\.surroundTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     var hasTopEdgeClocks = false
+    var shadowExclusions: [BoardSceneShadowRegion] = []
 
     var body: some View {
         Group {
@@ -2585,10 +2622,94 @@ struct GameDetailSceneForeground: View {
                     SurroundStudioFoliageContent(size: geometry.size, scheme: colorScheme,
                                                  hasTopEdgeClocks: hasTopEdgeClocks).equatable()
                 }
+            } else if theme == .frostPine {
+                GeometryReader { geometry in
+                    FrostPineShadow(size: geometry.size, scheme: colorScheme,
+                                    excludedBoards: shadowExclusions).equatable()
+                }
             }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// Winter light from the upper left projects the pine down and right. Like
+/// Garden's canopy, the cast is larger than the ornament and fixed to the scene.
+struct FrostPineShadowLayout: Equatable {
+    let size: CGSize
+    let canopy: CGRect
+    let blurRadius: CGFloat
+    let topFadeHeight: CGFloat
+
+    init(size: CGSize) {
+        let width = size.width.isFinite ? max(0, size.width) : 0
+        let height = size.height.isFinite ? max(0, size.height) : 0
+        self.size = CGSize(width: width, height: height)
+        let shortSide = min(width, height)
+        let side = min(840, shortSide * 1.3)
+        // Keep the source's cut-off branch roots outside the viewport; the
+        // enlarged canopy's center projects down-right from the visible pine.
+        canopy = CGRect(x: -side * 0.08, y: -side * 0.04, width: side, height: side)
+        blurRadius = min(5, shortSide * 0.008)
+        topFadeHeight = min(92, height * 0.16)
+    }
+}
+
+/// Cut out the union of visible rounded slabs, including miniature chat boards.
+/// Apply after the pine blur so no cast spills onto board or stone colors.
+struct FrostPineShadowMask: View, Equatable {
+    var excludedBoards: [BoardSceneShadowRegion] = []
+    var topFadeHeight: CGFloat = 0
+
+    var body: some View {
+        Canvas { context, size in
+            let bounds = CGRect(origin: .zero, size: size)
+            if topFadeHeight > 0 {
+                context.fill(Path(bounds), with: .linearGradient(
+                    Gradient(colors: [.clear, .white]), startPoint: .zero,
+                    endPoint: CGPoint(x: 0, y: topFadeHeight)))
+            } else {
+                context.fill(Path(bounds), with: .color(.white))
+            }
+            context.blendMode = .destinationOut
+            for region in excludedBoards {
+                let clipped = region.bounds.intersection(bounds)
+                if !clipped.isNull && !clipped.isEmpty {
+                    // Keep the original corners when a preview or scroller
+                    // crops the board; intersecting first would invent corners.
+                    let shape = RoundedRectangle(cornerRadius: region.cornerRadius, style: .circular)
+                    context.fill(shape.path(in: region.bounds), with: .color(.white))
+                }
+            }
+        }
+        .animation(nil, value: excludedBoards)
+    }
+}
+
+/// Blur the pine's static alpha only, never the board, lettering or controls.
+private struct FrostPineShadow: View, Equatable {
+    let size: CGSize
+    let scheme: ColorScheme
+    var excludedBoards: [BoardSceneShadowRegion] = []
+
+    var body: some View {
+        let layout = FrostPineShadowLayout(size: size)
+        if let pine = FrostPineAssets.pine {
+            Image(uiImage: pine)
+                .renderingMode(.template)
+                .resizable()
+                .foregroundStyle(Color(themeHex: scheme == .dark ? 0x091522 : 0x253B49))
+                .frame(width: layout.canopy.width, height: layout.canopy.height)
+                .blur(radius: layout.blurRadius)
+                .opacity(0.18)
+                .position(x: layout.canopy.midX, y: layout.canopy.midY)
+                .frame(width: layout.size.width, height: layout.size.height)
+                .mask {
+                    FrostPineShadowMask(excludedBoards: excludedBoards, topFadeHeight: layout.topFadeHeight)
+                }
+                .clipped()
+        }
     }
 }
 

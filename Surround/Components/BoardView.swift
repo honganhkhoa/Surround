@@ -171,6 +171,7 @@ struct Goban: View {
     var body: some View {
         let size = stoneSize(geometry: geometry, boardSize: max(width, height), displayScale: displayScale)
         let padded = appearance.gridStyle.usesPaddedCells(at: size)
+        let engraved = appearance.gridStyle.usesEngraving(at: size)
         let lineColor = appearance.gridColor.opacity(padded ? 0.6 : 1)
         #if DEBUG
         let drawnRow = markerAuditState?.highlightedRow ?? highlightedRow
@@ -231,6 +232,13 @@ struct Goban: View {
                         .opacity(appearance.gridStyle.usesRaggedEdges(at: size) ? 1 : 0)
                         .animation(nil, value: appearance.gridStyle.usesRaggedEdges(at: size))
                 }
+                if appearance.gridStyle == .engraved {
+                    EngravedGobanGrid(
+                        geometry: EngravedGridGeometry(width: width, height: height,
+                                                      cellSize: size, lineScale: appearance.gridLineScale),
+                        color: appearance.gridColor
+                    ).equatable()
+                }
                 Group {
                     Path { path in
                         for i in 1..<height-1 {
@@ -251,8 +259,9 @@ struct Goban: View {
                         path.closeSubpath()
                     }.stroke(lineColor, lineWidth: size < 10 ? 0.5 : appearance.gridLineScale)
                 }
-                .opacity(appearance.gridStyle.usesRaggedEdges(at: size) ? 0 : 1)
+                .opacity(appearance.gridStyle.usesRaggedEdges(at: size) || engraved ? 0 : 1)
                 .animation(nil, value: appearance.gridStyle.usesRaggedEdges(at: size))
+                .animation(nil, value: engraved)
                 .animation(nil, value: padded)
                 if appearance.gridStyle == .stitched {
                     StitchedGobanGrid(
@@ -271,6 +280,8 @@ struct Goban: View {
                             path.addEllipse(in: starPointRect)
                         }
                     }.fill(appearance.gridColor)
+                        .opacity(engraved ? 0 : 1)
+                        .animation(nil, value: engraved)
                 }
                 if drawnColumn >= 0 && drawnColumn < width && drawnRow >= 0 && drawnRow < height {
                     Path { path in
@@ -739,7 +750,11 @@ private struct ImageStoneCanvas: View, Equatable {
             let glass = shadowStyle == .raisedGlass
             let shadowScale = min(1, max(glass ? 0.5 : 0.35, (cellSize - 10) / 30))
 
-            if shadowStyle != .contact {
+            if shadowStyle == .ice {
+                drawShadow(in: context, radius: min(1.8, max(0.65, cellSize * 0.04)),
+                           x: min(0.8, cellSize * 0.018), y: min(1.2, cellSize * 0.03),
+                           inset: 0.25, opacity: 0.26)
+            } else if shadowStyle != .contact {
                 // A full-footprint cast stays visible against wood grain at
                 // phone size. Cap its spread so larger boards do not float.
                 drawShadow(in: context, radius: min(3, max(1.8, cellSize * 0.07)) * shadowScale,
@@ -878,7 +893,8 @@ struct Stones: View {
             for column in 0..<width {
                 if case .hasStone(let stoneColor) = boardPosition[row, column] {
                     let padding = size < 10 ? CGFloat(0.0) : CGFloat(1.0)
-                    let stoneRect = CGRect(x: CGFloat(column) * size + padding, y: CGFloat(row) * size + padding, width: size - padding * 2, height: size - padding * 2)
+                    let nominalRect = CGRect(x: CGFloat(column) * size + padding, y: CGFloat(row) * size + padding, width: size - padding * 2, height: size - padding * 2)
+                    let stoneRect = stoneImages?.displayRect(in: nominalRect, cellSize: size) ?? nominalRect
                     let isRemoved = boardPosition.removedStones?.contains([row, column]) ?? false
                     if let stoneImages {
                         imageStones.append(ImageStone(
@@ -1656,7 +1672,7 @@ struct BoardView: View {
                                                 }
                                         }
                                     }
-                                    .opacity(detailed ? 1 : 0)
+                                    .modifier(BoardTextureVisibility(opacity: texture.opacity, cellSize: cellSize))
                             }
                         }
                         .overlay {
@@ -1735,6 +1751,15 @@ struct BoardView: View {
                         x: showsCoordinate ? geometry.size.width / (width + 1) / 2 : 0,
                         y: showsCoordinate ? geometry.size.height / (height + 1) / 2 : 0
                     )
+            }
+            .background(alignment: .topLeading) {
+                // Match the rounded slab and its sidewall, leaving the space
+                // reserved for its soft shadow in the surrounding scene.
+                Color.clear
+                    .frame(width: geometry.size.width, height: geometry.size.height + depthGeometry.thickness)
+                    .modifier(BoardSceneShadowExclusion(cornerRadius: faceRadius))
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
         }
     }

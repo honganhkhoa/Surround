@@ -7,6 +7,48 @@
 
 import SwiftUI
 
+/// Opted-in scenes keep their cast shadows off every board and its stones.
+/// Bounds are resolved by the scene without feeding geometry back into layout.
+struct BoardSceneShadowRegion: Equatable {
+    var bounds: CGRect
+    var cornerRadius: CGFloat = 0
+}
+
+struct BoardSceneShadowAnchor {
+    let bounds: Anchor<CGRect>
+    let cornerRadius: CGFloat
+}
+
+struct BoardSceneShadowExclusionKey: PreferenceKey {
+    static let defaultValue: [BoardSceneShadowAnchor] = []
+
+    static func reduce(value: inout [BoardSceneShadowAnchor], nextValue: () -> [BoardSceneShadowAnchor]) {
+        value.append(contentsOf: nextValue())
+    }
+}
+
+private struct ExcludesBoardsFromSceneShadowsKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var excludesBoardsFromSceneShadows: Bool {
+        get { self[ExcludesBoardsFromSceneShadowsKey.self] }
+        set { self[ExcludesBoardsFromSceneShadowsKey.self] = newValue }
+    }
+}
+
+struct BoardSceneShadowExclusion: ViewModifier {
+    @Environment(\.excludesBoardsFromSceneShadows) private var enabled
+    var cornerRadius: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content.anchorPreference(key: BoardSceneShadowExclusionKey.self, value: .bounds) {
+            enabled ? [BoardSceneShadowAnchor(bounds: $0, cornerRadius: cornerRadius)] : []
+        }
+    }
+}
+
 /// The colors of one player's stones and of the marks drawn on them.
 struct StonePalette: Equatable {
     /// The lit side of a shaded stone.
@@ -41,6 +83,9 @@ struct StoneImages: Equatable {
     var black: [UIImage]
     var white: [UIImage]
     var footprint: CGFloat = 0.94
+    /// Extra breathing room for detailed phone stones, independent of the
+    /// source image's transparent margin. Large and solid stones keep their size.
+    var smallStoneInset: CGFloat = 0
     /// Scene lighting applied to the artwork, independently of game marks.
     var tint: Color = .white
     /// Optional wool silhouettes, sampled once from the source alpha. Other
@@ -50,6 +95,18 @@ struct StoneImages: Equatable {
 
     func variants(_ color: StoneColor) -> [UIImage] {
         color == .black ? black : white
+    }
+
+    func displayRect(in rect: CGRect, cellSize: CGFloat) -> CGRect {
+        guard cellSize.isFinite, usesDetailedStoneRendering(at: cellSize), smallStoneInset.isFinite,
+              smallStoneInset > 0, rect.width.isFinite, rect.height.isFinite,
+              rect.width > 0, rect.height > 0 else { return rect }
+        // A normal board's stone is two points narrower than its cell.
+        // Key the taper to the visible diameter so standalone previews agree.
+        let growth = min(1, max(0, (cellSize - 14) / 2))
+        let fade = min(1, max(0, (30 - rect.width) / 10))
+        let inset = min(smallStoneInset * growth * fade, min(rect.width, rect.height) / 4)
+        return rect.insetBy(dx: inset, dy: inset)
     }
 
     func fiberContour(_ color: StoneColor, variant: Int = 0) -> FeltFiberContour? {
@@ -81,6 +138,8 @@ enum StoneLightDirection: Equatable {
 enum ImageStoneShadowStyle: Equatable {
     case contact
     case raised
+    /// Clear ice rests close to the polished surface with a gentle contact.
+    case ice
     /// A firmer contact edge gives polished glass depth on dark enamel.
     case raisedGlass
 }
@@ -90,18 +149,43 @@ enum ImageStoneShadowStyle: Equatable {
 enum ImageStoneShading: Equatable {
     case artwork
     case clamshellShoulder
+    case iceEdge
 
     func opacity(for color: StoneColor, cellSize: CGFloat, diameter: CGFloat) -> Double {
-        guard self == .clamshellShoulder, color == .white,
-              cellSize.isFinite, diameter.isFinite,
+        guard cellSize.isFinite, diameter.isFinite,
               usesDetailedStoneRendering(at: cellSize), diameter > 0 else { return 0 }
-        return 0.18 * Double(min(1, max(0, (32 - diameter) / 12)))
+        switch self {
+        case .artwork:
+            return 0
+        case .clamshellShoulder:
+            return color == .white ? 0.18 * Double(min(1, max(0, (32 - diameter) / 12))) : 0
+        case .iceEdge:
+            return 0.38 * Double(min(1, max(0, (32 - diameter) / 10)))
+        }
     }
 
     func draw(in context: GraphicsContext, rect: CGRect, color: StoneColor,
               cellSize: CGFloat, lightDirection: StoneLightDirection) {
         let strength = opacity(for: color, cellSize: cellSize, diameter: rect.width)
         guard strength > 0 else { return }
+        if self == .iceEdge {
+            // A narrow shoulder separates adjacent ice stones without
+            // darkening their faces or broadening their contact shadows.
+            // Pale ice keeps a shaded lower edge; midnight catches the key
+            // light along its upper edge. Both stay inside the artwork.
+            let edge = Path(ellipseIn: rect.insetBy(dx: 0.45, dy: 0.45))
+            let lit = CGPoint(x: lightDirection == .upperLeft ? rect.minX : rect.maxX, y: rect.minY)
+            let shaded = CGPoint(x: lightDirection == .upperLeft ? rect.maxX : rect.minX, y: rect.maxY)
+            let colors: [Color] = color == .white
+                ? [Color(red: 0.18, green: 0.34, blue: 0.47).opacity(strength * 0.55),
+                   Color(red: 0.18, green: 0.34, blue: 0.47).opacity(strength)]
+                : [Color(red: 0.48, green: 0.74, blue: 0.95).opacity(strength),
+                   Color(red: 0.48, green: 0.74, blue: 0.95).opacity(strength * 0.45)]
+            context.stroke(edge, with: .linearGradient(Gradient(colors: colors),
+                                                       startPoint: lit, endPoint: shaded),
+                           lineWidth: color == .white ? 0.5 : 0.65)
+            return
+        }
         let center = CGPoint(x: rect.minX + rect.width * (lightDirection == .upperLeft ? 0.34 : 0.66),
                              y: rect.minY + rect.height * 0.3)
         // The clear center keeps the ivory face and shell lines untouched.
@@ -128,6 +212,9 @@ struct BoardTexture: Equatable {
     /// Applied after image preparation, so changing appearance reuses the
     /// original texture and its cached margin without baking in old traits.
     var tint: Color = .white
+    /// Blend busy material grain with the board's base pigment while keeping
+    /// the original artwork and its separate surface deposits intact.
+    var opacity: Double = 1
 
     func paintScale(in size: CGSize) -> CGFloat {
         switch mapping {
@@ -142,12 +229,28 @@ struct BoardTexture: Equatable {
     }
 }
 
+/// Hide the complete texture group below the detail threshold without
+/// unmounting it or cross-fading when the board resizes.
+struct BoardTextureVisibility: ViewModifier {
+    var opacity: Double
+    var cellSize: CGFloat
+
+    func body(content: Content) -> some View {
+        let detailed = usesDetailedStoneRendering(at: cellSize)
+        content.opacity(detailed ? opacity : 0)
+            .animation(nil, value: detailed)
+    }
+}
+
 /// Transparent material resting on the whole board face. Stretching this
 /// composition to the face retains every edge on rectangular boards.
 struct BoardSurfaceOverlay: Equatable {
     var image: UIImage
     var opacity: Double = 1
     var tint: Color = .white
+    /// Fade inward across this fraction of the shorter face dimension.
+    /// Nil retains the complete artwork; a bounded rim keeps the field calm.
+    var perimeterFadeFraction: CGFloat? = nil
 }
 
 /// The surface layer stays mounted across the detail threshold, without
@@ -162,6 +265,28 @@ struct BoardSurfaceOverlayView: View {
             .resizable()
             .interpolation(.high)
             .colorMultiply(surface.tint)
+            .mask {
+                if let fraction = surface.perimeterFadeFraction {
+                    Canvas { context, size in
+                        let reach = min(size.width, size.height) * min(0.5, max(0, fraction))
+                        guard fraction.isFinite, reach > 0, detailed else { return }
+                        let fade = Gradient(colors: [.white, .clear])
+                        func edge(_ rect: CGRect, from start: CGPoint, to end: CGPoint) {
+                            context.fill(Path(rect), with: .linearGradient(fade, startPoint: start, endPoint: end))
+                        }
+                        edge(CGRect(x: 0, y: 0, width: size.width, height: reach),
+                             from: .zero, to: CGPoint(x: 0, y: reach))
+                        edge(CGRect(x: 0, y: size.height - reach, width: size.width, height: reach),
+                             from: CGPoint(x: 0, y: size.height), to: CGPoint(x: 0, y: size.height - reach))
+                        edge(CGRect(x: 0, y: 0, width: reach, height: size.height),
+                             from: .zero, to: CGPoint(x: reach, y: 0))
+                        edge(CGRect(x: size.width - reach, y: 0, width: reach, height: size.height),
+                             from: CGPoint(x: size.width, y: 0), to: CGPoint(x: size.width - reach, y: 0))
+                    }
+                } else {
+                    Color.white
+                }
+            }
             .opacity(detailed ? surface.opacity : 0)
             .animation(nil, value: detailed)
             .allowsHitTesting(false)
@@ -438,7 +563,11 @@ struct StoneMarkerText: View, Equatable {
 }
 
 enum BoardGridStyle: Equatable {
-    case straight, ragged, stitched
+    case straight, ragged, stitched, engraved
+
+    func usesEngraving(at cellSize: CGFloat) -> Bool {
+        self == .engraved && usesDetailedStoneRendering(at: cellSize)
+    }
 
     func usesRaggedEdges(at cellSize: CGFloat) -> Bool {
         self == .ragged && usesDetailedStoneRendering(at: cellSize)
@@ -450,6 +579,116 @@ enum BoardGridStyle: Equatable {
 
     func usesPaddedCells(at cellSize: CGFloat) -> Bool {
         self == .stitched && usesDetailedStoneRendering(at: cellSize)
+    }
+}
+
+/// The engraved core uses the same half-cell intersections as the plain
+/// grid. Relief never changes the playing area, including rectangular boards.
+struct EngravedGridGeometry: Equatable {
+    var width: Int
+    var height: Int
+    var cellSize: CGFloat
+    var lineScale: CGFloat = 1
+
+    private var isValid: Bool {
+        width >= 2 && height >= 2 && cellSize.isFinite && cellSize > 0
+            && lineScale.isFinite && lineScale > 0
+    }
+
+    var gridRect: CGRect {
+        guard isValid else { return .zero }
+        return CGRect(x: cellSize / 2, y: cellSize / 2,
+                      width: CGFloat(width - 1) * cellSize, height: CGFloat(height - 1) * cellSize)
+    }
+
+    var innerPath: Path {
+        guard isValid else { return Path() }
+        var path = Path()
+        for row in 1..<(height - 1) {
+            let y = (CGFloat(row) + 0.5) * cellSize
+            path.move(to: CGPoint(x: gridRect.minX, y: y))
+            path.addLine(to: CGPoint(x: gridRect.maxX, y: y))
+        }
+        for column in 1..<(width - 1) {
+            let x = (CGFloat(column) + 0.5) * cellSize
+            path.move(to: CGPoint(x: x, y: gridRect.minY))
+            path.addLine(to: CGPoint(x: x, y: gridRect.maxY))
+        }
+        return path
+    }
+
+    var outlinePath: Path { isValid ? Path(gridRect) : Path() }
+
+    /// Chipped lips share a straight, continuous spine. Their seeded edge
+    /// variation stays attached to each row/cell as the board resizes.
+    var chippedPath: Path {
+        guard isValid else { return Path() }
+        // Preserve the phone's facets and give larger ice cuts enough width
+        // to read at tablet viewing distance. Seeded positions stay fixed.
+        let largeBoardStrength = min(1, max(0, (cellSize - 22) / 18))
+        return RaggedGridGeometry(width: width, height: height,
+                                  cellSize: cellSize, lineScale: lineScale,
+                                  edgeAmplitude: 0.7 + 0.4 * largeBoardStrength,
+                                  edgeSamplesPerCell: 8, independentEdges: true).path
+    }
+
+    var starCenters: [CGPoint] {
+        guard isValid, width == height else { return [] }
+        let points: [(Int, Int)]
+        switch width {
+        case 19: points = [3, 9, 15].flatMap { row in [3, 9, 15].map { (row, $0) } }
+        case 13: points = [(3, 3), (3, 9), (6, 6), (9, 3), (9, 9)]
+        case 9: points = [(2, 2), (2, 6), (4, 4), (6, 2), (6, 6)]
+        default: points = []
+        }
+        return points.map { CGPoint(x: (CGFloat($0.1) + 0.5) * cellSize,
+                                    y: (CGFloat($0.0) + 0.5) * cellSize) }
+    }
+
+    var dimpleDiameter: CGFloat { min(5.5, max(4.5, cellSize * 0.26)) }
+    /// A substantial opaque center stays distinct from a chipped crossing.
+    var dimpleCoreDiameter: CGFloat { dimpleDiameter - 0.8 }
+}
+
+/// Rough ice-cut lips around a continuous blue-gray core. Relief stays in a
+/// narrow strip along each cut, leaving the playing field and intersections clear.
+struct EngravedGobanGrid: View, Equatable {
+    var geometry: EngravedGridGeometry
+    var color: Color
+
+    var body: some View {
+        Canvas { context, _ in
+            guard usesDetailedStoneRendering(at: geometry.cellSize) else { return }
+            let chips = geometry.chippedPath
+            var upperWall = context
+            upperWall.translateBy(x: -0.3, y: -0.3)
+            upperWall.fill(chips, with: .color(color.opacity(0.3)))
+            var lowerWall = context
+            lowerWall.translateBy(x: 0.5, y: 0.5)
+            lowerWall.fill(chips, with: .color(.white.opacity(0.62)))
+            context.fill(chips, with: .color(color.opacity(0.64)))
+            // The pigment is drawn last, so neither relief wall interrupts it.
+            context.stroke(geometry.innerPath, with: .color(color), lineWidth: 0.45 * geometry.lineScale)
+            context.stroke(geometry.outlinePath, with: .color(color), lineWidth: 0.7 * geometry.lineScale)
+            for center in geometry.starCenters {
+                let diameter = geometry.dimpleDiameter
+                let rect = CGRect(x: center.x - diameter / 2, y: center.y - diameter / 2,
+                                  width: diameter, height: diameter)
+                context.fill(Path(ellipseIn: rect), with: .linearGradient(
+                    Gradient(colors: [color.opacity(0.9), .white.opacity(0.8)]),
+                    startPoint: CGPoint(x: rect.minX, y: rect.minY),
+                    endPoint: CGPoint(x: rect.maxX, y: rect.maxY)))
+                let lip = (diameter - geometry.dimpleCoreDiameter) / 2
+                let core = Path(ellipseIn: rect.insetBy(dx: lip, dy: lip))
+                context.fill(core, with: .color(color))
+                // A deeper recess reads as a star even where several chipped
+                // edges meet; keep its light-catching rim narrow.
+                context.fill(core, with: .color(.black.opacity(0.28)))
+            }
+        }
+        .animation(nil, value: usesDetailedStoneRendering(at: geometry.cellSize))
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -538,6 +777,11 @@ struct RaggedGridGeometry: Equatable {
     var height: Int
     var cellSize: CGFloat
     var lineScale: CGFloat
+    /// Defaults retain the scratched wood grid; ice opts into wider facets.
+    var edgeAmplitude: CGFloat = RaggedGridGeometry.edgeVariation
+    var edgeSamplesPerCell: Int = RaggedGridGeometry.samplesPerCell
+    /// Independent ice fractures avoid matching, diamond-shaped width peaks.
+    var independentEdges: Bool = false
 
     static let samplesPerCell = 20
     // Keep edge variation visible after native 2x/3x antialiasing; smaller
@@ -546,7 +790,9 @@ struct RaggedGridGeometry: Equatable {
 
     var path: Path {
         guard width >= 2, height >= 2, cellSize >= 10,
-              cellSize.isFinite, lineScale.isFinite, lineScale > 0 else { return Path() }
+              cellSize.isFinite, lineScale.isFinite, lineScale > 0,
+              edgeAmplitude.isFinite, edgeAmplitude >= 0,
+              (2...64).contains(edgeSamplesPerCell) else { return Path() }
         var result = Path()
         for row in 0..<height {
             addLine(to: &result, line: row, cells: width - 1, vertical: false,
@@ -560,12 +806,13 @@ struct RaggedGridGeometry: Equatable {
     }
 
     private func coreWidth(outer: Bool) -> CGFloat {
-        max(0.5, (outer ? 1 : 0.5) * lineScale - 2 * Self.edgeVariation)
+        max(0.5, (outer ? 1 : 0.5) * lineScale - 2 * edgeAmplitude)
     }
 
-    private func sampleHash(line: Int, sample: Int, vertical: Bool) -> UInt32 {
+    private func sampleHash(line: Int, sample: Int, vertical: Bool, positiveSide: Bool) -> UInt32 {
         var hash = UInt32(truncatingIfNeeded: line &* 92_821 &+ sample &* 68_917)
         hash ^= vertical ? 0xA341_316C : 0xC801_3EA4
+        if independentEdges && positiveSide { hash ^= 0x9E37_79B9 }
         hash ^= hash >> 16
         hash &*= 0x7FEB_352D
         hash ^= hash >> 15
@@ -573,7 +820,7 @@ struct RaggedGridGeometry: Equatable {
     }
 
     private func addLine(to path: inout Path, line: Int, cells: Int, vertical: Bool, outer: Bool) {
-        let sampleCount = cells * Self.samplesPerCell
+        let sampleCount = cells * edgeSamplesPerCell
         let center = (CGFloat(line) + 0.5) * cellSize
         let coreHalfWidth = coreWidth(outer: outer) / 2
         func point(along: CGFloat, offset: CGFloat) -> CGPoint {
@@ -591,13 +838,13 @@ struct RaggedGridGeometry: Equatable {
         path.addLine(to: point(along: start, offset: coreHalfWidth))
         path.closeSubpath()
         func edgePoint(_ sample: Int, side: CGFloat) -> CGPoint {
-            let hash = sampleHash(line: line, sample: sample, vertical: vertical)
-            let irregularity = (CGFloat(hash & 0xFFFF) / 65_535 * 2 - 1) * Self.edgeVariation
+            let hash = sampleHash(line: line, sample: sample, vertical: vertical, positiveSide: side > 0)
+            let irregularity = (CGFloat(hash & 0xFFFF) / 65_535 * 2 - 1) * edgeAmplitude
             let halfWidth = max(coreHalfWidth, (outer ? 0.5 : 0.25) * lineScale + irregularity)
             // Unequal short runs avoid regular teeth along the edge. The
             // endpoints remain exact and the sample order stays monotonic.
             let jitter = sample == 0 || sample == sampleCount ? 0 : (CGFloat(hash >> 16) / 65_535 - 0.5) * 0.6
-            let along = (0.5 + (CGFloat(sample) + jitter) / CGFloat(Self.samplesPerCell)) * cellSize
+            let along = (0.5 + (CGFloat(sample) + jitter) / CGFloat(edgeSamplesPerCell)) * cellSize
             return point(along: along, offset: side * halfWidth)
         }
         path.move(to: edgePoint(0, side: -1))
@@ -757,11 +1004,17 @@ struct Stone: View {
                     if shadowRadius > 0, usesDetailedStoneRendering(at: size),
                        let images = appearance.stoneImages,
                        let image = images.variants(color!).first {
+                        let imageSize = images.displayRect(in: CGRect(x: 0, y: 0, width: size, height: size),
+                                                           cellSize: size).width
                         Image(uiImage: image)
                             .resizable()
                             .colorMultiply(images.tint)
-                            .frame(width: size / images.footprint, height: size / images.footprint)
-                            .frame(width: size, height: size)
+                            .frame(width: imageSize / images.footprint, height: imageSize / images.footprint)
+                            .frame(width: imageSize, height: imageSize)
+                            // Ice's thin contour must not cast its own blurred
+                            // ring. Other materials retain their composition.
+                            .shadow(color: .black.opacity(appearance.imageStoneShading == .iceEdge ? 0.35 : 0), radius: shadowRadius,
+                                    x: shadowXSign * shadowRadius / 2, y: shadowRadius)
                             .overlay {
                                 if appearance.imageStoneShading != .artwork {
                                     Canvas { context, canvasSize in
@@ -769,12 +1022,14 @@ struct Stone: View {
                                             rect: CGRect(origin: .zero, size: canvasSize), color: color!,
                                             cellSize: size, lightDirection: appearance.stoneLightDirection)
                                     }
+                                    .colorMultiply(images.tint)
                                     .allowsHitTesting(false)
                                     .accessibilityHidden(true)
                                 }
                             }
-                            .shadow(color: .black.opacity(0.35), radius: shadowRadius,
+                            .shadow(color: .black.opacity(appearance.imageStoneShading == .iceEdge ? 0 : 0.35), radius: shadowRadius,
                                     x: shadowXSign * shadowRadius / 2, y: shadowRadius)
+                            .frame(width: size, height: size)
                     } else {
                         // Small stones stay flat, as on small boards.
                         let detailed = shadowRadius > 0 && usesDetailedStoneRendering(at: size)

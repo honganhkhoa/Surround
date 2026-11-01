@@ -724,6 +724,8 @@ struct GameDetailView: View {
         #endif
         
         let result = gameBody(compact: compactLayout, geometry: geometry)
+        .environment(\.excludesBoardsFromSceneShadows,
+                     SurroundTheme.current(storedID: gameThemeID) == .frostPine)
         .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
         .onChange(of: showsActiveGamesButton) { _, isVisible in
             if !isVisible { showsActiveGames = false }
@@ -738,9 +740,14 @@ struct GameDetailView: View {
             }
             .ignoresSafeArea(.container)
         }
-        .overlay {
-            GameDetailSceneForeground(hasTopEdgeClocks: hasActiveVerticalDisplayDivision(in: geometry))
-                .ignoresSafeArea(.container)
+        .overlayPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
+            GeometryReader { scene in
+                GameDetailSceneForeground(hasTopEdgeClocks: hasActiveVerticalDisplayDivision(in: geometry),
+                                          shadowExclusions: anchors.map {
+                                              BoardSceneShadowRegion(bounds: scene[$0.bounds], cornerRadius: $0.cornerRadius)
+                                          })
+            }
+            .ignoresSafeArea(.container)
         }
         .overlay(alignment: .topTrailing) { zenExitOverlay }
         .overlay(alignment: .topLeading) { duoSidebarButton }

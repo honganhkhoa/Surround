@@ -49,10 +49,20 @@ struct ThemeLivePreview: View {
                     GameDetailBackdrop()
                 }
                 BoardView(boardPosition: Self.position)
+                    .environment(\.excludesBoardsFromSceneShadows, theme == .frostPine)
                     .frame(width: boardSide, height: boardSide)
                     .offset(x: side * 0.22, y: side * 0.22)
             }
             .frame(width: side, height: side, alignment: .topLeading)
+            .overlayPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
+                if theme == .frostPine {
+                    GeometryReader { scene in
+                        GameDetailSceneForeground(shadowExclusions: anchors.map {
+                            BoardSceneShadowRegion(bounds: scene[$0.bounds], cornerRadius: $0.cornerRadius)
+                        })
+                    }
+                }
+            }
             .clipped()
         }
         .aspectRatio(1, contentMode: .fit)
