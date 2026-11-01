@@ -426,6 +426,43 @@ extension DuoPublishingExecutorTests {
         XCTAssertEqual(try fixture.state().phase, "complete")
     }
 
+    func testCountMismatchRecordsSanitizedEvidenceWithoutAdoptingOlderRows() throws {
+        let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }
+        let original = try XCTUnwrap(fixture.set.compatibilityBaseline)
+        let fullLegacy = try XCTUnwrap(fixture.service.makeLegacy())
+        let previous = DuoCompatibilityBaseline(policy: original.policy,
+            legacy: DuoLegacyView(setID: original.legacy.setID, images: Array(original.legacy.images.dropFirst(2))),
+            placements: Array(original.placements.dropFirst(2)), content: Array(original.content.dropFirst(2)))
+        let graph = Array(original.placements.dropFirst(3))
+        fixture.service.rows = graph
+        fixture.service.legacyOverride = { fullLegacy }
+        let expected = zip(original.content.dropFirst(3), original.legacy.images.dropFirst(3)).map { proof, old in
+            DuoExpectedContent(fileName: proof.fileName, byteCount: proof.byteCount, width: proof.asset.width,
+                height: proof.asset.height, pixels: proof.pixelSHA256, checksum: old.checksum,
+                pinnedAsset: proof.asset, pinnedLegacyID: old.id)
+        }
+        let verifier = DuoCompatibilityVerifier(service: fixture.service, localizationID: fixture.set.localizationID,
+            group: "test-duo-group", attempts: 2, sleeper: { _ in })
+        XCTAssertThrowsError(try verifier.prove(graph: graph, expected: expected, previous: previous)) { error in
+            let message = error.localizedDescription
+            let marker = "sanitized-readback="
+            guard let start = message.range(of: marker) else { return XCTFail(message) }
+            guard let evidence = try? JSONDecoder().decode(JSONValue.self, from: Data(message[start.upperBound...].utf8)) else {
+                return XCTFail("Invalid sanitized readback JSON")
+            }
+            XCTAssertEqual(evidence["expectedModern"]?.arrayValue?.count, 7)
+            XCTAssertEqual(evidence["observedLegacy"]?["rows"]?.arrayValue?.count, 10)
+            XCTAssertEqual(evidence["previousLegacy"]?["rows"]?.arrayValue?.count, 8)
+            XCTAssertEqual(evidence["previousCheckpointSHA256"]?.stringValue?.count, 64)
+            XCTAssertNotNil(evidence["atUTC"]?.stringValue)
+            XCTAssertFalse(message.contains("https://"))
+            XCTAssertFalse(message.contains("old-1.png"))
+            XCTAssertFalse(message.contains("DO-NOT-PERSIST"))
+        }
+        XCTAssertTrue(fixture.service.events.isEmpty)
+        XCTAssertEqual(fixture.service.downloads, 0)
+    }
+
     func testDualViewUnknownLegacyRowOrOrderStopsBeforeAnyCloudMutation() throws {
         for fault in ["identity", "order", "processing"] {
             let fixture = try DuoExecutorFixture(compatibility: true); defer { fixture.clean() }

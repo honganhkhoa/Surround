@@ -135,6 +135,10 @@ public final class ASCAPIClient: @unchecked Sendable {
         let url = try makeURL(path: path, query: query)
         var request = URLRequest(url: url)
         request.httpMethod = method
+        if method.uppercased() == "GET" {
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        }
         request.setValue("Bearer \(try token())", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let body {
@@ -212,6 +216,8 @@ public final class ASCAPIClient: @unchecked Sendable {
     public func download(url: URL) throws -> Data {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
         let response = try sendWithRetry(request)
         guard (200..<300).contains(response.statusCode) else {
             throw apiError(method: "GET", url: url, response: response)

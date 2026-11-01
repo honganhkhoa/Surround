@@ -145,6 +145,33 @@ final class DuoCompatibilityVerifier {
         return sha
     }
 
+    private func countMismatch(graph: [DuoRemotePlacement], legacy: DuoLegacyView,
+                               previous: DuoCompatibilityBaseline?, attempt: Int) -> DuoExecutionFailure {
+        func modern(_ rows: [DuoRemotePlacement]) -> JSONValue {
+            .array(rows.map { .object(["placementID": .string($0.id), "imageID": .string($0.imageID)]) })
+        }
+        func projection(_ view: DuoLegacyView) -> JSONValue {
+            .object(["setID": view.setID.map(JSONValue.string) ?? .null,
+                "rows": .array(view.images.map { row in .object([
+                    "id": .string(row.id), "fileNameSHA256": .string(FileIO.sha256(Data(row.fileName.utf8))),
+                    "byteCount": .number(Double(row.byteCount)),
+                    "checksumSHA256": row.checksum.map { .string(FileIO.sha256(Data($0.utf8))) } ?? .null,
+                    "width": .number(Double(row.asset.width)), "height": .number(Double(row.asset.height)),
+                    "assetTemplateSHA256": .string(row.asset.templateSHA256)]) })])
+        }
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let checkpointHash = previous.flatMap { try? encoder.encode($0) }.map(FileIO.sha256)
+        let evidence: JSONValue = .object([
+            "schemaVersion": .number(1), "atUTC": .string(ISO8601DateFormatter.releaseTool.string(from: Date())),
+            "localizationID": .string(localizationID), "group": .string(group), "attempt": .number(Double(attempt)),
+            "expectedModern": modern(graph), "observedLegacy": projection(legacy),
+            "previousModern": previous.map { modern($0.placements) } ?? .null,
+            "previousLegacy": previous.map { projection($0.legacy) } ?? .null,
+            "previousCheckpointSHA256": checkpointHash.map(JSONValue.string) ?? .null])
+        let detail = (try? FileIO.canonicalData(evidence)).flatMap { String(data: $0, encoding: .utf8) } ?? "unavailable"
+        return .drift("Legacy Duo view contains unknown or missing rows; sanitized-readback=" + detail)
+    }
+
     func prove(graph: [DuoRemotePlacement], expected: [DuoExpectedContent],
                previous: DuoCompatibilityBaseline?) throws -> DuoCompatibilityBaseline {
         guard graph.count == expected.count else { throw DuoExecutionFailure.drift("Missing expected Duo graph content") }
@@ -164,7 +191,7 @@ final class DuoCompatibilityVerifier {
                 throw DuoExecutionFailure.uncertain("Legacy Duo view still shows the proven previous graph; no mutation is replayed")
             }
             guard legacy.images.count == graph.count else {
-                throw DuoExecutionFailure.drift("Legacy Duo view contains unknown or missing rows")
+                throw countMismatch(graph: graph, legacy: legacy, previous: previous, attempt: attempt + 1)
             }
             if let previous, duoSameGraph(previous.placements, graph), legacy != previous.legacy {
                 throw DuoExecutionFailure.drift("Stable Duo graph has a changed legacy resource identity")

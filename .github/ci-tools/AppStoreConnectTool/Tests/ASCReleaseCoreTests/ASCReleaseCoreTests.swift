@@ -331,9 +331,59 @@ final class ASCReleaseCoreTests: XCTestCase {
         }
     }
 
+    func testAPIClientReadsUpdatedProjectionInsteadOfCachedCollection() throws {
+        var count = 8, networkReads = 0
+        var cached: TransportResponse?
+        let transport = MockTransport { request in
+            if request.cachePolicy == .useProtocolCachePolicy,
+               request.value(forHTTPHeaderField: "Cache-Control") != "no-cache", let cached { return cached }
+            networkReads += 1
+            let rows = (0..<count).map { "{\"type\":\"widgets\",\"id\":\"row-\($0)\"}" }.joined(separator: ",")
+            let response = TransportResponse.json(200, "{\"data\":[" + rows + "]}")
+            cached = response
+            return response
+        }
+        let client = makeAPIClient(transport: transport, maxRetries: 0)
+        XCTAssertEqual(try client.list(path: "/v1/widgets").count, 8)
+        count = 7
+        XCTAssertEqual(try client.list(path: "/v1/widgets").count, 7)
+        XCTAssertEqual(networkReads, 2)
+    }
+
+    func testDownloadReadsChangedBytesWithoutJWTOrCachedContent() throws {
+        var live = Data([1, 2, 3]), cached: TransportResponse?
+        let transport = MockTransport { request in
+            XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+            if request.cachePolicy == .useProtocolCachePolicy,
+               request.value(forHTTPHeaderField: "Cache-Control") != "no-cache", let cached { return cached }
+            let response = TransportResponse(data: live, statusCode: 200)
+            cached = response
+            return response
+        }
+        let client = makeAPIClient(transport: transport, maxRetries: 0)
+        let url = URL(string: "https://images.example.test/same-rendition.png")!
+        XCTAssertEqual(try client.download(url: url), Data([1, 2, 3]))
+        live = Data([4, 5, 6])
+        XCTAssertEqual(try client.download(url: url), Data([4, 5, 6]))
+    }
+
+    func testReadFreshnessDoesNotAlterMutationRequests() throws {
+        let transport = MockTransport { request in
+            XCTAssertEqual(request.httpMethod, "PATCH")
+            XCTAssertEqual(request.cachePolicy, .useProtocolCachePolicy)
+            XCTAssertNil(request.value(forHTTPHeaderField: "Cache-Control"))
+            return .json(200, #"{"data":{"id":"known"}}"#)
+        }
+        _ = try makeAPIClient(transport: transport, maxRetries: 0).request(
+            method: "PATCH", path: "/v1/widgets/known", body: .object([:]), retryPolicy: .singleAttempt)
+        XCTAssertEqual(transport.requests.count, 1)
+    }
+
     func testAPIClientFollowsPaginationAndUsesBearerJWT() throws {
         let transport = MockTransport { request in
             XCTAssertNotNil(request.value(forHTTPHeaderField: "Authorization"))
+            XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalCacheData)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cache-Control"), "no-cache")
             if request.url?.query == nil {
                 return .json(200, """
                 {"data":[{"type":"widgets","id":"one"}],

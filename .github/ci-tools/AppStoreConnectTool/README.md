@@ -131,6 +131,13 @@ and contradictory content stop. The previous proven projection or identified
 owned processing rows may poll boundedly, granting no further write until they
 converge. No mutation is replayed because a compatibility view is stale.
 
+API GETs and native-image downloads bypass the local URL cache and request
+revalidation. Count-mismatch errors include a sanitized readback containing
+ordered resource IDs, hashed content metadata, checkpoint digest and timestamp;
+they omit rendition URLs, raw filenames, credentials and upload headers. These
+diagnostics do not admit unknown rows or change ownership/content checks. A
+later coherent read does not establish the cause of an earlier mismatch.
+
 Only the explicitly proven target Duo projection participates in compatibility
 comparison. Both full raw views remain in the stored snapshots; released-source,
 metadata, unrelated locale and screenshot-set checks stay strict. This also
