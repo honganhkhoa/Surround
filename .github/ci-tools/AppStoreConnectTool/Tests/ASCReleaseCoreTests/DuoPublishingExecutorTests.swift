@@ -463,7 +463,7 @@ extension DuoPublishingExecutorTests {
         XCTAssertEqual(fixture.service.downloads, 0)
     }
 
-    private func appendedDeletingRow(_ original: RemoteScreenshotSet) throws -> RemoteScreenshotSet {
+    private func appendedDeletingRow(_ original: RemoteScreenshotSet, position: Int? = nil) throws -> RemoteScreenshotSet {
         let deleted = try XCTUnwrap(original.screenshots.first)
         var attributes = deleted.attributes
         var asset = try XCTUnwrap(attributes["imageAsset"]?.objectValue)
@@ -471,15 +471,17 @@ extension DuoPublishingExecutorTests {
         attributes["imageAsset"] = .object(asset)
         let pending = RemoteScreenshot(id: deleted.id, fileName: deleted.fileName,
             checksum: deleted.checksum, attributes: attributes)
-        return RemoteScreenshotSet(id: original.id, displayType: original.displayType,
-            screenshots: Array(original.screenshots.dropFirst()) + [pending])
+        var rows = Array(original.screenshots.dropFirst())
+        rows.insert(pending, at: position ?? rows.count)
+        return RemoteScreenshotSet(id: original.id, displayType: original.displayType, screenshots: rows)
     }
 
     func testVerifiedDeletionAppendedLegacyRowWaitsForStrictCurrentPixelsIncludingEmptyGroup() throws {
         for count in [5, 1] {
+          for position in Set([0, min(1, count - 1), count - 1]).sorted() {
             let fixture = try DuoExecutorFixture(baselineCount: count, compatibility: true); defer { fixture.clean() }
             let previous = try XCTUnwrap(fixture.set.compatibilityBaseline)
-            let lagging = try appendedDeletingRow(XCTUnwrap(fixture.service.makeLegacy()))
+            let lagging = try appendedDeletingRow(XCTUnwrap(fixture.service.makeLegacy()), position: position)
             let graph = Array(previous.placements.dropFirst())
             fixture.service.rows = graph
             var reads = 0, waits = 0
@@ -502,18 +504,18 @@ extension DuoPublishingExecutorTests {
             XCTAssertEqual(result.content, Array(previous.content.dropFirst()))
             XCTAssertEqual(fixture.service.downloads, count - 1)
             XCTAssertTrue(fixture.service.events.isEmpty)
+          }
         }
     }
 
     func testAppendedDeletingLegacyRowRejectsMissingContextAndUnownedOrChangedContent() throws {
-        for fault in ["missing-context", "wrong-context", "foreign", "duplicate", "survivor-order", "survivor-template", "survivor-name", "deleted-checksum", "deleted-size", "deleted-dimensions", "deleted-middle"] {
+        for fault in ["missing-context", "wrong-context", "foreign", "duplicate", "survivor-order", "survivor-template", "survivor-name", "deleted-checksum", "deleted-size", "deleted-dimensions"] {
             let fixture = try DuoExecutorFixture(baselineCount: 5, compatibility: true); defer { fixture.clean() }
             let previous = try XCTUnwrap(fixture.set.compatibilityBaseline)
             let original = try appendedDeletingRow(XCTUnwrap(fixture.service.makeLegacy()))
             var rows = original.screenshots
             if fault == "survivor-order" { rows.swapAt(0, 1) }
             else if fault == "duplicate" { rows[4] = rows[0] }
-            else if fault == "deleted-middle" { rows.insert(rows.removeLast(), at: 1) }
             else if !["missing-context", "wrong-context"].contains(fault) {
                 let index = fault.hasPrefix("survivor") ? 0 : 4
                 let old = rows[index]; var attributes = old.attributes

@@ -139,7 +139,8 @@ diagnostics do not admit unknown rows or change ownership/content checks. A
 later coherent read does not establish the cause of an earlier mismatch.
 
 After exactly one current-epoch journal-verified deletion, a legacy projection
-may temporarily append that deleted row with a changed rendition template.
+may temporarily retain that deleted row with a changed rendition template,
+either in its previous position or elsewhere among the unchanged survivors.
 The verifier waits boundedly only when every survivor retains its complete
 proven identity, metadata and relative order, and the deleted row retains its
 ID, name, checksum, size and dimensions. This projection is never accepted or

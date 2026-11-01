@@ -172,7 +172,7 @@ final class DuoCompatibilityVerifier {
         return .drift("Legacy Duo view contains unknown or missing rows; sanitized-readback=" + detail)
     }
 
-    // Apple may temporarily append a just-deleted legacy row with a new
+    // Apple may temporarily retain a just-deleted legacy row with a new
     // rendition template. This is a wait state, never an accepted projection.
     // Only the executor's current-epoch verified deletion can authorize waiting;
     // every survivor must retain its exact proven identity, metadata and order.
@@ -183,11 +183,11 @@ final class DuoCompatibilityVerifier {
               let index = previous.placements.firstIndex(where: { $0.id == deletionID }),
               duoSameGraph(previous.placements.filter { $0.id != deletionID }, graph),
               legacy.setID == previous.legacy.setID,
-              legacy.images.count == previous.legacy.images.count,
-              let pending = legacy.images.last else { return false }
+              legacy.images.count == previous.legacy.images.count else { return false }
         let deleted = previous.legacy.images[index]
+        guard let pending = legacy.images.first(where: { $0.id == deleted.id }) else { return false }
         let survivors = previous.legacy.images.enumerated().filter { $0.offset != index }.map(\.element)
-        return Array(legacy.images.dropLast()) == survivors &&
+        return legacy.images.filter { $0.id != deleted.id } == survivors &&
             pending.id == deleted.id && pending.fileName == deleted.fileName &&
             pending.byteCount == deleted.byteCount && pending.checksum == deleted.checksum &&
             pending.asset.width == deleted.asset.width && pending.asset.height == deleted.asset.height
