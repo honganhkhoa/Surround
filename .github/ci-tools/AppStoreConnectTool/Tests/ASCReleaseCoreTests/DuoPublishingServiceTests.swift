@@ -99,6 +99,61 @@ final class DuoPublishingServiceTests: XCTestCase {
         XCTAssertEqual(transport.count, 1)
     }
 
+    func testCompoundPaginationPreservesImagesAndRejectsConflictsAndForeignLinks() throws {
+        func placement(_ id: String) -> JSONValue {
+            .object(["type": .string("appAssetLibraryPlacements"), "id": .string(id),
+                "attributes": .object(["placementGroup": .string("group"), "placementType": .string("APP_SCREENSHOT"), "state": .string("ACTIVE")]),
+                "relationships": .object(["image": .object(["data": .object([
+                    "type": .string("appAssetLibraryImages"), "id": .string("image")])])])])
+        }
+        for fault in ["none", "conflict", "foreign", "duplicate", "malformed"] {
+            var requests = 0
+            let transport = DuoServiceTransport { request in
+                requests += 1
+                var image: JSONValue = .object(["type": .string("appAssetLibraryImages"), "id": .string("image"),
+                    "attributes": .object(["fileName": .string(requests == 2 && fault == "conflict" ? "changed.png" : "image.png")])])
+                if fault == "malformed" { image = .object(["type": .string("appAssetLibraryImages"), "id": .string("image")]) }
+                let next: JSONValue = requests == 1 ? .string(fault == "foreign" ? "https://foreign.example/next" : "https://api.appstoreconnect.apple.com/v1/next") : .null
+                let document: JSONValue = .object(["data": .array([placement(requests == 1 || fault == "duplicate" ? "one" : "two")]),
+                    "included": .array([image]), "links": .object(["next": next])])
+                return TransportResponse(data: try JSONEncoder().encode(document), statusCode: 200)
+            }
+            let service = ASCDuoPublishingService(client: client(transport))
+            if fault == "none" {
+                let value = try service.placementReadback(localizationID: "locale", group: "group")
+                XCTAssertEqual(value.placements.map(\.id), ["one", "two"])
+                XCTAssertEqual(value.images.count, 1)
+                XCTAssertEqual(requests, 2)
+            } else {
+                XCTAssertThrowsError(try service.placementReadback(localizationID: "locale", group: "group"))
+                XCTAssertEqual(requests, ["foreign", "malformed"].contains(fault) ? 1 : 2)
+            }
+        }
+    }
+
+    func testFifteenLocaleContextIsVerifiedInFourRequests() throws {
+        let sets = (0..<15).map { index in
+            DuoPublishSet(version: "3.0", bundleID: "com.example.App", appID: "app", assetLibraryID: "library",
+                versionID: "version", localizationID: "locale-\(index)", locale: "language-\(index)",
+                sourceManifestSHA256: String(repeating: "a", count: 64), catalog: [], images: [], reviewedBaseline: [])
+        }
+        let transport = DuoServiceTransport { request in
+            let value: JSONValue
+            switch request.url!.path {
+            case "/v1/apps/app": value = .object(["data": .object(["type": .string("apps"), "id": .string("app"), "attributes": .object(["bundleId": .string("com.example.App")])])])
+            case "/v1/apps/app/assetLibrary": value = .object(["data": .object(["type": .string("appAssetLibraries"), "id": .string("library")])])
+            case "/v1/apps/app/appStoreVersions": value = .object(["data": .array([.object(["type": .string("appStoreVersions"), "id": .string("version"), "attributes": .object([
+                "versionString": .string("3.0"), "platform": .string("IOS"), "appVersionState": .string("PREPARE_FOR_SUBMISSION")])])])])
+            case "/v1/appStoreVersions/version/appStoreVersionLocalizations": value = .object(["data": .array(sets.map {
+                .object(["type": .string("appStoreVersionLocalizations"), "id": .string($0.localizationID), "attributes": .object(["locale": .string($0.locale)])]) })])
+            default: throw ReleaseToolError.api("Unexpected context request")
+            }
+            return TransportResponse(data: try JSONEncoder().encode(value), statusCode: 200)
+        }
+        try ASCDuoPublishingService(client: client(transport)).verifyEditableTargets(sets)
+        XCTAssertEqual(transport.count, 4)
+    }
+
     private func client(_ transport: HTTPTransport) -> ASCAPIClient {
         ASCAPIClient(credentials: ASCCredentials(keyId: "unit", issuerId: "unit", privateKeyPEM: P256.Signing.PrivateKey().pemRepresentation),
                      transport: transport, maxRetries: 4)

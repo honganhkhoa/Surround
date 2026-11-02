@@ -257,6 +257,10 @@ final class DuoPublishingExecutorTests: XCTestCase {
 }
 
 extension DuoPublishingExecutorTests {
+    private func printBudget(_ label: String, _ value: ASCRequestMetricsSnapshot) throws {
+        let counts = value.categories.mapValues(\.attempts)
+        print(label + " " + String(data: try JSONEncoder().encode(counts), encoding: .utf8)!)
+    }
     private func coordinator(_ fixture: DuoExecutorFixture) -> DuoReleaseCoordinator {
         let binding = HandoffFileBinding(path: "/unused-test-binding", sha256: String(repeating: "a", count: 64))
         let handoff = SelectedReleaseHandoff(schemaVersion: 1, mode: "selected-release-handoff",
@@ -834,6 +838,7 @@ private final class DuoExecutorFixture {
     static func resource(id: String, name: String, data: Data, size: (Int, Int), spec: String, state: String) -> JSONValue {
         .object(["type": .string("appAssetLibraryImages"), "id": .string(id), "attributes": .object([
             "fileName": .string(name), "fileSize": .number(Double(data.count)), "category": .string("APP_SCREENSHOTS_AND_PREVIEWS"),
+            "createdDate": .string("2026-01-01T00:00:00Z"), "lastModifiedDate": .string("2026-01-01T00:00:01Z"),
             "state": .string(state), "specId": .string(spec), "imageAsset": .object([
                 "width": .number(Double(size.0)), "height": .number(Double(size.1)), "templateUrl": .string("https://backup.example/\(id).png")])])])
     }
@@ -861,6 +866,7 @@ private final class DuoMemoryService: DuoPublishingService {
     var namespace = ""
     var holdProcessingNames: Set<String> = []
     var beforeImageRead: ((String) throws -> Void)?
+    var beforePlacementRead: (() throws -> Void)?
     private var nextImage = 0, nextPlacement = 0
     func makeLegacy() throws -> RemoteScreenshotSet? {
         if rows.isEmpty { return nil }
@@ -881,7 +887,9 @@ private final class DuoMemoryService: DuoPublishingService {
         return try makeLegacy()
     }
     func verifyEditableTarget(_ set: DuoPublishSet) throws {}
-    func placements(localizationID: String, group: String) throws -> [DuoRemotePlacement] { rows }
+    func placements(localizationID: String, group: String) throws -> [DuoRemotePlacement] {
+        try beforePlacementRead?(); return rows
+    }
     func image(id: String) throws -> JSONValue {
         try beforeImageRead?(id)
         var row = try XCTUnwrap(images[id]).objectValue!
@@ -948,6 +956,382 @@ private final class DuoMemoryService: DuoPublishingService {
             try end("order"); return nil
         }
         throw DuoExecutionFailure.rejected("Unexpected mock route")
+    }
+}
+
+/// Exercises the real ASC adapter and request counters without any networking.
+private final class DuoBudgetTransport: HTTPTransport, @unchecked Sendable {
+    let fixture: DuoExecutorFixture
+    var omitIncluded = false
+    var editable = true
+    var beforeRead: ((String) throws -> Void)?
+    init(_ fixture: DuoExecutorFixture) { self.fixture = fixture }
+    func send(_ request: URLRequest) throws -> TransportResponse {
+        let url = request.url!, path = url.path, method = request.httpMethod ?? "GET"
+        let set = fixture.set, memory = fixture.service
+        func response(_ value: JSONValue?) throws -> TransportResponse {
+            guard let value else { return TransportResponse(data: Data(), statusCode: 204) }
+            return TransportResponse(data: try JSONEncoder().encode(value), statusCode: 200)
+        }
+        func list(_ rows: [JSONValue], included: [JSONValue] = []) throws -> TransportResponse {
+            try response(.object(["data": .array(rows), "included": .array(included)]))
+        }
+        func target() -> JSONValue {
+            .object(["type": .string("appStoreVersions"), "id": .string(set.versionID),
+                "attributes": .object(["versionString": .string(set.version), "platform": .string("IOS"),
+                    "appVersionState": .string(editable ? "PREPARE_FOR_SUBMISSION" : "WAITING_FOR_REVIEW")])])
+        }
+        if url.host == "backup.example" { return TransportResponse(data: try memory.download(url), statusCode: 200) }
+        if url.host == "upload.example" {
+            let bytes = request.httpBody ?? Data()
+            try memory.upload(UploadOperation(method: "PUT", url: url.absoluteString, offset: 0,
+                length: bytes.count, requestHeaders: []), bytes: bytes)
+            return TransportResponse(data: Data(), statusCode: 200)
+        }
+        if method != "GET" {
+            let body = try request.httpBody.map { try JSONDecoder().decode(JSONValue.self, from: $0) } ?? .null
+            return try response(memory.send(DuoAssetLibraryRequest(method: method, path: path, body: body)))
+        }
+        try beforeRead?(path)
+        switch path {
+        case "/v1/apps/\(set.appID)":
+            return try response(.object(["data": .object(["type": .string("apps"), "id": .string(set.appID),
+                "attributes": .object(["bundleId": .string(set.bundleID)])])]))
+        case "/v1/apps/\(set.appID)/assetLibrary":
+            return try response(.object(["data": .object(["type": .string("appAssetLibraries"), "id": .string(set.assetLibraryID)])]))
+        case "/v1/apps/\(set.appID)/appStoreVersions": return try list([target()])
+        case "/v1/appStoreVersions/\(set.versionID)": return try response(.object(["data": target()]))
+        case "/v1/appStoreVersions/\(set.versionID)/appStoreVersionLocalizations":
+            return try list([.object(["type": .string("appStoreVersionLocalizations"), "id": .string(set.localizationID),
+                "attributes": .object(["locale": .string(set.locale)])])])
+        case "/v1/appStoreVersionLocalizations/\(set.localizationID)/placements":
+            let rows = memory.rows.map { row in JSONValue.object([
+                "type": .string("appAssetLibraryPlacements"), "id": .string(row.id),
+                "attributes": .object(["placementGroup": .string(row.group), "placementType": .string(row.placementType), "state": .string(row.state)]),
+                "relationships": .object(["image": .object(["data": .object([
+                    "type": .string("appAssetLibraryImages"), "id": .string(row.imageID)])])])]) }
+            XCTAssertEqual(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "include" })?.value, "image")
+            return try list(rows, included: omitIncluded ? [] : memory.rows.compactMap { memory.images[$0.imageID] })
+        case "/v1/appStoreVersionLocalizations/\(set.localizationID)/appScreenshotSets":
+            let legacy = try memory.legacyDuoSet(localizationID: set.localizationID)
+            return try list(legacy.map { [.object(["id": .string($0.id),
+                "attributes": .object(["screenshotDisplayType": .string($0.displayType)])])] } ?? [])
+        case "/v1/appScreenshotSets/legacy-view/appScreenshots":
+            let legacy = try memory.legacyDuoSet(localizationID: set.localizationID)
+            return try list(legacy?.screenshots.map { .object(["type": .string("appScreenshots"),
+                "id": .string($0.id), "attributes": .object($0.attributes)]) } ?? [])
+        default:
+            if path.hasPrefix("/v1/appAssetLibraryImages/") {
+                return try response(.object(["data": memory.image(id: String(path.split(separator: "/").last!))]))
+            }
+            throw ReleaseToolError.api("Unexpected offline budget route")
+        }
+    }
+    func client() -> ASCAPIClient {
+        let key = P256.Signing.PrivateKey()
+        return ASCAPIClient(credentials: ASCCredentials(keyId: "test", issuerId: "test", privateKeyPEM: key.pemRepresentation),
+            transport: self, maxRetries: 0, sleeper: { _ in })
+    }
+}
+
+extension DuoPublishingExecutorTests {
+    private func budgetCoordinator(_ f: DuoExecutorFixture, service: DuoPublishingService,
+                                   queueSleep: @escaping (TimeInterval) -> Void = { _ in }) -> DuoReleaseCoordinator {
+        let binding = HandoffFileBinding(path: "/unused-budget-binding", sha256: String(repeating: "a", count: 64))
+        let handoff = SelectedReleaseHandoff(schemaVersion: 1, mode: "selected-release-handoff", selectedImport: binding,
+            selectionSHA256: binding.sha256, evidenceAcceptance: binding, integrityVerification: binding,
+            duoInspection: binding, duoCompatibility: binding, qualificationLimits: .object([:]), sets: [f.set])
+        return DuoReleaseCoordinator(handoff: handoff, service: service, journalDirectory: f.directory, queueSleep: queueSleep)
+    }
+
+    func testEfficientCompoundWorkflowAndCompletedResumeHaveBoundedRequests() throws {
+        let f = try DuoExecutorFixture(compatibility: true); defer { f.clean() }
+        let transport = DuoBudgetTransport(f), client = transport.client()
+        let service = ASCDuoPublishingService(client: client)
+        do {
+            let coordinator = budgetCoordinator(f, service: service)
+            try coordinator.prepareForReconciliation()
+            try coordinator.publish(continuingVerifiedEntry: true)
+            try coordinator.prepareForReconciliation(requireComplete: true)
+        }
+        let clean = client.metrics.snapshot()
+        XCTAssertEqual(clean.categories["authenticatedWrite"]?.attempts, 41)
+        XCTAssertEqual(clean.categories["binaryUpload"]?.attempts, 10)
+        XCTAssertLessThanOrEqual(clean.categories["authenticatedRead"]?.attempts ?? 0, 370)
+        XCTAssertLessThanOrEqual(clean.categories["imageDownload"]?.attempts ?? 0, 60,
+            "Unchanged survivors must not be redownloaded after each placement mutation")
+        try printBudget("DUO_CLEAN_REQUEST_BUDGET", clean)
+        let writes = f.service.events.count
+        do {
+            let coordinator = budgetCoordinator(f, service: service)
+            try coordinator.prepareForReconciliation()
+            try coordinator.publish(continuingVerifiedEntry: true)
+            try coordinator.prepareForReconciliation(requireComplete: true)
+        }
+        let resumed = client.metrics.snapshot()
+        XCTAssertEqual(f.service.events.count, writes)
+        XCTAssertLessThanOrEqual(resumed.total.attempts - clean.total.attempts, 66)
+        XCTAssertEqual((resumed.categories["imageDownload"]?.attempts ?? 0) - (clean.categories["imageDownload"]?.attempts ?? 0), 20)
+        try printBudget("DUO_COMPLETE_RESUME_REQUEST_BUDGET", resumed)
+    }
+
+    func testCompoundFallbackAndSameInstanceCompletionStillRejectDrift() throws {
+        for missing in [false, true] {
+            let f = try DuoExecutorFixture(compatibility: true); defer { f.clean() }
+            let transport = DuoBudgetTransport(f); transport.omitIncluded = missing
+            let executor = try DuoPublishingExecutor(set: f.set, journalURL: f.journal,
+                service: ASCDuoPublishingService(client: transport.client()), sleeper: { _ in })
+            try executor.publish(confirmedVersion: "3.0", confirmedSetDigest: f.set.digest())
+            f.service.rows.reverse()
+            let writes = f.service.events.count
+            XCTAssertThrowsError(try executor.publish(confirmedVersion: "3.0", confirmedSetDigest: f.set.digest()))
+            XCTAssertEqual(f.service.events.count, writes)
+        }
+    }
+
+    func testQueuedBackupTamperingStopsBeforeFirstDestructiveMutation() throws {
+        let f = try DuoExecutorFixture(compatibility: true); defer { f.clean() }
+        let executor = try DuoPublishingExecutor(set: f.set, journalURL: f.journal, service: f.service, sleeper: { _ in })
+        try executor.preflight()
+        let backup = try XCTUnwrap(f.state().backups.first)
+        try Data("changed backup".utf8).write(to: URL(fileURLWithPath: backup.file.path))
+        XCTAssertThrowsError(try executor.publish(confirmedVersion: "3.0", confirmedSetDigest: f.set.digest()))
+        XCTAssertFalse(f.service.events.contains { $0.hasPrefix("delete:") || $0.hasPrefix("place:") })
+    }
+
+    func testReadyQueueRehashesSelectedFilesBeforeFirstDeletion() throws {
+        let f = try DuoExecutorFixture(compatibility: true); defer { f.clean() }
+        let executor = try DuoPublishingExecutor(set: f.set, journalURL: f.journal, service: f.service, sleeper: { _ in })
+        try executor.preflight()
+        for position in 1...10 { _ = try executor.submitDesired(position: position) }
+        let writes = f.service.events.count
+        try Data("tampered after upload".utf8).write(to: URL(fileURLWithPath: f.set.images[0].path))
+        XCTAssertThrowsError(try executor.publish(confirmedVersion: "3.0", confirmedSetDigest: f.set.digest()))
+        XCTAssertEqual(f.service.events.count, writes)
+        XCTAssertEqual(f.service.rows, f.set.reviewedBaseline)
+    }
+
+    func testCompoundTargetStateChangeStopsBeforeNextPlacementMutation() throws {
+        let f = try DuoExecutorFixture(compatibility: true); defer { f.clean() }
+        let transport = DuoBudgetTransport(f)
+        f.service.fault = { label, after in if label.hasPrefix("delete:") && after { transport.editable = false } }
+        let executor = try DuoPublishingExecutor(set: f.set, journalURL: f.journal,
+            service: ASCDuoPublishingService(client: transport.client()), sleeper: { _ in })
+        XCTAssertThrowsError(try executor.publish(confirmedVersion: "3.0", confirmedSetDigest: f.set.digest()))
+        XCTAssertEqual(f.service.events.filter { $0.hasPrefix("delete:") }.count, 1)
+        XCTAssertFalse(f.service.events.contains { $0.hasPrefix("place:") })
+    }
+
+    func testFinalNativeProofRejectsSameMetadataChangedPixelsBeforeCompletion() throws {
+        let f = try DuoExecutorFixture(compatibility: true); defer { f.clean() }
+        let transport = DuoBudgetTransport(f)
+        f.service.fault = { label, after in
+            if label == "order" && after {
+                let pinned = try f.service.makeLegacy()
+                f.service.legacyOverride = { pinned }
+                f.service.data["image-1"] = f.originalPixels[0]
+            }
+        }
+        let executor = try DuoPublishingExecutor(set: f.set, journalURL: f.journal,
+            service: ASCDuoPublishingService(client: transport.client()), sleeper: { _ in })
+        XCTAssertThrowsError(try executor.publish(confirmedVersion: "3.0", confirmedSetDigest: f.set.digest()))
+        XCTAssertNotEqual(try f.state().phase, "complete")
+    }
+
+    func testCoordinatorRetainsSingleWriterLockAndReleasesItOnDeinit() throws {
+        let f = try DuoExecutorFixture(); defer { f.clean() }
+        var coordinator: DuoReleaseCoordinator? = budgetCoordinator(f, service: f.service)
+        try coordinator!.prepareForReconciliation()
+        let path = f.directory.appendingPathComponent("duo-en-US-journal.json")
+        XCTAssertThrowsError(try DuoPublishingExecutor(set: f.set, journalURL: path, service: f.service))
+        coordinator = nil
+        XCTAssertNoThrow(try DuoPublishingExecutor(set: f.set, journalURL: path, service: f.service))
+    }
+
+    func testScopedCacheHitStillFencesModernDriftDuringLegacyRead() throws {
+        for missingAfter in [false, true] {
+            let f = try DuoExecutorFixture(compatibility: true); defer { f.clean() }
+            let transport = DuoBudgetTransport(f), service = ASCDuoPublishingService(client: transport.client())
+            let baseline = try XCTUnwrap(f.set.compatibilityBaseline)
+            let expected = baseline.content.enumerated().map { index, content in
+                DuoExpectedContent(fileName: content.fileName, byteCount: content.byteCount,
+                    width: content.asset.width, height: content.asset.height, pixels: content.pixelSHA256,
+                    checksum: baseline.legacy.images[index].checksum, pinnedAsset: content.asset,
+                    pinnedLegacyID: baseline.legacy.images[index].id)
+            }
+            let verifier = DuoCompatibilityVerifier(service: service, localizationID: f.set.localizationID,
+                group: "test-duo-group", attempts: 1, sleeper: { _ in })
+            let proof = try verifier.prove(graph: baseline.placements, expected: expected, previous: baseline)
+            var changed = false
+            transport.beforeRead = { path in
+                guard !changed && path.hasSuffix("/appScreenshotSets") else { return }
+                changed = true; transport.omitIncluded = missingAfter
+                var raw = f.service.images["old-image-1"]!.objectValue!, attrs = raw["attributes"]!.objectValue!
+                attrs["lastModifiedDate"] = .string("2026-01-02T00:00:00Z")
+                raw["attributes"] = .object(attrs); f.service.images["old-image-1"] = .object(raw)
+            }
+            XCTAssertThrowsError(try verifier.prove(graph: baseline.placements, expected: expected,
+                previous: proof, forceNative: false))
+            XCTAssertTrue(f.service.events.isEmpty)
+        }
+    }
+
+    func testNativeCacheRequiresRevisionAndForcedBoundariesAlwaysDownload() throws {
+        for missing in ["none", "revision", "checksum"] {
+            let f = try DuoExecutorFixture(compatibility: true); defer { f.clean() }
+            if missing == "revision" {
+                for (id, row) in f.service.images {
+                    var value = row.objectValue!, attrs = value["attributes"]!.objectValue!
+                    attrs.removeValue(forKey: "lastModifiedDate"); value["attributes"] = .object(attrs)
+                    f.service.images[id] = .object(value)
+                }
+            }
+            if missing == "checksum" {
+                let original = try XCTUnwrap(f.service.makeLegacy())
+                let screenshots = original.screenshots.map { row -> RemoteScreenshot in
+                    var attrs = row.attributes; attrs.removeValue(forKey: "sourceFileChecksum")
+                    return RemoteScreenshot(id: row.id, fileName: row.fileName, checksum: nil, attributes: attrs)
+                }
+                f.service.legacyOverride = { RemoteScreenshotSet(id: original.id, displayType: original.displayType, screenshots: screenshots) }
+            }
+            let baseline = try XCTUnwrap(f.set.compatibilityBaseline)
+            let expected = baseline.content.enumerated().map { index, content in
+                DuoExpectedContent(fileName: content.fileName, byteCount: content.byteCount,
+                    width: content.asset.width, height: content.asset.height, pixels: content.pixelSHA256,
+                    checksum: baseline.legacy.images[index].checksum, pinnedAsset: content.asset,
+                    pinnedLegacyID: baseline.legacy.images[index].id)
+            }
+            let transport = DuoBudgetTransport(f)
+            let verifier = DuoCompatibilityVerifier(service: ASCDuoPublishingService(client: transport.client()),
+                localizationID: f.set.localizationID, group: "test-duo-group", attempts: 1, sleeper: { _ in })
+            let initial = try verifier.prove(graph: baseline.placements, expected: expected, previous: missing == "checksum" ? nil : baseline)
+            XCTAssertEqual(f.service.downloads, 10)
+            _ = try verifier.prove(graph: baseline.placements, expected: expected, previous: initial, forceNative: false)
+            XCTAssertEqual(f.service.downloads, missing == "none" ? 10 : 20)
+            _ = try verifier.prove(graph: baseline.placements, expected: expected, previous: initial, forceNative: true)
+            XCTAssertEqual(f.service.downloads, missing == "none" ? 20 : 30)
+        }
+    }
+
+    func testCompoundInterruptedDeleteCreateAndOrderResumeWithoutReplay() throws {
+        for label in ["delete:old-placement-1", "place:1.png", "order"] {
+            let f = try DuoExecutorFixture(compatibility: true); defer { f.clean() }
+            let transport = DuoBudgetTransport(f), client = transport.client()
+            f.service.fault = { event, after in
+                if event == label && after { f.service.fault = nil; throw DuoExecutionFailure.uncertain("lost response") }
+            }
+            func run() throws {
+                let executor = try DuoPublishingExecutor(set: f.set, journalURL: f.journal,
+                    service: ASCDuoPublishingService(client: client), sleeper: { _ in })
+                try executor.publish(confirmedVersion: "3.0", confirmedSetDigest: f.set.digest())
+            }
+            XCTAssertThrowsError(try run())
+            try run()
+            XCTAssertEqual(try f.state().phase, "complete")
+            XCTAssertEqual(f.service.events.filter { $0 == label }.count, 1, label)
+            XCTAssertTrue(f.originalImagesPreserved())
+        }
+    }
+
+    func testMissingIncludedImagesHasExplicitFallbackRequestBudget() throws {
+        let f = try DuoExecutorFixture(compatibility: true); defer { f.clean() }
+        let transport = DuoBudgetTransport(f); transport.omitIncluded = true
+        let client = transport.client(), coordinator = budgetCoordinator(f, service: ASCDuoPublishingService(client: client))
+        try coordinator.prepareForReconciliation()
+        try coordinator.publish(continuingVerifiedEntry: true)
+        try coordinator.prepareForReconciliation(requireComplete: true)
+        let report = client.metrics.snapshot()
+        XCTAssertEqual(report.categories["authenticatedWrite"]?.attempts, 41)
+        XCTAssertEqual(report.categories["binaryUpload"]?.attempts, 10)
+        XCTAssertLessThanOrEqual(report.categories["authenticatedRead"]?.attempts ?? 0, 820)
+        XCTAssertLessThanOrEqual(report.categories["imageDownload"]?.attempts ?? 0, 60)
+        try printBudget("DUO_FALLBACK_REQUEST_BUDGET", report)
+    }
+
+    func testSingleImageRetryOnlyUsesAffectedScopeAndHasBoundedRequests() throws {
+        let f = try DuoExecutorFixture(compatibility: true); defer { f.clean() }
+        let transport = DuoBudgetTransport(f)
+        let path = f.directory.appendingPathComponent("duo-en-US-journal.json")
+        f.service.holdProcessingNames = ["6.png"]
+        do {
+            let setup = try DuoPublishingExecutor(set: f.set, journalURL: path,
+                service: ASCDuoPublishingService(client: transport.client()), sleeper: { _ in })
+            _ = try setup.prepareQueuedStaging(confirmedVersion: "3.0", confirmedSetDigest: f.set.digest())
+            for position in 1...10 { _ = try setup.submitDesired(position: position) }
+        }
+        f.service.holdProcessingNames = []
+        let events = f.service.events.count, client = transport.client()
+        let coordinator = budgetCoordinator(f, service: ASCDuoPublishingService(client: client))
+        try coordinator.prepareForSingleImageRetry(locale: "en-US")
+        let result = try coordinator.retryImage(locale: "en-US", position: 6,
+            originalImageID: "image-6", sourceSHA256: f.set.images[5].sha256)
+        XCTAssertEqual(result.state, "adopted")
+        XCTAssertEqual(result.imageID, "image-11")
+        XCTAssertEqual(f.service.rows, f.set.reviewedBaseline)
+        XCTAssertEqual(f.service.images["image-6"]?["attributes"]?["state"], .string("UPLOAD_COMPLETE"))
+        XCTAssertEqual(f.service.events.count - events, 3)
+        let report = client.metrics.snapshot()
+        XCTAssertEqual(report.categories["authenticatedWrite"]?.attempts, 2)
+        XCTAssertEqual(report.categories["binaryUpload"]?.attempts, 1)
+        XCTAssertLessThanOrEqual(report.categories["authenticatedRead"]?.attempts ?? 0, 130)
+        XCTAssertLessThanOrEqual(report.categories["imageDownload"]?.attempts ?? 0, 25)
+        try printBudget("DUO_ONE_IMAGE_RETRY_REQUEST_BUDGET", report)
+    }
+
+    func testNarrowRetryNeverReadsCompletedOtherLocaleAndRejectsItsInvalidJournal() throws {
+        let first = try DuoExecutorFixture(compatibility: true, namespace: "a-"),
+            second = try DuoExecutorFixture(compatibility: true, namespace: "b-", locale: "fr-FR")
+        defer { first.clean(); second.clean() }
+        first.service.holdProcessingNames = ["6.png"]
+        do {
+            let setup = try DuoPublishingExecutor(set: first.set, journalURL: first.journal, service: first.service, sleeper: { _ in })
+            _ = try setup.prepareQueuedStaging(confirmedVersion: "3.0", confirmedSetDigest: first.set.digest())
+            for position in 1...10 { _ = try setup.submitDesired(position: position) }
+        }
+        try second.run()
+        let firstPath = first.directory.appendingPathComponent("duo-en-US-journal.json")
+        let secondPath = first.directory.appendingPathComponent("duo-fr-FR-journal.json")
+        try FileManager.default.copyItem(at: first.journal, to: firstPath)
+        try FileManager.default.copyItem(at: second.journal, to: secondPath)
+        first.service.holdProcessingNames = []
+        let otherWrites = second.service.events, otherDownloads = second.service.downloads
+        second.service.beforeImageRead = { _ in throw ReleaseToolError.api("Unaffected image must not be read by isolated retry") }
+        second.service.beforePlacementRead = { throw ReleaseToolError.api("Unaffected placement must not be read by isolated retry") }
+        second.service.legacyOverride = { throw ReleaseToolError.api("Unaffected legacy view must not be read by isolated retry") }
+        do {
+            let coordinator = queuedCoordinator([first, second])
+            try coordinator.prepareForSingleImageRetry(locale: "en-US")
+            let result = try coordinator.retryImage(locale: "en-US", position: 6,
+                originalImageID: "a-image-6", sourceSHA256: first.set.images[5].sha256)
+            XCTAssertEqual(result.state, "adopted")
+            XCTAssertEqual(second.service.events, otherWrites)
+            XCTAssertEqual(second.service.downloads, otherDownloads)
+        }
+        var changed = try ManifestBuilder.decode(DuoExecutionJournal.self, at: secondPath)
+        changed.schemaVersion = 99; try FileIO.writeJSON(changed, to: secondPath)
+        let coordinator = queuedCoordinator([first, second])
+        XCTAssertThrowsError(try coordinator.prepareForSingleImageRetry(locale: "en-US"))
+    }
+
+    func testQueuedProcessingPollsStayWithinTheAffectedImageBudget() throws {
+        let f = try DuoExecutorFixture(compatibility: true); defer { f.clean() }
+        f.service.holdProcessingNames = ["6.png"]
+        let transport = DuoBudgetTransport(f), client = transport.client()
+        var sleeps = 0
+        let coordinator = budgetCoordinator(f, service: ASCDuoPublishingService(client: client), queueSleep: { _ in
+            sleeps += 1
+            if sleeps == 2 { try! f.service.finishProcessing() }
+            XCTAssertLessThan(sleeps, 4)
+        })
+        try coordinator.prepareForReconciliation()
+        try coordinator.publish(continuingVerifiedEntry: true)
+        try coordinator.prepareForReconciliation(requireComplete: true)
+        let report = client.metrics.snapshot()
+        XCTAssertEqual(report.categories["authenticatedWrite"]?.attempts, 41)
+        XCTAssertEqual(report.categories["binaryUpload"]?.attempts, 10)
+        XCTAssertLessThanOrEqual(report.categories["authenticatedRead"]?.attempts ?? 0, 380)
+        XCTAssertEqual(report.categories["imageDownload"]?.attempts, 60)
+        try printBudget("DUO_DELAYED_PROCESSING_REQUEST_BUDGET", report)
     }
 }
 

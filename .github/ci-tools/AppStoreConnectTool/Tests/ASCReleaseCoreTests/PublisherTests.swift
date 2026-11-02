@@ -65,7 +65,7 @@ final class PublisherTests: XCTestCase {
                     return TransportResponse(data: Data(), statusCode: 500)
                 }
             }
-            let provider = SnapshotSequence([fixture.baseline, fixture.baseline, fixture.final])
+            let provider = SnapshotSequence([fixture.baseline, fixture.final])
             let publisher = try Publisher(
                 client: makeClient(transport),
                 journalURL: directory.appendingPathComponent("journal.json"),
@@ -343,7 +343,7 @@ final class PublisherTests: XCTestCase {
                 journalURL: journalURL,
                 manifest: fixture.manifest,
                 snapshotProvider: SnapshotSequence([
-                    restoredSnapshot, restoredSnapshot, finalSnapshot,
+                    restoredSnapshot, finalSnapshot,
                 ]).next,
                 sleeper: { _ in }
             )
@@ -492,7 +492,7 @@ final class PublisherTests: XCTestCase {
                 journalURL: journalURL,
                 manifest: fixture.manifest,
                 snapshotProvider: SnapshotSequence([
-                    restoredSnapshot, restoredSnapshot, finalSnapshot,
+                    restoredSnapshot, finalSnapshot,
                 ]).next,
                 sleeper: { _ in }
             )
@@ -577,7 +577,7 @@ final class PublisherTests: XCTestCase {
                 }
             }
             let provider = SnapshotSequence([
-                fixture.baseline, fixture.createdEmpty, fixture.createdEmpty,
+                fixture.baseline, fixture.createdEmpty,
                 fixture.createdAppInfoOnly, fixture.final,
             ])
             let publisher = try Publisher(
@@ -622,7 +622,7 @@ final class PublisherTests: XCTestCase {
                 }
             }
             let provider = SnapshotSequence([
-                fixture.baseline, fixture.createdEmpty, fixture.createdEmpty, fixture.final,
+                fixture.baseline, fixture.createdEmpty, fixture.final,
             ])
             let publisher = try Publisher(
                 client: makeClient(transport),
@@ -696,7 +696,6 @@ final class PublisherTests: XCTestCase {
             let journalURL = directory.appendingPathComponent("journal.json")
             let provider = SnapshotSequence([
                 fixture.baseline,
-                fixture.createdEmpty,
                 fixture.createdEmpty,
                 sideEffectSnapshot,
                 fixture.final,
@@ -894,7 +893,7 @@ final class PublisherTests: XCTestCase {
                 XCTFail("Reconciled completed metadata must not be replayed: \(request.url?.path ?? "")")
                 return TransportResponse(data: Data(), statusCode: 500)
             }
-            let provider = SnapshotSequence([fixture.live, fixture.live, fixture.live])
+            let provider = SnapshotSequence([fixture.live, fixture.live])
             let publisher = try Publisher(
                 client: makeClient(transport), journalURL: journalURL,
                 manifest: fixture.manifest, snapshotProvider: provider.next, sleeper: { _ in }

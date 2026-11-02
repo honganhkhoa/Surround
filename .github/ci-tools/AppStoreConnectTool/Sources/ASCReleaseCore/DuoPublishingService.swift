@@ -106,16 +106,37 @@ func duoIdentifier(_ id: String) throws -> String {
 /// Tests inject an in-memory service or transport. Offline planning and dry runs
 /// never invoke the concrete service's network methods.
 public protocol DuoPublishingService {
+    func withPhase<T>(_ phase: ASCRequestPhase, _ operation: () throws -> T) rethrows -> T
     func verifyEditableTarget(_ set: DuoPublishSet) throws
+    func verifyEditableTargets(_ sets: [DuoPublishSet]) throws
+    func verifyEditableState(_ set: DuoPublishSet) throws
     func placements(localizationID: String, group: String) throws -> [DuoRemotePlacement]
     func image(id: String) throws -> JSONValue
     func send(_ request: DuoAssetLibraryRequest) throws -> JSONValue?
     func upload(_ operation: UploadOperation, bytes: Data) throws
     func download(_ url: URL) throws -> Data
     func legacyDuoSet(localizationID: String) throws -> RemoteScreenshotSet?
+    func placementReadback(localizationID: String, group: String) throws -> DuoPlacementReadback
+}
+
+/// One fresh compound response. Included resources are evidence for this read,
+/// never an image cache carried over from a previous placement request.
+public struct DuoPlacementReadback {
+    public let placements: [DuoRemotePlacement]
+    public let images: [String: JSONValue]
+
+    public init(placements: [DuoRemotePlacement], images: [String: JSONValue] = [:]) {
+        self.placements = placements; self.images = images
+    }
 }
 
 public extension DuoPublishingService {
+    func withPhase<T>(_ phase: ASCRequestPhase, _ operation: () throws -> T) rethrows -> T { try operation() }
+    func verifyEditableTargets(_ sets: [DuoPublishSet]) throws { for set in sets { try verifyEditableTarget(set) } }
+    func verifyEditableState(_ set: DuoPublishSet) throws { try verifyEditableTarget(set) }
+    func placementReadback(localizationID: String, group: String) throws -> DuoPlacementReadback {
+        DuoPlacementReadback(placements: try placements(localizationID: localizationID, group: group))
+    }
     func legacyDuoSet(localizationID: String) throws -> RemoteScreenshotSet? {
         throw ReleaseToolError.validation("This service has no legacy Duo compatibility reader")
     }
@@ -124,8 +145,20 @@ public extension DuoPublishingService {
 public final class ASCDuoPublishingService: DuoPublishingService {
     private let client: ASCAPIClient
     public init(client: ASCAPIClient) { self.client = client }
+    public func withPhase<T>(_ phase: ASCRequestPhase, _ operation: () throws -> T) rethrows -> T {
+        try client.withPhase(phase, operation)
+    }
 
     public func verifyEditableTarget(_ set: DuoPublishSet) throws {
+        try verifyEditableTargets([set])
+    }
+
+    public func verifyEditableTargets(_ sets: [DuoPublishSet]) throws {
+        guard let set = sets.first else { return }
+        guard sets.allSatisfy({ $0.appID == set.appID && $0.bundleID == set.bundleID &&
+            $0.assetLibraryID == set.assetLibraryID && $0.versionID == set.versionID && $0.version == set.version }) else {
+            throw DuoExecutionFailure.drift("Target verification cannot combine different apps or versions")
+        }
         let app = try client.request(method: "GET", path: "/v1/apps/\(duoIdentifier(set.appID))")?["data"]
         let library = try client.request(method: "GET", path: "/v1/apps/\(set.appID)/assetLibrary")?["data"]
         let versions = try client.list(path: "/v1/apps/\(set.appID)/appStoreVersions", query: [
@@ -142,19 +175,71 @@ public final class ASCDuoPublishingService: DuoPublishingService {
         }
         let locales = try client.list(path: "/v1/appStoreVersions/\(duoIdentifier(set.versionID))/appStoreVersionLocalizations",
                                       query: [URLQueryItem(name: "limit", value: "200")])
-        guard locales.filter({ $0["type"] == .string("appStoreVersionLocalizations") && $0["id"] == .string(set.localizationID) &&
-            $0["attributes"]?["locale"] == .string(set.locale) }).count == 1 else {
-            throw DuoExecutionFailure.drift("Target localization no longer belongs to the reviewed version")
+        for set in sets {
+            guard locales.filter({ $0["type"] == .string("appStoreVersionLocalizations") && $0["id"] == .string(set.localizationID) &&
+                $0["attributes"]?["locale"] == .string(set.locale) }).count == 1 else {
+                throw DuoExecutionFailure.drift("Target localization no longer belongs to the reviewed version")
+            }
+        }
+    }
+
+    /// The executor calls this only after this invocation has verified the full
+    /// app/library/version/localization binding. Resource IDs and ownership are
+    /// checked again at the final boundary and at every new invocation.
+    public func verifyEditableState(_ set: DuoPublishSet) throws {
+        let target = try client.request(method: "GET", path: "/v1/appStoreVersions/\(duoIdentifier(set.versionID))")?["data"]
+        guard target?["type"] == .string("appStoreVersions"), target?["id"] == .string(set.versionID),
+              target?["attributes"]?["versionString"] == .string(set.version),
+              target?["attributes"]?["platform"] == .string("IOS"),
+              target?["attributes"]?["appVersionState"] == .string("PREPARE_FOR_SUBMISSION") else {
+            throw DuoExecutionFailure.drift("Reviewed version is no longer editable")
+        }
+        if let app = target?["relationships"]?["app"]?["data"],
+           app["id"] != .string(set.appID) || app["type"] != .string("apps") {
+            throw DuoExecutionFailure.drift("Reviewed version belongs to a different app")
         }
     }
 
     public func placements(localizationID: String, group: String) throws -> [DuoRemotePlacement] {
-        try client.list(path: "/v1/appStoreVersionLocalizations/\(duoIdentifier(localizationID))/placements", query: [
+        try placementReadback(localizationID: localizationID, group: group).placements
+    }
+
+    public func placementReadback(localizationID: String, group: String) throws -> DuoPlacementReadback {
+        var path: String? = "/v1/appStoreVersionLocalizations/\(try duoIdentifier(localizationID))/placements"
+        var query = [
             URLQueryItem(name: "filter[placementType]", value: "APP_SCREENSHOT"),
             URLQueryItem(name: "filter[placementGroup]", value: group),
             URLQueryItem(name: "sort", value: "placementGroupPosition"),
             URLQueryItem(name: "include", value: "image"), URLQueryItem(name: "limit", value: "200")
-        ]).map(DuoRemotePlacement.parse)
+        ]
+        var rows: [DuoRemotePlacement] = [], images: [String: JSONValue] = [:]
+        while let current = path {
+            guard let document = try client.request(method: "GET", path: current, query: query),
+                  let data = document["data"]?.arrayValue else {
+                throw DuoExecutionFailure.drift("Missing placement compound response")
+            }
+            rows += try data.map(DuoRemotePlacement.parse)
+            for resource in document["included"]?.arrayValue ?? [] where resource["type"] == .string("appAssetLibraryImages") {
+                guard let id = resource["id"]?.stringValue, resource["attributes"]?.objectValue != nil else {
+                    throw DuoExecutionFailure.drift("Incomplete included image resource")
+                }
+                _ = try duoIdentifier(id)
+                if let previous = images[id], previous != resource {
+                    throw DuoExecutionFailure.drift("Conflicting included image resources")
+                }
+                images[id] = resource
+            }
+            if let next = document["links"]?["next"], next != .null {
+                guard let link = next.stringValue else { throw DuoExecutionFailure.drift("Malformed placement pagination") }
+                path = link // ASCAPIClient validates same-origin before attaching credentials.
+            } else { path = nil }
+            query = []
+        }
+        guard Set(rows.map(\.id)).count == rows.count else {
+            throw DuoExecutionFailure.drift("Duplicate placement rows across pages")
+        }
+        let referenced = Set(rows.map(\.imageID))
+        return DuoPlacementReadback(placements: rows, images: images.filter { referenced.contains($0.key) })
     }
 
     public func image(id: String) throws -> JSONValue {

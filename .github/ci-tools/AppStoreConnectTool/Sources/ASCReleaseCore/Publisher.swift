@@ -46,10 +46,10 @@ public final class Publisher {
     public func retryDuoImage(manifest: PublishManifest, confirmedVersion: String,
                               confirmedManifestDigest: String, locale: String, position: Int,
                               originalImageID: String, sourceSHA256: String) throws -> DuoSingleImageRetryResult {
-        try ManifestBuilder.verify(manifest)
+        let selected = try ManifestBuilder.verifyWithHandoff(manifest)
         guard confirmedVersion == manifest.release.version,
               confirmedManifestDigest == manifest.manifestDigest,
-              let selected = try SelectedReleaseHandoff.load(manifest: manifest),
+              let selected,
               selected.sets.contains(where: { $0.locale == locale && $0.images.contains(where: {
                   $0.position == position && $0.sha256 == sourceSHA256
               }) }), !journal.operations.isEmpty, journal.completedAt == nil,
@@ -65,14 +65,7 @@ public final class Publisher {
             journalDirectory: journalURL.deletingLastPathComponent())
         managedDuo = duo
         defer { managedDuo = nil }
-        try duo.requireSingleRetryCheckpoint(locale: locale)
-        try duo.prepareForReconciliation(allowPendingRetryLocale: locale)
-        let live = try snapshotProvider(manifest.release)
-        guard live.targetVersion?.state == "PREPARE_FOR_SUBMISSION",
-              live.targetVersion?.id == manifest.remoteSnapshot.targetVersion?.id else {
-            throw ReleaseToolError.remoteDrift("Retry requires the exact existing editable target")
-        }
-        try reconcileLiveState(manifest: manifest, live: live)
+        try duo.prepareForSingleImageRetry(locale: locale)
         return try duo.retryImage(locale: locale, position: position,
             originalImageID: originalImageID, sourceSHA256: sourceSHA256)
     }
@@ -90,8 +83,7 @@ public final class Publisher {
                 "--confirm-version must exactly match \(manifest.release.version)"
             )
         }
-        try ManifestBuilder.verify(manifest)
-        let selected = try SelectedReleaseHandoff.load(manifest: manifest)
+        let selected = try ManifestBuilder.verifyWithHandoff(manifest)
         if (selected != nil && confirmedManifestDigest == nil) ||
             (confirmedManifestDigest != nil && confirmedManifestDigest != manifest.manifestDigest) {
             throw ReleaseToolError.validation("Selected release requires the exact reviewed aggregate manifest digest")
@@ -105,15 +97,16 @@ public final class Publisher {
                                                        journalDirectory: journalURL.deletingLastPathComponent()) }
         managedDuo = duo
         defer { managedDuo = nil }
-        try duo?.prepareForReconciliation()
-
-        var snapshot = try snapshotProvider(manifest.release)
-        guard snapshot.appId == manifest.remoteSnapshot.appId else {
-            throw ReleaseToolError.remoteDrift("Live app resource does not match the reviewed manifest")
+        var snapshot = try client.withPhase(.initialVerification) {
+            try duo?.prepareForReconciliation()
+            let live = try snapshotProvider(manifest.release)
+            guard live.appId == manifest.remoteSnapshot.appId else {
+                throw ReleaseToolError.remoteDrift("Live app resource does not match the reviewed manifest")
+            }
+            try reconcileLiveState(manifest: manifest, live: live)
+            try duo?.recoverPendingRollback()
+            return live
         }
-        try reconcileLiveState(manifest: manifest, live: snapshot)
-        try duo?.recoverPendingRollback()
-        try duo?.preflight()
 
         let versionId: String
         if let target = snapshot.targetVersion {
@@ -123,15 +116,15 @@ public final class Publisher {
             versionId = target.id
         } else {
             versionId = try createVersion(manifest: manifest)
+            // The visibility read already includes the newly created draft AppInfo.
+            // Reconcile that fresh result instead of taking a second full snapshot.
             snapshot = try waitForVersion(manifest.release, id: versionId)
+            guard snapshot.appId == manifest.remoteSnapshot.appId else {
+                throw ReleaseToolError.remoteDrift("App resource changed after version creation")
+            }
+            try reconcileLiveState(manifest: manifest, live: snapshot)
         }
 
-        // Creating a version can create a draft AppInfo. Always re-read and only mutate that draft.
-        snapshot = try snapshotProvider(manifest.release)
-        guard snapshot.appId == manifest.remoteSnapshot.appId else {
-            throw ReleaseToolError.remoteDrift("App resource changed after version creation")
-        }
-        try reconcileLiveState(manifest: manifest, live: snapshot)
         guard let appInfo = snapshot.appInfo, appInfo.state == "PREPARE_FOR_SUBMISSION" else {
             throw ReleaseToolError.validation(
                 "App Store Connect did not expose a PREPARE_FOR_SUBMISSION App Info after version creation"
@@ -252,78 +245,93 @@ public final class Publisher {
             versionLocalizationIds[locale.appStoreLocale] = id
         }
 
-        for locale in manifest.localizations {
-            guard let localizationId = versionLocalizationIds[locale.appStoreLocale] else {
-                throw ReleaseToolError.api("Missing version localization ID for \(locale.appStoreLocale)")
-            }
-            for set in locale.screenshotSets {
-                try publishScreenshotSet(
-                    locale: locale.appStoreLocale,
-                    localizationId: localizationId,
-                    set: set,
-                    manifest: manifest
-                )
-            }
-        }
-
-        try duo?.publish()
-
-        // Apply reviewed textual metadata only after every screenshot has processed and been ordered.
-        let effectiveVersionMetadata = effectiveVersionMetadata(manifest)
-        if !effectiveVersionMetadata.isEmpty {
-            try perform(key: "version:\(versionId):metadata") {
-                _ = try client.request(
-                    method: "PATCH",
-                    path: "/v1/appStoreVersions/\(versionId)",
-                    body: resourceBody(
-                        type: "appStoreVersions",
-                        id: versionId,
-                        attributes: effectiveVersionMetadata
-                    )
-                )
-                return nil
-            }
-        }
-        for locale in manifest.localizations {
-            if !locale.appMetadata.isEmpty,
-               let id = appInfoLocalizationIds[locale.appStoreLocale] {
-                try perform(key: "app-info:\(locale.appStoreLocale):metadata") {
-                    _ = try client.request(
-                        method: "PATCH",
-                        path: "/v1/appInfoLocalizations/\(id)",
-                        body: resourceBody(
-                            type: "appInfoLocalizations",
-                            id: id,
-                            attributes: locale.appMetadata
+        try client.withPhase(.imageStaging) {
+            for locale in manifest.localizations {
+                guard let localizationId = versionLocalizationIds[locale.appStoreLocale] else {
+                    throw ReleaseToolError.api("Missing version localization ID for \(locale.appStoreLocale)")
+                }
+                for set in locale.screenshotSets {
+                    let completionKey = "screenshots:\(locale.appStoreLocale):\(set.family):complete"
+                    if isDone(completionKey) {
+                        // Entry reconciliation has freshly read this whole release. Reuse
+                        // that exact completed-set observation; incomplete sets retain
+                        // their scoped current-set reads and verified backup before DELETE.
+                        try requireCompletedScreenshotSet(
+                            locale: locale.appStoreLocale, desired: set,
+                            live: liveTarget.localizations.first { $0.locale == locale.appStoreLocale }
                         )
+                        continue
+                    }
+                    try publishScreenshotSet(
+                        locale: locale.appStoreLocale,
+                        localizationId: localizationId,
+                        set: set,
+                        manifest: manifest
                     )
-                    return id
                 }
             }
-            if let id = versionLocalizationIds[locale.appStoreLocale] {
-                try perform(key: "version-locale:\(locale.appStoreLocale):metadata") {
+            try duo?.publish(continuingVerifiedEntry: true)
+        }
+
+        try client.withPhase(.metadata) {
+            // Apply reviewed textual metadata only after every screenshot has processed and been ordered.
+            let effectiveVersionMetadata = effectiveVersionMetadata(manifest)
+            if !effectiveVersionMetadata.isEmpty {
+                try perform(key: "version:\(versionId):metadata") {
                     _ = try client.request(
                         method: "PATCH",
-                        path: "/v1/appStoreVersionLocalizations/\(id)",
+                        path: "/v1/appStoreVersions/\(versionId)",
                         body: resourceBody(
-                            type: "appStoreVersionLocalizations",
-                            id: id,
-                            attributes: locale.versionMetadata
+                            type: "appStoreVersions",
+                            id: versionId,
+                            attributes: effectiveVersionMetadata
                         )
                     )
-                    return id
+                    return nil
+                }
+            }
+            for locale in manifest.localizations {
+                if !locale.appMetadata.isEmpty,
+                   let id = appInfoLocalizationIds[locale.appStoreLocale] {
+                    try perform(key: "app-info:\(locale.appStoreLocale):metadata") {
+                        _ = try client.request(
+                            method: "PATCH",
+                            path: "/v1/appInfoLocalizations/\(id)",
+                            body: resourceBody(
+                                type: "appInfoLocalizations",
+                                id: id,
+                                attributes: locale.appMetadata
+                            )
+                        )
+                        return id
+                    }
+                }
+                if let id = versionLocalizationIds[locale.appStoreLocale] {
+                    try perform(key: "version-locale:\(locale.appStoreLocale):metadata") {
+                        _ = try client.request(
+                            method: "PATCH",
+                            path: "/v1/appStoreVersionLocalizations/\(id)",
+                            body: resourceBody(
+                                type: "appStoreVersionLocalizations",
+                                id: id,
+                                attributes: locale.versionMetadata
+                            )
+                        )
+                        return id
+                    }
                 }
             }
         }
 
-        try duo?.prepareForReconciliation()
-        let finalSnapshot = try snapshotProvider(manifest.release)
-        guard finalSnapshot.appId == manifest.remoteSnapshot.appId else {
-            throw ReleaseToolError.remoteDrift("App resource changed before final verification")
+        try client.withPhase(.finalVerification) {
+            try duo?.prepareForReconciliation(requireComplete: true)
+            let finalSnapshot = try snapshotProvider(manifest.release)
+            guard finalSnapshot.appId == manifest.remoteSnapshot.appId else {
+                throw ReleaseToolError.remoteDrift("App resource changed before final verification")
+            }
+            try verifyReadBack(manifest: manifest, snapshot: finalSnapshot)
+            if duo != nil { try reconcileLiveState(manifest: manifest, live: finalSnapshot) }
         }
-        try verifyReadBack(manifest: manifest, snapshot: finalSnapshot)
-        if duo != nil { try reconcileLiveState(manifest: manifest, live: finalSnapshot) }
-        try duo?.verifyCompleted()
         journal.completedAt = ISO8601DateFormatter.releaseTool.string(from: Date())
         try persistJournal()
     }
@@ -355,6 +363,27 @@ public final class Publisher {
             sleeper(2)
         }
         throw ReleaseToolError.api("Created version \(id) was not visible after 24 seconds")
+    }
+
+    /// Reuses only the current invocation's fully reconciled entry snapshot.
+    /// A journal completion by itself is insufficient: exact live identity,
+    /// ordered checksums and processing state are checked before skipping work.
+    private func requireCompletedScreenshotSet(
+        locale: String, desired: ManifestScreenshotSet, live: RemoteLocalization?
+    ) throws {
+        let matches = live?.screenshotSets.filter { $0.displayType == desired.displayType } ?? []
+        guard matches.count == 1, let set = matches.first,
+              remoteScreenshotsMatch(set.screenshots, desired.screenshots) else {
+            throw ReleaseToolError.remoteDrift(
+                "Completed screenshot set \(locale)/\(desired.family) is absent or changed in the fresh snapshot"
+            )
+        }
+        for key in ["screenshots:\(locale):\(desired.family):complete",
+                    "screenshots:\(locale):\(desired.family):order"] {
+            if let recordedID = operationDetailValue(key: key), recordedID != set.id {
+                throw ReleaseToolError.remoteDrift("Completed screenshot set journal has a stale ID")
+            }
+        }
     }
 
     private func publishScreenshotSet(
@@ -487,11 +516,13 @@ public final class Publisher {
             let relationships = newIds.map { id in
                 JSONValue.object(["type": .string("appScreenshots"), "id": .string(id)])
             }
-            _ = try client.request(
-                method: "PATCH",
-                path: "/v1/appScreenshotSets/\(setId)/relationships/appScreenshots",
-                body: .object(["data": .array(relationships)])
-            )
+            _ = try client.withPhase(.placementMutation) {
+                try client.request(
+                    method: "PATCH",
+                    path: "/v1/appScreenshotSets/\(setId)/relationships/appScreenshots",
+                    body: .object(["data": .array(relationships)])
+                )
+            }
             _ = try waitForScreenshotSet(
                 setId: setId,
                 screenshots: desired.screenshots,
@@ -503,7 +534,9 @@ public final class Publisher {
         } catch {
             let originalError = error
             do {
-                let restored = try restoreBackup(backup, setId: setId)
+                let restored = try client.withPhase(.recovery) {
+                    try restoreBackup(backup, setId: setId)
+                }
                 let checkpoint = ScreenshotRollbackCheckpoint(
                     schemaVersion: 1,
                     locale: locale,
@@ -588,7 +621,9 @@ public final class Publisher {
 
     private func waitForScreenshot(id: String) throws {
         for _ in 0..<120 {
-            let response = try client.request(method: "GET", path: "/v1/appScreenshots/\(id)")
+            let response = try client.withPhase(.processingPoll) {
+                try client.request(method: "GET", path: "/v1/appScreenshots/\(id)")
+            }
             let delivery = response?["data"]?["attributes"]?["assetDeliveryState"]
             let state = delivery?["state"]?.stringValue
             if state == "COMPLETE" { return }
@@ -852,7 +887,9 @@ public final class Publisher {
 
     private func deleteScreenshotIfPresent(_ id: String) throws {
         do {
-            _ = try client.request(method: "DELETE", path: "/v1/appScreenshots/\(id)")
+            _ = try client.withPhase(.placementMutation) {
+                try client.request(method: "DELETE", path: "/v1/appScreenshots/\(id)")
+            }
         } catch let error as ReleaseToolError where error.description.contains("HTTP 404") {
             return
         }

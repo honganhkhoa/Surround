@@ -181,6 +181,12 @@ public enum ManifestBuilder {
     }
 
     public static func verify(_ manifest: PublishManifest) throws {
+        _ = try verifyWithHandoff(manifest)
+    }
+
+    /// Return the admitted handoff from the same verification pass. Callers
+    /// must not rebuild and decode every selected source a second time.
+    public static func verifyWithHandoff(_ manifest: PublishManifest) throws -> SelectedReleaseHandoff? {
         guard manifest.schemaVersion == 1 else {
             throw ReleaseToolError.validation("Unsupported manifest schemaVersion")
         }
@@ -267,7 +273,7 @@ public enum ManifestBuilder {
                 }
             }
         }
-        _ = try SelectedReleaseHandoff.load(manifest: manifest)
+        return try SelectedReleaseHandoff.load(manifest: manifest)
     }
 
     private static func resolvedPixelSize(

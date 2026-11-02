@@ -27,6 +27,10 @@ public final class DuoPublishingExecutor {
     private let compatibilityVerifier: DuoCompatibilityVerifier?
     private let singleAttemptOnly: Bool
     private var localPixelCache: [String: String] = [:]
+    private var validatedPNGHashes: Set<String> = []
+    private var lastPlacementReadback: DuoPlacementReadback?
+    private var targetContextVerified = false
+    private var queuedAdmissionVerified = false
 
     public init(set: DuoPublishSet, journalURL: URL, service: DuoPublishingService,
                 pollAttempts: Int = 120, compatibilityPollAttempts: Int = 12,
@@ -75,14 +79,16 @@ public final class DuoPublishingExecutor {
     /// GET-only remote reconciliation before the aggregate publisher may write.
     /// Known readbacks may update the local journal; an offline dry run never calls this.
     func preflight(allowRollbackProof: Bool = false, allowKnownProcessing: Bool = false,
-                   allowPendingRetry: Bool = false) throws {
+                   allowPendingRetry: Bool = false, targetContextAlreadyVerified: Bool = false) throws {
         try requireRetryResolved(allowPending: allowPendingRetry)
         for image in set.images { _ = try validatedBytes(image) }
-        try service.verifyEditableTarget(set)
+        if targetContextAlreadyVerified { targetContextVerified = true }
+        else { try verifyTarget(freshContext: true) }
         if journal.phase == "complete" {
             try requireExactGroup(journal.completedPlacements)
             for image in set.images { _ = try processedImage(id: try reservedID("desired:\(image.position)"), file: image) }
-            try proveCompatibility(try group())
+            try proveCompatibility(try group(), forceNative: true)
+            queuedAdmissionVerified = true
             return
         }
         guard ["preparing", "switching", "rollingBack", "rolledBack"].contains(journal.phase) else {
@@ -125,12 +131,13 @@ public final class DuoPublishingExecutor {
                 journal.expectedGraph = current
                 try entry(key, "verified", digest: pending.requestDigest)
             }
-            try guardOwnedGraph()
+            try guardOwnedGraph(forceNative: true)
         } else {
             try requireExactGroup(journal.activeBaseline)
-            try proveCompatibility(try group())
+            try proveCompatibility(try group(), forceNative: true)
         }
         try requireKnownEntries(processingKeys: processingKeys)
+        queuedAdmissionVerified = true
     }
 
     private func requireKnownEntries(processingKeys: Set<String>) throws {
@@ -246,10 +253,11 @@ public final class DuoPublishingExecutor {
         try validateProcessedImage(before, file: image)
         let asset = try DuoImageAsset.read(rawAsset)
         let served = try service.download(asset.1)
-        let decoded = try ImageValidation.decodePNG(served, context: "one-image retry native rendition")
+        let proof = try ImageValidation.canonicalPNG(served, context: "one-image retry native rendition")
+        let decoded = proof.decoded
         guard decoded.pixelWidth == image.pixelWidth, decoded.pixelHeight == image.pixelHeight,
-              try ImageValidation.pixelSHA256(served, context: "retry served pixels") ==
-                  ImageValidation.pixelSHA256(validatedBytes(image), context: "retry selected pixels"),
+              proof.pixelSHA256 ==
+                  (try ImageValidation.pixelSHA256(validatedBytes(image), context: "retry selected pixels")),
               try basicImage(id, file: image)["attributes"] == before["attributes"] else {
             throw DuoExecutionFailure.drift("Retry native content or metadata changed; binding was not adopted")
         }
@@ -276,7 +284,7 @@ public final class DuoPublishingExecutor {
                 return DuoSingleImageRetryResult(state: "adopted", imageID: id)
             }
         }
-        try preflight(allowKnownProcessing: true, allowPendingRetry: true)
+        if !queuedAdmissionVerified { try preflight(allowKnownProcessing: true, allowPendingRetry: true) }
         let states = try pollDesiredReadiness()
         for other in set.images where other.position != position {
             guard case .ready = states[other.position] else {
@@ -359,7 +367,7 @@ public final class DuoPublishingExecutor {
                 try attempt.proveNative(image, id: id)
                 try requireExactGroup(journal.activeBaseline)
                 try verifyBaselineImageIdentities()
-                try proveCompatibility(try group())
+                try proveCompatibility(try group(), forceNative: true)
                 let bytes = try Data(contentsOf: attemptURL)
                 guard try JSONDecoder().decode(DuoExecutionJournal.self, from: bytes).entries == attempt.journal.entries else {
                     throw DuoExecutionFailure.persistence("Retry journal changed before atomic adoption")
@@ -378,6 +386,19 @@ public final class DuoPublishingExecutor {
 
     public func publish(confirmedVersion: String, confirmedSetDigest: String) throws {
         if try prepareQueuedStaging(confirmedVersion: confirmedVersion, confirmedSetDigest: confirmedSetDigest) { return }
+        let ready: [Int: DuoDesiredReadiness]
+        if journal.phase == "preparing" { ready = try pollDesiredReadiness() }
+        else { ready = [:] }
+        if ready.count == set.images.count && ready.values.allSatisfy({ if case .ready = $0 { return true }; return false }) {
+            // These are fresh validated processing/specification reads, not the
+            // queue's scheduling cache. No reservation/upload/commit is replayed.
+            let ids = try Dictionary(uniqueKeysWithValues: set.images.map { ($0.position, try reservedID("desired:\($0.position)")) })
+            try switchPlacements(desiredImages: ids)
+            return
+        }
+        guard !ready.values.contains(where: { if case .processing = $0 { return true }; return false }) else {
+            throw DuoExecutionFailure.uncertain("A known processing image is not ready for the placement transaction")
+        }
         var desiredImages: [Int: String] = [:]
         for image in set.images { desiredImages[image.position] = try stage(image, key: "desired:\(image.position)") }
         try switchPlacements(desiredImages: desiredImages)
@@ -394,12 +415,14 @@ public final class DuoPublishingExecutor {
             throw ReleaseToolError.validation("Duo execution requires the exact reviewed version, set digest and ten-image order")
         }
         for id in [set.appID, set.assetLibraryID, set.versionID, set.localizationID] { _ = try duoIdentifier(id) }
+        if queuedAdmissionVerified && journal.phase == "preparing" { return false }
         for image in set.images { _ = try validatedBytes(image) }
-        try service.verifyEditableTarget(set)
+        try verifyTarget(freshContext: true)
         if journal.phase == "complete" {
             try requireExactGroup(journal.completedPlacements)
             for image in set.images { _ = try processedImage(id: try reservedID("desired:\(image.position)"), file: image) }
-            try proveCompatibility(try group())
+            try proveCompatibility(try group(), forceNative: true)
+            queuedAdmissionVerified = true
             return true
         }
         if journal.phase == "rollingBack" {
@@ -410,12 +433,17 @@ public final class DuoPublishingExecutor {
             try requireExactGroup(journal.activeBaseline)
             journal.epoch += 1; journal.phase = "preparing"; try save()
         }
-        if journal.phase == "preparing" { try proveCompatibility(try group()) }
+        if journal.phase == "preparing" { try proveCompatibility(try group(), forceNative: true) }
         try sealAndVerifyBackup()
+        queuedAdmissionVerified = true
         return false
     }
 
     func pollDesiredReadiness(previous: [Int: DuoDesiredReadiness] = [:]) throws -> [Int: DuoDesiredReadiness] {
+        try service.withPhase(.processingPoll) { try readDesiredReadiness(previous: previous) }
+    }
+
+    private func readDesiredReadiness(previous: [Int: DuoDesiredReadiness]) throws -> [Int: DuoDesiredReadiness] {
         var result: [Int: DuoDesiredReadiness] = [:], processingKeys: Set<String> = []
         for image in set.images {
             // Cached readiness only schedules work. publish() reads every image
@@ -436,18 +464,29 @@ public final class DuoPublishingExecutor {
         guard journal.phase == "preparing", let image = set.images.first(where: { $0.position == position }) else {
             throw DuoExecutionFailure.uncertain("New image submission requires a preparing owned locale")
         }
-        try service.verifyEditableTarget(set)
         try requireExactGroup(journal.activeBaseline)
         _ = try submit(image, key: "desired:\(position)", preferOriginal: preferOriginal)
         return try preflightStagedImage(image, key: "desired:\(position)", allowKnownProcessing: true)
     }
 
     var isPreparing: Bool { journal.phase == "preparing" }
+    var isComplete: Bool { journal.phase == "complete" }
 
     private func switchPlacements(desiredImages: [Int: String]) throws {
+        try service.withPhase(.placementMutation) { try executePlacementSwitch(desiredImages: desiredImages) }
+    }
+
+    private func executePlacementSwitch(desiredImages: [Int: String]) throws {
         if journal.phase == "preparing" {
+            guard let seal = journal.backupDigest, try digest(journal.backups) == seal,
+                  journal.backups.count == journal.activeBaseline.count else {
+                throw DuoExecutionFailure.drift("Sealed rollback backup changed before switching")
+            }
+            for backup in journal.backups { _ = try validatedBytes(backup.file) }
+            for image in set.images { _ = try validatedBytes(image) }
             try requireExactGroup(journal.activeBaseline)
             try verifyBaselineImageIdentities()
+            try proveCompatibility(try group(), forceNative: true)
             journal.expectedGraph = journal.activeBaseline
             journal.phase = "switching"; try save()
         }
@@ -496,7 +535,7 @@ public final class DuoPublishingExecutor {
             throw DuoExecutionFailure.uncertain("Final Duo order/image readback does not match the reviewed set")
         }
         for image in set.images { _ = try processedImage(id: desiredImages[image.position]!, file: image) }
-        try proveCompatibility(current)
+        try proveCompatibility(current, forceNative: true)
         journal.completedPlacements = current; journal.phase = "complete"; try save()
     }
     private func save() throws { try file.save(journal) }
@@ -584,24 +623,37 @@ public final class DuoPublishingExecutor {
               data.count <= (spec["maxFileSize"]?.intValue ?? 0) else {
             throw ReleaseToolError.validation("Duo image bytes differ from the reviewed manifest")
         }
-        try ImageValidation.validateScreenshot(data, pixelWidth: image.pixelWidth, pixelHeight: image.pixelHeight, context: image.fileName)
+        let validationKey = image.sha256 + ":\(image.pixelWidth)x\(image.pixelHeight)"
+        if !validatedPNGHashes.contains(validationKey) {
+            try ImageValidation.validateScreenshot(data, pixelWidth: image.pixelWidth, pixelHeight: image.pixelHeight, context: image.fileName)
+            validatedPNGHashes.insert(validationKey)
+        }
         return data
     }
     private func group() throws -> [DuoRemotePlacement] {
-        let rows = try service.placements(localizationID: set.localizationID, group: groupID)
+        let readback = try service.placementReadback(localizationID: set.localizationID, group: groupID)
+        let rows = readback.placements
         guard rows.count <= 10, Set(rows.map(\.id)).count == rows.count,
               rows.allSatisfy({ $0.group == groupID && $0.placementType == "APP_SCREENSHOT" &&
                   ["ACTIVE", "PARENT_PREPARE_FOR_SUBMISSION"].contains($0.state) }) else {
             throw DuoExecutionFailure.drift("Duo group contains duplicate, processing, failed or foreign placements")
         }
+        lastPlacementReadback = readback
         return rows
     }
     private func sameBindings(_ lhs: [DuoRemotePlacement], _ rhs: [DuoRemotePlacement]) -> Bool {
         lhs.map(\.id) == rhs.map(\.id) && lhs.map(\.imageID) == rhs.map(\.imageID)
     }
     private func requireExactGroup(_ expected: [DuoRemotePlacement]) throws {
-        try service.verifyEditableTarget(set)
+        try verifyTarget()
         guard sameBindings(try group(), expected) else { throw DuoExecutionFailure.drift("Reviewed ordered Duo baseline changed") }
+    }
+
+    private func verifyTarget(freshContext: Bool = false) throws {
+        if freshContext || !targetContextVerified {
+            try service.verifyEditableTarget(set)
+            targetContextVerified = true
+        } else { try service.verifyEditableState(set) }
     }
     private func imageIdentity(_ image: JSONValue) throws -> JSONValue {
         guard image["type"] == .string("appAssetLibraryImages"), let id = image["id"]?.stringValue,
@@ -832,8 +884,8 @@ public final class DuoPublishingExecutor {
             try entry(key, "verified", digest: pending.requestDigest, id: matches[0].id)
         }
     }
-    private func guardOwnedGraph() throws {
-        try service.verifyEditableTarget(set)
+    private func guardOwnedGraph(forceNative: Bool = false) throws {
+        try verifyTarget()
         let current = try group()
         let pendingDeletes = Set(journal.entries.filter {
             $0.key.hasPrefix("switch:\(journal.epoch):delete:") || $0.key.hasPrefix("restore:\(journal.epoch):remove:")
@@ -870,10 +922,14 @@ public final class DuoPublishingExecutor {
                 throw DuoExecutionFailure.drift("A known placement vanished without this journal's verified deletion")
             }
         }
-        try proveCompatibility(current)
+        try proveCompatibility(current, forceNative: forceNative)
     }
 
     private func rollback() throws {
+        try service.withPhase(.recovery) { try executeRollback() }
+    }
+
+    private func executeRollback() throws {
         try reconcilePendingPlacementCreates()
         try guardOwnedGraph()
         guard let hash = journal.backupDigest, try digest(journal.backups) == hash else {
@@ -931,7 +987,7 @@ public final class DuoPublishingExecutor {
                 identities[row.imageID] = try imageIdentity(raw)
             }
         }
-        try proveCompatibility(current)
+        try proveCompatibility(current, forceNative: true)
         journal.activeBaseline = current; journal.activeImageIdentities = identities
         journal.activeCompatibility = journal.compatibilityCheckpoint
         journal.phase = "rolledBack"; try save()
@@ -978,7 +1034,7 @@ public final class DuoPublishingExecutor {
         throw DuoExecutionFailure.drift("Duo compatibility content has no reviewed or journal-owned origin")
     }
 
-    private func proveCompatibility(_ graph: [DuoRemotePlacement]) throws {
+    private func proveCompatibility(_ graph: [DuoRemotePlacement], forceNative: Bool = false) throws {
         guard let compatibilityVerifier else { return }
         let expected = try graph.map(expectedContent)
         let removed = journal.compatibilityCheckpoint?.placements.filter { previous in
@@ -989,7 +1045,8 @@ public final class DuoPublishingExecutor {
                 latest($0)?.status == "verified"
             }) ? removed[0].id : nil
         let checkpoint = try compatibilityVerifier.prove(graph: graph, expected: expected,
-            previous: journal.compatibilityCheckpoint, verifiedDeletionID: verifiedDeletionID)
+            previous: journal.compatibilityCheckpoint, verifiedDeletionID: verifiedDeletionID,
+            observed: lastPlacementReadback.flatMap { duoSameGraph($0.placements, graph) ? $0 : nil }, forceNative: forceNative)
         if checkpoint != journal.compatibilityCheckpoint {
             journal.compatibilityCheckpoint = checkpoint
             try save()

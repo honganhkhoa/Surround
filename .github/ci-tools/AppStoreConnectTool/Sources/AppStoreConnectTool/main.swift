@@ -272,10 +272,10 @@ do {
             "--journal", "--locale", "--position", "--original-image-id", "--source-sha256", "--output",
             optional: ["--dry-run"])
         let manifest = try ManifestBuilder.decode(PublishManifest.self, at: fileURL(values[0]))
-        try ManifestBuilder.verify(manifest)
+        let selected = try ManifestBuilder.verifyWithHandoff(manifest)
         guard values[1] == manifest.release.version, values[2] == manifest.manifestDigest,
               let position = Int(values[5]), (1...10).contains(position),
-              let selected = try SelectedReleaseHandoff.load(manifest: manifest),
+              let selected,
               selected.sets.contains(where: { $0.locale == values[4] && $0.images.contains(where: {
                   $0.position == position && $0.sha256 == values[7]
               }) }), FileManager.default.fileExists(atPath: fileURL(values[3]).path),
@@ -296,12 +296,19 @@ do {
             exit(EXIT_SUCCESS)
         }
         let credentials = try ASCCredentials.fromEnvironment()
-        let publisher = try Publisher(client: ASCAPIClient(credentials: credentials),
-            journalURL: fileURL(values[3]), manifest: manifest)
-        let result = try publisher.retryDuoImage(manifest: manifest, confirmedVersion: values[1],
-            confirmedManifestDigest: values[2], locale: values[4], position: position,
-            originalImageID: values[6], sourceSHA256: values[7])
-        try FileIO.writeJSON(result, to: fileURL(values[8]))
+        let client = ASCAPIClient(credentials: credentials)
+        let metricsURL = client.metrics.reportURL(beside: fileURL(values[3]))
+        print("Request-count evidence: \(metricsURL.path)")
+        let result = try client.metrics.recording(to: metricsURL) {
+            try client.withPhase(.singleImageRetry) {
+                let publisher = try Publisher(client: client, journalURL: fileURL(values[3]), manifest: manifest)
+                let result = try publisher.retryDuoImage(manifest: manifest, confirmedVersion: values[1],
+                    confirmedManifestDigest: values[2], locale: values[4], position: position,
+                    originalImageID: values[6], sourceSHA256: values[7])
+                try FileIO.writeJSON(result, to: fileURL(values[8]))
+                return result
+            }
+        }
         print("Single-image retry result: \(result.state), image \(result.imageID); full publication is not claimed")
 
     case "publish":
@@ -324,13 +331,16 @@ do {
             exit(EXIT_SUCCESS)
         }
         let credentials = try ASCCredentials.fromEnvironment()
-        let publisher = try Publisher(
-            client: ASCAPIClient(credentials: credentials),
-            journalURL: fileURL(values[2]),
-            manifest: manifest
-        )
-        try publisher.publish(manifest: manifest, confirmedVersion: values[1],
-                              confirmedManifestDigest: arguments.options["--confirm-manifest-digest"])
+        let client = ASCAPIClient(credentials: credentials)
+        let metricsURL = client.metrics.reportURL(beside: fileURL(values[2]))
+        print("Request-count evidence: \(metricsURL.path)")
+        try client.metrics.recording(to: metricsURL) {
+            try client.withPhase(.publication) {
+                let publisher = try Publisher(client: client, journalURL: fileURL(values[2]), manifest: manifest)
+                try publisher.publish(manifest: manifest, confirmedVersion: values[1],
+                    confirmedManifestDigest: arguments.options["--confirm-manifest-digest"])
+            }
+        }
         print("Published and verified App Store metadata for version \(manifest.release.version)")
 
     case "publish-metadata-only":

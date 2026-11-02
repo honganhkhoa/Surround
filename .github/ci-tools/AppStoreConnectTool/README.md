@@ -376,6 +376,20 @@ A bundle/platform/version-scoped advisory lock serializes distinct handoffs and 
 if a process exits. A possibly successful version-creation POST is never replayed automatically;
 an exact inherited target may be adopted under its existing journal, otherwise prepare again.
 
+## Verification cost and request evidence
+
+An existing-target publication takes one full entry snapshot and one final snapshot. Completed normal sets use the freshly reconciled entry IDs, checksums, processing states and order; incomplete sets still obtain current scoped state and verified backups before deletion. Duo executors and their exclusive journal locks stay with one invocation, avoiding repeated admission of the same group.
+
+Fresh Duo placement responses retain `include=image` resources. Complete included image metadata replaces individual image GETs; missing resources fall back to exact image reads. Pagination remains same-origin and conflicting resources are rejected. Full app/library/version/localization ownership is checked together at entry and final boundaries, with fresh editable-version checks before affected mutations.
+
+Duo native content is refreshed at entry/resume, before destructive switching, after ordering/before completion, and final verification. Between these boundaries, unchanged pixels may be reused only within the invocation when fresh image ID, complete attributes, revision timestamps and the exact legacy identity/checksum match. Metadata comparisons retain a fresh modern ownership/revision fence. Missing revision/checksum forces a download. A template URL alone never establishes reusable content. Local PNGs are still reread and hashed on every use; only decoding of already verified bytes is reused.
+
+The isolated single-image retry creates no placements and writes no listing metadata. It validates all local recovery journals, freshly checks the affected locale and adopts only the proven one-attempt binding. Unrelated remote groups are validated by the normal publisher's mandatory global entry boundary before listing writes, rather than downloaded before the isolated upload.
+
+Every `publish` and `retry-duo-image` invocation prints the path to a unique `request-metrics-<UUID>.json` beside its journal. It counts actual transport attempts by authenticated read/write, binary upload and image download, plus typed phases, retries, statuses, attempted payload bytes and pacing/transport time. It records no URLs, headers, request bodies, resource identifiers or credentials. Running checkpoints are batched diagnostics and explicitly report their hard-stop loss limits; ordinary success/error reports contain exact process counters. Journals remain the recovery authority, including uncertain writes. Metrics failure after an operation never changes that operation's reported outcome.
+
+Request-budget regression tests cover a fresh ten-image Duo group, completed resume, missing inclusion, delayed processing and isolated retry, using the real HTTP adapter with offline transport. Their ceilings reject repeated release scans or survivor downloads returning unnoticed. The fixtures assume single-page responses and one upload operation per image; real polling, pagination and chunking appear in the metrics rather than being hidden in a fixed estimate. These tests establish local behavior, not Apple processing latency or storefront acceptance.
+
 ## Tests
 
 ```sh

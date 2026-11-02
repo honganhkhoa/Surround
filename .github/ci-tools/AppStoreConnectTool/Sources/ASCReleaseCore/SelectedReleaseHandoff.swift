@@ -276,6 +276,7 @@ final class DuoReleaseCoordinator {
     let service: DuoPublishingService
     let journalDirectory: URL
     private var provenViews: [String: DuoLegacyView] = [:]
+    private var executors: [String: DuoPublishingExecutor] = [:]
     private let processingWindow: Int
     private let idlePollLimit: Int
     private let queueSleep: (TimeInterval) -> Void
@@ -292,39 +293,64 @@ final class DuoReleaseCoordinator {
         journalDirectory.appendingPathComponent("duo-\(set.locale)-journal.json")
     }
 
+    private func executor(_ set: DuoPublishSet) throws -> DuoPublishingExecutor {
+        if let existing = executors[set.locale] { return existing }
+        let value = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
+        executors[set.locale] = value
+        return value
+    }
+
     func requireSingleRetryCheckpoint(locale: String) throws {
         guard handoff.sets.contains(where: { $0.locale == locale }) else {
             throw ReleaseToolError.validation("Unknown single-image retry locale")
         }
         for set in handoff.sets {
             let state = try ManifestBuilder.decode(DuoExecutionJournal.self, at: journal(set))
+            try state.validateRetry(set: set, url: journal(set))
             guard state.setDigest == (try set.digest()),
                   set.locale == locale ? (state.phase == "preparing" && state.epoch == 0) : state.phase == "complete" else {
                 throw ReleaseToolError.validation("Single-image retry requires all other Duo locales complete; rollback or other progress takes priority")
+            }
+            if set.locale != locale {
+                guard Set(state.entries.map(\.key)).allSatisfy({ key in
+                    state.latest(key).map { ["verified", "rejected"].contains($0.status) } ?? false
+                }) else { throw DuoExecutionFailure.uncertain("Another locale has unresolved local mutation history") }
             }
         }
     }
 
     func preflight() throws {
-        for set in handoff.sets {
-            _ = try duoIdentifier(set.locale)
-            try service.verifyEditableTarget(set)
-            let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
-            try executor.preflight(allowKnownProcessing: true)
-            provenViews[set.locale] = executor.provenLegacyView
-        }
+        try prepareForReconciliation(allowRollbackProof: false)
     }
 
     /// Establish target-only compatibility before generic reconciliation; no
     /// cloud mutation is permitted here, including while rollback is pending.
-    func prepareForReconciliation(allowPendingRetryLocale: String? = nil) throws {
+    func prepareForReconciliation(allowPendingRetryLocale: String? = nil, requireComplete: Bool = false,
+                                  allowRollbackProof: Bool = true) throws {
         provenViews.removeAll()
+        try service.verifyEditableTargets(handoff.sets)
         for set in handoff.sets {
-            let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
-            try executor.preflight(allowRollbackProof: true, allowKnownProcessing: true,
-                allowPendingRetry: set.locale == allowPendingRetryLocale)
+            let executor = try executor(set)
+            guard !requireComplete || executor.isComplete else {
+                throw ReleaseToolError.validation("Duo execution has no completed checkpoint")
+            }
+            try executor.preflight(allowRollbackProof: allowRollbackProof, allowKnownProcessing: true,
+                allowPendingRetry: set.locale == allowPendingRetryLocale, targetContextAlreadyVerified: true)
             provenViews[set.locale] = executor.provenLegacyView
         }
+    }
+
+    /// The isolated retry only stages one library image and adopts its local
+    /// binding. It cannot place screenshots or write metadata. Other groups are
+    /// revalidated by the normal publisher's mandatory global entry boundary.
+    func prepareForSingleImageRetry(locale: String) throws {
+        try requireSingleRetryCheckpoint(locale: locale)
+        guard let set = handoff.sets.first(where: { $0.locale == locale }) else {
+            throw ReleaseToolError.validation("Unknown retry locale")
+        }
+        let value = try executor(set)
+        try value.preflight(allowKnownProcessing: true, allowPendingRetry: true)
+        provenViews[locale] = value.provenLegacyView
     }
 
     func retryImage(locale: String, position: Int, originalImageID: String,
@@ -332,7 +358,7 @@ final class DuoReleaseCoordinator {
         guard let set = handoff.sets.first(where: { $0.locale == locale }) else {
             throw ReleaseToolError.validation("Retry locale is absent from the approved handoff")
         }
-        let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
+        let executor = try executor(set)
         return try executor.retrySingleImage(position: position, originalImageID: originalImageID,
             confirmedSourceSHA256: sourceSHA256)
     }
@@ -376,12 +402,13 @@ final class DuoReleaseCoordinator {
         }
     }
 
-    func publish() throws {
+    func publish(continuingVerifiedEntry: Bool = false) throws {
         // A single owner holds every per-locale journal lock. Only Apple's
         // processing overlaps; submissions, journal saves and placements never do.
         var jobs: [(set: DuoPublishSet, executor: DuoPublishingExecutor)] = []
         for set in handoff.sets {
-            let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
+            let executor = try executor(set)
+            if continuingVerifiedEntry && executor.isComplete && provenViews[set.locale] != nil { continue }
             if try executor.prepareQueuedStaging(confirmedVersion: set.version, confirmedSetDigest: set.digest()) {
                 provenViews[set.locale] = executor.provenLegacyView
             } else if !executor.isPreparing {
@@ -429,10 +456,6 @@ final class DuoReleaseCoordinator {
             }) == true {
                 // This path revalidates current readiness, target, ownership,
                 // both views and content before/through the serial replacement.
-                let fresh = try job.executor.pollDesiredReadiness()
-                guard fresh.count == 10, fresh.values.allSatisfy({
-                    if case .ready = $0 { return true }; return false
-                }) else { throw DuoExecutionFailure.uncertain("Locale readiness changed before its placement transaction") }
                 try job.executor.publish(confirmedVersion: job.set.version, confirmedSetDigest: job.set.digest())
                 provenViews[job.set.locale] = job.executor.provenLegacyView
                 completed.insert(job.set.locale)
@@ -461,21 +484,13 @@ final class DuoReleaseCoordinator {
         for set in handoff.sets where FileManager.default.fileExists(atPath: journal(set).path) {
             let state = try ManifestBuilder.decode(DuoExecutionJournal.self, at: journal(set))
             guard state.phase == "rollingBack" else { continue }
-            let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
+            let executor = try executor(set)
             try executor.publish(confirmedVersion: set.version, confirmedSetDigest: set.digest())
             provenViews[set.locale] = executor.provenLegacyView
         }
     }
 
     func verifyCompleted() throws {
-        for set in handoff.sets {
-            let completed = try ManifestBuilder.decode(DuoExecutionJournal.self, at: journal(set))
-            guard completed.phase == "complete" else {
-                throw ReleaseToolError.validation("Duo execution has no completed checkpoint")
-            }
-            // The executor's completed path performs readback only, including image processing/specification.
-            let executor = try DuoPublishingExecutor(set: set, journalURL: journal(set), service: service)
-            try executor.publish(confirmedVersion: set.version, confirmedSetDigest: set.digest())
-        }
+        try prepareForReconciliation(requireComplete: true)
     }
 }

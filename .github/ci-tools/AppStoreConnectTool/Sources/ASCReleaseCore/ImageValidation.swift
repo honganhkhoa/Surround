@@ -10,15 +10,21 @@ public struct DecodedImage: Equatable, Sendable {
     public let orientation: Int
 }
 
+public struct PNGPixelProof: Equatable, Sendable {
+    public let decoded: DecodedImage
+    public let pixelSHA256: String
+}
+
 public enum ImageValidation {
     /// Encoding-independent fingerprint in a fixed 8-bit premultiplied sRGB raster.
     /// It never changes or writes the source PNG.
     public static func pixelSHA256(_ data: Data, context: String) throws -> String {
-        let decoded = try decodePNG(data, context: context)
-        let options = [kCGImageSourceShouldCache: true] as CFDictionary
-        guard let source = CGImageSourceCreateWithData(data as CFData, options),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, options),
-              let space = CGColorSpace(name: CGColorSpace.sRGB) else {
+        try canonicalPNG(data, context: context).pixelSHA256
+    }
+
+    public static func canonicalPNG(_ data: Data, context: String) throws -> PNGPixelProof {
+        let (decoded, image) = try readPNG(data, context: context)
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB) else {
             throw ReleaseToolError.validation("Could not render canonical PNG pixels: \(context)")
         }
         let (count, overflow) = image.width.multipliedReportingOverflow(by: image.height)
@@ -38,10 +44,14 @@ public enum ImageValidation {
         }
         var identity = Data("sRGB8-RGBA-v1:\(decoded.pixelWidth)x\(decoded.pixelHeight):".utf8)
         identity.append(pixels)
-        return FileIO.sha256(identity)
+        return PNGPixelProof(decoded: decoded, pixelSHA256: FileIO.sha256(identity))
     }
 
     public static func decodePNG(_ data: Data, context: String) throws -> DecodedImage {
+        try readPNG(data, context: context).0
+    }
+
+    private static func readPNG(_ data: Data, context: String) throws -> (DecodedImage, CGImage) {
         let options = [kCGImageSourceShouldCache: true] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, options) else {
             throw ReleaseToolError.validation("Could not decode PNG data: \(context)")
@@ -81,12 +91,12 @@ public enum ImageValidation {
         @unknown default:
             hasAlpha = true
         }
-        return DecodedImage(
+        return (DecodedImage(
             pixelWidth: image.width,
             pixelHeight: image.height,
             hasAlpha: hasAlpha,
             orientation: orientations.first ?? 1
-        )
+        ), image)
     }
 
     @discardableResult

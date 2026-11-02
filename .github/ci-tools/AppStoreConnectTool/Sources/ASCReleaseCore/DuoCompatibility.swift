@@ -125,7 +125,8 @@ final class DuoCompatibilityVerifier {
     let group: String
     let attempts: Int
     let sleeper: (TimeInterval) -> Void
-    private var pixelCache: [DuoImageAsset: String] = [:]
+    private var pixelCache: [String: String] = [:]
+    private var nativeReads = 0
 
     init(service: DuoPublishingService, localizationID: String, group: String,
          attempts: Int, sleeper: @escaping (TimeInterval) -> Void) {
@@ -133,16 +134,28 @@ final class DuoCompatibilityVerifier {
         self.attempts = max(1, attempts); self.sleeper = sleeper
     }
 
-    private func pixels(_ asset: DuoImageAsset, url: URL) throws -> String {
-        if let cached = pixelCache[asset] { return cached }
+    private func pixels(_ asset: DuoImageAsset, url: URL, cacheKey: String?, forceNative: Bool) throws -> String {
+        if !forceNative, let cacheKey, let cached = pixelCache[cacheKey] { return cached }
         let data = try service.download(url)
-        let decoded = try ImageValidation.decodePNG(data, context: "Duo compatibility rendition")
+        nativeReads += 1
+        let proof = try ImageValidation.canonicalPNG(data, context: "Duo compatibility rendition")
+        let decoded = proof.decoded
         guard decoded.pixelWidth == asset.width, decoded.pixelHeight == asset.height else {
             throw DuoExecutionFailure.drift("Duo compatibility rendition has the wrong native dimensions")
         }
-        let sha = try ImageValidation.pixelSHA256(data, context: "Duo compatibility rendition")
-        pixelCache[asset] = sha
+        let sha = proof.pixelSHA256
+        if let cacheKey { pixelCache[cacheKey] = sha }
         return sha
+    }
+
+    private func cacheKey(imageID: String, attributes: JSONValue, legacy: DuoLegacyImage) throws -> String? {
+        // A URL/template alone cannot bind content. Reuse is invocation-local,
+        // only with a usable image revision and exact fresh legacy checksum.
+        guard let created = attributes["createdDate"]?.stringValue, !created.isEmpty,
+              let modified = attributes["lastModifiedDate"]?.stringValue, !modified.isEmpty,
+              let checksum = legacy.checksum, !checksum.isEmpty else { return nil }
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return imageID + ":" + FileIO.sha256(try encoder.encode(attributes)) + ":" + FileIO.sha256(try encoder.encode(legacy))
     }
 
     private func countMismatch(graph: [DuoRemotePlacement], legacy: DuoLegacyView,
@@ -194,13 +207,13 @@ final class DuoCompatibilityVerifier {
     }
 
     func prove(graph: [DuoRemotePlacement], expected: [DuoExpectedContent],
-               previous: DuoCompatibilityBaseline?, verifiedDeletionID: String? = nil) throws -> DuoCompatibilityBaseline {
+               previous: DuoCompatibilityBaseline?, verifiedDeletionID: String? = nil,
+               observed: DuoPlacementReadback? = nil, forceNative: Bool = true) throws -> DuoCompatibilityBaseline {
         guard graph.count == expected.count else { throw DuoExecutionFailure.drift("Missing expected Duo graph content") }
         for attempt in 0..<attempts {
-            // A template URL is not an immutable revision. Only the two reads
-            // within this attempt may share decoded content; every barrier reads anew.
-            pixelCache.removeAll(keepingCapacity: true)
-            let before = try service.placements(localizationID: localizationID, group: group)
+            let nativeReadsBefore = nativeReads
+            let readback = try (attempt == 0 ? observed : nil) ?? service.placementReadback(localizationID: localizationID, group: group)
+            let before = readback.placements
             guard duoEligibleGraph(before, group: group), duoSameGraph(before, graph) else { throw DuoExecutionFailure.drift("Duo graph changed around compatibility readback") }
             let rawLegacy = try service.legacyDuoSet(localizationID: localizationID)
             let legacy = try DuoLegacyView.read(rawLegacy, allowProcessing: true)
@@ -222,10 +235,12 @@ final class DuoCompatibilityVerifier {
                 throw DuoExecutionFailure.drift("Stable Duo graph has a changed legacy resource identity")
             }
             var content: [DuoContentProof] = []
+            var observedImages: [String: JSONValue] = [:]
             for (index, row) in graph.enumerated() {
                 let wanted = expected[index], old = legacy.images[index]
-                let raw = try service.image(id: row.imageID)
-                guard raw["id"] == .string(row.imageID), let attributes = raw["attributes"],
+                let raw = try readback.images[row.imageID] ?? service.image(id: row.imageID)
+                observedImages[row.imageID] = raw
+                guard raw["id"] == .string(row.imageID), raw["type"] == .string("appAssetLibraryImages"), let attributes = raw["attributes"],
                       attributes["category"] == .string("APP_SCREENSHOTS_AND_PREVIEWS"),
                       let state = attributes["state"]?.stringValue,
                       ["PREPARE_FOR_SUBMISSION", "APPROVED", "ACCEPTED"].contains(state),
@@ -242,18 +257,46 @@ final class DuoCompatibilityVerifier {
                       wanted.checksum == nil || old.checksum == nil || wanted.checksum == old.checksum else {
                     throw DuoExecutionFailure.drift("Duo views have different image identities, content metadata or order")
                 }
-                let pixelSHA = try pixels(asset.0, url: asset.1)
+                let pixelSHA = try pixels(asset.0, url: asset.1,
+                    cacheKey: cacheKey(imageID: row.imageID, attributes: attributes, legacy: old), forceNative: forceNative)
                 guard pixelSHA == wanted.pixels else {
                     throw DuoExecutionFailure.drift("Duo readback pixels differ from the exact owned content")
                 }
                 content.append(DuoContentProof(imageID: row.imageID, fileName: wanted.fileName,
                     byteCount: wanted.byteCount, asset: asset.0, pixelSHA256: pixelSHA))
             }
-            let after = try service.placements(localizationID: localizationID, group: group)
+            if !forceNative && nativeReads == nativeReadsBefore && complete {
+                // No external raster I/O occurred: this is a scoped metadata
+                // comparison, not a new native-content claim. Both views were
+                // freshly read. Keep a final modern ownership/revision fence
+                // around the legacy reads, without duplicating that projection.
+                let fence = try service.placementReadback(localizationID: localizationID, group: group)
+                guard duoEligibleGraph(fence.placements, group: group), duoSameGraph(fence.placements, before) else {
+                    throw DuoExecutionFailure.drift("Duo graph changed during scoped metadata verification")
+                }
+                for row in graph {
+                    let after = try fence.images[row.imageID] ?? service.image(id: row.imageID)
+                    if let before = observedImages[row.imageID], after != before {
+                        throw DuoExecutionFailure.drift("Duo image revision changed during scoped metadata verification")
+                    }
+                }
+                let result = DuoCompatibilityBaseline(policy: DuoCompatibilityBaseline.policyName,
+                    legacy: legacy, placements: graph, content: content)
+                try result.validate()
+                return result
+            }
+            let afterReadback = try service.placementReadback(localizationID: localizationID, group: group)
+            let after = afterReadback.placements
             let rawAfter = try service.legacyDuoSet(localizationID: localizationID)
             let legacyAfter = try DuoLegacyView.read(rawAfter, allowProcessing: true)
             guard duoEligibleGraph(after, group: group), duoSameGraph(after, before), legacyAfter == legacy else {
                 throw DuoExecutionFailure.drift("Duo views changed during compatibility readback")
+            }
+            for row in graph {
+                if let rawAfter = afterReadback.images[row.imageID], let rawBefore = observedImages[row.imageID],
+                   rawAfter != rawBefore {
+                    throw DuoExecutionFailure.drift("Duo image changed around native content verification")
+                }
             }
             let afterComplete = rawAfter?.screenshots.allSatisfy {
                 $0.attributes["assetDeliveryState"]?["state"] == .string("COMPLETE")

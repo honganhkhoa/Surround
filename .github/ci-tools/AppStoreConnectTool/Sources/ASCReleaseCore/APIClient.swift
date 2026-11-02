@@ -116,6 +116,7 @@ public final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
 
 public final class ASCAPIClient: @unchecked Sendable {
     public let baseURL: URL
+    public let metrics: ASCRequestMetrics
     private let credentials: ASCCredentials
     private let transport: HTTPTransport
     private let maxRetries: Int
@@ -133,7 +134,8 @@ public final class ASCAPIClient: @unchecked Sendable {
         transport: HTTPTransport = URLSessionTransport(),
         maxRetries: Int = 4,
         now: @escaping () -> Date = Date.init,
-        sleeper: @escaping (TimeInterval) -> Void = Thread.sleep
+        sleeper: @escaping (TimeInterval) -> Void = Thread.sleep,
+        metrics: ASCRequestMetrics? = nil
     ) {
         self.credentials = credentials
         self.baseURL = baseURL
@@ -141,6 +143,11 @@ public final class ASCAPIClient: @unchecked Sendable {
         self.maxRetries = maxRetries
         self.now = now
         self.sleeper = sleeper
+        self.metrics = metrics ?? ASCRequestMetrics(now: now)
+    }
+
+    public func withPhase<T>(_ phase: ASCRequestPhase, _ operation: () throws -> T) rethrows -> T {
+        try metrics.withPhase(phase, operation)
     }
 
     public func request(
@@ -227,7 +234,7 @@ public final class ASCAPIClient: @unchecked Sendable {
         for header in operation.requestHeaders {
             request.setValue(header.value, forHTTPHeaderField: header.name)
         }
-        let response = try sendWithRetry(request, retryPolicy: retryPolicy)
+        let response = try sendWithRetry(request, retryPolicy: retryPolicy, category: .binaryUpload)
         guard (200..<300).contains(response.statusCode) else {
             throw apiError(method: operation.method, url: url, response: response)
         }
@@ -238,7 +245,7 @@ public final class ASCAPIClient: @unchecked Sendable {
         request.httpMethod = "GET"
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        let response = try sendWithRetry(request)
+        let response = try sendWithRetry(request, category: .imageDownload)
         guard (200..<300).contains(response.statusCode) else {
             throw apiError(method: "GET", url: url, response: response)
         }
@@ -334,7 +341,8 @@ public final class ASCAPIClient: @unchecked Sendable {
     private func sendWithRetry(
         _ request: URLRequest,
         retryPolicy: ASCRetryPolicy = .automatic,
-        authenticatedAPI: Bool = false
+        authenticatedAPI: Bool = false,
+        category: ASCRequestCategory? = nil
     ) throws -> TransportResponse {
         let method = (request.httpMethod ?? "GET").uppercased()
         let retryLimit = retryPolicy == .singleAttempt ? 0 : maxRetries
@@ -344,16 +352,20 @@ public final class ASCAPIClient: @unchecked Sendable {
             let apiOrigin = origin(of: baseURL)
             let isAuthenticatedAPI = authenticatedAPI && request.value(forHTTPHeaderField: "Authorization") != nil
                 && apiOrigin != nil && request.url.flatMap({ origin(of: $0) }) == apiOrigin
+            let metricCategory = category ?? ((method == "GET" || method == "HEAD") ? .authenticatedRead : .authenticatedWrite)
             if isAuthenticatedAPI {
-                paceAPI()
+                paceAPI(category: metricCategory)
                 // Pace before refreshing auth: a cooldown must not replay an
                 // already expired JWT. CDN/upload requests never enter here.
                 outgoing.setValue("Bearer \(try token())", forHTTPHeaderField: "Authorization")
             }
             let response: TransportResponse
+            let metricAttempt = metrics.begin(category: metricCategory, retry: attempt > 0,
+                                               sentBytes: outgoing.httpBody?.count ?? 0)
             do {
                 response = try transport.send(outgoing)
             } catch {
+                metrics.finish(metricAttempt, response: nil)
                 lastError = error
                 if method == "POST" || retryPolicy == .singleAttempt {
                     throw ReleaseToolError.api(
@@ -363,9 +375,11 @@ public final class ASCAPIClient: @unchecked Sendable {
                     )
                 }
                 if attempt == retryLimit { break }
-                try sleepBeforeRetry(attempt: attempt, headers: [:], request: request, rateLimited: false)
+                try sleepBeforeRetry(attempt: attempt, headers: [:], request: request, rateLimited: false,
+                                     category: metricCategory)
                 continue
             }
+            metrics.finish(metricAttempt, response: response)
             if isAuthenticatedAPI { observeRateLimit(response.headers) }
             if response.statusCode == 429 || response.statusCode >= 500 {
                 if method == "POST" || retryPolicy == .singleAttempt {
@@ -381,11 +395,11 @@ public final class ASCAPIClient: @unchecked Sendable {
                 }
                 if response.statusCode == 429 && attempt == retryLimit {
                     try sleepBeforeRetry(attempt: attempt, headers: response.headers, request: request,
-                                         rateLimited: true, forcePause: true)
+                                         rateLimited: true, forcePause: true, category: metricCategory)
                 }
                 if attempt < retryLimit {
                     try sleepBeforeRetry(attempt: attempt, headers: response.headers, request: request,
-                                         rateLimited: response.statusCode == 429)
+                                         rateLimited: response.statusCode == 429, category: metricCategory)
                     continue
                 }
             }
@@ -414,12 +428,14 @@ public final class ASCAPIClient: @unchecked Sendable {
         apiInterval = 3600 / (Double(limit) * 0.8)
     }
 
-    private func paceAPI() {
+    private func paceAPI(category: ASCRequestCategory) {
         pacingLock.lock()
         let current = now(), start = max(current, (lastAPIStart ?? current).addingTimeInterval(apiInterval))
         lastAPIStart = start
         pacingLock.unlock()
-        sleepInChunks(max(0, start.timeIntervalSince(current)))
+        let delay = max(0, start.timeIntervalSince(current))
+        metrics.recordWait(delay, category: category, pacing: true)
+        sleepInChunks(delay)
     }
 
     private func sleepInChunks(_ delay: TimeInterval) {
@@ -430,7 +446,8 @@ public final class ASCAPIClient: @unchecked Sendable {
     }
 
     private func sleepBeforeRetry(attempt: Int, headers: [String: String], request: URLRequest,
-                                  rateLimited: Bool, forcePause: Bool = false) throws {
+                                  rateLimited: Bool, forcePause: Bool = false,
+                                  category: ASCRequestCategory) throws {
         let value = headers.first(where: { $0.key.lowercased() == "retry-after" })?.value
         var requested: TimeInterval?
         if let value {
@@ -447,6 +464,7 @@ public final class ASCAPIClient: @unchecked Sendable {
             throw ASCRateLimitCooldown(method: request.httpMethod ?? "GET", path: request.url?.path ?? "<unknown>",
                 notBefore: now().addingTimeInterval(delay), serverSpecified: requested != nil)
         }
+        metrics.recordWait(delay, category: category, pacing: false)
         sleepInChunks(delay)
     }
 
