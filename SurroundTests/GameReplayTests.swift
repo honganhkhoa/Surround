@@ -82,14 +82,18 @@ final class GameReplayTests: XCTestCase {
 
     func testEstimatedScoreStatusDistinguishesLeadsAndEvenScore() {
         let game = Game(width: 2, height: 1, blackName: "black", whiteName: "white", gameId: .OGS(1))
+        XCTAssertNil(game.estimatedScoreDifference)
 
         game.currentPosition.estimatedScores = [[.hasStone(.black), .hasStone(.black)]]
+        XCTAssertEqual(game.estimatedScoreDifference, -2)
         XCTAssertEqual(game.status, String(localized: "Black by \(2.0, specifier: "%.1f")"))
 
         game.currentPosition.estimatedScores = [[.hasStone(.white), .hasStone(.white)]]
+        XCTAssertEqual(game.estimatedScoreDifference, 2)
         XCTAssertEqual(game.status, String(localized: "White by \(2.0, specifier: "%.1f")"))
 
         game.currentPosition.estimatedScores = [[.hasStone(.black), .hasStone(.white)]]
+        XCTAssertEqual(game.estimatedScoreDifference, 0)
         XCTAssertEqual(
             game.status,
             String(
@@ -97,6 +101,79 @@ final class GameReplayTests: XCTestCase {
                 comment: "Estimated score is tied; the game has not necessarily ended"
             )
         )
+    }
+
+    func testEstimatedScoreDifferenceIncludesKomiAndClearsWithTheEstimate() throws {
+        var data = try loadGameFixture(id: 27_053_412)
+        data.phase = .play
+        data.outcome = nil
+        data.winner = nil
+        data.moves = []
+        data.komi = 6.5
+        let game = Game(ogsGame: data)
+        var estimate = Array(repeating: Array(repeating: PointState.empty, count: game.width), count: game.height)
+        estimate[0][0] = .hasStone(.black)
+        estimate[0][1] = .hasStone(.black)
+        estimate[0][2] = .hasStone(.white)
+        game.currentPosition.estimatedScores = estimate
+
+        XCTAssertEqual(game.estimatedScoreDifference, 5.5,
+                       "Count estimated ownership and komi, leaving neutral intersections out")
+        XCTAssertEqual(game.status, String(localized: "White by \(5.5, specifier: "%.1f")"))
+
+        game.currentPosition.estimatedScores = nil
+        XCTAssertNil(game.estimatedScoreDifference)
+
+        game.currentPosition.estimatedScores = estimate
+        try game.makeMove(move: .placeStone(0, 0))
+        XCTAssertNil(game.estimatedScoreDifference, "A new current position must not reuse the previous estimate")
+    }
+
+    func testMovesAndUndoClearEstimatesOnReusedPositions() throws {
+        let game = Game(width: 9, height: 9, blackName: "black", whiteName: "white", gameId: .OGS(1))
+        let estimate = Array(repeating: Array(repeating: PointState.hasStone(.black), count: 9), count: 9)
+        let initial = game.currentPosition
+        initial.estimatedScores = estimate
+
+        let variation = try game.makeMove(move: .placeStone(2, 2), fromAnalyticsPosition: initial)
+        XCTAssertNotNil(initial.estimatedScores, "Exploring a variation does not change the live estimate")
+        variation.estimatedScores = estimate
+        let live = try game.makeMove(move: .placeStone(2, 2))
+        XCTAssertTrue(live === variation)
+        XCTAssertNil(initial.estimatedScores)
+        XCTAssertNil(game.estimatedScoreDifference, "Promoting an analysis node must clear its old estimate")
+
+        // An analyzed node can carry a local estimate when an undo returns to it.
+        initial.estimatedScores = estimate
+        live.estimatedScores = estimate
+        game.undoLastMoves(count: 1)
+        XCTAssertTrue(game.currentPosition === initial)
+        XCTAssertNil(initial.estimatedScores)
+        XCTAssertNil(live.estimatedScores)
+        XCTAssertNil(game.estimatedScoreDifference)
+    }
+
+    func testCurrentEstimateChangesNotifyGameObserversWithoutClockUpdates() throws {
+        let game = Game(width: 9, height: 9, blackName: "black", whiteName: "white", gameId: .OGS(1))
+        let estimate = Array(repeating: Array(repeating: PointState.hasStone(.black), count: 9), count: 9)
+        let initial = game.currentPosition
+        var notifications = 0
+        let subscription = game.objectWillChange.sink { notifications += 1 }
+        defer { subscription.cancel() }
+
+        initial.estimatedScores = estimate
+        XCTAssertEqual(notifications, 1)
+        initial.estimatedScores = nil
+        XCTAssertEqual(notifications, 2)
+
+        try game.makeMove(move: .placeStone(2, 2))
+        notifications = 0
+        initial.estimatedScores = estimate
+        XCTAssertEqual(notifications, 0, "A historical board must no longer notify game observers")
+        game.currentPosition.estimatedScores = estimate
+        XCTAssertEqual(notifications, 1)
+        game.currentPosition.estimatedScores = nil
+        XCTAssertEqual(notifications, 2)
     }
 
     func testFinishedGameFixtureReplaysMovesPassesAndScoringState() throws {

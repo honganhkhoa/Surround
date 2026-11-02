@@ -152,11 +152,18 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var gameName: String?
     @Published var currentPosition: BoardPosition {
         didSet {
+            if currentPosition !== oldValue {
+                // Estimates belong to the current position only. MoveTree can
+                // reuse an earlier or analyzed node after a move or undo.
+                if oldValue.estimatedScores != nil { oldValue.estimatedScores = nil }
+                if currentPosition.estimatedScores != nil { currentPosition.estimatedScores = nil }
+            }
             scoringRevision &+= 1
             self.positionByLastMoveNumber[currentPosition.lastMoveNumber] = currentPosition
             refreshConditionalMoveBranches()
         }
     }
+    private var estimatedScoreObservation: AnyCancellable?
     @Published var undoRequest: OGSUndoRequest?
 //    var blackFormattedRank: String {
 //        return blackPlayer?.formattedRank() ?? "?"
@@ -352,7 +359,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     @Published var removedStonesAccepted = [StoneColor: Set<[Int]>]()
     lazy var computeQueue = DispatchQueue(label: "com.honganhkhoa.Surround.computeQueue", qos: .default)
-    private var scoringRevision: UInt64 = 0
+    private(set) var scoringRevision: UInt64 = 0
     
     @Published var chatLog = [OGSChatLine]()
     var positionByLastMoveNumber = [Int: BoardPosition]()
@@ -480,7 +487,12 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     
     private func _postInit() {
-
+        // Clocks and their single-chip selection observe Game. Forward only
+        // the current board's estimate changes, even when no clock is ticking.
+        estimatedScoreObservation = $currentPosition
+            .map { $0.$estimatedScores.dropFirst().map { _ in () } }
+            .switchToLatest()
+            .sink { [weak self] in self?.objectWillChange.send() }
     }
     
     @discardableResult
@@ -1144,6 +1156,21 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         return self.clock?.currentPlayerId == user.id
     }
     
+    /// The local territory estimate's lead, including komi. Positive values
+    /// favor White; zero is even. It is separate from authoritative scoring.
+    var estimatedScoreDifference: Double? {
+        guard let estimatedScores = currentPosition.estimatedScores else { return nil }
+        var difference = gameData?.komi ?? 0
+        for row in 0..<currentPosition.height {
+            for column in 0..<currentPosition.width {
+                if case .hasStone(let color) = estimatedScores[row][column] {
+                    difference += color == .white ? 1 : -1
+                }
+            }
+        }
+        return difference
+    }
+
     var status: String {
         // Listing metadata can be newer than cached game detail. An annulled
         // result must not become a win or draw because OGS also sends a winner.
@@ -1187,21 +1214,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             } else {
                 return ""
             }
-        } else if let estimatedScores = currentPosition.estimatedScores {
-            var whiteScore: Double = 0
-            var blackScore: Double = 0
-            for row in 0..<currentPosition.height {
-                for column in 0..<currentPosition.width {
-                    if case .hasStone(let color) = estimatedScores[row][column] {
-                        if color == .black {
-                            blackScore += 1
-                        } else {
-                            whiteScore += 1
-                        }
-                    }
-                }
-            }
-            let difference = whiteScore + (gameData?.komi ?? 0) - blackScore
+        } else if let difference = estimatedScoreDifference {
             if difference > 0 {
                 return String(localized: "White by \(difference, specifier: "%.1f")")
             } else if difference < 0 {

@@ -249,7 +249,6 @@ struct GameControlRow: View {
 
     func clearEstimatedTerritory() {
         game.currentPosition.estimatedScores = nil
-        game.objectWillChange.send()
     }
 
     private var rematchChallenge: OGSChallengeTemplate? {

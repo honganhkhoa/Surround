@@ -1499,6 +1499,7 @@ extension OGSService {
             }
             data.clock.currentPlayerId = data.clock.currentPlayerColor == .black ? data.players.black.id : data.players.white.id
             game.gameData = data
+            applyGameDetailEstimateReviewState(clockState, to: game)
             if clockState == "finished-resignation" { game.currentPosition.lastMoveNumber = 142 }
             if clockState == "finished-timeout" { game.currentPosition.lastMoveNumber = 87 }
             if clockState == "canceled" { game.currentPosition.lastMoveNumber = 2 }
@@ -1616,6 +1617,10 @@ extension OGSService {
             periods: 3, periodsLeft: 3, periodTime: 30, periodTimeLeft: 30)
         switch state {
         case "byoyomi-main", "undo-offered": break
+        case "estimate-white", "estimate-black", "estimate-even":
+            data.komi = state == "estimate-even" ? 0 : 6.5
+            data.clock.currentPlayerColor = .black
+            data.clock.currentPlayerId = data.players.black.id
         case "byoyomi-overtime", "sudden-death":
             let last = state == "sudden-death"
             data.clock.whiteTime = ThinkingTime(thinkingTime: 0, thinkingTimeLeft: 0,
@@ -1685,6 +1690,18 @@ extension OGSService {
         default: preconditionFailure("Unknown game-detail clock review state: \(state)")
         }
         game.gameData = data
+        applyGameDetailEstimateReviewState(state, to: game)
+    }
+
+    private static func applyGameDetailEstimateReviewState(_ state: String, to game: Game) {
+        guard ["estimate-white", "estimate-black", "estimate-even"].contains(state) else { return }
+        let black = state == "estimate-black" ? 12 : (state == "estimate-even" ? 5 : 8)
+        let white = 5
+        var estimate = Array(repeating: Array(repeating: PointState.empty, count: game.width), count: game.height)
+        for index in 0..<(black + white) {
+            estimate[index / game.width][index % game.width] = .hasStone(index < black ? .black : .white)
+        }
+        game.currentPosition.estimatedScores = estimate
     }
 
     #if MAIN_APP

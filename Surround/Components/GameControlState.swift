@@ -454,6 +454,7 @@ final class GameControlState: ObservableObject {
     func estimateTerritory(game: Game, using ogs: OGSService) {
         let position = game.currentPosition
         let revision = position.scoringRevision
+        let gameRevision = game.scoringRevision
         let phase = game.gamePhase
         performRequest(
             gameID: game.ID,
@@ -462,6 +463,7 @@ final class GameControlState: ObservableObject {
             receiveValue: { estimatedTerritory in
                 guard game.currentPosition === position,
                       position.scoringRevision == revision,
+                      game.scoringRevision == gameRevision,
                       game.gamePhase == phase else { return }
                 position.estimatedScores = estimatedTerritory
             }

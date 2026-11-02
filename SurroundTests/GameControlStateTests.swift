@@ -36,6 +36,40 @@ final class GameControlStateTests: XCTestCase {
     private let accountID = 100
 
     @MainActor
+    func testDelayedEstimateCannotReturnAfterAMoveAndUndoToTheSamePosition() throws {
+        let game = Game(width: 9, height: 9, blackName: "black", whiteName: "white", gameId: firstGame)
+        game.gamePhase = .play
+        let position = game.currentPosition
+        let positionRevision = position.scoringRevision
+        let state = GameControlState()
+        let service = OGSService(previewState: .init())
+        state.updateContext(gameID: game.ID, accountID: service.user?.id)
+        let finished = expectation(description: "Delayed estimate finishes")
+        let observation = state.$isBusy.dropFirst().filter { !$0 }.prefix(1)
+            .sink { _ in finished.fulfill() }
+        defer { observation.cancel() }
+
+        // Use the existing per-game worker queue to delay the real estimator.
+        let queue = game.computeQueue
+        queue.suspend()
+        var suspended = true
+        defer { if suspended { queue.resume() } }
+        state.estimateTerritory(game: game, using: service)
+        XCTAssertTrue(state.isBusy)
+        try game.makeMove(move: .placeStone(2, 2))
+        game.undoLastMoves(count: 1)
+        XCTAssertTrue(game.currentPosition === position)
+        XCTAssertEqual(position.scoringRevision, positionRevision,
+                       "Position identity and its own revision cannot detect the intervening move")
+
+        queue.resume()
+        suspended = false
+        wait(for: [finished], timeout: 5)
+        XCTAssertFalse(state.isBusy)
+        XCTAssertNil(position.estimatedScores, "Undo must not revive an estimate requested before the move")
+    }
+
+    @MainActor
     func testDelayedRequestKeepsBusyStateAndPreventsAnotherCommand() {
         let state = GameControlState()
         let response = PassthroughSubject<Int, Failure>()

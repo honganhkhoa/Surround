@@ -46,6 +46,17 @@ struct GameDetailClockState {
     var canAnswerUndo: Bool { ownsUndoRequest && game.canAcceptUndo }
     var canWithdrawUndo: Bool { ownsUndoRequest && game.canCancelUndo }
 
+    /// Estimates belong to play, independently of the confirmed scoring totals.
+    /// Positive values mean this side leads; a tie belongs on both clocks.
+    var estimatedLead: Double? {
+        guard !isFinished, game.gamePhase == .play,
+              let difference = game.estimatedScoreDifference else { return nil }
+        return color == .white ? difference : -difference
+    }
+    var showsEstimateBadge: Bool {
+        !reconnecting && !ownsUndoRequest && (estimatedLead.map { $0 >= 0 } ?? false)
+    }
+
     func badgeTitle(narrow: Bool = false) -> String {
         guard !isFinished, !isScoring else { return "" }
         if reconnecting {
@@ -55,7 +66,15 @@ struct GameDetailClockState {
         if ownsUndoRequest {
             return canAnswerUndo ? String(localized: "Undo?") : String(localized: "Undo asked")
         }
+        if showsEstimateBadge, let lead = estimatedLead {
+            return lead == 0
+                ? String(localized: "Even", comment: "Estimated score is tied; the game has not necessarily ended")
+                : "+\(gameDetailPoints(lead))"
+        }
         if passed { return String(localized: "Passed") }
+        // The glow still identifies the running clock while the estimate
+        // takes the turn label's place, including on the trailing side.
+        guard estimatedLead == nil else { return "" }
         // A paused clock keeps the badge on the side to move, so the turn
         // stays clear; the card drops its hourglass and glow instead.
         guard isToMove else { return "" }
@@ -251,10 +270,15 @@ struct GameDetailClockState {
     }
 
     /// The one clock a title slot shows when it cannot hold both (rule 14):
-    /// the player to move; when no one is (stone removal, game over), the
-    /// viewer's own; spectators see the winner's, or Black's without one.
+    /// the estimate leader, otherwise the player to move. For an even estimate
+    /// or when no one is to move (stone removal, game over), the viewer's own;
+    /// spectators see the winner's, or Black's without one.
     static func singleChipColor(game: Game, clock: OGSClock?) -> StoneColor {
         let state = GameDetailClockState(game: game, color: .black, clockOverride: clock)
+        if let lead = state.estimatedLead {
+            if lead != 0 { return lead > 0 ? .black : .white }
+            return game.userStoneColor ?? state.winner ?? .black
+        }
         guard state.isFinished || state.isScoring else {
             return (clock ?? game.clock)?.currentPlayerColor ?? game.currentPosition.nextToMove
         }
@@ -299,7 +323,11 @@ struct GameDetailClockState {
     var accessibilityValue: String {
         var values = [String]()
         let badge = badgeTitle()
-        if !badge.isEmpty { values.append(badge) }
+        if showsEstimateBadge, let lead = estimatedLead {
+            values.append(lead == 0
+                ? String(localized: "estimate: even", comment: "VoiceOver clock value for a tied provisional score estimate")
+                : String(localized: "estimate: ahead by \(gameDetailPoints(lead))", comment: "VoiceOver clock value for a provisional score estimate; the argument is the point lead"))
+        } else if !badge.isEmpty { values.append(badge) }
         if isFinished {
             values += [resultTitle, resultDetail]
         } else if isScoring {

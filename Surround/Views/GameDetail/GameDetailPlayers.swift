@@ -389,7 +389,9 @@ private struct GameDetailClockCard: View {
     }
     /// A narrow title chip can drop its turn label; the glow still shows the turn.
     private var displaysStatus: Bool {
-        showsStatus && (style != .inline || inlineDetail == .full)
+        // An estimate stays readable when a title chip drops its turn label
+        // or time metadata to fit the navigation bar.
+        state.showsEstimateBadge || (showsStatus && (style != .inline || inlineDetail == .full))
     }
     private var shape: RoundedRectangle {
         RoundedRectangle(cornerRadius: spaciousCompact ? 14 : 12)
@@ -406,6 +408,7 @@ private struct GameDetailClockCard: View {
     private var badgeBackground: Color {
         if state.reconnecting { return theme.statusBadge }
         if state.ownsUndoRequest { return theme.clockUndoBadge(scheme: colorScheme) }
+        if state.showsEstimateBadge { return Color(white: 0.25) }
         if state.passed || (state.notStarted && !state.firstMoveDeadline) {
             return Color(uiColor: .systemGray)
         }
@@ -541,6 +544,8 @@ private struct GameDetailClockCard: View {
                         ProgressView().controlSize(.mini)
                     } else if state.ownsUndoRequest {
                         Image(systemName: "arrow.uturn.left")
+                    } else if state.showsEstimateBadge {
+                        Image(systemName: "dot.squareshape.split.2x2")
                     }
                     Text(verbatim: badgeTitle)
                     if hasUndoMenu { Image(systemName: "chevron.down").font(.system(size: 8 * scale)) }
@@ -554,6 +559,8 @@ private struct GameDetailClockCard: View {
                     ProgressView().controlSize(.mini).tint(.white)
                 } else if state.ownsUndoRequest {
                     Image(systemName: "arrow.uturn.left").font(.system(size: 10 * scale))
+                } else if state.showsEstimateBadge {
+                    Image(systemName: "dot.squareshape.split.2x2").font(.system(size: 10 * scale))
                 } else if state.running && !state.ownsUndoRequest && !state.notStarted {
                     // The hourglass, like the glow, means the time is running.
                     Image(systemName: "hourglass").font(.system(size: 10 * scale))
@@ -661,7 +668,7 @@ private struct GameDetailClockCard: View {
                 Text(timeString(timeLeft: deadline)).font(mainFont)
                     .foregroundStyle(disconnectedColor)
                 if displaysStatus {
-                    if state.reconnecting {
+                    if state.reconnecting || state.showsEstimateBadge {
                         statusBadgeSlot
                     } else {
                         Text("Disconnected").font(detailFont)
@@ -798,7 +805,7 @@ private struct GameDetailClockCard: View {
             } else {
                 Image(systemName: "hourglass")
             }
-        } else if showsStatus {
+        } else if displaysStatus {
             statusBadgeSlot
         } else if state.running {
             Image(systemName: "hourglass").foregroundStyle(accent)
@@ -857,7 +864,7 @@ private struct GameDetailClockCard: View {
                 if style == .compact && narrowCompactCard { compactStatusRow }
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     if style == .compact && !narrowCompactCard && mirrored { compactKomi }
-                    if style == .compact && !showsStatus && state.running {
+                    if style == .compact && !displaysStatus && state.running {
                         Image(systemName: "hourglass")
                             .font(smallFont).foregroundStyle(accent)
                     }

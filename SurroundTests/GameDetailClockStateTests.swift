@@ -453,14 +453,165 @@ final class GameDetailClockStateTests: XCTestCase {
         XCTAssertNil(game.clock?.autoResignTime[.white], "A finished game drops the deadline")
     }
 
-    func testEstimatesNeverReplaceClockStatusOrAuthoritativeScore() throws {
+    func testWhiteEstimateLeadIncludesKomiAndKeepsClockAndScore() throws {
         let game = try game()
-        game.currentPosition.estimatedScores = Array(repeating: Array(repeating: .hasStone(.white), count: game.width), count: game.height)
-        let state = GameDetailClockState(game: game, color: .black)
-        XCTAssertFalse(state.isScoring)
-        XCTAssertTrue(state.canShowTimer)
-        XCTAssertEqual(state.badgeTitle(), "To move")
-        XCTAssertEqual(state.valueClock?.blackTime.thinkingTimeLeft, 272)
+        game.gameData?.komi = 6.5
+        game.currentPosition.gameScores = scores(black: 60, white: 56.5)
+        setEstimate(game, black: 8, white: 5)
+        let black = GameDetailClockState(game: game, color: .black)
+        let white = GameDetailClockState(game: game, color: .white)
+
+        XCTAssertEqual(white.estimatedLead, 3.5)
+        XCTAssertEqual(white.badgeTitle(), "+3.5")
+        XCTAssertEqual(white.badgeTitle(narrow: true), "+3.5")
+        XCTAssertTrue(white.showsEstimateBadge)
+        XCTAssertTrue(white.accessibilityValue.contains("estimate: ahead by 3.5"))
+        XCTAssertEqual(black.badgeTitle(), "", "The running side keeps its glow instead of a turn badge")
+        XCTAssertFalse(black.showsEstimateBadge)
+        XCTAssertTrue(black.running)
+        XCTAssertFalse(white.running)
+        XCTAssertFalse(black.isScoring)
+        XCTAssertTrue(black.canShowTimer)
+        XCTAssertEqual(black.valueClock?.blackTime.thinkingTimeLeft, 272)
+        XCTAssertEqual(white.valueClock?.whiteTime.thinkingTimeLeft, 272)
+        XCTAssertEqual(black.score?.total, 60)
+        XCTAssertEqual(white.score?.total, 56.5)
+    }
+
+    func testBlackEstimateLeadClearsBackToTheTurnBadge() throws {
+        let game = try game()
+        game.gameData?.komi = 6.5
+        setEstimate(game, black: 12, white: 5)
+        let black = GameDetailClockState(game: game, color: .black)
+        let white = GameDetailClockState(game: game, color: .white)
+        XCTAssertEqual(black.estimatedLead, 0.5)
+        XCTAssertEqual(black.badgeTitle(), "+0.5")
+        XCTAssertTrue(black.accessibilityValue.contains("estimate: ahead by 0.5"))
+        XCTAssertEqual(white.badgeTitle(), "")
+
+        game.currentPosition.estimatedScores = nil
+        XCTAssertNil(black.estimatedLead)
+        XCTAssertFalse(black.showsEstimateBadge)
+        XCTAssertEqual(black.badgeTitle(), "To move")
+        XCTAssertEqual(white.badgeTitle(), "")
+        XCTAssertFalse(black.accessibilityValue.contains("estimate:"))
+    }
+
+    func testEvenEstimateAppearsOnBothClocksWithoutChangingTheRunningSide() throws {
+        let game = try game()
+        game.gameData?.komi = 3
+        setEstimate(game, black: 8, white: 5)
+        for color in [StoneColor.black, .white] {
+            let state = GameDetailClockState(game: game, color: color)
+            XCTAssertEqual(state.estimatedLead, 0)
+            XCTAssertTrue(state.showsEstimateBadge)
+            XCTAssertEqual(state.badgeTitle(), "Even")
+            XCTAssertEqual(state.badgeTitle(narrow: true), "Even")
+            XCTAssertTrue(state.accessibilityValue.contains("estimate: even"))
+            XCTAssertEqual(state.running, color == .black)
+        }
+    }
+
+    func testEstimateOutranksPassedOnlyOnTheLeadingClock() throws {
+        let game = try game()
+        game.gameData?.komi = 6.5
+        try game.makeMove(move: .pass)
+        game.clock?.currentPlayerColor = .white
+        setEstimate(game, black: 12, white: 5)
+        let black = GameDetailClockState(game: game, color: .black)
+        let white = GameDetailClockState(game: game, color: .white)
+        XCTAssertTrue(black.passed)
+        XCTAssertEqual(black.badgeTitle(), "+0.5")
+        XCTAssertEqual(white.badgeTitle(), "")
+
+        setEstimate(game, black: 8, white: 5)
+        XCTAssertEqual(black.badgeTitle(), "Passed")
+        XCTAssertFalse(black.showsEstimateBadge)
+        XCTAssertEqual(white.badgeTitle(), "+3.5")
+    }
+
+    func testUndoAndReconnectBadgesTakePrecedenceOverEstimateLead() throws {
+        let game = try game()
+        game.gameData?.komi = 6.5
+        let service = OGSService(previewState: .init(user: game.blackPlayer, isLoggedIn: true))
+        game.ogs = service
+        setEstimate(game, black: 8, white: 5)
+        game.undoRequest = OGSUndoRequest(moveNumber: game.currentPosition.lastMoveNumber,
+                                          requestedBy: game.whitePlayer?.id)
+        let white = GameDetailClockState(game: game, color: .white)
+        XCTAssertEqual(white.badgeTitle(), "Undo?")
+        XCTAssertTrue(white.canAnswerUndo)
+        XCTAssertFalse(white.showsEstimateBadge)
+
+        game.clock?.currentPlayerColor = .white
+        let reconnecting = GameDetailClockState(game: game, color: .white,
+                                                clockOverride: game.clock, isConnected: false)
+        XCTAssertEqual(reconnecting.badgeTitle(), "Reconnecting…")
+        XCTAssertFalse(reconnecting.showsEstimateBadge)
+        XCTAssertFalse(reconnecting.running)
+        game.undoRequest = nil
+        XCTAssertEqual(white.badgeTitle(), "+3.5", "The estimate returns when the higher-priority status clears")
+        XCTAssertTrue(white.showsEstimateBadge)
+    }
+
+    func testEstimateNeverReplacesStoneRemovalOrFinishedResults() throws {
+        let game = try game()
+        game.autoScoringDone = true
+        game.gamePhase = .stoneRemoval
+        game.currentPosition.gameScores = scores(black: 60, white: 56.5)
+        setEstimate(game, black: 0, white: 10)
+        for color in [StoneColor.black, .white] {
+            let state = GameDetailClockState(game: game, color: color)
+            XCTAssertNil(state.estimatedLead)
+            XCTAssertFalse(state.showsEstimateBadge)
+            XCTAssertEqual(state.badgeTitle(), "")
+            XCTAssertFalse(state.accessibilityValue.contains("estimate:"))
+        }
+        XCTAssertEqual(GameDetailClockState(game: game, color: .black).score?.total, 60)
+
+        game.gameData?.phase = .finished
+        game.gameData?.winner = game.blackPlayer?.id
+        game.gameData?.outcome = "6.5 points"
+        game.gameData?.score = scores(black: 63, white: 56.5)
+        setEstimate(game, black: 0, white: 10)
+        let white = GameDetailClockState(game: game, color: .white)
+        XCTAssertNil(white.estimatedLead)
+        XCTAssertFalse(white.showsEstimateBadge)
+        XCTAssertEqual(white.badgeTitle(), "")
+        XCTAssertEqual(white.resultTitle, "Lost")
+        XCTAssertEqual(white.resultDetail, "56.5 points")
+    }
+
+    func testSingleTitleChipSelectsEstimateLeaderAndUsesViewerFallbackForTie() throws {
+        let game = try game()
+        game.gameData?.komi = 6.5
+        setEstimate(game, black: 8, white: 5)
+        XCTAssertEqual(GameDetailClockState.singleChipColor(game: game, clock: nil), .white,
+                       "The leader appears even when Black is to move")
+        game.clock?.currentPlayerColor = .white
+        setEstimate(game, black: 12, white: 5)
+        XCTAssertEqual(GameDetailClockState.singleChipColor(game: game, clock: nil), .black)
+
+        game.gameData?.komi = 3
+        game.clock?.currentPlayerColor = .white
+        setEstimate(game, black: 8, white: 5)
+        XCTAssertEqual(GameDetailClockState.singleChipColor(game: game, clock: nil), .black,
+                       "A spectator sees Black for an even estimate")
+        let service = OGSService(previewState: .init(user: game.whitePlayer, isLoggedIn: true))
+        game.ogs = service
+        game.clock?.currentPlayerColor = .black
+        XCTAssertEqual(GameDetailClockState.singleChipColor(game: game, clock: nil), .white,
+                       "A player sees their own clock for an even estimate")
+        game.currentPosition.estimatedScores = nil
+        XCTAssertEqual(GameDetailClockState.singleChipColor(game: game, clock: nil), .black)
+    }
+
+    private func setEstimate(_ game: Game, black: Int, white: Int) {
+        var estimate = Array(repeating: Array(repeating: PointState.empty, count: game.width), count: game.height)
+        for index in 0..<(black + white) {
+            estimate[index / game.width][index % game.width] = .hasStone(index < black ? .black : .white)
+        }
+        game.currentPosition.estimatedScores = estimate
     }
 
     private func scores(black: Double, white: Double) -> GameScores {

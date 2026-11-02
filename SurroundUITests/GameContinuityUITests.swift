@@ -48,6 +48,58 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         return app
     }
 
+    func testEstimateLeadSurvivesChatAndClearsBackToTurn() throws {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.activeGameBoard.rawValue,
+            SurroundUITestContract.gameDetailClockStateLaunchArgument, "estimate-white",
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+        ], orientation: .portrait)
+        element(ID.gameBoard, in: app)
+        setGameChatVisible(false, in: app)
+        let blackClock = element("game.clock.black", in: app, matching: .button)
+        let whiteClock = element("game.clock.white", in: app, matching: .button)
+        let fullClockHeight = whiteClock.frame.height
+        let blackValue = try XCTUnwrap(blackClock.value as? String)
+        let whiteValue = try XCTUnwrap(whiteClock.value as? String)
+        XCTAssertTrue(whiteValue.contains("estimate: ahead by 3.5"))
+        XCTAssertTrue(whiteValue.contains("06:15"), "The estimate must preserve the clock's countdown")
+        XCTAssertTrue(blackValue.contains("04:32"))
+        XCTAssertTrue(blackValue.contains("running"), "The other clock still identifies the turn")
+        XCTAssertFalse(blackValue.contains("move"), "The estimate replaces the ordinary turn badge")
+        XCTAssertTrue(app.buttons["Clear estimates"].waitForExistence(timeout: 10))
+        keepScreenshot("Estimate lead on full clock", in: app)
+
+        openGameChat(in: app)
+        let titleClock = app.navigationBars.buttons.matching(identifier: "game.clock.white").firstMatch
+        XCTAssertTrue(titleClock.waitForExistence(timeout: 10),
+                      "Portrait Chat must retain the leading clock in the title slot")
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            (titleClock.value as? String)?.contains("estimate: ahead by 3.5") == true
+                && titleClock.frame.height < fullClockHeight
+        }, "The folded clock must retain the estimate without replacing the countdown")
+        XCTAssertTrue((titleClock.value as? String)?.contains("06:15") == true)
+        keepScreenshot("Estimate lead in Chat title clock", in: app)
+
+        let clear = app.buttons["Clear estimates"].firstMatch
+        XCTAssertTrue(waitUntilHittable(clear, timeout: 10))
+        clear.tap()
+        XCTAssertTrue(pollUntil(timeout: 10) { !clear.exists })
+        setGameChatVisible(false, in: app)
+        let restoredBlack = element("game.clock.black", in: app, matching: .button)
+        let restoredWhite = element("game.clock.white", in: app, matching: .button)
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            let value = restoredBlack.value as? String ?? ""
+            return value.contains("move") && value.contains("running")
+                && !value.contains("estimate:")
+        }, "Clearing estimates must restore the ordinary turn status immediately")
+        XCTAssertFalse((restoredWhite.value as? String ?? "").contains("estimate:"))
+        XCTAssertEqual(restoredWhite.frame.height, fullClockHeight, accuracy: 1,
+                       "The estimate must not change the clock card's footprint")
+        keepScreenshot("Cleared estimate restores clock turn badge", in: app)
+    }
+
     /// The normal More menu keeps an offered undo reachable even when the
     /// compact clock layout omits its status label. No game action is selected.
     func testMoreMenuExposesOfferedUndoWithoutChangingGame() throws {
