@@ -204,4 +204,96 @@ extension View {
         }
     }
 }
+// DIAGNOSTIC (iPadOS 18 Home long-press on CI): logs touch delivery,
+// gesture-recognizer state changes and main-thread stalls, so a long press
+// that ends as a tap shows which recognizer won and whether touches arrived
+// late. Enabled with the animation-diagnostics launch argument.
+enum SurroundTouchTrace {
+    private static let logger = Logger(subsystem: "com.honganhkhoa.Surround", category: "TouchTrace")
+    private static var sequence = 0
+    private static let limit = 20_000
+    private static var lastTouchUptime: TimeInterval = -.infinity
+    private static var lastTick = ProcessInfo.processInfo.systemUptime
+    private static var installed = false
+
+    static func installIfEnabled() {
+        guard SurroundAnimationDiagnostics.isEnabled, !installed else { return }
+        installed = true
+        swizzle(UIApplication.self, #selector(UIApplication.sendEvent(_:)),
+                #selector(UIApplication.surroundTrace_sendEvent(_:)))
+        swizzle(UIGestureRecognizer.self, NSSelectorFromString("setState:"),
+                #selector(UIGestureRecognizer.surroundTrace_setState(_:)))
+        let timer = Timer(timeInterval: 0.05, repeats: true) { _ in
+            let now = ProcessInfo.processInfo.systemUptime
+            let gap = now - lastTick
+            lastTick = now
+            if gap > 0.25 { emit("stall gap=\(String(format: "%.3f", gap))") }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        emit("installed")
+    }
+
+    private static func swizzle(_ cls: AnyClass, _ original: Selector, _ replacement: Selector) {
+        guard let a = class_getInstanceMethod(cls, original),
+              let b = class_getInstanceMethod(cls, replacement) else {
+            emit("swizzleFailed \(NSStringFromSelector(original))")
+            return
+        }
+        method_exchangeImplementations(a, b)
+    }
+
+    static var isNearTouch: Bool {
+        ProcessInfo.processInfo.systemUptime - lastTouchUptime < 6
+    }
+
+    static func touches(_ event: UIEvent) {
+        guard event.type == .touches, let touches = event.allTouches else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        lastTouchUptime = now
+        for touch in touches {
+            let point = touch.window.map { touch.location(in: $0) } ?? .zero
+            var chain = [String]()
+            var view = touch.view
+            while let current = view, chain.count < 8 {
+                let recognizers = current.gestureRecognizers?.map { String(describing: type(of: $0)) } ?? []
+                chain.append(String(describing: type(of: current))
+                             + (recognizers.isEmpty ? "" : "{\(recognizers.joined(separator: ","))}"))
+                view = current.superview
+            }
+            let lag = now - touch.timestamp
+            emit("touch phase=\(touch.phase.rawValue) at=\(Int(point.x)),\(Int(point.y)) "
+                 + "lag=\(String(format: "%.3f", lag)) taps=\(touch.tapCount) "
+                 + "recognizers=\(touch.gestureRecognizers?.count ?? 0) view=\(chain.joined(separator: " < "))")
+        }
+    }
+
+    static func state(_ recognizer: UIGestureRecognizer, _ newState: UIGestureRecognizer.State) {
+        guard isNearTouch, newState != .possible || recognizer.state != .possible else { return }
+        let view = recognizer.view.map { String(describing: type(of: $0)) } ?? "nil"
+        emit("gesture \(type(of: recognizer)) \(recognizer.state.rawValue)->\(newState.rawValue) "
+             + "view=\(view) enabled=\(recognizer.isEnabled) "
+             + "delegate=\(recognizer.delegate.map { String(describing: type(of: $0)) } ?? "nil")")
+    }
+
+    static func emit(_ message: String) {
+        guard sequence < limit else { return }
+        sequence += 1
+        let uptime = String(format: "%.4f", ProcessInfo.processInfo.systemUptime)
+        logger.notice("[SurroundTouch] seq=\(sequence) uptime=\(uptime, privacy: .public) \(message, privacy: .public)")
+    }
+}
+
+extension UIApplication {
+    @objc func surroundTrace_sendEvent(_ event: UIEvent) {
+        SurroundTouchTrace.touches(event)
+        surroundTrace_sendEvent(event)
+    }
+}
+
+extension UIGestureRecognizer {
+    @objc func surroundTrace_setState(_ newState: UIGestureRecognizer.State) {
+        SurroundTouchTrace.state(self, newState)
+        surroundTrace_setState(newState)
+    }
+}
 #endif

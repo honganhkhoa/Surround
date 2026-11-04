@@ -27,6 +27,7 @@ struct SurroundApp: App {
         {
             OGSService.clearAppStoreScreenshotWidgetFixture()
         }
+        SurroundTouchTrace.installIfEnabled()
         #endif
     }
     

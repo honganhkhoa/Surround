@@ -1,0 +1,85 @@
+# DIAGNOSTIC, not for merging: traces the iPadOS 18 Home long-press that CI
+# turns into a tap while the sidebar is open.
+name: Diagnostic iPadOS 18 long-press
+
+on:
+  push:
+    branches:
+      - diagnostic/ipad18-longpress-trace
+
+permissions:
+  contents: read
+
+jobs:
+  trace:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.2
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Select an iPadOS 18 simulator
+        id: ipad_simulator
+        run: echo "id=$(.github/ci-tools/select-ios-simulator.sh 18 iPad)" >> "$GITHUB_OUTPUT"
+
+      - name: Prefer an iPadOS 18 hardware keyboard
+        timeout-minutes: 10
+        run: .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh "${{ steps.ipad_simulator.outputs.id }}"
+
+      - name: Build iPad UI tests on iPadOS 18
+        timeout-minutes: 25
+        run: .github/ci-tools/run-ipad-ui-tests.sh build "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run the Home long-press test with touch tracing
+        timeout-minutes: 30
+        run: |
+          set -o pipefail
+          simulator_id="${{ steps.ipad_simulator.outputs.id }}"
+          products="$(.github/ci-tools/run-ipad-ui-tests.sh derived-data-path "$simulator_id")/Build/Products"
+          python3 - "$products" <<'PY'
+          import plistlib, sys
+          from pathlib import Path
+          products = Path(sys.argv[1])
+          sources = list(products.glob("Surround_*.xctestrun"))
+          assert len(sources) == 1, sources
+          configuration = plistlib.loads(sources[0].read_bytes())
+          configuration["SurroundUITests"].setdefault("EnvironmentVariables", {})[
+              "SURROUND_UI_ANIMATION_DIAGNOSTICS"] = "1"
+          (products / "TouchTrace.xctestrun").write_bytes(plistlib.dumps(configuration))
+          PY
+          mkdir -p TestResults
+          date -u "+%Y-%m-%d %H:%M:%S" > TestResults/trace-start.txt
+          xcodebuild test-without-building \
+            -xctestrun "$products/TouchTrace.xctestrun" \
+            -destination "platform=iOS Simulator,id=${simulator_id}" \
+            -parallel-testing-enabled NO \
+            -test-iterations 2 \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 600 \
+            -maximum-test-execution-time-allowance 600 \
+            -only-testing:SurroundUITests/ProfileUITests/testHomeGameMenusOpenOpponentProfilesWithoutOpeningGames \
+            -resultBundlePath TestResults/TouchTrace.xcresult \
+            | tee TestResults/xcodebuild.log
+
+      - name: Collect the trace
+        if: ${{ always() }}
+        run: |
+          simulator_id="${{ steps.ipad_simulator.outputs.id }}"
+          start="$(cat TestResults/trace-start.txt 2>/dev/null || date -u -v-1H "+%Y-%m-%d %H:%M:%S")"
+          xcrun simctl spawn "$simulator_id" log show --style compact --info --start "$start" \
+            --predicate 'process == "Surround" AND (category == "TouchTrace" OR category == "UIAnimationDiagnostics" OR eventMessage CONTAINS[c] "contextmenu" OR eventMessage CONTAINS[c] "gesture")' \
+            > TestResults/touch-trace.log || true
+          wc -l TestResults/touch-trace.log || true
+          grep -c "\[SurroundTouch\]" TestResults/touch-trace.log || true
+
+      - name: Upload trace
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipad18-longpress-trace
+          path: TestResults
+          retention-days: 7
