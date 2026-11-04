@@ -134,7 +134,7 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             // From iPadOS 26, UIKit restores the sidebar's last toggled
             // visibility under this identifier. UI tests start from its default.
             if SurroundUITestContract.isEnabled { controller.customizationIdentifier = UUID().uuidString }
-            if prefersSidebarHidden { controller.sidebar.isHidden = true }
+            controller.sidebar.isHidden = true // INVESTIGATION: pre-af3d761 launch state
             controller.sidebar.delegate = self
             controller.onHorizontalSizeClassChange = { [weak self] in
                 self?.hiddenHostBaselines.removeAll()
