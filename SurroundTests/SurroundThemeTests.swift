@@ -1481,58 +1481,329 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
-    func testChristmasKeepsakesKeepsFullDecorationsOnTheLandscapeTabletop() {
-        for (size, board, clocks) in [
-            (CGSize(width: 1024, height: 768), CGRect(x: 379, y: 118, width: 582, height: 582),
-             CGRect(x: 92, y: 320, width: 224, height: 180)),
-            (CGSize(width: 1376, height: 1032), CGRect(x: 509, y: 158, width: 782, height: 782),
-             CGRect(x: 124, y: 449, width: 300, height: 200))
-        ] {
-            let layout = ChristmasKeepsakesDecorationLayout(size: size, occupiedFrames: [
-                .board: board, .clocks: clocks
-            ])
-            XCTAssertTrue(layout.usesLandscapeTabletop)
-            XCTAssertEqual(layout.pine.origin, .zero, "Corner artwork meets the viewport, not an interior crop")
-            XCTAssertLessThan(layout.pine.maxX, board.minX)
-            XCTAssertGreaterThanOrEqual(layout.gifts.width, size.height * 0.25,
-                                        "Gifts retain tabletop scale instead of shrinking to the narrow gutter")
-            XCTAssertLessThan(layout.gifts.maxX, board.minX)
-            XCTAssertGreaterThan(layout.gifts.minY, clocks.maxY)
-            XCTAssertTrue(CGRect(origin: .zero, size: size).contains(layout.gifts))
-            XCTAssertFalse(layout.gifts.intersects(board))
-            for panel: GameDetailLayoutPlan.Slot in [.analysis, .information, .chat] {
-                let other = ChristmasKeepsakesDecorationLayout(size: size, occupiedFrames: [
-                    .board: board,
-                    .clocks: CGRect(x: 18, y: 76, width: board.minX - 80, height: 71),
-                    panel: CGRect(x: 18, y: 153, width: board.minX - 80, height: size.height - 200)
-                ])
-                XCTAssertEqual(layout, other, "Panels cover stable tabletop objects without moving or shrinking them")
+    @MainActor
+    func testChristmasKeepsakesWindowLightPreservesRenderedBoardsAtEveryDetailSize() throws {
+        let scene = CGSize(width: 440, height: 520)
+        let panel = CGRect(x: 12, y: 110, width: 230, height: 200)
+        let frames = [CGRect(x: 24, y: 130, width: 63, height: 63),
+                      CGRect(x: 115, y: 150, width: 117, height: 117),
+                      CGRect(x: 240, y: 210, width: 180, height: 180)]
+        for scheme: ColorScheme in [.light, .dark] {
+            let appearance = SurroundTheme.christmasKeepsakes.board(for: scheme)
+            func render(light: Bool, lightAboveBoards: Bool = false) throws
+                -> (pixels: [UInt8], width: Int, height: Int) {
+                try nativeMaterialPixels(ZStack(alignment: .topLeading) {
+                    Color(red: 0.48, green: 0.48, blue: 0.48)
+                    if light && !lightAboveBoards {
+                        ChristmasKeepsakesWindowLight(size: scene, scheme: scheme)
+                    }
+                    // Opaque panels sample the room field below their content.
+                    Rectangle().fill(SurroundTheme.christmasKeepsakes.panel)
+                        .overlay {
+                            ChristmasKeepsakesSurfaceBeam(size: scene, origin: panel.origin,
+                                                          scheme: scheme, profile: .panel)
+                                .opacity(light ? 1 : 0)
+                        }
+                        .frame(width: panel.width, height: panel.height)
+                        .clipped()
+                        .offset(x: panel.minX, y: panel.minY)
+                    ForEach(frames.indices, id: \.self) { index in
+                        // The standalone unit target includes Stone and the
+                        // opaque board pigment, but not BoardView. Both panel
+                        // miniatures and the room's main board occlude light.
+                        ZStack {
+                            appearance.surfaceColor(detailed: false)
+                            HStack(spacing: 2) {
+                                Stone(color: .black, shadowRadius: 1)
+                                Stone(color: .white, shadowRadius: 1)
+                            }
+                            .frame(width: frames[index].width * 2 / 9 + 2,
+                                   height: frames[index].width / 9)
+                        }
+                            .frame(width: frames[index].width, height: frames[index].height)
+                            .offset(x: frames[index].minX, y: frames[index].minY)
+                    }
+                    if light && lightAboveBoards {
+                        // Wrong-layer control proves the field reaches each
+                        // slab, so preservation cannot pass vacuously.
+                        ChristmasKeepsakesWindowLight(size: scene, scheme: scheme)
+                    }
+                }
+                .frame(width: scene.width, height: scene.height)
+                .environment(\.surroundTheme, .christmasKeepsakes)
+                .environment(\.boardAppearance, appearance)
+                .environment(\.colorScheme, scheme)
+                .environment(\.displayScale, 3))
+            }
+            let baseline = try render(light: false)
+            let lit = try render(light: true)
+            let unprotected = try render(light: true, lightAboveBoards: true)
+            XCTAssertEqual(lit.width, baseline.width)
+            XCTAssertEqual(lit.height, baseline.height)
+            let slabs = frames.map { (rect: $0, radius: CGFloat.zero) }
+            var changedInside = [Int](repeating: 0, count: frames.count)
+            var unprotectedChanges = changedInside
+            var checkedInside = changedInside
+            var changedOutside = 0
+            for y in 0..<lit.height {
+                for x in 0..<lit.width {
+                    let offset = (y * lit.width + x) * 4
+                    let point = CGPoint(x: (CGFloat(x) + 0.5) / 3, y: (CGFloat(y) + 0.5) / 3)
+                    let differs = (0..<4).contains { lit.pixels[offset + $0] != baseline.pixels[offset + $0] }
+                    var inSlab = false
+                    for (index, slab) in slabs.enumerated() {
+                        let qx = abs(point.x - slab.rect.midX) - (slab.rect.width / 2 - slab.radius)
+                        let qy = abs(point.y - slab.rect.midY) - (slab.rect.height / 2 - slab.radius)
+                        let distance = hypot(max(qx, 0), max(qy, 0)) + min(max(qx, qy), 0) - slab.radius
+                        if distance < -1.0 / 3 {
+                            inSlab = true
+                            checkedInside[index] += 1
+                            if differs { changedInside[index] += 1 }
+                            if (0..<4).contains(where: { unprotected.pixels[offset + $0] != baseline.pixels[offset + $0] }) {
+                                unprotectedChanges[index] += 1
+                            }
+                        }
+                    }
+                    if !inSlab && differs { changedOutside += 1 }
+                }
+            }
+            for index in frames.indices {
+                XCTAssertGreaterThan(checkedInside[index], 1000)
+                XCTAssertEqual(changedInside[index], 0,
+                               "Lighting must preserve every slab and stone pixel at \(frames[index].width / 9) pt")
+                XCTAssertGreaterThan(unprotectedChanges[index], 100,
+                                     "Each board fixture must intersect actual lighting so the occlusion check cannot pass vacuously")
+            }
+            XCTAssertGreaterThan(changedOutside, 1000, "The production light remains visible over the surrounding scene")
+        }
+    }
+
+    func testChristmasKeepsakesWindowLightRespectsAccessibilityDisplaySettings() throws {
+        // These native environment values are read-only. Verify the policy
+        // used by room and material backgrounds without inventing an override.
+        XCTAssertTrue(ChristmasKeepsakesWindowLight.isVisible(contrast: .standard, reduceTransparency: false))
+        for (contrast, reduced): (ColorSchemeContrast, Bool) in [(.increased, false), (.standard, true), (.increased, true)] {
+            XCTAssertFalse(ChristmasKeepsakesWindowLight.isVisible(contrast: contrast, reduceTransparency: reduced),
+                           "Increase Contrast and Reduce Transparency each suppress the complete decorative projection")
+        }
+    }
+
+    @MainActor
+    func testChristmasKeepsakesSurfaceLightSamplesOneFieldAcrossSeparateCards() throws {
+        let scene = CGSize(width: 440, height: 520)
+        // The upper tile crosses the right shoulder; the adjacent lower
+        // tiles cross both pane edges and share a seam through its falloff.
+        let tiles = [CGRect(x: 40, y: 40, width: 150, height: 140),
+                     CGRect(x: 20, y: 300, width: 180, height: 150),
+                     CGRect(x: 200, y: 300, width: 180, height: 150)]
+        for scheme: ColorScheme in [.light, .dark] {
+            for profile: ChristmasKeepsakesSurfaceLighting.Profile in [.room, .panel, .glassCard,
+                                                                      .ivoryGlassCard, .pigmentCard] {
+                func render(origin: CGPoint, size: CGSize) throws
+                    -> (pixels: [UInt8], width: Int, height: Int) {
+                    try nativeMaterialPixels(ChristmasKeepsakesSurfaceBeam(
+                        size: scene, origin: origin, scheme: scheme, profile: profile)
+                        .frame(width: size.width, height: size.height).clipped())
+                }
+                let full = try render(origin: .zero, size: scene)
+                for tile in tiles {
+                    let cropped = try render(origin: tile.origin, size: tile.size)
+                    let startX = Int(tile.minX * 3), startY = Int(tile.minY * 3)
+                    XCTAssertEqual(cropped.width, Int(tile.width * 3))
+                    XCTAssertEqual(cropped.height, Int(tile.height * 3))
+                    var differentPixels = 0
+                    var maximumDelta = 0
+                    var lowestAlpha = 255, highestAlpha = 0
+                    var deltaHistogram = [Int](repeating: 0, count: 256)
+                    var edgePixels = [Int](repeating: 0, count: 4)
+                    var edgeErrors = edgePixels
+                    var gridErrors = [Int](repeating: 0, count: 144)
+                    var signedChannelDelta = [Int](repeating: 0, count: 4)
+                    var maximumRGBDelta = 0, maximumAlphaDelta = 0
+                    var interiorMaximumDelta = 0
+                    var maximumSamples = [[Int]]()
+                    for y in 0..<cropped.height {
+                        for x in 0..<cropped.width {
+                            let local = (y * cropped.width + x) * 4
+                            let global = ((y + startY) * full.width + x + startX) * 4
+                            var differs = false
+                            var pixelMaximumDelta = 0
+                            for channel in 0..<4 {
+                                let signed = Int(cropped.pixels[local + channel]) - Int(full.pixels[global + channel])
+                                let delta = abs(signed)
+                                signedChannelDelta[channel] += signed
+                                maximumDelta = max(maximumDelta, delta)
+                                pixelMaximumDelta = max(pixelMaximumDelta, delta)
+                                if channel == 3 { maximumAlphaDelta = max(maximumAlphaDelta, delta) }
+                                else { maximumRGBDelta = max(maximumRGBDelta, delta) }
+                                differs = differs || delta > 1
+                            }
+                            deltaHistogram[pixelMaximumDelta] += 1
+                            let edgeDistance = min(x, y, cropped.width - 1 - x, cropped.height - 1 - y)
+                            let edgeBucket = edgeDistance < 4 ? 0 : (edgeDistance < 12 ? 1 : (edgeDistance < 36 ? 2 : 3))
+                            edgePixels[edgeBucket] += 1
+                            if edgeBucket == 3 { interiorMaximumDelta = max(interiorMaximumDelta, pixelMaximumDelta) }
+                            if differs {
+                                edgeErrors[edgeBucket] += 1
+                                gridErrors[min(11, y * 12 / cropped.height) * 12 + min(11, x * 12 / cropped.width)] += 1
+                            }
+                            if pixelMaximumDelta >= 3 && maximumSamples.count < 20 {
+                                maximumSamples.append([x, y, pixelMaximumDelta])
+                            }
+                            if differs { differentPixels += 1 }
+                            lowestAlpha = min(lowestAlpha, Int(full.pixels[global + 3]))
+                            highestAlpha = max(highestAlpha, Int(full.pixels[global + 3]))
+                        }
+                    }
+                    let pixelCount = cropped.width * cropped.height
+                    let pixelsAboveTwo = deltaHistogram.dropFirst(3).reduce(0, +)
+                    let excessiveEdgeError = zip(edgeErrors, edgePixels).contains {
+                        Double($0.0) / Double($0.1) > 0.0075
+                    }
+                    let excessiveBias = signedChannelDelta.contains { abs(Double($0)) / Double(pixelCount) > 0.01 }
+                    if maximumDelta > 3 || Double(differentPixels) / Double(pixelCount) > 0.0075
+                        || Double(pixelsAboveTwo) / Double(pixelCount) > 0.00005
+                        || excessiveEdgeError || excessiveBias || highestAlpha - lowestAlpha <= 2 {
+                        let diagnostic: [String: Any] = [
+                            "appearance": String(describing: scheme), "profile": String(describing: profile),
+                            "tile": [tile.minX, tile.minY, tile.width, tile.height],
+                            "pixel_size": [cropped.width, cropped.height],
+                            "maximum_delta": maximumDelta, "maximum_rgb_delta": maximumRGBDelta,
+                            "maximum_alpha_delta": maximumAlphaDelta, "interior_maximum_delta": interiorMaximumDelta,
+                            "pixels_above_one": differentPixels, "delta_histogram": deltaHistogram,
+                            "edge_distance_buckets_px": ["0-3", "4-11", "12-35", "36+"],
+                            "edge_pixels": edgePixels, "edge_errors": edgeErrors,
+                            "error_grid_12x12_row_major": gridErrors,
+                            "signed_channel_delta_sums_rgba": signedChannelDelta,
+                            "first_maximum_samples_xy_delta": maximumSamples
+                        ]
+                        let data = try JSONSerialization.data(withJSONObject: diagnostic, options: [.sortedKeys])
+                        let text = try XCTUnwrap(String(data: data, encoding: .utf8))
+                        let attachment = XCTAttachment(string: text)
+                        attachment.name = "light-field-\(scheme)-\(profile)-\(Int(tile.minX))-\(Int(tile.minY)).json"
+                        attachment.lifetime = .keepAlways
+                        add(attachment)
+                        print("LIGHT_FIELD_DIAGNOSTIC " + text)
+                    }
+                    XCTAssertGreaterThan(highestAlpha - lowestAlpha, 2,
+                                         "Each tile must sample a changing field, including its feathered boundary")
+                    // Independently rasterized masked layers accumulate sparse
+                    // RGB rounding (up to three byte steps), with matching alpha
+                    // and no directional bias. Bound both magnitude and local
+                    // density so a coherent edge seam still fails this check.
+                    XCTAssertLessThanOrEqual(maximumDelta, 3,
+                                             "A card must sample the same scene field: \(scheme), \(profile), \(tile)")
+                    XCTAssertLessThanOrEqual(Double(pixelsAboveTwo) / Double(pixelCount), 0.00005,
+                                             "At most 0.005% of pixels may differ by more than two byte steps")
+                    XCTAssertLessThanOrEqual(Double(differentPixels) / Double(pixelCount), 0.0075,
+                                             "At most 0.75% of pixels may differ by more than one byte step")
+                    for (errors, count) in zip(edgeErrors, edgePixels) {
+                        XCTAssertLessThanOrEqual(Double(errors) / Double(count), 0.0075,
+                                                 "Rounding cannot concentrate at a card edge: \(scheme), \(profile), \(tile)")
+                    }
+                    for bias in signedChannelDelta {
+                        XCTAssertLessThanOrEqual(abs(Double(bias)) / Double(pixelCount), 0.01,
+                                                 "The sampled field must not shift a color channel systematically")
+                    }
+                }
             }
         }
     }
 
-    func testChristmasKeepsakesUsesCornerPlacementWithoutASpaciousLandscapeTabletop() {
-        let portrait = CGSize(width: 768, height: 1024)
-        let baseline = ChristmasKeepsakesDecorationLayout(size: portrait)
-        XCTAssertEqual(baseline, ChristmasKeepsakesDecorationLayout(size: portrait, occupiedFrames: [
-            .board: CGRect(x: 20, y: 250, width: 728, height: 728),
-            .clocks: CGRect(x: 20, y: 80, width: 728, height: 80)
-        ]))
-        XCTAssertFalse(baseline.usesLandscapeTabletop)
-        for size in [CGSize.zero, CGSize(width: -20, height: 40),
-                     CGSize(width: CGFloat.infinity, height: CGFloat.nan), CGSize(width: 1024, height: 768)] {
-            let layout = ChristmasKeepsakesDecorationLayout(size: size, occupiedFrames: [
-                .board: .infinite, .clocks: .null,
-                .chat: CGRect(x: -200, y: 10, width: 100, height: 300)
-            ])
-            XCTAssertFalse(layout.usesLandscapeTabletop)
-            for frame in [layout.pine, layout.gifts] {
-                XCTAssertTrue(frame.minX.isFinite && frame.minY.isFinite)
-                XCTAssertTrue(frame.width.isFinite && frame.height.isFinite)
+    func testChristmasKeepsakesSelectsRoomCompositionForViewportShapeAndSize() {
+        let cases: [(CGSize, ChristmasKeepsakesRoomLayout.Composition)] = [
+            (CGSize(width: 390, height: 844), .compactPortrait),
+            (CGSize(width: 844, height: 390), .compactLandscape),
+            (CGSize(width: 834, height: 1210), .regularPortrait),
+            (CGSize(width: 1210, height: 834), .regularLandscape),
+            (CGSize(width: 560, height: 840), .compactPortrait),
+            (CGSize(width: 561, height: 840), .regularPortrait),
+            (CGSize(width: 840, height: 560), .compactLandscape),
+            (CGSize(width: 840, height: 561), .regularLandscape),
+            (CGSize(width: 1079, height: 600), .regularLandscape),
+            (CGSize(width: 1080, height: 600), .compactLandscape),
+            (CGSize(width: 1920, height: 900), .compactLandscape),
+            (CGSize(width: 600, height: 900), .regularPortrait),
+            (CGSize(width: 440, height: 440), .compactPortrait),
+            (CGSize(width: 834, height: 834), .regularPortrait)
+        ]
+        for (size, expected) in cases {
+            XCTAssertEqual(ChristmasKeepsakesRoomLayout(size: size).composition, expected, "\(size)")
+        }
+    }
+
+    func testChristmasKeepsakesRoomCoversViewportWithoutDistortionOrInvalidGeometry() {
+        let sizes = [
+            CGSize(width: 320, height: 568), CGSize(width: 440, height: 956),
+            CGSize(width: 956, height: 440), CGSize(width: 375, height: 548),
+            CGSize(width: 560, height: 840), CGSize(width: 561, height: 840),
+            CGSize(width: 600, height: 900), CGSize(width: 834, height: 1210),
+            CGSize(width: 1210, height: 834), CGSize(width: 1920, height: 1080),
+            CGSize(width: 1920, height: 900), CGSize(width: 1600, height: 700),
+            CGSize(width: 1080, height: 2400),
+            CGSize(width: 100, height: 140), .zero, CGSize(width: -20, height: 40),
+            CGSize(width: CGFloat.infinity, height: CGFloat.nan)
+        ]
+        for size in sizes {
+            let layout = ChristmasKeepsakesRoomLayout(size: size)
+            for frame in [layout.backdrop, layout.lightingReference] {
+                XCTAssertTrue(frame.minX.isFinite && frame.minY.isFinite, "\(size)")
+                XCTAssertTrue(frame.width.isFinite && frame.height.isFinite, "\(size)")
                 XCTAssertGreaterThanOrEqual(frame.width, 0)
                 XCTAssertGreaterThanOrEqual(frame.height, 0)
+                XCTAssertEqual(frame.width, frame.height, accuracy: 0.001,
+                               "Room pixels and the lighting reference must retain their square proportions")
             }
+            guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else { continue }
+            let viewport = CGRect(origin: .zero, size: size)
+            XCTAssertTrue(layout.backdrop.contains(viewport), "\(size): no uncovered strip at any edge")
+            XCTAssertEqual(layout.backdrop.minX, 0, accuracy: 0.001)
+            XCTAssertEqual(layout.backdrop.maxY, size.height, accuracy: 0.001,
+                           "The whole room composition stays anchored to the bottom-leading viewport corner")
         }
+    }
+
+    func testChristmasKeepsakesRoomRetainsWindowAreaInShortAndWideViewports() {
+        // Each composition places its window at a different height in the
+        // source plate. Bound the discarded top portion independently of
+        // the sizing formula so short windows cannot crop it down to the sill.
+        let cases: [(CGSize, CGFloat)] = [
+            (CGSize(width: 320, height: 568), 0.05),
+            (CGSize(width: 375, height: 548), 0.05),
+            (CGSize(width: 600, height: 900), 0.17),
+            (CGSize(width: 1920, height: 900), 0.57),
+            (CGSize(width: 1600, height: 700), 0.57)
+        ]
+        for (size, maximumTopCrop) in cases {
+            let layout = ChristmasKeepsakesRoomLayout(size: size)
+            let croppedTopFraction = max(0, -layout.backdrop.minY) / layout.backdrop.height
+            XCTAssertLessThanOrEqual(croppedTopFraction, maximumTopCrop,
+                                    "\(size): retain the window region of the selected composition")
+        }
+    }
+
+    func testChristmasKeepsakesRoomRevealsMoreTableAtStableScaleWithinEachComposition() {
+        let pairs: [(CGSize, CGSize)] = [
+            (CGSize(width: 440, height: 956), CGSize(width: 440, height: 1000)),
+            (CGSize(width: 956, height: 440), CGSize(width: 1000, height: 440)),
+            (CGSize(width: 834, height: 1210), CGSize(width: 834, height: 1376)),
+            (CGSize(width: 1210, height: 834), CGSize(width: 1376, height: 834))
+        ]
+        for (smallerSize, largerSize) in pairs {
+            let smaller = ChristmasKeepsakesRoomLayout(size: smallerSize)
+            let larger = ChristmasKeepsakesRoomLayout(size: largerSize)
+            XCTAssertEqual(smaller.composition, larger.composition)
+            XCTAssertEqual(smaller.backdrop.size, larger.backdrop.size,
+                           "More viewport space reveals the composition without enlarging its gifts and needles")
+            XCTAssertGreaterThan(largerSize.width * largerSize.height,
+                                 smallerSize.width * smallerSize.height)
+            XCTAssertEqual(smaller.backdrop.maxY, smallerSize.height, accuracy: 0.001)
+            XCTAssertEqual(larger.backdrop.maxY, largerSize.height, accuracy: 0.001)
+        }
+        let smallPhone = ChristmasKeepsakesRoomLayout(size: CGSize(width: 320, height: 568))
+        let largePhone = ChristmasKeepsakesRoomLayout(size: CGSize(width: 440, height: 956))
+        XCTAssertLessThan(smallPhone.backdrop.width, largePhone.backdrop.width,
+                          "The smallest phones need a proportionate composition, not an oversized crop")
     }
 
     func testChristmasKeepsakesChangesLightingWithoutMovingTheBoard() throws {
@@ -2320,23 +2591,36 @@ final class SurroundThemeTests: XCTestCase {
         ))
     }
 
-    func testChristmasKeepsakesAssetsSeparateGlassFromSceneDecorations() throws {
+    func testChristmasKeepsakesRoomAssetsAreOpaqueSquareCompositions() throws {
+        let bundle = Bundle(for: Self.self)
+        let compositions = ChristmasKeepsakesRoomLayout.Composition.allCases
+        let names = Set(compositions.map(\.assetName))
+        XCTAssertEqual(compositions.count, 4)
+        XCTAssertEqual(names, ["ChristmasKeepsakesRoomCompactPortrait", "ChristmasKeepsakesRoomCompactLandscape",
+                               "ChristmasKeepsakesRoomRegularPortrait", "ChristmasKeepsakesRoomRegularLandscape"])
+        var roomPixels: [Data] = []
+        for name in names.sorted() {
+            let image = try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
+            let source = try XCTUnwrap(image.cgImage, name)
+            XCTAssertEqual(source.width, source.height, "\(name): composition must match the square crop model")
+            let pixels = try rgbaPixels(for: source, side: 128)
+            XCTAssertTrue(stride(from: 3, to: pixels.count, by: 4).allSatisfy { pixels[$0] == 255 },
+                          "\(name): gifts, contact shadows and tabletop form one opaque room")
+            roomPixels.append(Data(pixels))
+        }
+        XCTAssertEqual(Set(roomPixels).count, 4,
+                       "Each aspect family must package its own composition rather than four aliases of one crop")
+    }
+
+    func testChristmasKeepsakesAssetsKeepOpaqueBoardAndEqualGlassFootprints() throws {
         let bundle = Bundle(for: Self.self)
         func image(_ suffix: String) throws -> UIImage {
             let name = "ChristmasKeepsakes" + suffix
             return try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
         }
-        for suffix in ["BoardSurface", "Backdrop"] {
-            let pixels = try rgbaPixels(for: XCTUnwrap(image(suffix).cgImage), side: 128)
-            XCTAssertTrue(stride(from: 3, to: pixels.count, by: 4).allSatisfy { pixels[$0] == 255 },
-                          "The board and backdrop are continuous opaque surfaces")
-        }
-        for suffix in ["Pine", "Gifts"] {
-            let pixels = try rgbaPixels(for: XCTUnwrap(image(suffix).cgImage), side: 128)
-            let alpha = stride(from: 3, to: pixels.count, by: 4).map { pixels[$0] }
-            XCTAssertTrue(alpha.contains { $0 > 127 }, "The decoration contains visible artwork")
-            XCTAssertTrue(alpha.contains { $0 < 16 }, "The decoration retains a transparent background")
-        }
+        let pixels = try rgbaPixels(for: XCTUnwrap(image("BoardSurface").cgImage), side: 128)
+        XCTAssertTrue(stride(from: 3, to: pixels.count, by: 4).allSatisfy { pixels[$0] == 255 },
+                      "The board remains a separate opaque playing surface")
         try assertEqualAlphaStoneFootprints(StoneImages(
             black: [try image("RubyStone")], white: [try image("IvoryStone")]
         ))

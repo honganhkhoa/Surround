@@ -398,6 +398,7 @@ struct ChatLog: View {
                     .id(session.composerPresentationID)
             }
         }
+        .background { ChristmasKeepsakesSurfaceLighting() }
         .background(GameDetailAppearance.panel)
         .onChange(of: game.ID) { _, _ in
             clearSelection()
@@ -815,6 +816,7 @@ struct NewChatInput: View {
             .padding(.vertical, 4)
             .padding(.horizontal, 10)
         }
+        .background { ChristmasKeepsakesSurfaceLighting() }
         .background(backgroundColor)
         .onAppear {
             session.composerAppeared(

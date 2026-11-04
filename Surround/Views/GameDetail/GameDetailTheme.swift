@@ -80,17 +80,18 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     func board(for scheme: ColorScheme) -> BoardAppearance {
         if self == .christmasKeepsakes, scheme == .dark {
             var night = board
-            night.boardColor = Color(themeHex: 0x0C2E22)
-            night.compactBoardColor = Color(themeHex: 0x0C2E22)
-            night.boardEdge = Color(themeHex: 0xBDA16D)
-            night.boardTexture?.tint = Color(themeHex: 0x8E998D)
+            night.boardColor = Color(themeHex: 0x667F6C)
+            night.compactBoardColor = Color(themeHex: 0x667F6C)
+            night.boardEdge = Color(themeHex: 0xBFA981)
+            // Keep medium pine under the dark grid as the room dims.
+            night.boardTexture?.tint = Color(themeHex: 0xF8F8F8)
             night.stoneImages?.tint = Color(themeHex: 0xE8E5DC)
-            night.gridColor = Color(themeHex: 0xCCB278)
-            night.coordinateColor = Color(themeHex: 0xE3CAA0)
-            night.black.flat = Color(themeHex: 0x660D21)
-            night.black.territory = Color(themeHex: 0x660D21)
-            night.white.flat = Color(themeHex: 0xDFD0B6)
-            night.white.territory = Color(themeHex: 0xDFD0B6)
+            night.coordinateColor = Color(themeHex: 0x000703)
+            night.emptyPointMarker = Color(themeHex: 0x000703)
+            night.black.flat = Color(themeHex: 0x5B0A1B)
+            night.black.territory = Color(themeHex: 0x5B0A1B)
+            night.white.flat = Color(themeHex: 0xE9E2D5)
+            night.white.territory = Color(themeHex: 0xE9E2D5)
             return night
         }
         if self == .nightGarden, scheme == .dark {
@@ -542,47 +543,47 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             )
         case .christmasKeepsakes:
             return BoardAppearance(
-                boardColor: Color(themeHex: 0x123F2E),
-                compactBoardColor: Color(themeHex: 0x123F2E),
-                boardEdge: Color(themeHex: 0xD8B77F),
+                boardColor: Color(themeHex: 0x6D8975),
+                compactBoardColor: Color(themeHex: 0x6D8975),
+                boardEdge: Color(themeHex: 0xD9C29A),
                 boardTexture: ChristmasKeepsakesAssets.board,
-                // The enamel is a slim face: exact brass lines and a narrow
-                // contour, with no bevel, raised slab or ornaments on the grid.
-                gridLineScale: 1,
+                // Winter Window keeps the enamel calm: a fine dark-pine
+                // grid and a champagne edge, with no raised slab or bevel.
+                gridLineScale: 0.85,
                 stoneImages: ChristmasKeepsakesAssets.stones,
                 stoneLightDirection: .upperLeft,
                 imageStoneShadow: .raisedGlass,
-                gridColor: Color(themeHex: 0xE2C487),
-                coordinateColor: Color(themeHex: 0xF1D8A5),
+                gridColor: Color(themeHex: 0x10291C),
+                coordinateColor: Color(themeHex: 0x020D06),
                 black: StonePalette(
                     highlight: Color(themeHex: 0xCE5B62), shade: Color(themeHex: 0x370512),
-                    flat: Color(themeHex: 0x790D24), outline: Color(themeHex: 0xE2C487),
-                    rim: Color(themeHex: 0xE7AC8C).opacity(0.55),
+                    flat: Color(themeHex: 0x650D24), outline: Color(themeHex: 0x370512),
+                    rim: Color(themeHex: 0xCE5B62).opacity(0.4),
                     lastMove: Color(themeHex: 0xFFF3D8), label: Color(themeHex: 0xFFF3D8),
-                    territory: Color(themeHex: 0x790D24),
+                    territory: Color(themeHex: 0x650D24),
                     detailedMarkerCasing: Color(themeHex: 0x2B0711)
                 ),
                 white: StonePalette(
-                    highlight: Color(themeHex: 0xFFF9E8), shade: Color(themeHex: 0xB18C60),
-                    flat: Color(themeHex: 0xF3E2C2), outline: Color(themeHex: 0x493320),
+                    highlight: Color(themeHex: 0xFFF9EF), shade: Color(themeHex: 0xB9A993),
+                    flat: Color(themeHex: 0xF7EEDF), outline: Color(themeHex: 0x493F32),
                     rim: Color(themeHex: 0xFFF3D8).opacity(0.7),
                     lastMove: Color(themeHex: 0x3B1520), label: Color(themeHex: 0x3B1520),
-                    territory: Color(themeHex: 0xF3E2C2),
+                    territory: Color(themeHex: 0xF7EEDF),
                     detailedMarkerCasing: Color(themeHex: 0xFFF3D8)
                 ),
-                emptyPointMarker: Color(themeHex: 0xF1D8A5),
-                markOutline: Color(themeHex: 0xE2C487),
-                dameColor: Color(themeHex: 0xEEC48B),
-                highlightColor: Color(themeHex: 0xA9D7E2),
-                highlightCasing: Color(themeHex: 0x211611),
-                crosshair: .init(valid: Color(themeHex: 0xB9D99F),
-                                 invalid: Color(themeHex: 0xFFAA9F),
-                                 removal: Color(themeHex: 0xA9D7E2)),
+                emptyPointMarker: Color(themeHex: 0x020D06),
+                markOutline: Color(themeHex: 0x10291C),
+                dameColor: Color(themeHex: 0x382943),
+                highlightColor: Color(themeHex: 0x102F40),
+                highlightCasing: Color(themeHex: 0xFFF4E3),
+                crosshair: .init(valid: Color(themeHex: 0x102C1B),
+                                 invalid: Color(themeHex: 0x501525),
+                                 removal: Color(themeHex: 0x102F40)),
                 crosshairWidth: 1.5,
-                removeMark: Color(themeHex: 0xFFAA9F),
-                restoreMark: Color(themeHex: 0xB9D99F),
-                removalMarkCasing: Color(themeHex: 0x211611),
-                removedStoneOutline: Color(themeHex: 0xE2C487)
+                removeMark: Color(themeHex: 0x501525),
+                restoreMark: Color(themeHex: 0x102C1B),
+                removalMarkCasing: Color(themeHex: 0xFFF4E3),
+                removedStoneOutline: Color(themeHex: 0x10291C)
             )
         case .frostPine:
             return BoardAppearance(
@@ -716,13 +717,13 @@ private enum ChristmasKeepsakesAssets {
               let white = UIImage(named: "ChristmasKeepsakesIvoryStone") else { return nil }
         return StoneImages(black: [black], white: [white])
     }()
-    // Keep the source's brightest enamel reflection below the brass labels'
-    // contrast ceiling. Evening lighting grades this same cached image further.
+    // The muted enamel has a narrow luminance range so the fine dark-pine
+    // grid and coordinates stay legible across the entire playing surface.
     static let board = UIImage(named: "ChristmasKeepsakesBoardSurface")
-        .map { BoardTexture(image: $0, mapping: .board, tint: Color(themeHex: 0xA8A8A8)) }
-    static let backdrop = UIImage(named: "ChristmasKeepsakesBackdrop")
-    static let pine = UIImage(named: "ChristmasKeepsakesPine")
-    static let gifts = UIImage(named: "ChristmasKeepsakesGifts")
+        .map { BoardTexture(image: $0, mapping: .board) }
+    static func room(for composition: ChristmasKeepsakesRoomLayout.Composition) -> UIImage? {
+        UIImage(named: composition.assetName)
+    }
 }
 
 /// Warm walnut, ivory and ruby retain their material identities as the room
@@ -2077,7 +2078,6 @@ extension View {
 struct GameDetailBackdrop: View {
     @Environment(\.surroundTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
-    var occupiedFrames: [GameDetailLayoutPlan.Slot: CGRect] = [:]
 
     var body: some View {
         switch theme {
@@ -2094,67 +2094,87 @@ struct GameDetailBackdrop: View {
         case .nightGarden:
             NightGardenScene(scheme: colorScheme)
         case .christmasKeepsakes:
-            ChristmasKeepsakesScene(scheme: colorScheme, occupiedFrames: occupiedFrames)
+            ChristmasKeepsakesScene(scheme: colorScheme)
         case .frostPine:
             FrostPineScene(scheme: colorScheme)
         }
     }
 }
 
-/// The pine is corner artwork, so its source edges meet the viewport edges.
-/// Spacious landscape puts full-size gifts on the table left of the board.
-/// Panels naturally cover these objects without moving or cropping the art.
-struct ChristmasKeepsakesDecorationLayout: Equatable {
-    let pine: CGRect
-    let gifts: CGRect
-    let lightCenter: CGPoint
-    let usesLandscapeTabletop: Bool
+/// The gifts, contact shadows and window belong to one photograph. Its crop
+/// follows only the viewport, keeping the room still beneath panels and Zen.
+struct ChristmasKeepsakesRoomLayout: Equatable {
+    enum Composition: CaseIterable {
+        case compactPortrait, compactLandscape, regularPortrait, regularLandscape
 
-    init(size: CGSize, occupiedFrames: [GameDetailLayoutPlan.Slot: CGRect] = [:]) {
+        var assetName: String {
+            switch self {
+            case .compactPortrait: return "ChristmasKeepsakesRoomCompactPortrait"
+            case .compactLandscape: return "ChristmasKeepsakesRoomCompactLandscape"
+            case .regularPortrait: return "ChristmasKeepsakesRoomRegularPortrait"
+            case .regularLandscape: return "ChristmasKeepsakesRoomRegularLandscape"
+            }
+        }
+
+        var visibleHeightFraction: CGFloat {
+            switch self {
+            case .compactPortrait: return 956 / 1000
+            case .compactLandscape: return 440 / 1000
+            case .regularPortrait: return 1210 / 1440
+            case .regularLandscape: return 834 / 1440
+            }
+        }
+    }
+
+    let composition: Composition
+    let backdrop: CGRect
+    /// Material lighting has its own square coordinates. Reframing the room
+    /// must not change the daylight sampled by clocks, cards and controls.
+    let lightingReference: CGRect
+    let lightCenter: CGPoint
+
+    init(size: CGSize) {
         let width = size.width.isFinite ? max(0, size.width) : 0
         let height = size.height.isFinite ? max(0, size.height) : 0
         let shortSide = min(width, height)
-        let viewport = CGRect(x: 0, y: 0, width: width, height: height)
-        let frames = occupiedFrames.filter {
-            let frame = $0.value
-            return !frame.isEmpty && !frame.isInfinite && !frame.isNull
-                && frame.origin.x.isFinite && frame.origin.y.isFinite
-                && frame.width.isFinite && frame.height.isFinite
-                && viewport.contains(frame)
+        let compact = shortSide <= 560 || width >= height * 1.8
+        if width > height {
+            composition = compact ? .compactLandscape : .regularLandscape
+        } else {
+            composition = compact ? .compactPortrait : .regularPortrait
         }
-        if width > height, shortSide >= 600,
-           let board = frames[.board], board.width > shortSide * 0.45,
-           board.minX >= min(280, shortSide * 0.32) {
-            let pineSide = min(500, min(shortSide * 0.54, board.minX - 24))
-            pine = CGRect(x: 0, y: 0, width: pineSide, height: pineSide)
-            // Scale against the whole tabletop, not the narrow panel/board gap.
-            // Do not follow clock or panel frames: those move when panels open.
-            let giftsSide = min(280, min(shortSide * 0.30, board.minX - 48))
-            gifts = CGRect(x: (board.minX - giftsSide) / 2,
-                           y: height - giftsSide - min(40, height * 0.04),
-                           width: giftsSide, height: giftsSide)
-            lightCenter = CGPoint(x: pineSide * 0.2, y: pineSide * 0.4)
-            usesLandscapeTabletop = true
-            return
-        }
-        let pineSide = min(400, min(shortSide * 0.62, height * 0.42))
-        let giftsSide = min(230, min(shortSide * 0.34, height * 0.28))
-        pine = CGRect(x: 0, y: min(24, height * 0.025), width: pineSide, height: pineSide)
-        gifts = CGRect(x: max(0, width - giftsSide), y: max(0, height - giftsSide - min(40, height * 0.04)),
-                       width: giftsSide, height: giftsSide)
-        lightCenter = CGPoint(x: pine.minX + pineSide * 0.2, y: pine.minY + pineSide * 0.4)
-        usesLandscapeTabletop = false
+        // The square plates include overscan above and to the right. Larger
+        // windows expose that art at the same scale until full coverage needs
+        // a larger plate. Small phones scale the whole scene down together.
+        let baseSide: CGFloat = compact ? 1000 * min(1, shortSide / 440) : 1440
+        // Short portrait windows need more of the photograph, not a deeper
+        // crop through its window frame. Scale the entire room down together.
+        let preferredSide = min(baseSide, height / composition.visibleHeightFraction)
+        let side = max(preferredSide, max(width, height))
+        backdrop = CGRect(x: 0, y: height - side, width: side, height: side)
+
+        let compactFraming = min(1, max(0, (600 - shortSide) / 160))
+        let backdropBaseSide: CGFloat = 1440 - 480 * compactFraming
+        let landscapeFraming = min(1, max(0, (width - height) / 160))
+        let compactTopCrop: CGFloat = 40 + 60 * landscapeFraming
+        let backdropTopCrop: CGFloat = 160 + (compactTopCrop - 160) * compactFraming
+        let backdropSide = max(backdropBaseSide, max(width, height + backdropTopCrop))
+        lightingReference = CGRect(x: 0, y: -backdropTopCrop,
+                                   width: backdropSide, height: backdropSide)
+        lightCenter = CGPoint(x: 72, y: 120)
     }
 }
 
 private struct ChristmasKeepsakesScene: View {
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let scheme: ColorScheme
-    let occupiedFrames: [GameDetailLayoutPlan.Slot: CGRect]
 
     var body: some View {
         GeometryReader { geometry in
             ChristmasKeepsakesSceneContent(size: geometry.size, scheme: scheme,
-                                           occupiedFrames: occupiedFrames).equatable()
+                                           showsLight: ChristmasKeepsakesWindowLight.isVisible(
+                                               contrast: contrast, reduceTransparency: reduceTransparency)).equatable()
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -2164,7 +2184,7 @@ private struct ChristmasKeepsakesScene: View {
 private struct ChristmasKeepsakesSceneContent: View, Equatable {
     let size: CGSize
     let scheme: ColorScheme
-    let occupiedFrames: [GameDetailLayoutPlan.Slot: CGRect]
+    let showsLight: Bool
 
     private var chrome: Color {
         Color(themeHex: scheme == .dark ? 0x201610 : 0xEAE1D1)
@@ -2175,37 +2195,39 @@ private struct ChristmasKeepsakesSceneContent: View, Equatable {
         return true
     }
 
+    private var topFade: Gradient {
+        if #available(iOS 26.0, *) {
+            return Gradient(colors: [chrome.opacity(0.82), chrome.opacity(0.26), .clear])
+        }
+        // Match Raked Garden's support for older, unbacked navigation bars.
+        return Gradient(stops: [
+            .init(color: chrome.opacity(0.92), location: 0),
+            .init(color: chrome.opacity(0.92), location: 0.62),
+            .init(color: .clear, location: 1)
+        ])
+    }
+
     var body: some View {
-        let layout = ChristmasKeepsakesDecorationLayout(size: size, occupiedFrames: occupiedFrames)
+        let layout = ChristmasKeepsakesRoomLayout(size: size)
         ZStack {
             chrome
-            if let backdrop = ChristmasKeepsakesAssets.backdrop {
+            if let backdrop = ChristmasKeepsakesAssets.room(for: layout.composition) {
                 Image(uiImage: backdrop)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
                     .saturation(scheme == .dark ? 0.78 : 1)
                     .colorMultiply(scheme == .dark ? Color(themeHex: 0x8A7767) : .white)
-                    .frame(width: size.width, height: size.height, alignment: .topLeading)
-                    .clipped()
+                    .frame(width: layout.backdrop.width, height: layout.backdrop.height)
+                    .position(x: layout.backdrop.midX, y: layout.backdrop.midY)
             }
             RadialGradient(colors: [Color(themeHex: 0xF4DFC2).opacity(scheme == .dark ? 0.16 : 0.13), .clear],
                            center: .center, startRadius: 0, endRadius: 210)
                 .frame(width: 420, height: 420)
                 .position(layout.lightCenter)
-            ChristmasKeepsakesDecoration(image: ChristmasKeepsakesAssets.pine,
-                                         frame: layout.pine, scheme: scheme)
-            ChristmasKeepsakesDecoration(image: ChristmasKeepsakesAssets.gifts,
-                                         frame: layout.gifts, scheme: scheme)
-            // Ivory ledges carry Light Mode chrome; dark walnut supports
-            // evening controls without tinting the quiet center of the table.
+            // Match the shipping garden's short fade so the window and pine
+            // stay visible beneath the native navigation controls.
             VStack(spacing: 0) {
-                LinearGradient(stops: [
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.98 : 0.96), location: 0),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.92 : 0.80), location: 0.58),
-                    .init(color: .clear, location: 1)
-                ], startPoint: .top, endPoint: .bottom)
-                .frame(height: layout.usesLandscapeTabletop ? min(110, size.height * 0.14)
-                       : min(170, max(120, size.height * 0.20)))
+                LinearGradient(gradient: topFade, startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(92, size.height * 0.16))
                 Spacer(minLength: 0)
                 LinearGradient(stops: [
                     .init(color: .clear, location: 0),
@@ -2214,28 +2236,16 @@ private struct ChristmasKeepsakesSceneContent: View, Equatable {
                 ], startPoint: .top, endPoint: .bottom)
                 .frame(height: min(96, size.height * 0.16))
             }
+            // The opaque room includes both gifts and their contact shadows,
+            // so the edge fade and appearance treatment affect them together.
+            if showsLight {
+                // The same field reaches the wood, gifts and material cards.
+                // It stays behind game content, so labels and boards stay crisp.
+                ChristmasKeepsakesWindowLight(size: size, scheme: scheme)
+            }
         }
         .frame(width: size.width, height: size.height)
         .clipped()
-    }
-}
-
-private struct ChristmasKeepsakesDecoration: View {
-    let image: UIImage?
-    let frame: CGRect
-    let scheme: ColorScheme
-
-    var body: some View {
-        if let image {
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .saturation(scheme == .dark ? 0.82 : 1)
-                .colorMultiply(scheme == .dark ? Color(themeHex: 0xB7A38C) : .white)
-                .frame(width: frame.width, height: frame.height)
-                .shadow(color: .black.opacity(scheme == .dark ? 0.26 : 0.18), radius: 6, x: 3, y: 6)
-                .position(x: frame.midX, y: frame.midY)
-        }
     }
 }
 
@@ -2631,6 +2641,246 @@ struct GameDetailSceneForeground: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// The content coordinate space excludes safe areas, while the room extends
+/// under them. Keep this conversion shared by every illuminated surface.
+struct ChristmasKeepsakesLightContext: Equatable {
+    static let coordinateSpace = "christmasKeepsakesWindowLight"
+    let size: CGSize
+    let contentOffset: CGPoint
+
+    init(size: CGSize, safeAreaInsets: EdgeInsets) {
+        self.size = CGSize(width: size.width + safeAreaInsets.leading + safeAreaInsets.trailing,
+                           height: size.height + safeAreaInsets.top + safeAreaInsets.bottom)
+        contentOffset = CGPoint(x: safeAreaInsets.leading, y: safeAreaInsets.top)
+    }
+}
+
+private struct ChristmasKeepsakesLightContextKey: EnvironmentKey {
+    static let defaultValue: ChristmasKeepsakesLightContext? = nil
+}
+
+extension EnvironmentValues {
+    var christmasKeepsakesLightContext: ChristmasKeepsakesLightContext? {
+        get { self[ChristmasKeepsakesLightContextKey.self] }
+        set { self[ChristmasKeepsakesLightContextKey.self] = newValue }
+    }
+}
+
+/// Real illumination of the material, below its text and controls. Each card
+/// samples the same window beam instead of restarting a gradient at its edge.
+struct ChristmasKeepsakesSurfaceLighting: View {
+    enum Profile {
+        case room, panel, glassCard, ivoryGlassCard, pigmentCard
+
+        var daylightOpacity: Double {
+            switch self {
+            case .room: 0.12
+            case .pigmentCard: 0.07
+            default: 0.14
+            }
+        }
+        var shadeOpacity: Double {
+            switch self {
+            case .room: 0.42
+            case .glassCard: 0.12
+            case .ivoryGlassCard: 0.06
+            case .panel, .pigmentCard: 0.04
+            }
+        }
+        var distanceShadeFraction: Double { self == .room ? 0.50 : 0.22 }
+
+        var frostOpacity: Double {
+            switch self {
+            case .room: 0.28
+            case .glassCard: 0.12
+            case .ivoryGlassCard: 0.10
+            case .panel: 0.07
+            case .pigmentCard: 0.05
+            }
+        }
+    }
+
+    @Environment(\.surroundTheme) private var theme
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.christmasKeepsakesLightContext) private var lightContext
+    var profile: Profile = .panel
+
+    var body: some View {
+        if theme == .christmasKeepsakes, let lightContext,
+           ChristmasKeepsakesWindowLight.isVisible(contrast: contrast, reduceTransparency: reduceTransparency) {
+            GeometryReader { geometry in
+                let frame = geometry.frame(in: .named(ChristmasKeepsakesLightContext.coordinateSpace))
+                let origin = CGPoint(x: frame.minX + lightContext.contentOffset.x,
+                                     y: frame.minY + lightContext.contentOffset.y)
+                ChristmasKeepsakesSurfaceBeam(size: lightContext.size, origin: origin,
+                                               scheme: scheme, profile: profile)
+                    .equatable()
+            }
+            .clipped()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+/// A stationary daylight field shared by the tabletop and every material.
+/// Its broad shoulder reaches both clocks; distance adds depth to the far wood.
+struct ChristmasKeepsakesSurfaceBeam: View, Equatable {
+    let size: CGSize
+    let origin: CGPoint
+    let scheme: ColorScheme
+    let profile: ChristmasKeepsakesSurfaceLighting.Profile
+
+    private struct Crystal {
+        let center: CGPoint
+        let radius: CGFloat
+        let angle: CGFloat
+        let strength: Double
+    }
+
+    private static let crystals = [
+        Crystal(center: CGPoint(x: 0.14, y: 0.21), radius: 0.047, angle: 0.24, strength: 1),
+        Crystal(center: CGPoint(x: 0.31, y: 0.22), radius: 0.038, angle: -0.17, strength: 0.85),
+        Crystal(center: CGPoint(x: 0.20, y: 0.415), radius: 0.056, angle: 0.46, strength: 0.8),
+        Crystal(center: CGPoint(x: 0.40, y: 0.46), radius: 0.05, angle: -0.32, strength: 0.55),
+        // Exposed tabletop beside the board on wider layouts; the near pane
+        // edge clips part of this projection instead of showing a full motif.
+        Crystal(center: CGPoint(x: 0.115, y: 0.52), radius: 0.065, angle: 0.13, strength: 0.9)
+    ]
+
+    var body: some View {
+        let plate = ChristmasKeepsakesRoomLayout(size: size).lightingReference
+        let side = plate.width
+        let scale = side / 1440
+        let strength = scheme == .dark ? 0.45 : 1.0
+        Canvas(rendersAsynchronously: false) { context, _ in
+            context.translateBy(x: -origin.x, y: -origin.y)
+            let bounds = Path(CGRect(origin: .zero, size: size))
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: plate.minX + side * x, y: plate.minY + side * y)
+            }
+            let acrossStart = point(0.12, 0.24)
+            let acrossEnd = point(0.42, 0.09)
+            let distanceStart = point(0.08, 0.12)
+            let distanceEnd = point(0.38, 0.94)
+            func daylightGradient(_ color: Color) -> GraphicsContext.Shading {
+                .linearGradient(Gradient(stops: [
+                    .init(color: color, location: 0),
+                    .init(color: color.opacity(0.65), location: 0.45),
+                    .init(color: .clear, location: 0.75),
+                    .init(color: .clear, location: 1)
+                ]), startPoint: acrossStart, endPoint: acrossEnd)
+            }
+            func fadeWithDistance(_ layer: inout GraphicsContext) {
+                layer.blendMode = .destinationIn
+                // A near pane edge leaves unlit wood beside the broad swath.
+                // Its location belongs to the room, never to a card or board.
+                layer.fill(bounds, with: .linearGradient(Gradient(stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .white, location: 0.45),
+                    .init(color: .white, location: 1)
+                ]), startPoint: point(-0.15, -0.10), endPoint: point(-0.03, -0.135)))
+                layer.fill(bounds, with: .linearGradient(Gradient(stops: [
+                    .init(color: .white, location: 0),
+                    .init(color: .white, location: 0.25),
+                    .init(color: .white.opacity(0.45), location: 0.65),
+                    .init(color: .clear, location: 1)
+                ]), startPoint: distanceStart, endPoint: distanceEnd))
+            }
+            // Stronger room shade preserves the timber's grain and color;
+            // card caps are gentler because text contrast governs their range.
+            let shade = Color(themeHex: 0x292321)
+            context.fill(bounds, with: .linearGradient(Gradient(stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .clear, location: 0.45),
+                .init(color: shade.opacity(profile.shadeOpacity * strength * (1 - profile.distanceShadeFraction)), location: 0.82),
+                .init(color: shade.opacity(profile.shadeOpacity * strength * (1 - profile.distanceShadeFraction)), location: 1)
+            ]), startPoint: acrossStart, endPoint: acrossEnd))
+            context.fill(bounds, with: .linearGradient(Gradient(stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .clear, location: 0.18),
+                .init(color: shade.opacity(profile.shadeOpacity * strength * profile.distanceShadeFraction), location: 1)
+            ]), startPoint: distanceStart, endPoint: distanceEnd))
+            context.drawLayer { light in
+                light.fill(bounds, with: daylightGradient(
+                    ChristmasKeepsakesWindowLight.daylight.opacity(profile.daylightOpacity * strength)))
+                fadeWithDistance(&light)
+            }
+            context.drawLayer { shadows in
+                shadows.drawLayer { softened in
+                    softened.addFilter(.blur(radius: (profile == .room ? 2.4 : 3.8) * scale))
+                    for crystal in Self.crystals {
+                        let center = point(crystal.center.x, crystal.center.y)
+                        let transform = CGAffineTransform(translationX: center.x, y: center.y)
+                            .rotated(by: .pi / 5)
+                            .scaledBy(x: 1.55, y: 0.82)
+                            .rotated(by: crystal.angle)
+                        let path = Self.crystalPath(radius: side * crystal.radius).applying(transform)
+                        softened.stroke(path, with: .color(ChristmasKeepsakesWindowLight.frostShade.opacity(
+                            profile.frostOpacity * strength * crystal.strength)),
+                            style: StrokeStyle(lineWidth: 8 * scale, lineCap: .round, lineJoin: .round))
+                    }
+                }
+                // Frost only interrupts the illuminated part of the room.
+                shadows.blendMode = .destinationIn
+                shadows.fill(bounds, with: daylightGradient(.white))
+                fadeWithDistance(&shadows)
+            }
+        }
+    }
+
+    private static func crystalPath(radius: CGFloat) -> Path {
+        var path = Path()
+        let lengths: [CGFloat] = [1, 0.78, 0.92, 0.68, 0.88, 0.79]
+        for arm in 0..<6 {
+            let angle = CGFloat(arm) * .pi / 3
+            let direction = CGPoint(x: cos(angle), y: sin(angle))
+            let normal = CGPoint(x: -direction.y, y: direction.x)
+            let length = radius * lengths[arm]
+            path.move(to: .zero)
+            path.addLine(to: CGPoint(x: direction.x * length, y: direction.y * length))
+            for fraction: CGFloat in [0.42, 0.7] {
+                let base = CGPoint(x: direction.x * length * fraction, y: direction.y * length * fraction)
+                let twig = length * (fraction < 0.5 ? 0.23 : 0.16)
+                for side: CGFloat in [-1, 1] {
+                    path.move(to: base)
+                    path.addLine(to: CGPoint(x: base.x + direction.x * twig + normal.x * twig * side,
+                                            y: base.y + direction.y * twig + normal.y * twig * side))
+                }
+            }
+        }
+        return path
+    }
+}
+
+/// Room illumination sits behind the boards and controls. Every material card
+/// samples the same field beneath its own labels, so no cast washes over ink.
+struct ChristmasKeepsakesWindowLight: View, Equatable {
+    let size: CGSize
+    let scheme: ColorScheme
+
+    static func isVisible(contrast: ColorSchemeContrast, reduceTransparency: Bool) -> Bool {
+        contrast != .increased && !reduceTransparency
+    }
+
+    static let daylight = Color(themeHex: 0xF8F5E8)
+    static let frostShade = Color(themeHex: 0x253C46)
+
+    var body: some View {
+        ChristmasKeepsakesSurfaceBeam(size: size, origin: .zero, scheme: scheme, profile: .room)
+            .frame(width: size.width, height: size.height)
+            .mask {
+                // Keep the existing short support fade behind native chrome.
+                FrostPineShadowMask(topFadeHeight: min(92, size.height * 0.16))
+            }
+            .clipped()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
 

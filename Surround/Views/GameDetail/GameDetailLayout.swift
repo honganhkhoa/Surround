@@ -1027,8 +1027,7 @@ struct GameDetailLayout: Layout {
 }
 
 extension View {
-    func gameDetailSlot(_ slot: GameDetailLayoutPlan.Slot, plan: GameDetailLayoutPlan,
-                        sceneVisible: Bool = true) -> some View {
+    func gameDetailSlot(_ slot: GameDetailLayoutPlan.Slot, plan: GameDetailLayoutPlan) -> some View {
         let frame = plan[slot]
         // The board takes the layout's (animated) proposal; see GameDetailLayout.
         let content = slot == .board
@@ -1046,32 +1045,9 @@ extension View {
             .accessibilityHidden(frame.isEmpty)
             // A hidden slot stays mounted; its content can tell it is not shown.
             .environment(\.gameDetailSlotVisible, !frame.isEmpty)
-            .modifier(GameDetailSceneBounds(slot: slot, isVisible: sceneVisible && !frame.isEmpty))
             .layoutValue(key: GameDetailSlotKey.self, value: slot)
     }
-}
 
-/// Bounds follow the actual layout, including the board's animated proposal.
-/// The scene resolves these anchors without feeding geometry back into layout.
-struct GameDetailSceneBoundsPreferenceKey: PreferenceKey {
-    static let defaultValue: [GameDetailLayoutPlan.Slot: Anchor<CGRect>] = [:]
-
-    static func reduce(value: inout [GameDetailLayoutPlan.Slot: Anchor<CGRect>],
-                       nextValue: () -> [GameDetailLayoutPlan.Slot: Anchor<CGRect>]) {
-        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
-    }
-}
-
-private struct GameDetailSceneBounds: ViewModifier {
-    @Environment(\.surroundTheme) private var theme
-    let slot: GameDetailLayoutPlan.Slot
-    let isVisible: Bool
-
-    func body(content: Content) -> some View {
-        content.anchorPreference(key: GameDetailSceneBoundsPreferenceKey.self, value: .bounds) {
-            theme == .christmasKeepsakes && isVisible ? [slot: $0] : [:]
-        }
-    }
 }
 
 private struct GameDetailSlotVisibleKey: EnvironmentKey {

@@ -445,7 +445,16 @@ private struct GameDetailClockCard: View {
                 .padding(.horizontal, spaciousCompact ? 14 : (style == .full ? (columnCard ? 10 : 12) : 8))
                 .frame(minWidth: 44, maxWidth: style == .inline && !cardWidth.isFinite ? nil : .infinity)
                 .frame(height: style == .inline ? max(34, height - 10) : height)
-                .background { surface }
+                .background {
+                    surface
+                        .overlay {
+                            if style != .inline {
+                                ChristmasKeepsakesSurfaceLighting(profile: showsThemeGlass
+                                    ? (color == .white ? .ivoryGlassCard : .glassCard) : .pigmentCard)
+                                    .clipShape(shape)
+                            }
+                        }
+                }
                 .overlay { clockOutline }
                 // Like the turn outline, frost belongs to the glass's
                 // foreground content, before the container captures it.
@@ -1366,6 +1375,15 @@ struct GameDetailPlayerIdentity: View {
                                                        avatarSize: columnAvatarSize,
                                                        padding: columnPadding)) : nil,
                alignment: isBottomRightPlayer ? .bottom : .top)
+        .background {
+            // This background is part of the glass's foreground content, so
+            // native glass cannot cover the light and names remain above it.
+            if !navigationHeader && !avatarOnly {
+                ChristmasKeepsakesSurfaceLighting(profile: showsThemeGlass
+                    ? (color == .white ? .ivoryGlassCard : .glassCard) : .pigmentCard)
+                    .clipShape(RoundedRectangle(cornerRadius: chipCornerRadius))
+            }
+        }
         .background {
             if theme == .feltMeadow {
                 FeltControlSurface(color: color, shape: RoundedRectangle(cornerRadius: chipCornerRadius))

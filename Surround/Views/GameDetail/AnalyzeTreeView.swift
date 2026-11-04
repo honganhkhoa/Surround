@@ -389,6 +389,7 @@ struct AnalyzeTreeView: View {
         // so scrolling cannot draw or receive taps beneath a side toolbar.
         .clipped()
         .contentShape(Rectangle())
+        .background { ChristmasKeepsakesSurfaceLighting() }
         .background(GameDetailAppearance.panel, ignoresSafeAreaEdges: [])
     }
 

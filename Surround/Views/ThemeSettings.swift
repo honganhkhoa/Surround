@@ -49,7 +49,8 @@ struct ThemeLivePreview: View {
                     GameDetailBackdrop()
                 }
                 BoardView(boardPosition: Self.position)
-                    .environment(\.excludesBoardsFromSceneShadows, theme == .frostPine)
+                    .environment(\.excludesBoardsFromSceneShadows,
+                                 theme == .frostPine)
                     .frame(width: boardSide, height: boardSide)
                     .offset(x: side * 0.22, y: side * 0.22)
             }

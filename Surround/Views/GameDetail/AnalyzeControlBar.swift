@@ -585,6 +585,7 @@ private struct MarkerToolMenu: View {
 private struct AnalyzeControlBarSurface: ViewModifier {
     func body(content: Content) -> some View {
         content
+            .background { ChristmasKeepsakesSurfaceLighting() }
             .background(GameDetailAppearance.panel, ignoresSafeAreaEdges: [])
             .overlay {
                 Rectangle().stroke(GameDetailAppearance.panelBorder, lineWidth: 0.5)

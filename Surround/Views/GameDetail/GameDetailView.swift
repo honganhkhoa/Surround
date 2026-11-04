@@ -724,9 +724,12 @@ struct GameDetailView: View {
         #endif
         
         let result = gameBody(compact: compactLayout, geometry: geometry)
+        .environment(\.christmasKeepsakesLightContext,
+                     ChristmasKeepsakesLightContext(size: geometry.size, safeAreaInsets: geometry.safeAreaInsets))
         .environment(\.excludesBoardsFromSceneShadows,
                      SurroundTheme.current(storedID: gameThemeID) == .frostPine)
         .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
+        .coordinateSpace(name: ChristmasKeepsakesLightContext.coordinateSpace)
         .onChange(of: showsActiveGamesButton) { _, isVisible in
             if !isVisible { showsActiveGames = false }
         }
@@ -734,11 +737,9 @@ struct GameDetailView: View {
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.gameDetail(currentGame)
         )
-        .backgroundPreferenceValue(GameDetailSceneBoundsPreferenceKey.self) { anchors in
-            GeometryReader { scene in
-                GameDetailBackdrop(occupiedFrames: anchors.mapValues { scene[$0] })
-            }
-            .ignoresSafeArea(.container)
+        .background {
+            GameDetailBackdrop()
+                .ignoresSafeArea(.container)
         }
         .overlayPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
             GeometryReader { scene in

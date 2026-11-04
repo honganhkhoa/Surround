@@ -485,13 +485,13 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
     func testChristmasKeepsakesBoardMarkerGallery() throws {
         try auditThemeBoardMarkerGallery(theme: "christmasKeepsakes", appearance: .light,
                                          suffix: "christmas-keepsakes", pageBrightnessBand: 0.70...1,
-                                         boardBrightnessBand: 0.12...0.40)
+                                         boardBrightnessBand: 0.35...0.65)
     }
 
     func testChristmasKeepsakesNightBoardMarkerGallery() throws {
         try auditThemeBoardMarkerGallery(theme: "christmasKeepsakes", appearance: .dark,
                                          suffix: "christmas-keepsakes-night", pageBrightnessBand: 0...0.25,
-                                         boardBrightnessBand: 0.08...0.32)
+                                         boardBrightnessBand: 0.35...0.65)
     }
 
     func testNightGardenBoardMarkerGallery() throws {
