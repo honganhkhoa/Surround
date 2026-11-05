@@ -1234,7 +1234,13 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
     // left near the top can sit almost entirely under a header. A long press
     // then reaches the row's thin visible edge and opens the game instead of
     // the context menu. Center the row before pressing, and if the press
-    // still opens its destination, return and press again, holding longer.
+    // still opens its destination, return and press again.
+    //
+    // Press above the row's middle, not at it. On iPadOS 18 SwiftUI offers no
+    // context menu along a hairline at the exact vertical middle of a Home
+    // tile, and XCUITest presses an element's middle, so whether the press
+    // landed on that line depended on the scroll position. Hold long enough
+    // for a slow runner to show the menu before the touch lifts.
     @discardableResult
     func openProfileContextMenu(
         for row: XCUIElement,
@@ -1245,7 +1251,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         line: UInt = #line
     ) -> XCUIElement {
         let menuItem = menuButton(accessibilityIdentifier, title: title, in: app)
-        let pressDurations: [TimeInterval] = [1, 2.5, 2.5]
+        let pressDurations: [TimeInterval] = [2.5, 2.5, 2.5]
         for (attempt, pressDuration) in pressDurations.enumerated() {
             scrollIntoTappableArea(row, in: app)
             XCTAssertTrue(row.isHittable, "The row must be visible before opening its context menu.",
@@ -1254,7 +1260,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             row.rightClick()
             #else
             centerInScrollContainer(row, in: app)
-            row.press(forDuration: pressDuration)
+            row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).press(forDuration: pressDuration)
             #endif
             if attempt == pressDurations.count - 1 || menuItem.waitForExistence(timeout: 10) { break }
             guard !(row.exists && row.isHittable) else { continue }
