@@ -223,6 +223,8 @@ enum SurroundTouchTrace {
                 #selector(UIApplication.surroundTrace_sendEvent(_:)))
         swizzle(UIGestureRecognizer.self, NSSelectorFromString("setState:"),
                 #selector(UIGestureRecognizer.surroundTrace_setState(_:)))
+        swizzle(UIGestureRecognizer.self, NSSelectorFromString("setEnabled:"),
+                #selector(UIGestureRecognizer.surroundTrace_setEnabled(_:)))
         let timer = Timer(timeInterval: 0.05, repeats: true) { _ in
             let now = ProcessInfo.processInfo.systemUptime
             let gap = now - lastTick
@@ -275,6 +277,17 @@ enum SurroundTouchTrace {
              + "delegate=\(recognizer.delegate.map { String(describing: type(of: $0)) } ?? "nil")")
     }
 
+    static func enabled(_ recognizer: UIGestureRecognizer, _ enabled: Bool) {
+        guard isNearTouch, enabled != recognizer.isEnabled else { return }
+        let name = String(describing: type(of: recognizer))
+        guard name.contains("TouchDuration") || name.contains("Relationship") || name.contains("LongPress") else { return }
+        let view = recognizer.view.map { String(describing: type(of: $0)) } ?? "nil"
+        emit("setEnabled \(name) \(recognizer.isEnabled)->\(enabled) state=\(recognizer.state.rawValue) view=\(view)")
+        for (index, frame) in Thread.callStackSymbols.prefix(45).enumerated() {
+            emit("  stack[\(index)] \(frame)")
+        }
+    }
+
     static func emit(_ message: String) {
         guard sequence < limit else { return }
         sequence += 1
@@ -291,6 +304,11 @@ extension UIApplication {
 }
 
 extension UIGestureRecognizer {
+    @objc func surroundTrace_setEnabled(_ enabled: Bool) {
+        SurroundTouchTrace.enabled(self, enabled)
+        surroundTrace_setEnabled(enabled)
+    }
+
     @objc func surroundTrace_setState(_ newState: UIGestureRecognizer.State) {
         SurroundTouchTrace.state(self, newState)
         surroundTrace_setState(newState)
