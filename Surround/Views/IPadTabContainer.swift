@@ -180,6 +180,9 @@ struct IPadTabContainer: UIViewControllerRepresentable {
 
         func update(_ parent: IPadTabContainer, regularWidth: Bool, layoutDirection: LayoutDirection) {
             self.parent = parent
+            #if DEBUG && MAIN_APP
+            SurroundTouchTrace.emit("container.update regular=\(regularWidth)")
+            #endif
             applyLayoutDirection(layoutDirection)
             for (root, host) in hosts {
                 host.rootView = hostedContent(root)
@@ -473,6 +476,9 @@ struct IPadTabContainer: UIViewControllerRepresentable {
 
         private func deliverMetrics() {
             guard let latest = pendingMetrics, latest != deliveredMetrics else { return }
+            #if DEBUG && MAIN_APP
+            SurroundTouchTrace.emit("metrics.deliver \(latest)")
+            #endif
             deliveredMetrics = latest
             for context in contexts.values { context.update(latest) }
         }
