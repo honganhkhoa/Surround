@@ -275,6 +275,9 @@ enum SurroundTouchTrace {
         emit("gesture \(type(of: recognizer)) \(recognizer.state.rawValue)->\(newState.rawValue) "
              + "view=\(view) enabled=\(recognizer.isEnabled) "
              + "delegate=\(recognizer.delegate.map { String(describing: type(of: $0)) } ?? "nil")")
+        if newState == .began, String(describing: type(of: recognizer)).contains("TouchDuration") {
+            ContextMenuProbe.began(recognizer)
+        }
     }
 
     static func enabled(_ recognizer: UIGestureRecognizer, _ enabled: Bool) {
@@ -294,6 +297,135 @@ enum SurroundTouchTrace {
         let uptime = String(format: "%.4f", ProcessInfo.processInfo.systemUptime)
         logger.notice("[SurroundTouch] seq=\(sequence) uptime=\(uptime, privacy: .public) \(message, privacy: .public)")
     }
+}
+
+/// Watches SwiftUI's answer to UIKit's context-menu question at a long-press.
+enum ContextMenuProbe {
+    private typealias Configure = @convention(c)
+        (AnyObject, Selector, UIContextMenuInteraction, CGPoint) -> UIContextMenuConfiguration?
+    private static var hookedClasses = Set<ObjectIdentifier>()
+    private static var original = [ObjectIdentifier: IMP]()
+    private static var mapsDrawn = Set<String>()
+    private static var inside = false
+
+    static func began(_ recognizer: UIGestureRecognizer) {
+        guard let view = recognizer.view, let window = view.window else {
+            SurroundTouchTrace.emit("probe began noView")
+            return
+        }
+        let point = recognizer.location(in: window)
+        let hit = window.hitTest(point, with: nil)
+        SurroundTouchTrace.emit("probe began at=\(format(point)) recognizerView=\(describe(view, in: window)) "
+                                + "hit=\(hit.map { chain($0, in: window) } ?? "nil")")
+        var current: UIView? = view
+        var depth = 0
+        while let candidate = current, depth < 14 {
+            for interaction in candidate.interactions {
+                guard let menu = interaction as? UIContextMenuInteraction else { continue }
+                let delegate = menu.delegate.map { String(describing: type(of: $0)) } ?? "nil"
+                SurroundTouchTrace.emit("probe interaction depth=\(depth) view=\(describe(candidate, in: window)) "
+                                        + "loc=\(format(menu.location(in: candidate))) delegate=\(delegate) "
+                                        + "count=\(candidate.interactions.count)")
+                if let object = menu.delegate { hook(type(of: object)) }
+            }
+            current = candidate.superview
+            depth += 1
+        }
+    }
+
+    private static func hook(_ cls: AnyClass) {
+        let key = ObjectIdentifier(cls)
+        guard !hookedClasses.contains(key) else { return }
+        hookedClasses.insert(key)
+        for name in ["contextMenuInteraction:configurationForMenuAtLocation:",
+                     "_contextMenuInteraction:configurationForMenuAtLocation:completion:",
+                     "_contextMenuInteraction:configurationForMenuAtLocation:",
+                     "contextMenuInteraction:configuration:highlightPreviewForItemWithIdentifier:"] {
+            let selector = NSSelectorFromString(name)
+            SurroundTouchTrace.emit("probe delegate \(cls) responds \(name)=\(class_respondsToSelector(cls, selector))")
+        }
+        let selector = #selector(UIContextMenuInteractionDelegate.contextMenuInteraction(_:configurationForMenuAtLocation:))
+        guard let method = class_getInstanceMethod(cls, selector) else {
+            SurroundTouchTrace.emit("probe hookFailed \(cls)")
+            return
+        }
+        original[key] = method_getImplementation(method)
+        let block: @convention(block) (AnyObject, UIContextMenuInteraction, CGPoint) -> UIContextMenuConfiguration? = {
+            object, interaction, location in
+            let result = call(object, cls: cls, interaction, location)
+            guard !inside else { return result }
+            let view = interaction.view
+            let window = view?.window
+            let windowPoint = view.map { $0.convert(location, to: window) } ?? .zero
+            SurroundTouchTrace.emit("probe configure loc=\(format(location)) window=\(format(windowPoint)) "
+                                    + "result=\(result.map { "config(\($0.identifier))" } ?? "nil") "
+                                    + "view=\(view.map { describe($0, in: window) } ?? "nil")")
+            if let view, let window {
+                drawMap(object, cls: cls, interaction, view: view, window: window, missed: result == nil)
+            }
+            return result
+        }
+        method_setImplementation(method, imp_implementationWithBlock(block))
+        SurroundTouchTrace.emit("probe hooked \(cls)")
+    }
+
+    private static func call(_ object: AnyObject, cls: AnyClass, _ interaction: UIContextMenuInteraction,
+                             _ location: CGPoint) -> UIContextMenuConfiguration? {
+        guard let imp = original[ObjectIdentifier(cls)] else { return nil }
+        let function = unsafeBitCast(imp, to: Configure.self)
+        return function(object, #selector(UIContextMenuInteractionDelegate.contextMenuInteraction(_:configurationForMenuAtLocation:)),
+                        interaction, location)
+    }
+
+    /// Once per launch for a miss and once for a hit: where SwiftUI would offer a menu, on a 25 pt grid.
+    private static func drawMap(_ object: AnyObject, cls: AnyClass, _ interaction: UIContextMenuInteraction,
+                                view: UIView, window: UIWindow, missed: Bool) {
+        let kind = missed ? "miss" : "hit"
+        guard !mapsDrawn.contains(kind) else { return }
+        mapsDrawn.insert(kind)
+        inside = true
+        defer { inside = false }
+        let step: CGFloat = 25
+        let bounds = window.bounds
+        SurroundTouchTrace.emit("probe map[\(kind)] begin window=\(format(bounds.size)) step=\(Int(step)) "
+                                + "view=\(describe(view, in: window))")
+        var y: CGFloat = step / 2
+        while y < bounds.height {
+            var row = ""
+            var x: CGFloat = step / 2
+            while x < bounds.width {
+                let local = window.convert(CGPoint(x: x, y: y), to: view)
+                if !view.bounds.contains(local) {
+                    row += " "
+                } else {
+                    row += call(object, cls: cls, interaction, local) == nil ? "." : "#"
+                }
+                x += step
+            }
+            SurroundTouchTrace.emit("probe map[\(kind)] y=\(String(format: "%4d", Int(y))) |\(row)|")
+            y += step
+        }
+        SurroundTouchTrace.emit("probe map[\(kind)] end")
+    }
+
+    private static func chain(_ view: UIView, in window: UIWindow) -> String {
+        var parts = [String]()
+        var current: UIView? = view
+        while let candidate = current, parts.count < 6 {
+            parts.append(describe(candidate, in: window))
+            current = candidate.superview
+        }
+        return parts.joined(separator: " < ")
+    }
+
+    private static func describe(_ view: UIView, in window: UIWindow?) -> String {
+        let frame = view.convert(view.bounds, to: window)
+        return "\(type(of: view))[\(format(frame.origin)) \(format(frame.size))]"
+    }
+
+    private static func int(_ value: CGFloat) -> String { abs(value) < 1e9 ? String(Int(value)) : String(format: "%g", Double(value)) }
+    private static func format(_ point: CGPoint) -> String { "\(int(point.x)),\(int(point.y))" }
+    private static func format(_ size: CGSize) -> String { "\(int(size.width))x\(int(size.height))" }
 }
 
 extension UIApplication {

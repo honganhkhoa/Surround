@@ -53,20 +53,11 @@ jobs:
           PY
           mkdir -p TestResults
           date -u "+%Y-%m-%d %H:%M:%S" > TestResults/trace-start.txt
-          (
-            for n in 1 2 3; do
-              for _ in $(seq 1 120); do pid="$(pgrep -x Surround | head -1)"; [ -n "$pid" ] && break; sleep 1; done
-              sleep 12
-              pid="$(pgrep -x Surround | head -1)"
-              [ -n "$pid" ] && sample "$pid" 20 -file "TestResults/sample-$n.txt" >/dev/null 2>&1
-              while pgrep -x Surround >/dev/null; do sleep 2; done
-            done
-          ) &
           xcodebuild test-without-building \
             -xctestrun "$products/TouchTrace.xctestrun" \
             -destination "platform=iOS Simulator,id=${simulator_id}" \
             -parallel-testing-enabled NO \
-            -test-iterations 2 \
+            -test-iterations 3 \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 600 \
             -maximum-test-execution-time-allowance 600 \
