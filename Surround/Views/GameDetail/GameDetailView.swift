@@ -752,6 +752,9 @@ struct GameDetailView: View {
         )
         .background {
             GameDetailBackdrop()
+                .overlay {
+                    GameDetailSceneFoliage(hasTopEdgeClocks: hasActiveVerticalDisplayDivision(in: geometry))
+                }
                 .overlay(alignment: .top) {
                     let theme = SurroundTheme.current(storedID: gameThemeID)
                     if theme.isFlowingInk {
@@ -772,8 +775,7 @@ struct GameDetailView: View {
         }
         .overlayPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
             GeometryReader { scene in
-                GameDetailSceneForeground(hasTopEdgeClocks: hasActiveVerticalDisplayDivision(in: geometry),
-                                          shadowExclusions: anchors.map {
+                GameDetailSceneForeground(shadowExclusions: anchors.map {
                                               BoardSceneShadowRegion(bounds: scene[$0.bounds], cornerRadius: $0.cornerRadius)
                                           })
             }

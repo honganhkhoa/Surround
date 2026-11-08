@@ -2998,25 +2998,43 @@ private struct SurroundStudioSceneContent: View, Equatable {
     }
 }
 
-/// Foliage sits above its cast shadow and the game, independently of panels.
-/// System chrome and presented sheets remain above this scene layer.
-struct GameDetailSceneForeground: View {
+/// Canopies follow the viewport behind the game, so clocks and panels cover
+/// the leaves in every layout, including folded displays.
+struct GameDetailSceneFoliage: View {
     @Environment(\.surroundTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     var hasTopEdgeClocks = false
-    var shadowExclusions: [BoardSceneShadowRegion] = []
 
     var body: some View {
         Group {
             if theme == .rakedGarden {
                 GeometryReader { geometry in
-                    RakedGardenForegroundContent(size: geometry.size, scheme: colorScheme,
+                    RakedGardenFoliageContent(size: geometry.size, scheme: colorScheme,
                                                  hasTopEdgeClocks: hasTopEdgeClocks).equatable()
                 }
             } else if theme == .surroundStudio {
                 GeometryReader { geometry in
                     SurroundStudioFoliageContent(size: geometry.size, scheme: colorScheme,
                                                  hasTopEdgeClocks: hasTopEdgeClocks).equatable()
+                }
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Cast shadows retain their projection across the game, above the backdrop.
+struct GameDetailSceneForeground: View {
+    @Environment(\.surroundTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
+    var shadowExclusions: [BoardSceneShadowRegion] = []
+
+    var body: some View {
+        Group {
+            if theme == .rakedGarden {
+                GeometryReader { geometry in
+                    RakedGardenMapleShadow(size: geometry.size, scheme: colorScheme).equatable()
                 }
             } else if theme == .frostPine {
                 GeometryReader { geometry in
@@ -3350,7 +3368,7 @@ private struct FrostPineShadow: View, Equatable {
 }
 
 /// Both canopies follow the viewport independently of game panels. The upper
-/// foliage reserves chrome; the lower tree stays behind the game and its bars.
+/// foliage reserves chrome; both canopies stay behind the game and its bars.
 struct SurroundStudioDecorationLayout: Equatable {
     let foliage: CGRect
     let tree: CGRect
@@ -3362,8 +3380,7 @@ struct SurroundStudioDecorationLayout: Equatable {
         let tileSide = min(260, max(176, shortSide * 0.5))
         let roomy = min(1, max(0, (shortSide - 430) / 250))
         let portrait = min(1, max(0, (height / max(1, width) - 1) * 2))
-        // A conservative, fixed top reach keeps
-        // the foreground clear of clocks and panel text through mode changes.
+        // Keep a conservative, fixed top reach through panel mode changes.
         let foliageSide = tileSide * 1.5
         let heightLimit: CGFloat = usesLegacyChrome ? 80 : hasTopEdgeClocks ? 88 : 128 - 18 * roomy
         // Phone landscape can place a board under this corner. Reserve that
@@ -3421,7 +3438,7 @@ private struct SurroundStudioFoliageContent: View, Equatable {
     }
 }
 
-private struct RakedGardenForegroundContent: View, Equatable {
+private struct RakedGardenFoliageContent: View, Equatable {
     let size: CGSize
     let scheme: ColorScheme
     let hasTopEdgeClocks: Bool
@@ -3434,30 +3451,27 @@ private struct RakedGardenForegroundContent: View, Equatable {
     var body: some View {
         let layout = RakedGardenSceneLayout(size: size, usesLegacyChrome: usesLegacyChrome,
                                            hasTopEdgeClocks: hasTopEdgeClocks)
-        ZStack {
-            RakedGardenMapleShadow(size: size, scheme: scheme).equatable()
-            Image("RakedGardenMaple")
-                .resizable()
-                .colorMultiply(scheme == .dark ? Color(themeHex: 0x8292AC) : .white)
-                .frame(width: layout.maple.width, height: layout.maple.height)
-                .position(x: layout.maple.midX, y: layout.maple.midY)
-                // Fade the foliage beneath system chrome without putting
-                // a pale scrim over the game content below it.
-                .mask {
-                    VStack(spacing: 0) {
-                        LinearGradient(stops: [
-                            .init(color: .white.opacity(usesLegacyChrome ? 0.08 : 0.18), location: 0),
-                            .init(color: .white.opacity(usesLegacyChrome ? 0.08 : 0.74),
-                                  location: usesLegacyChrome ? 0.62 : 0.5),
-                            .init(color: .white, location: 1)
-                        ], startPoint: .top, endPoint: .bottom)
-                        .frame(height: layout.topFadeHeight)
-                        Color.white
-                    }
+        Image("RakedGardenMaple")
+            .resizable()
+            .colorMultiply(scheme == .dark ? Color(themeHex: 0x8292AC) : .white)
+            .frame(width: layout.maple.width, height: layout.maple.height)
+            .position(x: layout.maple.midX, y: layout.maple.midY)
+            // Fade the foliage beneath system chrome without putting
+            // a pale scrim over the game content below it.
+            .mask {
+                VStack(spacing: 0) {
+                    LinearGradient(stops: [
+                        .init(color: .white.opacity(usesLegacyChrome ? 0.08 : 0.18), location: 0),
+                        .init(color: .white.opacity(usesLegacyChrome ? 0.08 : 0.74),
+                              location: usesLegacyChrome ? 0.62 : 0.5),
+                        .init(color: .white, location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: layout.topFadeHeight)
+                    Color.white
                 }
-        }
-        .frame(width: layout.size.width, height: layout.size.height)
-        .clipped()
+            }
+            .frame(width: layout.size.width, height: layout.size.height)
+            .clipped()
     }
 }
 
@@ -3526,8 +3540,7 @@ struct RakedGardenSceneLayout: Equatable {
                        width: rockSide, height: rockSide)
         upperRocks = CGRect(x: -upperRockSide * 0.30, y: -upperRockSide * 0.56,
                             width: upperRockSide, height: upperRockSide)
-        // Real leaves may overlap a panel edge, but stop above clock digits.
-        // Legacy phone clocks sit higher, below their shorter navigation bar.
+        // Keep the top canopy shallow around legacy chrome and divided layouts.
         let mapleHeightLimit: CGFloat = usesLegacyChrome || hasTopEdgeClocks ? 100 : 160
         let mapleVisibleHeight = min(mapleSide * 0.84, mapleHeightLimit)
         maple = CGRect(x: width - mapleSide * 0.68, y: mapleVisibleHeight - mapleSide,
