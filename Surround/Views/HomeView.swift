@@ -1120,7 +1120,7 @@ struct ThemeSceneBackdrop: View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
                 GameDetailBackdrop().ignoresSafeArea(.container)
-                if theme.hasScene {
+                if theme.showsSceneArt {
                     let titleArea = geometry.safeAreaInsets.top
                     let height = titleArea + fadeLength
                     LinearGradient(
@@ -1151,7 +1151,7 @@ struct HomeSceneLegibility: ViewModifier {
     @Environment(\.surroundTheme) private var theme
 
     func body(content: Content) -> some View {
-        if theme.hasScene {
+        if theme.showsSceneArt {
             content
                 .shadow(color: theme.pageBackground.opacity(0.9), radius: 1)
                 .background {

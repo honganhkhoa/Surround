@@ -459,6 +459,8 @@ struct HomeGameTile: View {
     var navigationAccessibilityIdentifier = ""
 
     @EnvironmentObject private var ogs: OGSService
+    @Environment(\.surroundTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.boardAppearance) private var boardAppearance
     @Environment(\.displayScale) private var displayScale
 
@@ -489,8 +491,11 @@ struct HomeGameTile: View {
                         .font(.footnote.weight(.medium))
                         .opacity(0.72)
                     if !game.isUserTurn, !game.conditionalMoveBranches.isEmpty, let gameID = game.ogsID {
+                        // Dark page ink is too pale for the white clock chip.
                         ConditionalMovesButton(game: game, context: .home(gameID: gameID), usesHomeLineStyle: true,
-                                               showsHomeLineTitle: false)
+                                               showsHomeLineTitle: false,
+                                               homeIconColor: theme.isFlowingInk && colorScheme == .dark
+                                                ? theme.identityForeground(facts.bottomColor) : nil)
                     }
                 } else if let player = game.currentPlayer(with: facts.bottomColor) {
                     HomePlayerName(player: player, surface: facts.bottomColor,

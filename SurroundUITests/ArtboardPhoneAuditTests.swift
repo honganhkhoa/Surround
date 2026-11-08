@@ -978,6 +978,69 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         }
     }
 
+    func testFlowingInkThemeStates() throws {
+        try auditThemeStates(theme: "flowingInk", title: "Flowing Ink",
+                             suffix: "-flowing-ink", appearance: .light)
+    }
+
+    func testFlowingInkNightThemeStates() throws {
+        let device = XCUIDevice.shared
+        let originalAppearance = device.appearance
+        addTeardownBlock { device.appearance = originalAppearance }
+        device.appearance = .dark
+        XCTAssertTrue(pollUntil(timeout: 10) { device.appearance == .dark })
+        // Exercise the system appearance, including native toolbar chrome,
+        // without a fixture override masking whether the theme follows it.
+        try auditThemeStates(theme: "flowingInkJade", title: "Flowing Ink in Dark Mode",
+                             suffix: "-flowing-ink-jade-night", appearance: nil)
+    }
+
+    func testFlowingInkControlStates() throws {
+        try auditFlowingInkControls(theme: "flowingInk", appearance: .light)
+    }
+
+    func testFlowingInkNightControlStates() throws {
+        try auditFlowingInkControls(theme: "flowingInk", appearance: .dark)
+    }
+
+    func testFlowingInkJadeControlStates() throws {
+        try auditFlowingInkControls(theme: "flowingInkJade", appearance: .light)
+    }
+
+    func testFlowingInkJadeNightControlStates() throws {
+        try auditFlowingInkControls(theme: "flowingInkJade", appearance: .dark)
+    }
+
+    private func auditFlowingInkControls(theme: String, appearance: SurroundUITestContract.Appearance) throws {
+        let suffix = "-\(theme)-\(appearance.rawValue)"
+        auditThemeControlStates(theme: theme, title: "Flowing Ink", appearance: appearance, suffix: suffix)
+        try auditThemeScoring(theme: theme, title: "Flowing Ink", suffix: suffix, appearance: appearance)
+        // These production clock fixtures render the distinct agreement,
+        // disconnected and undo accents as well as the ordinary running ring.
+        for state in ["byoyomi-main", "disconnected", "byoyomi-overtime", "stone-removal", "estimate-white"] {
+            let app = launch(artboard: 79, clock: state, fromMainNavigation: false,
+                             theme: theme, appearance: appearance)
+            capture(79, app: app, note: "Flowing Ink production clock state: \(state).", suffix: suffix + "-" + state)
+            app.terminate()
+        }
+        let header = launch(artboard: 11, clock: "sudden-death", theme: theme, appearance: appearance)
+        startChat(in: header, typing: false)
+        capture(11, app: header, note: "Flowing Ink compact header clock warning.", suffix: suffix + "-header")
+        header.terminate()
+    }
+
+    func testFlowingInkBoardMarkerGallery() throws {
+        try auditThemeBoardMarkerGallery(theme: "flowingInk", appearance: .light,
+                                         suffix: "flowing-ink", pageBrightnessBand: 0.85...1,
+                                         boardBrightnessBand: 0.70...1)
+    }
+
+    func testFlowingInkJadeNightBoardMarkerGallery() throws {
+        try auditThemeBoardMarkerGallery(theme: "flowingInkJade", appearance: .dark,
+                                         suffix: "flowing-ink-jade-night", pageBrightnessBand: 0...0.25,
+                                         boardBrightnessBand: 0.30...0.60)
+    }
+
     private func auditThemeStates(theme: String, title: String, suffix: String,
                                   appearance: SurroundUITestContract.Appearance? = nil) throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,

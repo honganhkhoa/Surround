@@ -76,12 +76,12 @@ final class StonePlacementSoundPlayer: ObservableObject {
     }
 
     static func assetName(theme: SurroundTheme, color: StoneColor, variation: Int) -> String {
-        "StoneSound-\(theme.rawValue)-\(color.rawValue)-\(variation)"
+        "StoneSound-\(theme.isFlowingInk ? SurroundTheme.standard.rawValue : theme.rawValue)-\(color.rawValue)-\(variation)"
     }
 
     static func captureAssetName(theme: SurroundTheme, color: StoneColor,
                                  tier: CaptureTier, variation: Int) -> String {
-        "StoneCapture-\(theme.rawValue)-\(color.rawValue)-\(tier.rawValue)-\(variation)"
+        "StoneCapture-\(theme.isFlowingInk ? SurroundTheme.standard.rawValue : theme.rawValue)-\(color.rawValue)-\(tier.rawValue)-\(variation)"
     }
 
     /// A structural guard for one placement, not proof of a live update. The

@@ -83,7 +83,17 @@ private struct GameControlGlass<Surface: Shape>: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if reduceTransparency || (theme.usesLightSceneSurfaces && contrast == .increased) {
+        if theme.isFlowingInk {
+            // Ink controls keep the same opaque surface with or without scenery.
+            content
+                .background(prominent ? prominentFill : theme.panel, in: shape)
+                .overlay {
+                    if !prominent {
+                        shape.stroke(theme.panelBorder, lineWidth: contrast == .increased ? 2 : 1)
+                            .allowsHitTesting(false)
+                    }
+                }
+        } else if reduceTransparency || (theme.usesLightSceneSurfaces && contrast == .increased) {
             content.background(prominent ? prominentFill : Color(uiColor: .secondarySystemGroupedBackground), in: shape)
         } else if #available(iOS 26, *) {
             if prominent {
@@ -204,6 +214,7 @@ struct GameControlRow: View {
     }
 
     private var moreForeground: Color {
+        if theme.isFlowingInk { return theme.homeActionForeground }
         guard theme == .nightGarden || theme == .christmasKeepsakes else {
             return theme == .feltMeadow ? theme.foreground : .accentColor
         }

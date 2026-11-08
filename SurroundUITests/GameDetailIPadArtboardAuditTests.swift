@@ -618,6 +618,58 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                                appearance: .dark)
     }
 
+    func testFlowingInkJadeThemeOrientations() {
+        auditThemeOrientations(theme: "flowingInkJade", title: "Flowing Ink in color",
+                               suffix: "-flowing-ink-jade", appearance: .light)
+    }
+
+    func testFlowingInkJadeThemePanels() {
+        auditThemePanels(theme: "flowingInkJade", title: "Flowing Ink in color",
+                         suffix: "-flowing-ink-jade", appearance: .light)
+    }
+
+    func testFlowingInkNightThemeOrientations() {
+        auditThemeOrientations(theme: "flowingInk", title: "Flowing Ink at night",
+                               suffix: "-flowing-ink-night", appearance: .dark)
+    }
+
+    func testFlowingInkNightThemePanels() {
+        auditThemePanels(theme: "flowingInk", title: "Flowing Ink at night",
+                         suffix: "-flowing-ink-night", appearance: .dark)
+    }
+
+    func testFlowingInkThemeNarrowWindow() {
+        auditNarrowNativeWindowArtboard(theme: "flowingInkJade", suffix: "-flowing-ink-jade", appearance: .light)
+    }
+
+    func testFlowingInkThemeTallWindow() {
+        auditNarrowNativeWindowArtboard(theme: "flowingInkJade", suffix: "-flowing-ink-jade-tall",
+                                       appearance: .light, requestedSize: CGSize(width: 375, height: 1000))
+    }
+
+    func testFlowingInkDarkHomeIconSurfaces() {
+        for theme in ["flowingInk", "flowingInkJade"] {
+            let app = launchGame(artboard: 17, theme: theme, appearance: .dark, opensGame: false)
+            setSidebarCollapsed(true, in: app)
+            let conditional = element(ID.homeConditionalButton(SurroundUITestContract.screenshotPrimaryGameID),
+                                      in: app, matching: .button)
+            let home = app.scrollViews[ID.screenHome].firstMatch
+            for _ in 0..<4 {
+                if app.windows.firstMatch.frame.insetBy(dx: 0, dy: 12).contains(conditional.frame) { break }
+                home.swipeUp()
+            }
+            XCTAssertTrue(conditional.isHittable, "The affected conditional-move control is usable")
+            XCTAssertTrue(app.windows.firstMatch.frame.insetBy(dx: 0, dy: 12).contains(conditional.frame),
+                          "The conditional-move icon on the white clock surface is fully visible")
+            keepScreenshot("\(theme)-dark-home-icon-surfaces", in: app)
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "\(theme)-dark-home-icon-surfaces-hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            app.terminate()
+        }
+    }
+
     private func auditThemeOrientations(theme: String, title: String, suffix: String,
                                         appearance: SurroundUITestContract.Appearance? = nil) {
         let app = launchGame(artboard: 17, theme: theme, appearance: appearance)
@@ -1468,8 +1520,15 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
     }
 
     private func auditNarrowNativeWindowArtboard(theme: String? = nil, suffix: String = "",
-                                                 appearance: SurroundUITestContract.Appearance? = nil) {
+                                                 appearance: SurroundUITestContract.Appearance? = nil,
+                                                 requestedSize: CGSize = CGSize(width: 375, height: 548)) {
         let app = launchGame(artboard: 84, portrait: true, theme: theme, appearance: appearance)
+        defer {
+            if theme?.hasPrefix("flowingInk") == true {
+                restoreFullWindow(in: app)
+                app.terminate()
+            }
+        }
         setSidebarCollapsed(true, in: app)
         // iPadOS 26 exposes its native resize grabber at the lower-right corner.
         // This is a real windowing gesture, never an injected SwiftUI viewport.
@@ -1478,7 +1537,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         let grabber = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
             .withOffset(CGVector(dx: -3, dy: -3))
         let target = window.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: 375, dy: 548))
+            .withOffset(CGVector(dx: requestedSize.width, dy: requestedSize.height))
         grabber.press(forDuration: 0.8, thenDragTo: target)
         Thread.sleep(forTimeInterval: 1.5)
         // Native floating windows resize about their center, with a short
@@ -1488,21 +1547,59 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
             guard abs(difference) > 1 else { return 0 }
             return difference / 2 + (difference > 0 ? 8 : -8)
         }
-        for _ in 0..<6 {
+        let tallWindow = requestedSize.height > before.height * 0.75
+        for _ in 0..<(tallWindow ? 10 : 6) {
             let current = window.frame
-            guard abs(current.width - 375) > 1 || abs(current.height - 548) > 1 else { break }
+            guard abs(current.width - requestedSize.width) > 1 || abs(current.height - requestedSize.height) > 1 else { break }
             let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
                 .withOffset(CGVector(dx: -3, dy: -3))
+            // A tall window stays pinned below the status bar, so only its
+            // lower edge can move. The centered-window half correction then
+            // under-shoots; use the full measured correction for that axis.
+            let heightCorrection = resizeDelta(requestedSize.height - current.height)
+                * (tallWindow && current.minY <= 40 ? 2 : 1)
             corner.press(forDuration: 0.8, thenDragTo: corner.withOffset(
-                CGVector(dx: resizeDelta(375 - current.width), dy: resizeDelta(548 - current.height))))
+                CGVector(dx: resizeDelta(requestedSize.width - current.width), dy: heightCorrection)))
             Thread.sleep(forTimeInterval: 0.8)
         }
         let after = window.frame
-        capture(84, "Native iPad minimum window, 375 × 548", in: app,
-                note: "Requested native 375 × 548 viewport by resize grabber. Before: \(before); after: \(after).",
+        capture(84, "Native iPad window, \(requestedSize)", in: app,
+                note: "Requested native \(requestedSize) viewport by resize grabber. Before: \(before); after: \(after).",
                 suffix: suffix)
-        XCTAssertEqual(after.width, 375, accuracy: 1, "Capture the design's actual native window width")
-        XCTAssertEqual(after.height, 548, accuracy: 1, "Capture the design's actual native window height")
+        XCTAssertEqual(after.width, requestedSize.width, accuracy: 1, "Capture the design's actual native window width")
+        XCTAssertEqual(after.height, requestedSize.height, accuracy: 1, "Capture the design's actual native window height")
+        if theme?.hasPrefix("flowingInk") == true {
+            let board = element(ID.gameBoard, in: app)
+            let position = board.value as? String
+            XCTAssertNotNil(position, "Record the exact position before using the narrow toolbar")
+            let cycle = element("game.flowingInkCycle", in: app, matching: .button)
+            let chat = element(ID.gameDisplayModePicker + ".chat", in: app, matching: .button)
+            for control in [cycle, chat] {
+                XCTAssertTrue(waitUntilHittable(control, timeout: 10),
+                              "Narrow toolbar controls remain directly reachable")
+                XCTAssertTrue(after.insetBy(dx: -1, dy: -1).contains(control.frame),
+                              "The native window contains each toolbar control")
+            }
+            XCTAssertLessThan(cycle.frame.maxY, after.midY, "Flowing Ink stays in the top toolbar")
+            XCTAssertGreaterThan(chat.frame.minY, after.midY, "Chat moves into the bottom toolbar")
+            XCTAssertEqual(cycle.value as? String, "Color with background")
+            tap(chat, description: "Open Chat from the narrow bottom toolbar", in: app)
+            element(ID.gameChatLog, in: app, matching: .scrollView)
+            element(ID.gameChatInput, in: app, matching: .textField)
+            XCTAssertEqual(board.value as? String, position, "Opening Chat preserves the position")
+            capture(84, "Native narrow window with Chat", in: app, suffix: suffix + "-chat")
+
+            tap(cycle, description: "Cycle Flowing Ink while Chat is open", in: app)
+            XCTAssertTrue(pollUntil(timeout: 5) { cycle.value as? String == "Color without background" })
+            XCTAssertTrue(app.scrollViews[ID.gameChatLog].exists, "Cycling the theme keeps Chat open")
+            XCTAssertEqual(board.value as? String, position, "Cycling the theme preserves the position")
+            capture(84, "Native narrow window with Chat after theme cycle", in: app,
+                    suffix: suffix + "-chat-paper")
+
+            tap(chat, description: "Close Chat from the narrow bottom toolbar", in: app)
+            XCTAssertTrue(pollUntil(timeout: 5) { !app.scrollViews[ID.gameChatLog].exists })
+            XCTAssertEqual(board.value as? String, position, "Closing Chat preserves the position")
+        }
     }
 
     func testAccessibility3Artboards() {

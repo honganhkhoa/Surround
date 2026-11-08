@@ -902,7 +902,8 @@ final class SurroundThemeTests: XCTestCase {
                        OGSUser(username: "supporter", id: 4, supporter: true),
                        OGSUser(username: "bot", id: 5, isBot: true)]
         for theme in SurroundTheme.allCases {
-            let styles: [UIUserInterfaceStyle] = theme.colorScheme == .dark ? [.dark] : [.light, .dark]
+            let styles: [UIUserInterfaceStyle] = theme.colorScheme.map { [$0 == .dark ? .dark : .light] }
+                ?? [.light, .dark]
             for style in styles {
                 let scheme: ColorScheme = style == .dark ? .dark : .light
                 let panelSurface: StoneColor = style == .dark ? .black : .white
@@ -1165,6 +1166,285 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertTrue(SurroundTheme.feltMeadow.hasScene)
     }
 
+    /// Changing the landscape must never change Go's flat ink-and-paper
+    /// rendering, including on a large board that normally shades stones.
+    func testFlowingInkKeepsFlatStonesAndFineStraightGridInEveryVariant() throws {
+        for theme: SurroundTheme in [.flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain] {
+            XCTAssertNil(theme.colorScheme, "Flowing Ink follows the selected system/app appearance")
+            for scheme: ColorScheme in [.light, .dark] {
+                let board = theme.board(for: scheme)
+                if scheme == .light {
+                    XCTAssertEqual(board.boardColor, theme.flowingInkUsesColor ? Color(themeHex: 0xDDE7DB) : .white,
+                                   "An explicit Light appearance preserves the original concept")
+                } else {
+                    XCTAssertLessThan(luminance(board.boardColor, style: .dark),
+                                      luminance(theme.board(for: .light).boardColor))
+                    XCTAssertGreaterThanOrEqual(contrast(.black, board.boardColor, style: .dark), 4.5,
+                                               "The dark board still separates its fine grid and labels")
+                    XCTAssertGreaterThanOrEqual(contrast(.white, board.boardColor, style: .dark), 3,
+                                               "White stones remain distinct on the subdued board")
+                }
+                XCTAssertEqual(board.surfaceColor(detailed: false), board.boardColor)
+                XCTAssertEqual(board.gridStyle, .straight)
+                XCTAssertEqual(board.gridColor, .black)
+                XCTAssertLessThanOrEqual(board.gridLineScale, 1)
+                XCTAssertFalse(board.usesShadedStones)
+                XCTAssertFalse(board.castsBoardShadow)
+                XCTAssertEqual(board.black.flat, .black)
+                XCTAssertEqual(board.white.flat, .white)
+                XCTAssertEqual(board.white.outline, .black)
+                XCTAssertFalse(board.boardBevel)
+                XCTAssertNil(board.boardDepth)
+                XCTAssertNil(board.boardTexture)
+                XCTAssertNil(board.boardReflection)
+                XCTAssertNil(board.surfaceFrost)
+                XCTAssertNil(board.stoneImages)
+            }
+        }
+        for scheme: ColorScheme in [.light, .dark] {
+            XCTAssertEqual(SurroundTheme.flowingInk.board(for: scheme), SurroundTheme.flowingInkPlain.board(for: scheme))
+            XCTAssertEqual(SurroundTheme.flowingInkJade.board(for: scheme), SurroundTheme.flowingInkJadePlain.board(for: scheme))
+        }
+    }
+
+    func testFlowingInkAdaptiveSurfacesKeepTextAndControlsReadable() throws {
+        let players = [
+            OGSUser(username: "ordinary", id: 1),
+            OGSUser(username: "moderator", id: 2, isModerator: true),
+            OGSUser(username: "professional", id: 3, professional: true),
+            OGSUser(username: "supporter", id: 4, supporter: true),
+        ]
+        for theme: SurroundTheme in [.flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain] {
+            assertAdaptiveColorsFollowRepeatedTraitChanges(theme)
+            for scheme: ColorScheme in [.light, .dark] {
+                let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+                try assertNightAnalysisMarksRemainReadable(theme, scheme: scheme)
+                for surface in [theme.pageBackground, theme.panel, theme.chatBubble] {
+                    XCTAssertGreaterThanOrEqual(contrast(theme.foreground, surface, style: style), 4.5)
+                    XCTAssertGreaterThanOrEqual(contrast(theme.detailSecondaryForeground, surface, style: style), 4.5)
+                }
+                XCTAssertGreaterThanOrEqual(contrast(theme.homeActionForeground, theme.panel, style: style), 4.5,
+                                           "The More dots remain readable on their flat panel")
+                XCTAssertGreaterThanOrEqual(contrast(.white, try XCTUnwrap(theme.actionTint), style: style), 4.5,
+                                           "The main action retains white text in both appearances")
+                for color: StoneColor in [.black, .white] {
+                    let surface = theme.clockSolidSurface(color)
+                    XCTAssertGreaterThanOrEqual(contrast(theme.clockForeground(color, scheme: scheme), surface, style: style), 4.5)
+                    XCTAssertGreaterThanOrEqual(contrast(theme.clockAccent(color), surface, style: style), 4.5,
+                                               "\(theme) \(scheme): regular accent reads on the \(color) clock")
+                    XCTAssertGreaterThanOrEqual(contrast(theme.identityForeground(color), surface, style: style), 4.5)
+                    XCTAssertGreaterThanOrEqual(contrast(theme.identitySecondary(color), surface, style: style), 4.5)
+                    for player in players {
+                        let role = try XCTUnwrap(theme.identityRoleColor(for: player, on: color))
+                        XCTAssertGreaterThanOrEqual(contrast(role, surface, style: style), 4.5,
+                                                   "\(theme) \(scheme): \(player.username) reads on the \(color) chip")
+                    }
+                    if scheme == .dark {
+                        for (state, accent) in [
+                            ("Sudden death", theme.clockSuddenDeathAccent(color, scheme: scheme)),
+                            ("Agreement", theme.clockAgreementAccent(color, scheme: scheme)),
+                            ("Disconnected", theme.clockDisconnectedAccent(color, scheme: scheme)),
+                            ("Undo", theme.clockUndoAccent(color, scheme: scheme)),
+                        ] {
+                            XCTAssertGreaterThanOrEqual(contrast(accent, surface, style: style), 4.5,
+                                                       "\(theme): \(state) reads on the dark \(color) clock")
+                        }
+                    }
+                }
+                if scheme == .dark {
+                    XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockSuddenDeathBadge(scheme: scheme), style: style), 4.5)
+                    XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockUndoBadge(scheme: scheme), style: style), 4.5)
+                }
+            }
+            XCTAssertLessThan(luminance(theme.clockSolidSurface(.white), style: .dark),
+                              luminance(theme.clockSolidSurface(.white), style: .light),
+                              "Dark Mode softens the flat white controls without adding material")
+        }
+    }
+
+    /// Exercise the exact outline used by the production clock card, rather
+    /// than only checking an unused palette token. Header and score cards use
+    /// this same view. The UI audit separately exercises the system's read-only
+    /// Increase Contrast environment through the supported simulator setting.
+    @MainActor
+    func testFlowingInkRunningClockOutlineRemainsVisibleAtEverySize() throws {
+        for theme: SurroundTheme in [.flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain] {
+            for scheme: ColorScheme in [.light, .dark] {
+                for color: StoneColor in [.black, .white] {
+                    for size in [CGSize(width: 88, height: 32), CGSize(width: 132, height: 48),
+                                 CGSize(width: 178, height: 88)] {
+                        for scale: CGFloat in [2, 3] {
+                            var widths: [Int] = []
+                            for running in [false, true] {
+                                let image = try nativeMaterialPixels(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(theme.clockSolidSurface(color))
+                                        .overlay { FlowingInkClockOutline(color: color, isRunning: running,
+                                                                          cornerRadius: 12) }
+                                        .frame(width: size.width, height: size.height)
+                                        .environment(\.surroundTheme, theme)
+                                        .environment(\.colorScheme, scheme), scale: scale)
+                                func pixel(_ y: Int) -> Color {
+                                    let i = (y * image.width + image.width / 2) * 4
+                                    return Color(red: Double(image.pixels[i]) / 255,
+                                                 green: Double(image.pixels[i + 1]) / 255,
+                                                 blue: Double(image.pixels[i + 2]) / 255)
+                                }
+                                let interior = pixel(image.height / 2)
+                                let detail = "\(theme) \(scheme) \(color) \(size) scale=\(scale)"
+                                if running {
+                                    XCTAssertGreaterThanOrEqual(contrast(pixel(Int(scale)), interior), 3, detail)
+                                }
+                                widths.append((0..<Int(6 * scale)).filter {
+                                    abs(luminance(pixel($0)) - luminance(interior)) > 0.05
+                                }.count)
+                            }
+                            XCTAssertGreaterThan(widths[1], widths[0], "Running is wider than idle")
+                            XCTAssertGreaterThanOrEqual(widths[1], Int(2.5 * scale))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testFlowingInkExplicitLightOverrideWinsInsideADarkEnvironment() throws {
+        struct PaletteProbe: View {
+            @Environment(\.surroundTheme) private var theme
+            @Environment(\.boardAppearance) private var board
+            var body: some View {
+                HStack(spacing: 0) {
+                    theme.pageBackground
+                    theme.panel
+                    board.boardColor
+                    theme.clockSolidSurface(.black)
+                    theme.clockSolidSurface(.white)
+                }
+                .frame(width: 100, height: 20)
+            }
+        }
+        for theme: SurroundTheme in [.flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain] {
+            let light = try nativeMaterialPixels(PaletteProbe().surroundTheme(theme, ownsWindow: false)
+                .environment(\.colorScheme, .light)).pixels
+            let dark = try nativeMaterialPixels(PaletteProbe().surroundTheme(theme, ownsWindow: false)
+                .environment(\.colorScheme, .dark)).pixels
+            let overridden = try nativeMaterialPixels(
+                ZStack {
+                    PaletteProbe().surroundTheme(theme, ownsWindow: false)
+                        .environment(\.colorScheme, .light)
+                }
+                .environment(\.colorScheme, .dark)
+            ).pixels
+            XCTAssertNotEqual(light, dark, "System Dark Mode must reach both the board and adaptive controls")
+            XCTAssertEqual(overridden, light, "An explicit Light appearance must win over a dark parent")
+        }
+    }
+
+    func testFlowingInkCyclesInOrderAndKeepsOnePickerEntry() {
+        let cycle: [SurroundTheme] = [.flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain]
+        for (index, theme) in cycle.enumerated() {
+            XCTAssertTrue(theme.isFlowingInk)
+            XCTAssertEqual(theme.nextFlowingInkTheme, cycle[(index + 1) % cycle.count])
+            XCTAssertTrue(theme.hasScene, "Every Flowing mode keeps the app-wide themed surfaces")
+            XCTAssertEqual(theme.showsSceneArt, index < 2)
+            XCTAssertEqual(theme.flowingInkUsesColor, index == 1 || index == 2)
+            XCTAssertEqual(theme.pickerTheme, .flowingInk)
+            #if DEBUG
+            XCTAssertEqual(SurroundTheme.current(storedID: theme.rawValue), theme,
+                           "The persisted theme ID must restore the exact variant")
+            #else
+            XCTAssertEqual(SurroundTheme.current(storedID: theme.rawValue), .standard)
+            #endif
+        }
+        for theme in SurroundTheme.allCases where !theme.isFlowingInk {
+            XCTAssertEqual(theme.nextFlowingInkTheme, .flowingInk)
+        }
+        #if DEBUG
+        XCTAssertEqual(SurroundTheme.pickerThemes.filter(\.isFlowingInk), [.flowingInk])
+        #else
+        XCTAssertTrue(SurroundTheme.pickerThemes.filter(\.isFlowingInk).isEmpty)
+        #endif
+    }
+
+    @MainActor
+    func testFlowingInkStandaloneStonesIgnoreRequestedShadows() throws {
+        func rendered(_ appearance: BoardAppearance, color: StoneColor, size: CGFloat,
+                      shadow: CGFloat) throws -> Data {
+            let view = Stone(color: color, shadowRadius: shadow)
+                .frame(width: size, height: size)
+                .padding(12)
+                .background(Color(red: 1, green: 0, blue: 1))
+                .environment(\.boardAppearance, appearance)
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = 3
+            return try XCTUnwrap(renderer.uiImage?.pngData())
+        }
+        for theme: SurroundTheme in [.flowingInk, .flowingInkJade] {
+            for scheme: ColorScheme in [.light, .dark] {
+                for color: StoneColor in [.black, .white] {
+                    for size: CGFloat in [7, 13, 20, 40] {
+                        XCTAssertEqual(try rendered(theme.board(for: scheme), color: color, size: size, shadow: 4),
+                                       try rendered(theme.board(for: scheme), color: color, size: size, shadow: 0),
+                                       "\(theme) \(scheme) \(color), \(size) pt stays solid with no shadow")
+                    }
+                }
+            }
+        }
+        // Prove the comparison detects shading on the ordinary stone path.
+        XCTAssertNotEqual(try rendered(.standard, color: .white, size: 40, shadow: 4),
+                          try rendered(.standard, color: .white, size: 40, shadow: 0))
+    }
+
+    func testFlowingInkArtworkPreservesProportionsAndLandmarksAcrossViewports() {
+        let sizes = [CGSize(width: 375, height: 548), CGSize(width: 402, height: 874),
+                     CGSize(width: 874, height: 402), CGSize(width: 820, height: 1180),
+                     CGSize(width: 1180, height: 820), CGSize(width: 320, height: 320),
+                     CGSize(width: 2000, height: 500), CGSize(width: 500, height: 2000)]
+        for size in sizes {
+            let layout = FlowingInkSceneLayout(size: size)
+            let portrait = size.height >= size.width
+            let source = portrait ? CGSize(width: 1024, height: 1536) : CGSize(width: 1536, height: 1024)
+            XCTAssertEqual(layout.imageSize.width / source.width,
+                           layout.imageSize.height / source.height, accuracy: 0.000001,
+                           "The painting must be scaled uniformly rather than stretched to the viewport")
+            XCTAssertEqual(layout.frame(for: .topLeft).minX, 0, accuracy: 0.001)
+            XCTAssertEqual(layout.frame(for: .topLeft).minY, 0, accuracy: 0.001)
+            XCTAssertEqual(layout.frame(for: .bottomRight).maxX, size.width, accuracy: 0.001)
+            XCTAssertEqual(layout.frame(for: .bottomRight).maxY, size.height, accuracy: 0.001)
+            let waterfall = portrait ? CGPoint(x: 0.05, y: 0.65) : CGPoint(x: 0.08, y: 0.70)
+            let pine = portrait ? CGPoint(x: 0.85, y: 0.84) : CGPoint(x: 0.85, y: 0.75)
+            XCTAssertTrue(layout.opaqueSourceBounds(for: .topLeft).contains(waterfall))
+            XCTAssertTrue(layout.opaqueSourceBounds(for: .bottomRight).contains(pine))
+        }
+        for size in [CGSize.zero, CGSize(width: -1, height: 100),
+                     CGSize(width: CGFloat.infinity, height: 100), CGSize(width: 100, height: CGFloat.nan)] {
+            let layout = FlowingInkSceneLayout(size: size)
+            for corner: FlowingInkSceneLayout.Corner in [.topLeft, .topRight, .bottomLeft, .bottomRight] {
+                let frame = layout.frame(for: corner)
+                XCTAssertTrue([frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite))
+                XCTAssertGreaterThanOrEqual(frame.width, 0)
+                XCTAssertGreaterThanOrEqual(frame.height, 0)
+            }
+        }
+    }
+
+    func testFlowingInkLandscapesDecodeAsOpaqueArtwork() throws {
+        let bundle = Bundle(for: Self.self)
+        for (name, portrait) in [("FlowingInkLandscapePortrait", true),
+                                 ("FlowingInkLandscapeLandscape", false)] {
+            let image = try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
+            let source = try XCTUnwrap(image.cgImage, name)
+            XCTAssertGreaterThanOrEqual(min(source.width, source.height), 1024)
+            XCTAssertEqual(source.height > source.width, portrait)
+            let pixels = try rgbaPixels(for: source, side: 128)
+            XCTAssertTrue(stride(from: 3, to: pixels.count, by: 4).allSatisfy { pixels[$0] == 255 },
+                          "The painting includes opaque white paper: \(name)")
+            XCTAssertTrue(stride(from: 0, to: pixels.count, by: 4).contains { pixels[$0] < 180 },
+                          "The exported artwork must contain visible ink: \(name)")
+        }
+    }
+
     func testAnUnknownStoredThemeFallsBackToStandard() {
         XCTAssertEqual(SurroundTheme.current(storedID: "unknown"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: ""), .standard)
@@ -1191,9 +1471,11 @@ final class SurroundThemeTests: XCTestCase {
     /// append the unreleased themes.
     func testPickersOfferTheReleasedThemesFirst() {
         XCTAssertEqual(SurroundTheme.released, [.standard, .surroundStudio, .rakedGarden, .nebulaPearl])
-        XCTAssertEqual(SurroundTheme.allCases.filter(\.isDebugOnly), [.frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes])
+        let unreleased: [SurroundTheme] = [.frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes,
+                                          .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain]
+        XCTAssertEqual(SurroundTheme.allCases.filter(\.isDebugOnly), unreleased)
         #if DEBUG
-        XCTAssertEqual(SurroundTheme.available, SurroundTheme.released + [.frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes])
+        XCTAssertEqual(SurroundTheme.available, SurroundTheme.released + unreleased)
         #else
         XCTAssertEqual(SurroundTheme.available, SurroundTheme.released)
         #endif
@@ -1237,7 +1519,7 @@ final class SurroundThemeTests: XCTestCase {
                 .map { $0.deletingPathExtension().lastPathComponent })
         }
         // Theme art is named after its theme: frostPine's is FrostPine….
-        func theme(of asset: String) -> SurroundTheme? {
+        func assetTheme(of asset: String) -> SurroundTheme? {
             SurroundTheme.allCases.first { theme in
                 asset == theme.previewImageName
                     || asset.hasPrefix(theme.rawValue.prefix(1).uppercased() + theme.rawValue.dropFirst())
@@ -1248,26 +1530,33 @@ final class SurroundThemeTests: XCTestCase {
         let shipping = assets(in: shippingCatalog)
         let debug = assets(in: debugCatalog)
         for asset in shipping {
-            XCTAssertFalse(theme(of: asset)?.isDebugOnly ?? false, "\(asset) belongs in DebugThemes.xcassets")
+            XCTAssertFalse(assetTheme(of: asset)?.isDebugOnly ?? false, "\(asset) belongs in DebugThemes.xcassets")
         }
         for asset in debug {
-            XCTAssertTrue(theme(of: asset)?.isDebugOnly ?? false, "\(asset) belongs in Assets.xcassets")
+            XCTAssertTrue(assetTheme(of: asset)?.isDebugOnly ?? false, "\(asset) belongs in Assets.xcassets")
         }
         for theme in SurroundTheme.allCases {
             let expected = theme.isDebugOnly ? debug : shipping
-            let other = theme.isDebugOnly ? shipping : debug
             XCTAssert(expected.contains(theme.previewImageName),
                       "\(theme)'s thumbnail is in the wrong catalog")
             for color: StoneColor in [.black, .white] {
                 for variation in StonePlacementSoundPlayer.variations {
                     let name = StonePlacementSoundPlayer.assetName(theme: theme, color: color, variation: variation)
-                    XCTAssertTrue(expected.contains(name), "\(name) is missing from its theme's catalog")
-                    XCTAssertFalse(other.contains(name), "\(name) is also in the wrong catalog")
+                    // Visual variants can share an existing sound bank. Its
+                    // catalog follows the bank's owner, not the active scene.
+                    let soundOwner = try XCTUnwrap(assetTheme(of: name), "\(name) has no owning theme")
+                    let soundCatalog = soundOwner.isDebugOnly ? debug : shipping
+                    let otherSoundCatalog = soundOwner.isDebugOnly ? shipping : debug
+                    XCTAssertTrue(soundCatalog.contains(name), "\(name) is missing from its theme's catalog")
+                    XCTAssertFalse(otherSoundCatalog.contains(name), "\(name) is also in the wrong catalog")
                     for tier in StonePlacementSoundPlayer.CaptureTier.allCases {
                         let capture = StonePlacementSoundPlayer.captureAssetName(theme: theme, color: color,
                                                                                 tier: tier, variation: variation)
-                        XCTAssertTrue(expected.contains(capture), "\(capture) is missing from its theme's catalog")
-                        XCTAssertFalse(other.contains(capture), "\(capture) is also in the wrong catalog")
+                        let captureOwner = try XCTUnwrap(assetTheme(of: capture), "\(capture) has no owning theme")
+                        let captureCatalog = captureOwner.isDebugOnly ? debug : shipping
+                        let otherCaptureCatalog = captureOwner.isDebugOnly ? shipping : debug
+                        XCTAssertTrue(captureCatalog.contains(capture), "\(capture) is missing from its theme's catalog")
+                        XCTAssertFalse(otherCaptureCatalog.contains(capture), "\(capture) is also in the wrong catalog")
                     }
                 }
             }
@@ -2566,10 +2855,10 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     @MainActor
-    private func nativeMaterialPixels<Content: View>(_ content: Content) throws
+    private func nativeMaterialPixels<Content: View>(_ content: Content, scale: CGFloat = 3) throws
         -> (pixels: [UInt8], width: Int, height: Int) {
         let renderer = ImageRenderer(content: content)
-        renderer.scale = 3
+        renderer.scale = scale
         let image = try XCTUnwrap(renderer.cgImage)
         var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
         try pixels.withUnsafeMutableBytes { bytes in

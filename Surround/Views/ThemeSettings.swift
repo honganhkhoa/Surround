@@ -116,7 +116,7 @@ struct ThemePreviewTile: View {
 /// carry a moon, and Debug builds mark the unreleased themes.
 struct ThemePicker: View {
     @Binding var selection: SurroundTheme
-    var themes = SurroundTheme.available
+    var themes = SurroundTheme.pickerThemes
     var columns = 4
     @Environment(\.surroundTheme) private var surroundingTheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -163,8 +163,12 @@ struct ThemePicker: View {
     }
 
     private func tile(_ theme: SurroundTheme) -> some View {
-        let selected = theme == selection
-        return Button { selection = theme } label: {
+        let selected = theme == selection.pickerTheme
+        return Button {
+            // Selecting the family again keeps its current color/background
+            // mode; the game's toolbar cycles those variants.
+            if !selected { selection = theme }
+        } label: {
             VStack(spacing: 6) {
                 ThemePreviewTile(theme: theme)
                     .overlay(alignment: .bottomLeading) {
@@ -376,7 +380,7 @@ struct HomeAppearanceOptions: View {
 }
 
 #if DEBUG && MAIN_APP
-/// Renders `ThemeLivePreview` for every theme and appearance into the app's
+/// Renders `ThemeLivePreview` for each picker entry and its appearances into the app's
 /// `Documents/ThemePreviews/`, for `.github/ci-tools/update-theme-previews.py` to copy
 /// into the asset catalogs. `themes.json` names the Debug-only themes, whose
 /// thumbnails join their art in `DebugThemes.xcassets`. Launch with
@@ -398,8 +402,10 @@ enum ThemePreviewExport {
             .appendingPathComponent("ThemePreviews", isDirectory: true)
         try? FileManager.default.removeItem(at: folder)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        for theme in SurroundTheme.allCases {
-            // An always-dark theme has one thumbnail; the others, one each.
+        let themes = SurroundTheme.pickerThemes
+        for theme in themes {
+            // A fixed-appearance theme has one thumbnail. Presentation modes
+            // share their family's picker preview rather than exporting extras.
             let schemes: [ColorScheme] = theme.colorScheme.map { [$0] } ?? [.light, .dark]
             for scheme in schemes {
                 let renderer = ImageRenderer(content: ThemeLivePreview(theme: theme)
@@ -414,7 +420,7 @@ enum ThemePreviewExport {
                 try data.write(to: folder.appendingPathComponent(name), options: .atomic)
             }
         }
-        let manifest = ["debugOnly": SurroundTheme.allCases.filter(\.isDebugOnly).map(\.rawValue)]
+        let manifest = ["debugOnly": themes.filter(\.isDebugOnly).map(\.rawValue)]
         try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])
             .write(to: folder.appendingPathComponent("themes.json"), options: .atomic)
         try Data("done\n".utf8).write(to: folder.appendingPathComponent("done"), options: .atomic)

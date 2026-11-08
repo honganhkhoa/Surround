@@ -572,6 +572,55 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         auditThemeStates(theme: "feltMeadow", suffix: "-felt-meadow-night", appearance: "dark")
     }
 
+    func testFlowingInkThemeStates() {
+        auditThemeStates(theme: "flowingInk", suffix: "-flowing-ink", appearance: "light")
+    }
+
+    func testFlowingInkJadeNightThemeStates() {
+        auditThemeStates(theme: "flowingInkJade", suffix: "-flowing-ink-jade-night", appearance: "dark")
+    }
+
+    /// The host changes actual Device Hub presets on each ready marker;
+    /// neither this test nor the app simulates a fold with injected dimensions.
+    func testFlowingInkPhysicalFoldRetainsAnalysis() throws {
+        try XCTSkipUnless(pose == .closedPortrait, "Begin in the physical Closed portrait pose.")
+        let app = launchScene(.gameAnalysis, artboard: 27, appearance: "dark", theme: "flowingInkJade")
+        let board = element(ID.gameBoard, in: app)
+        XCTAssertEqual(board.value as? String, "variation:38:lj-lk-mk")
+        // A recreated fixture would select its default three-move branch.
+        // Retain a different node so reseeding cannot hide a state reset.
+        tap("game.analyze.previous", in: app)
+        let retained = try XCTUnwrap(board.value as? String)
+        XCTAssertEqual(retained, "variation:38:lj-lk")
+        attachState("flowing-ink-physical-fold-seeded", in: app)
+        keepScreenshot("flowing-ink-physical-fold-seeded", in: app)
+        let geometry = element("game.layout.geometry", in: app)
+        XCTAssertLessThan(min(app.windows.firstMatch.frame.width, app.windows.firstMatch.frame.height), 600)
+        for target in ["open", "partially-open", "closed"] {
+            FileHandle.standardOutput.write(Data("[FlowingInkFoldReady] \(target)\n".utf8))
+            XCTAssertTrue(pollUntil(timeout: 90) {
+                let frame = app.windows.firstMatch.frame
+                let inner = min(frame.width, frame.height) >= 600
+                let divided = (geometry.value as? String)?.contains("division(active=true") == true
+                switch target {
+                case "open": return inner && !divided
+                case "partially-open": return inner && divided
+                default: return !inner
+                }
+            }, "The host must select the actual \(target) preset without relaunching")
+            XCTAssertEqual(board.value as? String, retained, "Physical \(target) retains the exact selected branch")
+            tap("game.analyze.previous", in: app)
+            XCTAssertNotEqual(board.value as? String, retained, "Previous remains usable after the physical fold")
+            tap("game.analyze.next", in: app)
+            XCTAssertEqual(board.value as? String, retained, "Next returns to the retained preferred branch")
+            let name = "flowing-ink-physical-fold-\(target)"
+            attachState(name, in: app)
+            keepScreenshot(name, in: app)
+            FileHandle.standardOutput.write(Data("[ArtboardCaptureReady] \(name) window=\(app.windows.firstMatch.frame)\n".utf8))
+            Thread.sleep(forTimeInterval: 3)
+        }
+    }
+
     private func auditThemeStates(theme: String, suffix: String, appearance: String? = nil) {
         var app = launchScene(.activeGameBoard, artboard: pose.playArtboard, appearance: appearance, theme: theme)
         capture(pose.playArtboard, in: app, suffix: suffix)

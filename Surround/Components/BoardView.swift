@@ -877,7 +877,7 @@ struct Stones: View {
         let scoresOnBlackStones = CGMutablePath()
         let scoresOnWhiteStones = CGMutablePath()
 
-        let drawsShadow = usesDetailedStoneRendering(at: size)
+        let drawsShadow = appearance.usesShadedStones && usesDetailedStoneRendering(at: size)
         let shadowXSign = appearance.stoneLightDirection.shadowXSign
         let shadowScale = min(1, max(0.35, (size - 10) / 30))
         let shadowOffset = min(2, max(1, size / 30)) * shadowScale
@@ -1736,7 +1736,7 @@ struct BoardView: View {
                             } else {
                                 RoundedRectangle(cornerRadius: faceRadius)
                                     .fill(appearance.surfaceColor(detailed: detailed))
-                                    .shadow(color: .black.opacity(detailed ? (appearance.boardBevel ? 0.55 : 0.33) : 0),
+                                    .shadow(color: .black.opacity(detailed && appearance.castsBoardShadow ? (appearance.boardBevel ? 0.55 : 0.33) : 0),
                                             radius: appearance.boardBevel ? 10 : 2,
                                             y: appearance.boardBevel ? 6 : 0)
                             }

@@ -65,7 +65,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
     }
 
     /// The themes a Debug build offers, in the pickers' order.
-    private let debugThemes = ["standard", "surroundStudio", "rakedGarden", "nebulaPearl", "frostPine", "feltMeadow", "nightGarden", "christmasKeepsakes"]
+    private let debugThemes = ["standard", "surroundStudio", "rakedGarden", "nebulaPearl", "frostPine", "feltMeadow", "nightGarden", "christmasKeepsakes", "flowingInk"]
 
     /// Every tile's preview keeps the full width of its column, whatever
     /// height the picker's host can give: a host shorter than the picker
@@ -179,6 +179,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(themeOption("feltMeadow", in: app).exists, "Debug builds offer the unreleased themes.")
         XCTAssertTrue(themeOption("nightGarden", in: app).exists, "Debug builds offer the unreleased themes.")
         XCTAssertTrue(themeOption("christmasKeepsakes", in: app).exists, "Debug builds offer the unreleased themes.")
+        XCTAssertTrue(themeOption("flowingInk", in: app).exists, "Flowing Ink has one picker tile for its four modes.")
         #endif
 
         // Settings has one picker; its screen identifier spans several elements.
@@ -226,6 +227,208 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         XCTAssertFalse(app.segmentedControls[ID.themeScope].exists,
                        "Where the theme applies stays a Settings choice.")
         keepScreenshot("Game Options – Surround Studio chosen", in: app)
+    }
+
+    func testFlowingInkToolbarCyclesAndRetainsTheSelectedVariant() throws {
+        try skipUnlessCompactPhone()
+        #if DEBUG
+        let originalOrientation = XCUIDevice.shared.orientation
+        defer { XCUIDevice.shared.orientation = originalOrientation }
+        let app = launchApp(orientation: .portrait)
+        let gameID = SurroundUITestContract.fixtureGameID
+        tap(ID.homeGamePlayerInfo(gameID), in: app)
+        let board = element(ID.gameBoard, in: app)
+        let position = try XCTUnwrap(board.value as? String)
+        let cycleID = "game.flowingInkCycle"
+        XCTAssertFalse(app.buttons[cycleID].exists,
+                       "Classic does not show the Flowing Ink control or its toolbar group")
+        tap(ID.gameOptions, in: app, matching: .button)
+        element(ID.screenGameOptions, in: app)
+        tap(themeOption("flowingInk", in: app), description: "Choose Flowing Ink", in: app)
+        tap(app.buttons["Done"].firstMatch, description: "Close game settings", in: app)
+        let cycle = element(cycleID, in: app, matching: .button)
+        let options = element(ID.gameOptions, in: app, matching: .button)
+        XCTAssertEqual(cycle.value as? String, "Monochrome with background")
+        XCTAssertLessThan(cycle.frame.maxX, options.frame.minX,
+                          "Flowing Ink precedes the existing trailing toolbar controls")
+        keepScreenshot("Flowing Ink – Monochrome with background", in: app)
+
+        let recordsTransitions = ProcessInfo.processInfo.environment["SURROUND_FLOWING_INK_TRANSITION_RECORDING"] == "1"
+        if recordsTransitions {
+            FileHandle.standardOutput.write(Data("[RecordStart] flowing-ink-cycle\n".utf8))
+            Thread.sleep(forTimeInterval: 2)
+        }
+        let modes = ["Color with background", "Color without background", "Monochrome without background",
+                     "Monochrome with background", "Color with background", "Color without background",
+                     "Monochrome without background"]
+        for (index, mode) in modes.enumerated() {
+            tap(cycleID, in: app, matching: .button)
+            let selected = pollUntil(timeout: 5) { app.buttons[cycleID].value as? String == mode }
+            if !selected {
+                keepScreenshot("Flowing Ink – unexpected mode after tap \(index + 1)", in: app)
+                let hierarchy = XCTAttachment(string: app.debugDescription)
+                hierarchy.name = "Flowing Ink – unexpected mode hierarchy"
+                hierarchy.lifetime = .keepAlways
+                add(hierarchy)
+                print("Flowing Ink actual value: \(String(describing: app.buttons[cycleID].value))")
+            }
+            XCTAssertTrue(selected,
+                          "Tap \(index + 1) selects \(mode)")
+            XCTAssertEqual(board.value as? String, position, "Changing theme keeps the game position")
+            if index < 3 { keepScreenshot("Flowing Ink – \(mode)", in: app) }
+            if recordsTransitions && index == 3 {
+                FileHandle.standardOutput.write(Data("[RecordStop] flowing-ink-cycle\n".utf8))
+                Thread.sleep(forTimeInterval: 1)
+            }
+        }
+
+        tap(ID.gameOptions, in: app, matching: .button)
+        element(ID.screenGameOptions, in: app)
+        let family = themeOption("flowingInk", in: app)
+        assertSelected(family, true)
+        XCTAssertFalse(app.buttons[ID.themeOption("flowingInkJade")].exists)
+        XCTAssertFalse(app.buttons[ID.themeOption("flowingInkJadePlain")].exists)
+        XCTAssertFalse(app.buttons[ID.themeOption("flowingInkPlain")].exists)
+        tap(family, description: "Keep the selected Flowing Ink mode", in: app)
+        tap(app.buttons["Done"].firstMatch, description: "Close game settings", in: app)
+        XCTAssertTrue(pollUntil(timeout: 5) {
+            app.buttons[cycleID].value as? String == "Monochrome without background"
+        }, "Selecting the family tile preserves its current mode")
+
+        func assertHeaderFits(_ panel: String) {
+            let themeButton = element(cycleID, in: app, matching: .button)
+            XCTAssertTrue(waitUntilHittable(themeButton, timeout: 10), "\(panel): the theme control is reachable")
+            XCTAssertTrue(waitUntilHittable(element(ID.gameOptions, in: app, matching: .button), timeout: 10))
+            XCTAssertFalse(moreButton(in: app).exists, "\(panel): compact game controls stay visible")
+            for color in ["black", "white"] {
+                let clock = app.buttons["game.clock.\(color)"].firstMatch
+                if clock.exists {
+                    XCTAssertFalse(clock.frame.intersects(themeButton.frame),
+                                   "\(panel): the clock must fit before the new theme group")
+                }
+            }
+        }
+        openGameChat(in: app)
+        dismissSoftwareKeyboardIfNeeded(in: app)
+        assertHeaderFits("Chat")
+        setGameAnalyzing(true, in: app)
+        assertHeaderFits("Analyze")
+        setGameAnalyzing(false, in: app)
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(pollUntil(timeout: 10) { app.frame.width > app.frame.height })
+        XCTAssertTrue(waitUntilHittable(element(cycleID, in: app, matching: .button), timeout: 10))
+        XCTAssertEqual(app.buttons[cycleID].value as? String, "Monochrome without background")
+        XCTAssertEqual(board.value as? String, position)
+        tap(cycleID, in: app, matching: .button)
+        XCTAssertTrue(pollUntil(timeout: 5) {
+            app.buttons[cycleID].value as? String == "Monochrome with background"
+        })
+        keepScreenshot("Flowing Ink – landscape, monochrome with background", in: app)
+
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(pollUntil(timeout: 10) { app.frame.height > app.frame.width })
+        let back = app.navigationBars.buttons.matching(NSPredicate(
+            format: "identifier == %@ OR label == %@", "BackButton", "Back"
+        )).firstMatch
+        tap(back.exists ? back : app.navigationBars.buttons.firstMatch,
+            description: "Return to Home", in: app)
+        element(ID.screenHome, in: app)
+        tap(ID.homeGamePlayerInfo(gameID), in: app)
+        XCTAssertEqual(element(cycleID, in: app, matching: .button).value as? String,
+                       "Monochrome with background", "A new Game Detail view restores the selected mode")
+        XCTAssertEqual(element(ID.gameBoard, in: app).value as? String, position)
+
+        tap(ID.gameOptions, in: app, matching: .button)
+        element(ID.screenGameOptions, in: app)
+        tap(themeOption("standard", in: app), description: "Switch back to Classic", in: app)
+        tap(app.buttons["Done"].firstMatch, description: "Close game settings", in: app)
+        XCTAssertTrue(pollUntil(timeout: 5) { !app.buttons[cycleID].exists },
+                      "Switching away removes the Flowing Ink control and its toolbar group")
+        keepScreenshot("Classic – no Flowing Ink toolbar group", in: app)
+        tap(ID.gameOptions, in: app, matching: .button)
+        element(ID.screenGameOptions, in: app)
+        tap(themeOption("flowingInk", in: app), description: "Restore Flowing Ink", in: app)
+        tap(app.buttons["Done"].firstMatch, description: "Close game settings", in: app)
+        let restoredCycle = element(cycleID, in: app, matching: .button)
+        XCTAssertEqual(restoredCycle.value as? String, "Monochrome with background")
+        XCTAssertLessThan(restoredCycle.frame.maxX, app.buttons[ID.gameOptions].frame.minX)
+        XCTAssertEqual(element(ID.gameBoard, in: app).value as? String, position)
+        #else
+        throw XCTSkip("Flowing Ink is currently a Debug theme.")
+        #endif
+    }
+
+    /// Plain modes keep the theme on the whole app; only the landscape is
+    /// removed. Capture the real routes and their player names/cards in both
+    /// appearances. Review the native captures for the card surface itself,
+    /// which accessibility does not describe; theme units guard its scene semantics.
+    func testFlowingInkPlainModesKeepTheWholeAppTheme() throws {
+        try skipUnlessCompactPhone()
+        #if DEBUG
+        for appearance in ["light", "dark"] {
+            for (theme, mode) in [
+                ("flowingInkPlain", "Monochrome without background"),
+                ("flowingInkJadePlain", "Color without background"),
+            ] {
+                let context = "Flowing Ink – \(theme), \(appearance)"
+                let app = launchApp(additionalLaunchArguments: [
+                    SurroundUITestContract.homeFinishedOnlyLaunchArgument,
+                    SurroundUITestContract.themeLaunchArgument, theme,
+                    SurroundUITestContract.appearanceLaunchArgument, appearance,
+                ], orientation: .portrait)
+                let historyID = ID.homeHistoryGame(SurroundUITestContract.homeFinishedOnlyHistoryGameID)
+                let home = element(ID.screenHome, in: app, matching: .scrollView)
+                let homeRow = elementAfterScrolling(historyID, in: app, within: home)
+                XCTAssertTrue(homeRow.isHittable, "\(context): Home shows the finished-game card")
+                keepScreenshot("\(context) – Home", in: app)
+
+                let viewAll = elementAfterScrolling(ID.homeHistoryViewAll, in: app, within: home, matching: .button)
+                tap(viewAll, description: "Open the full game history", in: app)
+                let history = element(ID.screenGameHistory, in: app, matching: .scrollView)
+                let historyRow = elementAfterScrolling(historyID, in: app, within: history)
+                XCTAssertTrue(historyRow.isHittable, "\(context): History shows the same finished game")
+                keepScreenshot("\(context) – History", in: app)
+                let back = app.navigationBars.buttons.matching(identifier: "BackButton").firstMatch
+                tap(back.exists ? back : app.navigationBars.buttons.firstMatch,
+                    description: "Return from History to Home", in: app)
+                element(ID.screenHome, in: app, matching: .scrollView)
+
+                selectMainNavigation(ID.navigationPublicGames, in: app)
+                element(ID.screenPublicGames, in: app, matching: .scrollView)
+                let publicGame = app.buttons.matching(NSPredicate(
+                    format: "identifier BEGINSWITH %@", "publicGames.game."
+                )).firstMatch
+                XCTAssertTrue(publicGame.waitForExistence(timeout: 10), "\(context): Public games lists the fixture")
+                XCTAssertTrue(waitUntilHittable(publicGame, timeout: 10))
+                keepScreenshot("\(context) – Public games", in: app)
+
+                selectMainNavigation(ID.navigationHome, in: app)
+                element(ID.screenHome, in: app, matching: .scrollView)
+                openSettings(in: app)
+                keepScreenshot("\(context) – Settings panels", in: app)
+                let family = themeOption("flowingInk", in: app)
+                assertSelected(family, true)
+                let scope = scopeControl(in: app)
+                XCTAssertTrue(scope.isEnabled, "\(context): a plain mode still supports theme scope")
+                XCTAssertTrue(scope.buttons["Whole app"].isSelected, "\(context): the theme still applies to the whole app")
+                keepScreenshot("\(context) – Settings selection", in: app)
+
+                tap(themeOption("flowingInk", in: app), description: "Keep the selected plain mode", in: app)
+                tap(app.navigationBars["Settings"].buttons["Done"].firstMatch,
+                    description: "Close Settings", in: app)
+                selectMainNavigation(ID.navigationPublicGames, in: app)
+                element(ID.screenPublicGames, in: app, matching: .scrollView)
+                tap(publicGame, description: "Open a public game with the retained plain mode", in: app)
+                element(ID.gameBoard, in: app)
+                XCTAssertEqual(element("game.flowingInkCycle", in: app, matching: .button).value as? String,
+                               mode, "\(context): visiting app screens and the family picker preserves the exact mode")
+                app.terminate()
+            }
+        }
+        #else
+        throw XCTSkip("Flowing Ink is currently a Debug theme.")
+        #endif
     }
 
     func testHomeAppearanceChoosesLayoutAndTheme() throws {

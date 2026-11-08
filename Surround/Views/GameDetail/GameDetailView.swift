@@ -16,10 +16,12 @@ struct GameDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.openPlayerProfile) private var openPlayerProfile
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
     private var gameThemeID = SurroundTheme.standard.rawValue
+    @State private var flowingInkCycleRevision = 0
 
     @Binding var currentGame: Game?
     /// Back clears the game as the slide-out begins. The screen keeps drawing
@@ -71,6 +73,15 @@ struct GameDetailView: View {
 
     private var onTurnActiveGameCount: Int {
         activeGames.filter(ogs.isOnUserTurn).count
+    }
+
+    private func cycleFlowingInkTheme() {
+        let selectedTheme = SurroundTheme.current(storedID: gameThemeID)
+        guard selectedTheme.isFlowingInk else { return }
+        gameThemeID = selectedTheme.nextFlowingInkTheme.rawValue
+        // A local state change carries the animation through this screen even
+        // when AppStorage publishes to its other observers independently.
+        flowingInkCycleRevision += 1
     }
 
     private var activeGamesButton: some View {
@@ -741,6 +752,22 @@ struct GameDetailView: View {
         )
         .background {
             GameDetailBackdrop()
+                .overlay(alignment: .top) {
+                    let theme = SurroundTheme.current(storedID: gameThemeID)
+                    if theme.isFlowingInk {
+                        // Give status-bar text a paper margin while the
+                        // landscape remains visible below the top chrome.
+                        LinearGradient(stops: [
+                            .init(color: theme.pageBackground, location: 0),
+                            .init(color: theme.pageBackground, location: 0.5),
+                            .init(color: .clear, location: 1)
+                        ], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 72)
+                        .opacity(theme.showsSceneArt ? 1 : 0)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                    }
+                }
                 .ignoresSafeArea(.container)
         }
         .overlayPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
@@ -881,6 +908,7 @@ struct GameDetailView: View {
                 showsActiveGamesButton: showsActiveGamesButton,
                 placesActiveGamesAtTop: placesActiveGamesAtTop,
                 activeGamesButton: AnyView(activeGamesButton),
+                cycleFlowingInk: cycleFlowingInkTheme,
                 dismissChatInput: chatSession.dismissInput,
                 enterZenMode: enterZenMode,
                 exitZenMode: exitZenMode,
@@ -902,6 +930,10 @@ struct GameDetailView: View {
             // screen sliding in already has its own appearance.
             .surroundTheme(SurroundTheme.current(storedID: gameThemeID),
                              ownsWindow: self.currentGame != nil)
+            // Only this toolbar action animates the theme. Picking a theme in
+            // Settings, game updates and layout changes keep their own policy.
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.38),
+                       value: flowingInkCycleRevision)
         )
     }
 }
@@ -1065,6 +1097,8 @@ extension EnvironmentValues {
 /// native vertical placement, and overflow. Game content never imitates a bar.
 private struct GameToolbarLayout: ViewModifier {
     @Environment(\.surroundTheme) private var theme
+    @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
+    private var gameThemeID = SurroundTheme.standard.rawValue
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
     @Environment(\.iPadTabContext) private var iPadTabContext
@@ -1093,6 +1127,7 @@ private struct GameToolbarLayout: ViewModifier {
     let showsActiveGamesButton: Bool
     let placesActiveGamesAtTop: Bool
     let activeGamesButton: AnyView
+    let cycleFlowingInk: () -> Void
     let dismissChatInput: () -> Void
     let enterZenMode: () -> Void
     let exitZenMode: () -> Void
@@ -1153,7 +1188,21 @@ private struct GameToolbarLayout: ViewModifier {
         nav.connectionBannerVisible
     }
 
-    @ViewBuilder private var compactNavigationTitle: some View {
+    private var compactNavigationTitle: some View {
+        compactNavigationTitleContent
+            .padding(.horizontal, theme.isFlowingInk ? 10 : 0)
+            .padding(.vertical, theme.isFlowingInk ? 5 : 0)
+            .background {
+                // Mountain ink can sit behind the title in landscape. Keep
+                // only its text on a small paper surface, leaving the scene
+                // visible across the rest of the native navigation bar.
+                if theme.isFlowingInk {
+                    Capsule().fill(theme.panel.opacity(0.96))
+                }
+            }
+    }
+
+    @ViewBuilder private var compactNavigationTitleContent: some View {
         if game.gamePhase == .stoneRemoval {
             Text("Stone removal").font(.headline)
         } else if game.gamePhase == .finished {
@@ -1295,6 +1344,42 @@ private struct GameToolbarLayout: ViewModifier {
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameOptions)
     }
 
+    private var flowingInkButton: some View {
+        let selectedTheme = SurroundTheme.current(storedID: gameThemeID)
+        // Preserve the button's live accessibility value: synthesizing a
+        // native bar item from its Label drops that value on recent iOS.
+        return ZStack {
+            Button(action: cycleFlowingInk) {
+                Label("Flowing Ink", systemImage: "pencil.and.scribble")
+                    .labelStyle(.iconOnly)
+                    .modifier(GameToolbarMinimumTouchTarget())
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(selectedTheme.isFlowingInk ? selectedTheme.flowingInkModeDescription : "")
+            .accessibilityHint(Text("Cycles the color and landscape background.",
+                                    comment: "Accessibility hint for the Flowing Ink toolbar button, which cycles monochrome/color and landscape/no landscape"))
+            .help(Text("Cycles the color and landscape background."))
+            .accessibilityIdentifier("game.flowingInkCycle")
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    /// A separate native group precedes the existing trailing controls. It
+    /// follows those controls onto Duo's side bar when the toolbar is vertical.
+    @ToolbarContentBuilder private func flowingInkItems(placement: ToolbarItemPlacement) -> some ToolbarContent {
+        if SurroundTheme.current(storedID: gameThemeID).isFlowingInk {
+            GameVerticalToolbarGroup(placement: placement) {
+                flowingInkButton
+            }
+            #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+            if #available(iOS 26.0, *) {
+                ToolbarSpacer(.fixed, placement: placement)
+            }
+            #endif
+        }
+    }
+
     @ViewBuilder private var utilityButtons: some View {
         utilityModeButton
         optionsButton
@@ -1401,8 +1486,12 @@ private struct GameToolbarLayout: ViewModifier {
     /// Modes, utilities and Active Games for each toolbar arrangement. The
     /// bottom-bar items stay in this one builder (see the spacer note).
     @ToolbarContentBuilder private var controlItems: some ToolbarContent {
+        if !isVerticalToolbar {
+            flowingInkItems(placement: .topBarTrailing)
+        }
         if isVerticalToolbar {
             if compact {
+                flowingInkItems(placement: .topBarTrailing)
                 // Closed keeps utilities beside upper navigation
                 // and modes in their own lower native group.
                 if interaction.panel == .chat || !analyzingIsPresented {
@@ -1421,6 +1510,7 @@ private struct GameToolbarLayout: ViewModifier {
                 // only the system sidebar toggle. The controls move
                 // to the vertical bar's lower group, which stays;
                 // the game draws Back at the top of the bar itself.
+                flowingInkItems(placement: .bottomBar)
                 GameVerticalToolbarGroup(placement: .bottomBar) {
                     if !drawsBackInContent { backButton }
                     modeButtons
@@ -1433,6 +1523,7 @@ private struct GameToolbarLayout: ViewModifier {
                 }
                 #endif
             } else {
+                flowingInkItems(placement: .topBarTrailing)
                 GameVerticalToolbarGroup(placement: .topBarTrailing) {
                     modeButtons
                     utilityButtons

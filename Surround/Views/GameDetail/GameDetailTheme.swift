@@ -12,6 +12,10 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     case feltMeadow
     case nightGarden
     case christmasKeepsakes
+    case flowingInk
+    case flowingInkJade
+    case flowingInkJadePlain
+    case flowingInkPlain
 
     var id: Self { self }
 
@@ -29,6 +33,43 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         #else
         released
         #endif
+    }
+
+    /// Flowing Ink has one picker tile and four persistent presentation modes.
+    /// Keep all modes available for stored IDs and board/marker audits.
+    static var pickerThemes: [SurroundTheme] {
+        available.filter { !$0.isFlowingInk || $0 == .flowingInk }
+    }
+
+    var pickerTheme: SurroundTheme { isFlowingInk ? .flowingInk : self }
+
+    var isFlowingInk: Bool {
+        switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain: true
+        default: false
+        }
+    }
+
+    var flowingInkUsesColor: Bool { self == .flowingInkJade || self == .flowingInkJadePlain }
+
+    /// The toolbar enters this family at monochrome with scenery, then
+    /// advances through the same cycle across navigation and app launches.
+    var nextFlowingInkTheme: SurroundTheme {
+        switch self {
+        case .flowingInk: .flowingInkJade
+        case .flowingInkJade: .flowingInkJadePlain
+        case .flowingInkJadePlain: .flowingInkPlain
+        default: .flowingInk
+        }
+    }
+
+    var flowingInkModeDescription: String {
+        switch self {
+        case .flowingInkJade: String(localized: "Color with background", comment: "Flowing Ink theme presentation mode")
+        case .flowingInkJadePlain: String(localized: "Color without background", comment: "Flowing Ink theme presentation mode")
+        case .flowingInkPlain: String(localized: "Monochrome without background", comment: "Flowing Ink theme presentation mode")
+        default: String(localized: "Monochrome with background", comment: "Flowing Ink theme presentation mode")
+        }
     }
 
     /// The theme games show. A stored theme this build does not offer falls
@@ -51,6 +92,8 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     /// Surround Studio keeps its branded name; stored IDs stay language-neutral.
     var title: String {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            String(localized: "Flowing Ink", comment: "Theme name: an ink-wash landscape with monochrome and pale jade presentations")
         case .standard: String(localized: "Classic", comment: "Theme name: Surround's ordinary look, with a kaya board and flat stones")
         case .nebulaPearl: String(localized: "Nebula & Pearl", comment: "Theme name: a cosmic nebula, dark glass stones and luminous pearls. Use a short, natural title naming the nebula and pearl.")
         case .rakedGarden: String(localized: "Raked Garden", comment: "Theme name: a Japanese dry landscape garden with raked sand, basalt and jade stones. Use a short, natural garden title; the sand pattern is visible in the preview.")
@@ -65,11 +108,13 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     /// The pickers' thumbnail in the asset catalog, with a Dark variant
     /// unless the theme is always dark. `.github/ci-tools/update-theme-previews.py`
     /// writes it from the app's own rendering.
-    var previewImageName: String { "ThemePreview-\(rawValue)" }
+    var previewImageName: String { "ThemePreview-\(pickerTheme.rawValue)" }
 
     /// Scene lighting follows the system; Nebula keeps its midnight palette.
     var colorScheme: ColorScheme? {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            nil
         case .standard, .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes: nil
         case .nebulaPearl: .dark
         }
@@ -78,6 +123,24 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     /// Resolve image grading alongside the board palette. The image references
     /// stay cached, so an appearance change does not decode or regenerate art.
     func board(for scheme: ColorScheme) -> BoardAppearance {
+        if isFlowingInk, scheme == .dark {
+            var night = board
+            // Medium graphite/jade separates both solid stone colors. A
+            // near-black board would hide the ink stones and their contours.
+            let paper = Color(themeHex: flowingInkUsesColor ? 0x748478 : 0x777777)
+            let ink = Color(themeHex: flowingInkUsesColor ? 0x183326 : 0x171717)
+            night.boardColor = paper
+            night.compactBoardColor = paper
+            night.boardEdge = Color.black.opacity(0.85)
+            night.dameColor = flowingInkUsesColor ? Color(themeHex: 0x3D2A10) : ink
+            night.highlightColor = ink
+            night.crosshair = .init(valid: ink,
+                                   invalid: flowingInkUsesColor ? Color(themeHex: 0x4D161C) : .black,
+                                   removal: ink)
+            night.removeMark = flowingInkUsesColor ? Color(themeHex: 0x4D161C) : .black
+            night.restoreMark = ink
+            return night
+        }
         if self == .christmasKeepsakes, scheme == .dark {
             var night = board
             night.boardColor = Color(themeHex: 0x667F6C)
@@ -279,6 +342,8 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
 
     var board: BoardAppearance {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            return flowingInkBoard
         case .standard:
             return .standard
         case .nebulaPearl:
@@ -1093,6 +1158,8 @@ extension SurroundTheme {
     /// The page behind the game when the theme has no scene.
     var pageBackground: Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkUsesColor ? FlowingInkColors.jadePage : FlowingInkColors.monoPage
         case .standard: Color(uiColor: .systemGroupedBackground)
         case .nebulaPearl: Color(themeHex: 0x070A1C)
         case .rakedGarden: RakedGardenColors.page
@@ -1106,6 +1173,8 @@ extension SurroundTheme {
 
     var panel: Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkUsesColor ? FlowingInkColors.jadePanel : FlowingInkColors.monoPanel
         case .standard: Color(uiColor: .secondarySystemGroupedBackground)
         case .nebulaPearl: Color(themeHex: 0x141938)
         case .rakedGarden: RakedGardenColors.panel
@@ -1119,6 +1188,8 @@ extension SurroundTheme {
 
     var foreground: Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkUsesColor ? FlowingInkColors.jadeForeground : FlowingInkColors.monoForeground
         case .standard, .nebulaPearl: .primary
         case .rakedGarden: RakedGardenColors.foreground
         case .surroundStudio: SurroundStudioColors.foreground
@@ -1133,6 +1204,8 @@ extension SurroundTheme {
     /// hierarchical opacity becomes too faint over the meadow's cream.
     var detailSecondaryForeground: Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkUsesColor ? FlowingInkColors.jadeSecondary : FlowingInkColors.monoSecondary
         case .feltMeadow: FeltMeadowColors.detailSecondary
         case .nightGarden: NightGardenColors.detailSecondary
         case .christmasKeepsakes: ChristmasKeepsakesColors.detailSecondary
@@ -1142,6 +1215,8 @@ extension SurroundTheme {
 
     var panelBorder: Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            foreground.opacity(0.22)
         case .standard:
             Color(uiColor: UIColor { traits in
                 traits.userInterfaceStyle == .dark
@@ -1158,22 +1233,29 @@ extension SurroundTheme {
         }
     }
 
-    /// Whether Game Detail draws a scene instead of a plain page.
+    /// Whether screens use the theme's scene layout and surfaces, including
+    /// the paper-only presentations. Hiding artwork must not remove cards,
+    /// alter spacing, or fall back to the system page palette.
     var hasScene: Bool { self != .standard }
+
+    /// Whether the scene includes decorative artwork behind its surfaces.
+    var showsSceneArt: Bool { hasScene && self != .flowingInkJadePlain && self != .flowingInkPlain }
 
     /// Clocks, player chips and the main action are tinted Liquid Glass,
     /// letting the scene show through; other themes keep solid surfaces.
-    var usesGlassControls: Bool { self != .standard && self != .feltMeadow }
+    var usesGlassControls: Bool { self != .standard && self != .feltMeadow && !isFlowingInk }
 
     /// The natural scenes use their own foregrounds, translucent pigment
     /// on older systems, and opaque controls under Increase Contrast.
-    var usesLightSceneSurfaces: Bool { self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden || self == .christmasKeepsakes }
+    var usesLightSceneSurfaces: Bool { isFlowingInk || self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden || self == .christmasKeepsakes }
 
     /// Tinted Liquid Glass for a player's clock, in the stone's color.
     /// Light stones use a strong tint to preserve their material color over
     /// the scene; dark ones retain enough pigment for light clock text.
     func clockGlassTint(_ color: StoneColor) -> Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            clockSolidSurface(color).opacity(color == .black ? 0.90 : 0.96)
         case .standard: .clear
         case .nebulaPearl:
             color == .black ? Color(themeHex: 0x3B2585).opacity(0.47) : Color(themeHex: 0xFBF1EC).opacity(0.95)
@@ -1196,6 +1278,8 @@ extension SurroundTheme {
     /// as its clock.
     func identityGlassTint(_ color: StoneColor) -> Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            clockSolidSurface(color).opacity(color == .black ? 0.94 : 0.96)
         case .standard: .clear
         case .nebulaPearl:
             color == .black ? Color(themeHex: 0x241858).opacity(0.51) : Color(themeHex: 0xF8EFEB).opacity(0.93)
@@ -1217,6 +1301,8 @@ extension SurroundTheme {
     /// The main action's tint; nil keeps the app's accent.
     var actionTint: Color? {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkAction
         case .standard: nil
         // Deep violet: white text at about 8:1, and close to the violet clock.
         case .nebulaPearl: Color(themeHex: 0x4E36B0)
@@ -1247,6 +1333,8 @@ extension SurroundTheme {
     /// Other themes keep the existing system-indigo treatment.
     var chatCoordinateForeground: Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkSelection
         case .nightGarden: NightGardenColors.selection
         case .christmasKeepsakes: ChristmasKeepsakesColors.selection
         default: Color(uiColor: .systemIndigo)
@@ -1256,6 +1344,8 @@ extension SurroundTheme {
     /// Main-channel chat bubbles.
     var chatBubble: Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkUsesColor ? FlowingInkColors.jadeChat : FlowingInkColors.monoChat
         case .standard: Color(.systemGray4)
         case .nebulaPearl: Color(themeHex: 0x2C2F5E)
         case .rakedGarden: RakedGardenColors.chatBubble
@@ -1274,6 +1364,8 @@ extension SurroundTheme {
     /// The selected move in the Analyze tree and its board thumbnails.
     var selectionMark: Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkSelection
         case .standard: Color(uiColor: .systemTeal)
         // The chat highlight's cyan: the one cool accent among the violets.
         case .nebulaPearl: Color(themeHex: 0x6FD6FF)
@@ -1290,6 +1382,8 @@ extension SurroundTheme {
     /// keeps the app's conditional-move color.
     var conditionalMark: Color? {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkUsesColor ? FlowingInkColors.jadeConditional : FlowingInkColors.monoSelection
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xE0A86A)
         case .rakedGarden: RakedGardenColors.conditional
@@ -1305,6 +1399,8 @@ extension SurroundTheme {
     /// the mark touch the stone.
     var treeMarkKeyline: Color? {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            FlowingInkColors.keyline
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0x0B0E22)
         case .rakedGarden: RakedGardenColors.keyline
@@ -1319,6 +1415,8 @@ extension SurroundTheme {
     /// The Analyze tree's guide at every fifth move.
     func treeGuide(scheme: ColorScheme) -> Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            foreground.opacity(0.16)
         case .standard: Color(scheme == .dark ? .systemGray6 : .systemGray4)
         case .nebulaPearl: Color(themeHex: 0xC9CFEA).opacity(0.2)
         case .rakedGarden: RakedGardenColors.treeGuide.opacity(0.25)
@@ -1333,6 +1431,8 @@ extension SurroundTheme {
     /// Active games where it is the user's turn; the clock's turn color.
     var userTurnMark: Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkSelection
         case .standard: Color(uiColor: .systemTeal)
         case .nebulaPearl: Color(themeHex: 0xC8B8FF)
         case .rakedGarden: RakedGardenColors.selection
@@ -1348,6 +1448,8 @@ extension SurroundTheme {
     /// draws the mark flat.
     var userTurnGlow: Color? {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            nil
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xB7A4FF).opacity(0.85)
         case .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes: nil
@@ -1357,6 +1459,8 @@ extension SurroundTheme {
     /// Active games in stone removal.
     var stoneRemovalMark: Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkUsesColor ? FlowingInkColors.jadeConditional : FlowingInkColors.monoSelection
         case .standard: Color(uiColor: .systemOrange)
         case .nebulaPearl: Color(themeHex: 0xF2B279)
         case .rakedGarden: RakedGardenColors.conditional
@@ -1371,6 +1475,8 @@ extension SurroundTheme {
     /// Active games waiting on the opponent.
     func idleGameMark(scheme: ColorScheme) -> Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkUsesColor ? FlowingInkColors.jadeIdle : FlowingInkColors.monoIdle
         case .standard: Color(uiColor: scheme == .dark ? .systemGray5 : .systemBackground)
         case .nebulaPearl: Color(themeHex: 0x2A2F55)
         case .rakedGarden: RakedGardenColors.idle
@@ -1388,6 +1494,9 @@ extension SurroundTheme {
 extension SurroundTheme {
     func clockSurfaceStops(_ color: StoneColor, scheme: ColorScheme) -> [Gradient.Stop] {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            return [.init(color: clockSolidSurface(color), location: 0),
+                    .init(color: clockSolidSurface(color), location: 1)]
         case .standard:
             if color == .black {
                 if scheme == .dark {
@@ -1463,6 +1572,10 @@ extension SurroundTheme {
     /// The clock surface under Reduce Transparency or Increase Contrast.
     func clockSolidSurface(_ color: StoneColor) -> Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            color == .black
+                ? (flowingInkUsesColor ? FlowingInkColors.jadeBlack : FlowingInkColors.monoBlack)
+                : (flowingInkUsesColor ? FlowingInkColors.jadeWhite : FlowingInkColors.monoWhite)
         case .standard: color == .black ? Color(white: 0.06) : Color(white: 0.98)
         case .nebulaPearl: color == .black ? Color(themeHex: 0x1C1240) : Color(themeHex: 0xF6F0EA)
         case .rakedGarden: color == .black ? RakedGardenColors.blackSolid : RakedGardenColors.whiteGlass
@@ -1476,6 +1589,8 @@ extension SurroundTheme {
 
     func clockForeground(_ color: StoneColor, scheme: ColorScheme) -> Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            color == .black ? .white : .black
         case .standard: color == .black ? .white : Color(white: scheme == .dark ? 19 / 255 : 32 / 255)
         case .nebulaPearl: color == .black ? .white : Color(themeHex: 0x241D33)
         case .rakedGarden: color == .black ? RakedGardenColors.cream : RakedGardenColors.whiteForeground
@@ -1490,6 +1605,10 @@ extension SurroundTheme {
     /// Icons and highlighted text on a clock outside sudden death.
     func clockAccent(_ color: StoneColor) -> Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            // White clocks keep dark text even when filled actions lighten
+            // against the charcoal page. Metadata needs text-level contrast.
+            color == .black ? .white : (flowingInkUsesColor ? FlowingInkColors.jadeInk : FlowingInkColors.ink)
         case .standard: Color(uiColor: .systemIndigo)
         case .nebulaPearl: color == .black ? Color(themeHex: 0xCDBEFF) : Color(themeHex: 0x5B3FC4)
         case .rakedGarden: color == .black ? RakedGardenColors.blackAccent : RakedGardenColors.whiteAccent
@@ -1504,6 +1623,7 @@ extension SurroundTheme {
     /// Keep the existing warning red on every daytime/other-theme clock.
     /// Pale night clocks need deeper red; dark clocks use brighter coral.
     func clockSuddenDeathAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
+        if isFlowingInk, scheme == .dark, color == .white { return Color(themeHex: 0x7D293B) }
         if self == .nightGarden || self == .christmasKeepsakes { return Color(themeHex: color == .white ? 0x7D293B : 0xFFB5AF) }
         if self == .feltMeadow {
             return Color(themeHex: color == .white ? 0x7D2D2D : 0xFFADA1)
@@ -1523,6 +1643,7 @@ extension SurroundTheme {
 
     /// The warning badge uses a solid pigment beneath its white text.
     func clockSuddenDeathBadge(scheme: ColorScheme) -> Color {
+        if isFlowingInk, scheme == .dark { return Color(themeHex: 0x8B3449) }
         if self == .nightGarden || self == .christmasKeepsakes { return Color(themeHex: 0x8B3449) }
         if self == .frostPine { return Color(themeHex: 0x913748) }
         if self == .feltMeadow { return Color(themeHex: 0x8B3434) }
@@ -1534,6 +1655,7 @@ extension SurroundTheme {
 
     /// Scoring acceptance remains green, with a deeper pigment on night ivory.
     func clockAgreementAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
+        if isFlowingInk, scheme == .dark, color == .white { return Color(themeHex: 0x284B31) }
         if self == .nightGarden || self == .christmasKeepsakes { return Color(themeHex: color == .white ? 0x284B31 : 0xBDDEA9) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xBCE7B8 : 0x254C30)
@@ -1550,6 +1672,7 @@ extension SurroundTheme {
 
     /// The auto-resign countdown and disconnected label share an amber accent.
     func clockDisconnectedAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
+        if isFlowingInk, scheme == .dark, color == .white { return Color(themeHex: 0x633D15) }
         if self == .nightGarden || self == .christmasKeepsakes { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xF2D09C : 0x603814)
@@ -1566,6 +1689,9 @@ extension SurroundTheme {
 
     /// Inline undo text sits directly on the player's clock, without a badge.
     func clockUndoAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
+        if isFlowingInk, scheme == .dark {
+            return Color(themeHex: color == .black ? 0xE8C891 : 0x6B431C)
+        }
         if self == .nightGarden || self == .christmasKeepsakes { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xF2D09C : 0x603814)
@@ -1581,6 +1707,7 @@ extension SurroundTheme {
 
     /// The full undo badge needs its own darker amber beneath white text.
     func clockUndoBadge(scheme: ColorScheme) -> Color {
+        if isFlowingInk, scheme == .dark { return Color(themeHex: 0x795022) }
         if self == .nightGarden || self == .christmasKeepsakes { return Color(themeHex: 0x79501F) }
         if self == .frostPine { return Color(themeHex: 0x795022) }
         if self == .feltMeadow { return Color(themeHex: 0x73511E) }
@@ -1593,6 +1720,8 @@ extension SurroundTheme {
     /// The running clock's outline outside sudden death.
     func turnOutline(scheme: ColorScheme) -> Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkUsesColor ? FlowingInkColors.jadeTurnOutline : FlowingInkColors.monoTurnOutline
         case .standard:
             scheme == .dark
                 ? Color(red: 125 / 255, green: 122 / 255, blue: 1)
@@ -1612,6 +1741,8 @@ extension SurroundTheme {
     /// The running clock's halo outside sudden death.
     var turnGlow: Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            .clear
         case .standard: Color(uiColor: .systemIndigo)
         case .nebulaPearl: Color(themeHex: 0xB7A4FF)
         case .rakedGarden: RakedGardenColors.turnGlow
@@ -1626,6 +1757,8 @@ extension SurroundTheme {
     /// The status capsule (Your move, reconnecting) behind white text.
     var statusBadge: Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkAction
         case .standard: Color(uiColor: .systemIndigo)
         case .nebulaPearl: Color(themeHex: 0x6A4FD6)
         // Maple carries the badge's white text at over 6:1. Lantern amber
@@ -1641,6 +1774,8 @@ extension SurroundTheme {
 
     func identityChipColors(_ color: StoneColor) -> [Color] {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            [clockSolidSurface(color), clockSolidSurface(color)]
         case .standard:
             color == .black
                 ? [Color(red: 61 / 255, green: 62 / 255, blue: 61 / 255), Color(white: 18 / 255)]
@@ -1678,6 +1813,8 @@ extension SurroundTheme {
 
     func identityChipBorder(_ color: StoneColor) -> Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            color == .black ? FlowingInkColors.blackBorder : Color.black.opacity(0.55)
         case .standard: color == .black ? Color.white.opacity(0.15) : Color.black.opacity(0.12)
         case .nebulaPearl: color == .black ? Color.white.opacity(0.18) : Color.white.opacity(0.5)
         case .rakedGarden:
@@ -1709,6 +1846,8 @@ extension SurroundTheme {
 
     func identityForeground(_ color: StoneColor) -> Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            color == .black ? .white : .black
         case .standard: color == .black ? .white : Color(white: 32 / 255)
         case .nebulaPearl: color == .black ? .white : Color(themeHex: 0x241D33)
         case .rakedGarden: color == .black ? RakedGardenColors.cream : RakedGardenColors.whiteForeground
@@ -1722,6 +1861,8 @@ extension SurroundTheme {
 
     func identitySecondary(_ color: StoneColor) -> Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            color == .black ? Color(themeHex: 0xDADADA) : Color(themeHex: 0x555555)
         case .standard:
             color == .black ? Color(white: 174 / 255) : Color(red: 108 / 255, green: 108 / 255, blue: 112 / 255)
         case .nebulaPearl:
@@ -1746,6 +1887,7 @@ extension SurroundTheme {
     func identityRoleColor(for player: OGSUser, on color: StoneColor) -> Color? {
         guard usesLightSceneSurfaces else { return nil }
         let darkSurface = color == .black
+        if isFlowingInk, !flowingInkUsesColor { return identityForeground(color) }
         if self == .rakedGarden {
             if player.isOGSModerator || player.isOGSAdmin {
                 return darkSurface ? RakedGardenColors.darkModerator : RakedGardenColors.lightModerator
@@ -1851,6 +1993,8 @@ extension SurroundTheme {
     /// ink follows the card, independently of its darker filled-button pigment.
     var homeActionForeground: Color {
         switch self {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            flowingInkSelection
         case .nightGarden: NightGardenColors.conditional
         case .christmasKeepsakes: ChristmasKeepsakesColors.conditional
         default: actionTint ?? .accentColor
@@ -1877,6 +2021,224 @@ extension SurroundTheme {
         // appearance, just as a white stone remains white in Dark Mode.
         let traits = UITraitCollection(userInterfaceStyle: surface == .black ? .dark : .light)
         return Color(uiColor: UIColor(player.uiColor).resolvedColor(with: traits))
+    }
+}
+
+// MARK: - Flowing Ink
+
+private enum FlowingInkColors {
+    private static func adaptive(_ light: UInt, _ dark: UInt) -> Color {
+        Color(uiColor: UIColor { traits in
+            let hex = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: CGFloat((hex >> 16) & 0xff) / 255,
+                           green: CGFloat((hex >> 8) & 0xff) / 255,
+                           blue: CGFloat(hex & 0xff) / 255, alpha: 1)
+        })
+    }
+
+    // Board inks stay explicit; page ink and filled-button pigment have
+    // different jobs in Dark Mode and must not share the board's colors.
+    static let ink = Color(themeHex: 0x171717)
+    static let jade = Color(themeHex: 0xDDE7DB)
+    static let jadeInk = Color(themeHex: 0x28513F)
+    static let ochre = Color(themeHex: 0x6B4C22)
+    static let monoPage = adaptive(0xFFFFFF, 0x242424)
+    static let jadePage = adaptive(0xFFFFFF, 0x242A27)
+    static let monoPanel = adaptive(0xFAFAFA, 0x2D2D2D)
+    static let jadePanel = adaptive(0xFAFAFA, 0x2A332E)
+    static let monoForeground = adaptive(0x171717, 0xF1F1F1)
+    static let jadeForeground = adaptive(0x171717, 0xEAF0EB)
+    static let monoSecondary = adaptive(0x555555, 0xC5C5C5)
+    static let jadeSecondary = adaptive(0x555555, 0xC2CCC4)
+    static let monoChat = adaptive(0xECECEC, 0x393939)
+    static let jadeChat = adaptive(0xE1E9E0, 0x39463D)
+    static let monoAction = adaptive(0x171717, 0x6E6E6E)
+    static let jadeAction = adaptive(0x28513F, 0x4D7B61)
+    static let monoSelection = adaptive(0x171717, 0xE0E0E0)
+    static let jadeSelection = adaptive(0x28513F, 0xB7D6BF)
+    static let jadeConditional = adaptive(0x6B4C22, 0xE1C391)
+    static let keyline = adaptive(0xFFFFFF, 0x171717)
+    static let monoIdle = adaptive(0xE5E5E5, 0x484848)
+    static let jadeIdle = adaptive(0xDFE7DD, 0x414E45)
+    static let monoBlack = adaptive(0x000000, 0x0B0B0B)
+    static let jadeBlack = adaptive(0x000000, 0x0A0C0B)
+    static let monoWhite = adaptive(0xFFFFFF, 0xDADADA)
+    static let jadeWhite = adaptive(0xFFFFFF, 0xD9DEDA)
+    static let blackBorder = adaptive(0x666666, 0x999999)
+    static let monoTurnOutline = adaptive(0x171717, 0x777777)
+    static let jadeTurnOutline = adaptive(0x28513F, 0x617F67)
+}
+
+extension SurroundTheme {
+    private var flowingInkAction: Color {
+        flowingInkUsesColor ? FlowingInkColors.jadeAction : FlowingInkColors.monoAction
+    }
+
+    private var flowingInkSelection: Color {
+        flowingInkUsesColor ? FlowingInkColors.jadeSelection : FlowingInkColors.monoSelection
+    }
+
+    private var flowingInkBoard: BoardAppearance {
+        let paper = flowingInkUsesColor ? FlowingInkColors.jade : Color.white
+        let accent = flowingInkUsesColor ? FlowingInkColors.jadeInk : FlowingInkColors.ink
+        return BoardAppearance(
+            boardColor: paper,
+            compactBoardColor: paper,
+            boardEdge: Color.black.opacity(0.7),
+            usesShadedStones: false,
+            castsBoardShadow: false,
+            gridColor: .black,
+            coordinateColor: .black,
+            black: StonePalette(highlight: .black, shade: .black, flat: .black,
+                                lastMove: .white, label: .white),
+            white: StonePalette(highlight: .white, shade: .white, flat: .white,
+                                outline: .black, lastMove: .black, label: .black),
+            emptyPointMarker: .black,
+            markOutline: .black,
+            dameColor: flowingInkUsesColor ? FlowingInkColors.ochre : FlowingInkColors.ink,
+            highlightColor: accent,
+            highlightCasing: .white,
+            crosshair: .init(valid: accent, invalid: flowingInkUsesColor ? Color(themeHex: 0x842F34) : .black,
+                             removal: accent),
+            crosshairWidth: 1.5,
+            removeMark: flowingInkUsesColor ? Color(themeHex: 0x842F34) : .black,
+            restoreMark: accent,
+            removalMarkCasing: .white,
+            removedStoneOutline: .black
+        )
+    }
+}
+
+private enum FlowingInkAssets {
+    static let portrait = UIImage(named: "FlowingInkLandscapePortrait")
+    static let landscape = UIImage(named: "FlowingInkLandscapeLandscape")
+}
+
+/// The paintings are separated through their mist into four corner plates.
+/// Every plate uses the same uniform scale; spare viewport width or height
+/// becomes quiet paper between them rather than stretched trees or cliffs.
+struct FlowingInkSceneLayout: Equatable {
+    enum Composition: CaseIterable {
+        case portrait, landscape
+
+        var sourceSize: CGSize {
+            self == .portrait ? CGSize(width: 1024, height: 1536) : CGSize(width: 1536, height: 1024)
+        }
+    }
+
+    enum Corner: CaseIterable {
+        case topLeft, topRight, bottomLeft, bottomRight
+
+        var isTrailing: Bool { self == .topRight || self == .bottomRight }
+        var isBottom: Bool { self == .bottomLeft || self == .bottomRight }
+    }
+
+    let size: CGSize
+    let composition: Composition
+    let scale: CGFloat
+    let imageSize: CGSize
+
+    static let horizontalTransition: ClosedRange<CGFloat> = 0.44...0.56
+
+    init(size: CGSize) {
+        let width = size.width.isFinite ? max(0, size.width) : 0
+        let height = size.height.isFinite ? max(0, size.height) : 0
+        self.size = CGSize(width: width, height: height)
+        composition = width > height ? .landscape : .portrait
+        let source = composition.sourceSize
+        scale = min(width / source.width, height / source.height)
+        imageSize = CGSize(width: source.width * scale, height: source.height * scale)
+    }
+
+    func frame(for corner: Corner) -> CGRect {
+        CGRect(x: corner.isTrailing ? size.width - imageSize.width : 0,
+               y: corner.isBottom ? size.height - imageSize.height : 0,
+               width: imageSize.width, height: imageSize.height)
+    }
+
+    /// The waterfall extends well below the midpoint of the source. Its
+    /// left-hand feather starts only after the falling water reaches mist.
+    /// The right-hand split sits in empty paper above the foreground pine.
+    func verticalTransition(for corner: Corner) -> ClosedRange<CGFloat> {
+        if corner.isTrailing { return 0.44...0.56 }
+        return composition == .portrait ? 0.70...0.78 : 0.74...0.82
+    }
+
+    /// Normalized source regions retained at full opacity, useful when
+    /// checking that a composition change preserves its subject landmarks.
+    func opaqueSourceBounds(for corner: Corner) -> CGRect {
+        let horizontal = Self.horizontalTransition
+        let vertical = verticalTransition(for: corner)
+        let x = corner.isTrailing ? horizontal.upperBound : 0
+        let y = corner.isBottom ? vertical.upperBound : 0
+        return CGRect(x: x, y: y,
+                      width: corner.isTrailing ? 1 - x : horizontal.lowerBound,
+                      height: corner.isBottom ? 1 - y : vertical.lowerBound)
+    }
+}
+
+/// Corner-anchored scenery keeps the waterfall and pine visible at their
+/// natural proportions on phones, tablets, narrow windows and Duo layouts.
+/// Switching presentation changes only pigment/opacity; the layers remain
+/// mounted beneath chat, analysis and Zen.
+private struct FlowingInkScene: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let usesColor: Bool
+    let showsLandscape: Bool
+
+    var body: some View {
+        GeometryReader { geometry in
+            let layout = FlowingInkSceneLayout(size: geometry.size)
+            let paper = usesColor ? FlowingInkColors.jadePage : FlowingInkColors.monoPage
+            ZStack {
+                paper
+                ZStack(alignment: .topLeading) {
+                    // White paper lets masked plates overlap as ink washes;
+                    // no plate's paper can erase its neighbor's edge art.
+                    Color.white
+                    if let image = layout.composition == .landscape
+                        ? FlowingInkAssets.landscape : FlowingInkAssets.portrait {
+                        ForEach(FlowingInkSceneLayout.Corner.allCases, id: \.self) { corner in
+                            let frame = layout.frame(for: corner)
+                            Image(uiImage: image)
+                                .resizable()
+                                .frame(width: frame.width, height: frame.height)
+                                .mask(fade(FlowingInkSceneLayout.horizontalTransition,
+                                           keepsStart: !corner.isTrailing,
+                                           start: .leading, end: .trailing))
+                                .mask(fade(layout.verticalTransition(for: corner),
+                                           keepsStart: !corner.isBottom,
+                                           start: .top, end: .bottom))
+                                .position(x: frame.midX, y: frame.midY)
+                                .blendMode(.multiply)
+                        }
+                    }
+                }
+                .frame(width: layout.size.width, height: layout.size.height)
+                .compositingGroup()
+                .saturation(usesColor ? 1 : 0)
+                // Grade the same ink onto charcoal paper rather than
+                // inverting it into luminous white silhouettes.
+                .colorMultiply(colorScheme == .dark ? paper : .white)
+                .opacity(showsLandscape ? 1 : 0)
+            }
+            .frame(width: layout.size.width, height: layout.size.height)
+            .clipped()
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func fade(_ transition: ClosedRange<CGFloat>, keepsStart: Bool,
+                      start: UnitPoint, end: UnitPoint) -> LinearGradient {
+        let first = keepsStart ? Color.white : .clear
+        let last = keepsStart ? Color.clear : .white
+        return LinearGradient(stops: [
+            .init(color: first, location: 0),
+            .init(color: first, location: transition.lowerBound),
+            .init(color: last, location: transition.upperBound),
+            .init(color: last, location: 1)
+        ], startPoint: start, endPoint: end)
     }
 }
 
@@ -1918,7 +2280,7 @@ private struct GameDetailThemeModifier: ViewModifier {
             .environment(\.boardAppearance, theme.board(for: theme.colorScheme ?? systemColorScheme))
             .environment(\.colorScheme, theme.colorScheme ?? systemColorScheme)
             .foregroundColor(theme.usesLightSceneSurfaces ? theme.foreground : nil)
-            .modifier(GameDetailLegacyTint(color: (theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes) ? theme.foreground : .accentColor))
+            .modifier(GameDetailLegacyTint(color: (theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes) ? theme.foreground : .accentColor))
             .toolbarColorScheme(theme.colorScheme, for: .navigationBar, .bottomBar)
             .background(WindowInterfaceStyle(colorScheme: ownsWindow ? theme.colorScheme : nil))
     }
@@ -2033,6 +2395,28 @@ private enum WindowStyleRequests {
     }
 }
 
+/// A flat, stone-contrasting turn cue that also reads when a compact clock
+/// omits its status label or shows a score estimate. The stroke stays inside
+/// the solid clock face, so landscape colors cannot reduce its contrast.
+struct FlowingInkClockOutline: View {
+    let color: StoneColor
+    let isRunning: Bool
+    var cornerRadius: CGFloat = 12
+    @Environment(\.surroundTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    var body: some View {
+        let increased = contrast == .increased
+        RoundedRectangle(cornerRadius: cornerRadius)
+            .strokeBorder(
+                theme.clockForeground(color, scheme: colorScheme)
+                    .opacity(isRunning ? 1 : (increased ? 0.5 : 0.22)),
+                lineWidth: isRunning ? (increased ? 4 : 3) : (increased ? 2 : 1)
+            )
+    }
+}
+
 /// A Game Detail surface that follows the current theme wherever a
 /// `ShapeStyle` is accepted.
 struct GameDetailSurfaceStyle: ShapeStyle {
@@ -2058,7 +2442,7 @@ struct GameDetailSecondaryText: ViewModifier {
     @Environment(\.surroundTheme) private var theme
 
     @ViewBuilder func body(content: Content) -> some View {
-        if theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes {
+        if theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes {
             content.foregroundStyle(theme.detailSecondaryForeground)
         } else {
             content.foregroundStyle(.secondary)
@@ -2081,6 +2465,8 @@ struct GameDetailBackdrop: View {
 
     var body: some View {
         switch theme {
+        case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
+            FlowingInkScene(usesColor: theme.flowingInkUsesColor, showsLandscape: theme.showsSceneArt)
         case .standard:
             theme.pageBackground
         case .nebulaPearl:

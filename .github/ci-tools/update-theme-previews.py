@@ -12,8 +12,9 @@ When `Documents/ThemePreviews/done` appears in the app's data container
 
     .github/ci-tools/update-theme-previews.py <data container>/Documents/ThemePreviews
 
-Each theme gets `ThemePreview-<theme>.imageset`: a light image with a dark
-variant, or one image for an always-dark theme. A released theme's goes into
+Each picker entry gets `ThemePreview-<theme>.imageset`: a light image with a
+dark variant, or one image for a fixed-appearance theme. Presentation modes
+share their family's preview. A released theme's goes into
 `Assets.xcassets`; a Debug-only theme's goes beside its art into
 `DebugThemes.xcassets`, which Release builds leave out. The export's
 `themes.json` names the Debug-only themes. The previous imagesets in both
@@ -68,7 +69,7 @@ def main():
         imageset = folder / f"ThemePreview-{theme}.imageset"
         imageset.mkdir()
         entries = []
-        # An always-dark theme exports only its dark image, used everywhere.
+        # A fixed-appearance theme exports only one image, used everywhere.
         base = images.get("light") or images["dark"]
         shutil.copyfile(base, imageset / f"{theme}.jpg")
         entries.append({"filename": f"{theme}.jpg", "idiom": "universal"})

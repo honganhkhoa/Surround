@@ -42,6 +42,7 @@ struct GameDetailClockPair: View {
     var fullCardScale: CGFloat? = nil
     @ScaledMetric(relativeTo: .body) private var textScale: CGFloat = 1
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.surroundTheme) private var theme
     var showsRoleNames = false
     /// A header can consume the first tap to dismiss an attached keyboard.
     var onTapBeforeDetails: (() -> Bool)? = nil
@@ -250,6 +251,9 @@ struct GameDetailClockPair: View {
             }
         }
         .opacity(ogs.socketStatus == .connected ? 1 : 0.65)
+        // Keep scenery-toggle animations out of full, compact and header clocks;
+        // color-only cycles and ordinary clock/layout updates still animate.
+        .animation(nil, value: theme.isFlowingInk && theme.showsSceneArt)
         .onChange(of: game.ID, initial: true) { _, _ in
             // A game the service did not freeze (shown before its connection
             // was requested) takes its snapshot here, once for every pair.
@@ -387,15 +391,14 @@ private struct GameDetailClockCard: View {
         let countdownScale = capsFullCountdown ? min(scale, 1.2) : scale
         return .system(size: size * countdownScale, weight: .semibold).monospacedDigit()
     }
-    /// A narrow title chip can drop its turn label; the glow still shows the turn.
+    /// A narrow title chip can drop its turn label; the outline still shows the turn.
     private var displaysStatus: Bool {
         // An estimate stays readable when a title chip drops its turn label
         // or time metadata to fit the navigation bar.
         state.showsEstimateBadge || (showsStatus && (style != .inline || inlineDetail == .full))
     }
-    private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: spaciousCompact ? 14 : 12)
-    }
+    private var clockCornerRadius: CGFloat { spaciousCompact ? 14 : 12 }
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: clockCornerRadius) }
 
     private var alignment: HorizontalAlignment { mirrored ? .trailing : .leading }
     private var frameAlignment: Alignment { mirrored ? .trailing : .leading }
@@ -425,7 +428,7 @@ private struct GameDetailClockCard: View {
         if state.reconnecting {
             // Reconnecting has replaced the undo label; its badge pigment
             // is too dark as text on night slate or charcoal felt clocks.
-            return theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || (theme == .surroundStudio && colorScheme == .dark)
+            return theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || (theme == .surroundStudio && colorScheme == .dark)
                 ? foreground : badgeBackground
         }
         return theme.clockUndoAccent(color, scheme: colorScheme)
@@ -468,7 +471,7 @@ private struct GameDetailClockCard: View {
                     }
                 }
                 .modifier(GameDetailClearGlass(shape: shape,
-                                               enabled: theme != .feltMeadow && !reduceTransparency
+                                               enabled: !theme.isFlowingInk && theme != .feltMeadow && !reduceTransparency
                                                    && (!theme.usesLightSceneSurfaces || contrast != .increased),
                                                tint: showsThemeGlass ? theme.clockGlassTint(color) : nil))
                 .frame(height: height)
@@ -589,7 +592,8 @@ private struct GameDetailClockCard: View {
     /// Scene clocks in a glass theme; header chips already sit on the bar's
     /// glass, and accessibility settings keep the solid surfaces.
     private var showsThemeGlass: Bool {
-        guard theme.usesGlassControls, style != .inline, !reduceTransparency, contrast != .increased else {
+        guard !theme.isFlowingInk, theme.usesGlassControls, style != .inline,
+              !reduceTransparency, contrast != .increased else {
             return false
         }
         if #available(iOS 26, *) { return true }
@@ -597,7 +601,10 @@ private struct GameDetailClockCard: View {
     }
 
     @ViewBuilder private var surface: some View {
-        if theme == .feltMeadow {
+        if theme.isFlowingInk {
+            // Ink clocks stay opaque and flat, whether scenery is visible or not.
+            shape.fill(theme.clockSolidSurface(color))
+        } else if theme == .feltMeadow {
             FeltControlSurface(color: color, shape: shape)
         } else if showsThemeGlass {
             Color.clear
@@ -615,21 +622,26 @@ private struct GameDetailClockCard: View {
         }
     }
 
-    // The halo and outline belong to the glass's foreground content. Applying
-    // a shadow after glassEffect lets the native compositor cover it. A blurred
-    // ring keeps the center clear while leaving the active edge visible.
+    // Flowing Ink uses an opaque, contrasting ring. Other themes keep their
+    // halo and outline in the glass's foreground content so the native
+    // compositor cannot cover them.
     private var clockOutline: some View {
         ZStack {
-            if state.running && contrast != .increased {
-                shape.strokeBorder(turnGlow.opacity(colorScheme == .dark ? 0.6 : 0.55), lineWidth: 6)
-                    .blur(radius: style == .inline ? 6 : (colorScheme == .dark ? 9 : 8))
+            if theme.isFlowingInk {
+                FlowingInkClockOutline(color: color, isRunning: state.running,
+                                       cornerRadius: clockCornerRadius)
+            } else {
+                if state.running && contrast != .increased {
+                    shape.strokeBorder(turnGlow.opacity(colorScheme == .dark ? 0.6 : 0.55), lineWidth: 6)
+                        .blur(radius: style == .inline ? 6 : (colorScheme == .dark ? 9 : 8))
+                }
+                shape.strokeBorder(
+                    state.running
+                        ? turnOutline.opacity(contrast == .increased ? 1 : (colorScheme == .dark ? 0.85 : 0.7))
+                        : (contrast == .increased ? foreground.opacity(0.5) : theme.panelBorder),
+                    lineWidth: contrast == .increased ? 2 : 1
+                )
             }
-            shape.strokeBorder(
-                state.running
-                    ? turnOutline.opacity(contrast == .increased ? 1 : (colorScheme == .dark ? 0.85 : 0.7))
-                    : (contrast == .increased ? foreground.opacity(0.5) : theme.panelBorder),
-                lineWidth: contrast == .increased ? 2 : 1
-            )
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -1385,7 +1397,15 @@ struct GameDetailPlayerIdentity: View {
             }
         }
         .background {
-            if theme == .feltMeadow {
+            if theme.isFlowingInk {
+                // Player chips share the clocks' flat ink-and-paper treatment.
+                RoundedRectangle(cornerRadius: chipCornerRadius)
+                    .fill(theme.clockSolidSurface(color))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: chipCornerRadius)
+                            .strokeBorder(theme.identityChipBorder(color), lineWidth: 1)
+                    }
+            } else if theme == .feltMeadow {
                 FeltControlSurface(color: color, shape: RoundedRectangle(cornerRadius: chipCornerRadius))
                     .overlay {
                         RoundedRectangle(cornerRadius: chipCornerRadius)
@@ -1461,7 +1481,8 @@ struct GameDetailPlayerIdentity: View {
     /// Scene chips in a glass theme; the navigation header sits on the bar's
     /// glass, and accessibility settings keep the solid chip.
     private var showsThemeGlass: Bool {
-        guard theme.usesGlassControls, !navigationHeader, !reduceTransparency, contrast != .increased else {
+        guard !theme.isFlowingInk, theme.usesGlassControls, !navigationHeader,
+              !reduceTransparency, contrast != .increased else {
             return false
         }
         if #available(iOS 26, *) { return true }

@@ -6,12 +6,16 @@ final class StonePlacementSoundTests: XCTestCase {
     func testEveryAvailableThemeHasDistinctDecodableCaptureSounds() throws {
         let bundle = Bundle(for: Self.self)
         var sounds = Set<Data>()
+        var assetNames = Set<String>()
         for theme in SurroundTheme.available {
             for color: StoneColor in [.black, .white] {
                 for tier in StonePlacementSoundPlayer.CaptureTier.allCases {
                     for variation in StonePlacementSoundPlayer.variations {
                         let name = StonePlacementSoundPlayer.captureAssetName(theme: theme, color: color,
                                                                              tier: tier, variation: variation)
+                        // Presentation variants deliberately share a bank;
+                        // distinct named clips must still have distinct audio.
+                        guard assetNames.insert(name).inserted else { continue }
                         let asset = try XCTUnwrap(NSDataAsset(name: name, bundle: bundle), name)
                         let player = try AVAudioPlayer(data: asset.data)
                         XCTAssertEqual(player.numberOfChannels, 1, name)
@@ -28,10 +32,12 @@ final class StonePlacementSoundTests: XCTestCase {
     func testEveryAvailableThemeHasDistinctDecodablePlacementSounds() throws {
         let bundle = Bundle(for: Self.self)
         var sounds = Set<Data>()
+        var assetNames = Set<String>()
         for theme in SurroundTheme.available {
             for color: StoneColor in [.black, .white] {
                 for variation in StonePlacementSoundPlayer.variations {
                     let name = StonePlacementSoundPlayer.assetName(theme: theme, color: color, variation: variation)
+                    guard assetNames.insert(name).inserted else { continue }
                     let asset = try XCTUnwrap(NSDataAsset(name: name, bundle: bundle), name)
                     let player = try AVAudioPlayer(data: asset.data)
                     XCTAssertEqual(player.numberOfChannels, 1, name)

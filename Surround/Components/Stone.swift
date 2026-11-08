@@ -867,6 +867,9 @@ struct BoardAppearance: Equatable {
     var compactBoardColor: Color? = nil
     /// A thin edge around the board surface.
     var boardEdge: Color? = nil
+    /// Ink drawings stay flat at every size, including standalone previews.
+    var usesShadedStones = true
+    var castsBoardShadow = true
     var boardTexture: BoardTexture? = nil
     /// A raised slab: light on the top-left edge, shade on the bottom-right.
     var boardBevel = false
@@ -1001,7 +1004,7 @@ struct Stone: View {
                 switch color {
                 case .black, .white:
                     let palette = appearance.stones(color!)
-                    if shadowRadius > 0, usesDetailedStoneRendering(at: size),
+                    if appearance.usesShadedStones, shadowRadius > 0, usesDetailedStoneRendering(at: size),
                        let images = appearance.stoneImages,
                        let image = images.variants(color!).first {
                         let imageSize = images.displayRect(in: CGRect(x: 0, y: 0, width: size, height: size),
@@ -1032,7 +1035,7 @@ struct Stone: View {
                             .frame(width: size, height: size)
                     } else {
                         // Small stones stay flat, as on small boards.
-                        let detailed = shadowRadius > 0 && usesDetailedStoneRendering(at: size)
+                        let detailed = appearance.usesShadedStones && shadowRadius > 0 && usesDetailedStoneRendering(at: size)
                         ZStack {
                             if detailed {
                                 Path(path).fill(
@@ -1050,7 +1053,7 @@ struct Stone: View {
                     }
                 case .none:
                     ZStack {
-                        if shadowRadius > 0 {
+                        if appearance.usesShadedStones && shadowRadius > 0 && usesDetailedStoneRendering(at: size) {
                             Path(path).fill(
                                 LinearGradient(
                                     gradient: Gradient(colors: [appearance.black.flat, appearance.white.flat]
@@ -1059,6 +1062,8 @@ struct Stone: View {
                                     endPoint: .trailing
                                 )
                             ).shadow(radius: shadowRadius, x: shadowXSign * shadowRadius, y: shadowRadius)
+                        } else {
+                            Circle().fill(appearance.black.flat)
                         }
                         Text(verbatim: "?").font(Font.system(size: size / 1.5).bold()).foregroundColor(Color.white)
                         Circle().stroke(Color.gray, lineWidth: 0.5)
@@ -1071,7 +1076,7 @@ struct Stone: View {
                         FeltStoneFringe(contour: contour, footprint: images.footprint,
                                         palette: appearance.stones(color))
                             .colorMultiply(images.tint)
-                            .opacity(shadowRadius > 0 && usesDetailedStoneRendering(at: size) ? 1 : 0)
+                            .opacity(appearance.usesShadedStones && shadowRadius > 0 && usesDetailedStoneRendering(at: size) ? 1 : 0)
                             .animation(nil, value: usesDetailedStoneRendering(at: size))
                     }
                 }
