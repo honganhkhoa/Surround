@@ -978,6 +978,67 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         }
     }
 
+    func testPaperBlossomsThemeStates() throws {
+        try auditThemeStates(theme: "paperBlossoms", title: "Paper Blossoms",
+                             suffix: "-paper-blossoms", appearance: .light)
+    }
+
+    func testPaperBlossomsNightThemeStates() throws {
+        try auditThemeStates(theme: "paperBlossoms", title: "Paper Blossoms in Dark Mode",
+                             suffix: "-paper-blossoms-night", appearance: .dark)
+    }
+
+    func testPaperBlossomsThemeScoring() throws {
+        try auditThemeScoring(theme: "paperBlossoms", title: "Paper Blossoms",
+                              suffix: "-paper-blossoms", appearance: .light)
+    }
+
+    func testPaperBlossomsThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "paperBlossoms", title: "Paper Blossoms",
+                                 suffix: "-paper-blossoms", appearance: .light)
+    }
+
+    func testPaperBlossomsThemeControlStates() {
+        auditThemeControlStates(theme: "paperBlossoms", title: "Paper Blossoms",
+                                appearance: .light, suffix: "-paper-blossoms")
+    }
+
+    func testPaperBlossomsThemePanelTransitions() throws {
+        try auditThemePanelTransitions(theme: "paperBlossoms", title: "Paper Blossoms",
+                                       suffix: "-paper-blossoms", appearance: .light)
+    }
+
+    func testPaperBlossomsChatPlaceholderInBothAppearances() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
+                          "The compact Chat audit requires an iPhone.")
+        defer { XCUIDevice.shared.orientation = .portrait }
+        for appearance: SurroundUITestContract.Appearance in [.light, .dark] {
+            let app = launch(artboard: 11, theme: "paperBlossoms", appearance: appearance)
+            startChat(in: app, typing: false)
+            let input = element(ID.gameChatInput, in: app, matching: .textField)
+            XCTAssertTrue(input.isEnabled, "An empty draft remains editable even while Send is disabled")
+            capture(11, app: app, note: "Paper Blossoms empty Chat composer, \(appearance.rawValue).",
+                    suffix: "-paper-blossoms-chat-\(appearance.rawValue)")
+            rotate(.landscapeLeft, app: app)
+            XCTAssertTrue(input.isEnabled)
+            capture(12, app: app, note: "Paper Blossoms empty Chat composer in native landscape.",
+                    suffix: "-paper-blossoms-chat-\(appearance.rawValue)")
+            app.terminate()
+        }
+    }
+
+    func testPaperBlossomsBoardMarkerGallery() throws {
+        try auditThemeBoardMarkerGallery(theme: "paperBlossoms", appearance: .light,
+                                         suffix: "paper-blossoms", pageBrightnessBand: 0.75...1,
+                                         boardBrightnessBand: 0.55...1)
+    }
+
+    func testPaperBlossomsNightBoardMarkerGallery() throws {
+        try auditThemeBoardMarkerGallery(theme: "paperBlossoms", appearance: .dark,
+                                         suffix: "paper-blossoms-night", pageBrightnessBand: 0...0.25,
+                                         boardBrightnessBand: 0.45...0.85)
+    }
+
     func testFlowingInkThemeStates() throws {
         try auditThemeStates(theme: "flowingInk", title: "Flowing Ink",
                              suffix: "-flowing-ink", appearance: .light)

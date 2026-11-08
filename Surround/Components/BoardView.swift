@@ -788,7 +788,17 @@ private struct ImageStoneCanvas: View, Equatable {
                 // Scoring fades the whole stone, as removed flat stones do.
                 if stone.isRemoved { stoneContext.opacity = 0.5 }
                 let side = stone.rect.width / images.footprint
-                stoneContext.draw(variants[stone.variant % variants.count],
+                var artworkContext = stoneContext
+                if stone.color == .black, images.blackFaceGain != 1 {
+                    var matrix = ColorMatrix()
+                    matrix.r1 = Float(images.blackFaceGain)
+                    matrix.g2 = Float(images.blackFaceGain)
+                    matrix.b3 = Float(images.blackFaceGain)
+                    // Grade only the face. Native contact shadows, surface
+                    // accents and all game marks retain their own colors.
+                    artworkContext.addFilter(.colorMatrix(matrix))
+                }
+                artworkContext.draw(variants[stone.variant % variants.count],
                                   in: CGRect(x: stone.rect.midX - side / 2, y: stone.rect.midY - side / 2,
                                              width: side, height: side))
                 // Removed stones retain their original faded artwork. The

@@ -489,6 +489,7 @@ struct NewChatInput: View {
     var game: Game
     @ObservedObject var session: ChatSessionState
     @EnvironmentObject var ogs: OGSService
+    @Environment(\.surroundTheme) private var theme
     var selectedChannel: Binding<OGSChatSendChannel> = .constant(.main)
     var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
     var onInteraction: () -> Void = {}
@@ -778,7 +779,10 @@ struct NewChatInput: View {
                 .background(alignment: .leading) {
                     if inputText.wrappedValue.isEmpty {
                         Text(channelPlaceholder)
-                            .foregroundStyle(Color(.placeholderText))
+                            // System placeholder ink is too translucent on
+                            // Paper Blossoms' cream and oxblood panels.
+                            .foregroundStyle(theme == .paperBlossoms
+                                ? theme.detailSecondaryForeground : Color(.placeholderText))
                             .lineLimit(1)
                             .allowsTightening(true)
                             .minimumScaleFactor(0.7)

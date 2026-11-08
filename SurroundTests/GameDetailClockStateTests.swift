@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 final class GameDetailClockStateTests: XCTestCase {
     private func game(_ system: TimeControlSystem = .ByoYomi(mainTime: 600, periods: 3, periodTime: 30)) throws -> Game {
@@ -53,6 +54,34 @@ final class GameDetailClockStateTests: XCTestCase {
         XCTAssertNil(GameDetailClockState(game: game, color: .white).cardDetail(full: true))
         XCTAssertEqual(GameDetailColumnDetailLayouts(game: game, fullCards: true, cardWidth: 100, scale: 1),
                        GameDetailColumnDetailLayouts())
+    }
+
+    func testColumnDetailsReserveTheTurnedCornerBeforeChoosingOneLine() throws {
+        let game = try game()
+        let state = GameDetailClockState(game: game, color: .white)
+        for fullCards in [true, false] {
+            let detail = try XCTUnwrap(state.cardDetail(full: fullCards)?.text)
+            let captures = String(localized: "\(state.captures) captures")
+            let font = UIFont.systemFont(ofSize: (fullCards ? 12 : 11) * 0.75)
+            let lineWidth = ((detail + " · " + captures) as NSString)
+                .size(withAttributes: [.font: font]).width
+            let standardPadding: CGFloat = fullCards ? 20 : 16
+            let foldedPadding: CGFloat = fullCards ? 32 : 22
+            // Leave two points of spare text width on an ordinary card. The
+            // same outer frame cannot fit that line after reserving the fold.
+            let cardWidth = ceil(lineWidth) + standardPadding + 2
+            let ordinary = GameDetailColumnDetailLayouts(game: game, fullCards: fullCards,
+                                                         cardWidth: cardWidth, scale: 1)
+            let folded = GameDetailColumnDetailLayouts(game: game, fullCards: fullCards,
+                                                       cardWidth: cardWidth, scale: 1,
+                                                       horizontalPadding: foldedPadding)
+            XCTAssertEqual(ordinary.black, .oneLine)
+            XCTAssertEqual(ordinary.white, .oneLine)
+            XCTAssertFalse(ordinary.needsGrowth)
+            XCTAssertEqual(folded.black, .splitAtSeparator)
+            XCTAssertEqual(folded.white, .splitAtSeparator)
+            XCTAssertTrue(folded.needsGrowth, "Reserve the extra row before drawing the folded card")
+        }
     }
 
     func testByoYomiUsesCurrentPeriodAndCountsOnlyFollowingPeriods() throws {

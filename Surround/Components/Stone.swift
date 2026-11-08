@@ -88,6 +88,9 @@ struct StoneImages: Equatable {
     var smallStoneInset: CGFloat = 0
     /// Scene lighting applied to the artwork, independently of game marks.
     var tint: Color = .white
+    /// Lift dark material facets without changing their black point, alpha,
+    /// contact shadows or marks. One preserves the source artwork.
+    var blackFaceGain: Double = 1
     /// Optional wool silhouettes, sampled once from the source alpha. Other
     /// materials keep their clean edges. Points follow each image variant.
     var blackFiberContours: [FeltFiberContour] = []
@@ -1007,10 +1010,15 @@ struct Stone: View {
                     if appearance.usesShadedStones, shadowRadius > 0, usesDetailedStoneRendering(at: size),
                        let images = appearance.stoneImages,
                        let image = images.variants(color!).first {
+                        let faceGain = color == .black ? images.blackFaceGain : 1
                         let imageSize = images.displayRect(in: CGRect(x: 0, y: 0, width: size, height: size),
                                                            cellSize: size).width
                         Image(uiImage: image)
                             .resizable()
+                            // This pair multiplies RGB while retaining the
+                            // black point; apply it before tint and shadows.
+                            .brightness((1 - 1 / faceGain) / 2)
+                            .contrast(faceGain)
                             .colorMultiply(images.tint)
                             .frame(width: imageSize / images.footprint, height: imageSize / images.footprint)
                             .frame(width: imageSize, height: imageSize)

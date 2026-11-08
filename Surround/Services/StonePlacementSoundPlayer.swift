@@ -75,13 +75,20 @@ final class StonePlacementSoundPlayer: ObservableObject {
         self.makePlayer = makePlayer ?? Self.bundledPlayer
     }
 
+    /// Folded paper shares the soft felt bank; visual presentations need not
+    /// duplicate audio assets merely to preserve their material character.
+    private static func soundTheme(for theme: SurroundTheme) -> SurroundTheme {
+        if theme.isFlowingInk { return .standard }
+        return theme == .paperBlossoms ? .feltMeadow : theme
+    }
+
     static func assetName(theme: SurroundTheme, color: StoneColor, variation: Int) -> String {
-        "StoneSound-\(theme.isFlowingInk ? SurroundTheme.standard.rawValue : theme.rawValue)-\(color.rawValue)-\(variation)"
+        "StoneSound-\(soundTheme(for: theme).rawValue)-\(color.rawValue)-\(variation)"
     }
 
     static func captureAssetName(theme: SurroundTheme, color: StoneColor,
                                  tier: CaptureTier, variation: Int) -> String {
-        "StoneCapture-\(theme.isFlowingInk ? SurroundTheme.standard.rawValue : theme.rawValue)-\(color.rawValue)-\(tier.rawValue)-\(variation)"
+        "StoneCapture-\(soundTheme(for: theme).rawValue)-\(color.rawValue)-\(tier.rawValue)-\(variation)"
     }
 
     /// A structural guard for one placement, not proof of a live update. The

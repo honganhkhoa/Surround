@@ -12,6 +12,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     case feltMeadow
     case nightGarden
     case christmasKeepsakes
+    case paperBlossoms
     case flowingInk
     case flowingInkJade
     case flowingInkJadePlain
@@ -101,6 +102,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         case .frostPine: String(localized: "Frost & Pine", comment: "Theme name: frost crystals and pine branches. Preserve the winter frost and pine imagery in a short title.")
         case .feltMeadow: String(localized: "Felt Meadow", comment: "Theme name: a meadow crafted from soft wool felt. Felt is the textile material, not the past tense of feel. Use a short, natural title.")
         case .nightGarden: String(localized: "Night Garden", comment: "Theme name: a quiet garden at night with lanterns and glass stones. Use a short, natural title.")
+        case .paperBlossoms: String(localized: "Paper Blossoms", comment: "Theme name: delicate layered paper blossoms, lanterns and a miniature village for Lunar New Year. Use a short, natural title preserving the paper-and-blossom imagery.")
         case .christmasKeepsakes: String(localized: "Christmas Keepsakes", comment: "Theme name: cherished Christmas ornaments, enamel pieces and keepsakes. Preserve Christmas and the treasured-object mood in a short, natural title.")
         }
     }
@@ -115,7 +117,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
             nil
-        case .standard, .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes: nil
+        case .standard, .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms: nil
         case .nebulaPearl: .dark
         }
     }
@@ -123,6 +125,17 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     /// Resolve image grading alongside the board palette. The image references
     /// stay cached, so an appearance change does not decode or regenerate art.
     func board(for scheme: ColorScheme) -> BoardAppearance {
+        if self == .paperBlossoms, scheme == .dark {
+            var night = board
+            // Keep rice paper light enough to separate the ink stones. Only
+            // its illumination changes; the native grid and marks stay crisp.
+            night.boardColor = Color(themeHex: 0xD6C0A0)
+            night.compactBoardColor = Color(themeHex: 0xD6C0A0)
+            night.boardTexture?.tint = Color(themeHex: 0xE1D5C1)
+            night.stoneImages?.tint = Color(themeHex: 0xE8DFD0)
+            night.boardEdge = Color(themeHex: 0x75513F)
+            return night
+        }
         if isFlowingInk, scheme == .dark {
             var night = board
             // Medium graphite/jade separates both solid stone colors. A
@@ -605,6 +618,47 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 restoreMark: Color(themeHex: 0x244A32),
                 removalMarkCasing: Color(themeHex: 0xFFF1D7),
                 removedStoneOutline: Color(themeHex: 0x17251E)
+            )
+        case .paperBlossoms:
+            return BoardAppearance(
+                boardColor: Color(themeHex: 0xF3DEC1),
+                compactBoardColor: Color(themeHex: 0xF3DEC1),
+                boardEdge: Color(themeHex: 0xA5785D),
+                boardTexture: PaperBlossomsAssets.board,
+                gridLineScale: 0.82,
+                stoneImages: PaperBlossomsAssets.stones,
+                stoneLightDirection: .upperLeft,
+                // The firmer two-layer profile lifts ivory folds off rice
+                // paper; it adds only cast/contact shadows, never gloss.
+                imageStoneShadow: .raisedGlass,
+                imageStoneShading: .clamshellShoulder,
+                gridColor: Color(themeHex: 0x9E2F25),
+                coordinateColor: Color(themeHex: 0x5B201A),
+                black: StonePalette(
+                    highlight: Color(themeHex: 0x42423D), shade: Color(themeHex: 0x171816),
+                    flat: Color(themeHex: 0x242321), outline: Color(themeHex: 0x111210),
+                    lastMove: Color(themeHex: 0xFFF5DF), label: Color(themeHex: 0xFFF5DF),
+                    detailedMarkerCasing: Color(themeHex: 0x171816)
+                ),
+                white: StonePalette(
+                    highlight: Color(themeHex: 0xFFF5DF), shade: Color(themeHex: 0xCAB294),
+                    flat: Color(themeHex: 0xF6ECD9), outline: Color(themeHex: 0x65503E),
+                    lastMove: Color(themeHex: 0x55221C), label: Color(themeHex: 0x55221C),
+                    detailedMarkerCasing: Color(themeHex: 0xFFF5DF)
+                ),
+                emptyPointMarker: Color(themeHex: 0x55221C),
+                markOutline: Color(themeHex: 0x65503E),
+                dameColor: Color(themeHex: 0x67421F),
+                highlightColor: Color(themeHex: 0x2F4955),
+                highlightCasing: Color(themeHex: 0xFFF5DF),
+                crosshair: .init(valid: Color(themeHex: 0x345241),
+                                 invalid: Color(themeHex: 0x8C231D),
+                                 removal: Color(themeHex: 0x2F4955)),
+                crosshairWidth: 1.5,
+                removeMark: Color(themeHex: 0x8C231D),
+                restoreMark: Color(themeHex: 0x345241),
+                removalMarkCasing: Color(themeHex: 0xFFF5DF),
+                removedStoneOutline: Color(themeHex: 0x65503E)
             )
         case .christmasKeepsakes:
             return BoardAppearance(
@@ -1168,6 +1222,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.page
         case .nightGarden: NightGardenColors.page
         case .christmasKeepsakes: ChristmasKeepsakesColors.page
+        case .paperBlossoms: PaperBlossomsColors.page
         }
     }
 
@@ -1183,6 +1238,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.panel
         case .nightGarden: NightGardenColors.panel
         case .christmasKeepsakes: ChristmasKeepsakesColors.panel
+        case .paperBlossoms: PaperBlossomsColors.panel
         }
     }
 
@@ -1197,6 +1253,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.foreground
         case .nightGarden: NightGardenColors.foreground
         case .christmasKeepsakes: ChristmasKeepsakesColors.foreground
+        case .paperBlossoms: PaperBlossomsColors.foreground
         }
     }
 
@@ -1209,6 +1266,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.detailSecondary
         case .nightGarden: NightGardenColors.detailSecondary
         case .christmasKeepsakes: ChristmasKeepsakesColors.detailSecondary
+        case .paperBlossoms: PaperBlossomsColors.detailSecondary
         default: .secondary
         }
     }
@@ -1230,6 +1288,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.panelBorder.opacity(0.28)
         case .nightGarden: NightGardenColors.panelBorder.opacity(0.28)
         case .christmasKeepsakes: ChristmasKeepsakesColors.panelBorder.opacity(0.28)
+        case .paperBlossoms: PaperBlossomsColors.panelBorder.opacity(0.28)
         }
     }
 
@@ -1243,11 +1302,11 @@ extension SurroundTheme {
 
     /// Clocks, player chips and the main action are tinted Liquid Glass,
     /// letting the scene show through; other themes keep solid surfaces.
-    var usesGlassControls: Bool { self != .standard && self != .feltMeadow && !isFlowingInk }
+    var usesGlassControls: Bool { self != .standard && self != .feltMeadow && self != .paperBlossoms && !isFlowingInk }
 
     /// The natural scenes use their own foregrounds, translucent pigment
     /// on older systems, and opaque controls under Increase Contrast.
-    var usesLightSceneSurfaces: Bool { isFlowingInk || self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden || self == .christmasKeepsakes }
+    var usesLightSceneSurfaces: Bool { isFlowingInk || self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms }
 
     /// Tinted Liquid Glass for a player's clock, in the stone's color.
     /// Light stones use a strong tint to preserve their material color over
@@ -1271,6 +1330,8 @@ extension SurroundTheme {
             color == .black ? NightGardenColors.blackGlass.opacity(0.82) : NightGardenColors.whiteGlass.opacity(0.84)
         case .christmasKeepsakes:
             color == .black ? ChristmasKeepsakesColors.blackGlass.opacity(0.82) : ChristmasKeepsakesColors.whiteGlass.opacity(0.84)
+        case .paperBlossoms:
+            color == .black ? PaperBlossomsColors.blackGlass.opacity(0.82) : PaperBlossomsColors.whiteGlass.opacity(0.84)
         }
     }
 
@@ -1295,6 +1356,8 @@ extension SurroundTheme {
             color == .black ? NightGardenColors.blackGlass.opacity(0.86) : NightGardenColors.whiteIdentityGlass.opacity(0.90)
         case .christmasKeepsakes:
             color == .black ? ChristmasKeepsakesColors.blackGlass.opacity(0.86) : ChristmasKeepsakesColors.whiteIdentityGlass.opacity(0.90)
+        case .paperBlossoms:
+            color == .black ? PaperBlossomsColors.blackGlass.opacity(0.86) : PaperBlossomsColors.whiteIdentityGlass.opacity(0.90)
         }
     }
 
@@ -1312,6 +1375,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.action
         case .nightGarden: NightGardenColors.action
         case .christmasKeepsakes: ChristmasKeepsakesColors.action
+        case .paperBlossoms: PaperBlossomsColors.action
         }
     }
 
@@ -1323,6 +1387,7 @@ extension SurroundTheme {
         case .feltMeadow: actionTint?.opacity(0.86)
         case .nightGarden: actionTint?.opacity(0.86)
         case .christmasKeepsakes: actionTint?.opacity(0.86)
+        case .paperBlossoms: actionTint?.opacity(0.86)
         case .rakedGarden: actionTint?.opacity(0.88)
         default: actionTint
         }
@@ -1337,6 +1402,7 @@ extension SurroundTheme {
             flowingInkSelection
         case .nightGarden: NightGardenColors.selection
         case .christmasKeepsakes: ChristmasKeepsakesColors.selection
+        case .paperBlossoms: PaperBlossomsColors.selection
         default: Color(uiColor: .systemIndigo)
         }
     }
@@ -1354,6 +1420,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.chatBubble
         case .nightGarden: NightGardenColors.chatBubble
         case .christmasKeepsakes: ChristmasKeepsakesColors.chatBubble
+        case .paperBlossoms: PaperBlossomsColors.chatBubble
         }
     }
 }
@@ -1375,6 +1442,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.selection
         case .nightGarden: NightGardenColors.selection
         case .christmasKeepsakes: ChristmasKeepsakesColors.selection
+        case .paperBlossoms: PaperBlossomsColors.selection
         }
     }
 
@@ -1392,6 +1460,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.conditional
         case .nightGarden: NightGardenColors.conditional
         case .christmasKeepsakes: ChristmasKeepsakesColors.conditional
+        case .paperBlossoms: PaperBlossomsColors.conditional
         }
     }
 
@@ -1409,6 +1478,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.keyline
         case .nightGarden: NightGardenColors.keyline
         case .christmasKeepsakes: ChristmasKeepsakesColors.keyline
+        case .paperBlossoms: PaperBlossomsColors.keyline
         }
     }
 
@@ -1425,6 +1495,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.treeGuide.opacity(0.24)
         case .nightGarden: NightGardenColors.treeGuide.opacity(0.24)
         case .christmasKeepsakes: ChristmasKeepsakesColors.treeGuide.opacity(0.24)
+        case .paperBlossoms: PaperBlossomsColors.treeGuide.opacity(0.24)
         }
     }
 
@@ -1441,6 +1512,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.selection
         case .nightGarden: NightGardenColors.selection
         case .christmasKeepsakes: ChristmasKeepsakesColors.selection
+        case .paperBlossoms: PaperBlossomsColors.selection
         }
     }
 
@@ -1452,7 +1524,7 @@ extension SurroundTheme {
             nil
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xB7A4FF).opacity(0.85)
-        case .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes: nil
+        case .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms: nil
         }
     }
 
@@ -1469,6 +1541,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.conditional
         case .nightGarden: NightGardenColors.conditional
         case .christmasKeepsakes: ChristmasKeepsakesColors.conditional
+        case .paperBlossoms: PaperBlossomsColors.conditional
         }
     }
 
@@ -1485,6 +1558,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.idle
         case .nightGarden: NightGardenColors.idle
         case .christmasKeepsakes: ChristmasKeepsakesColors.idle
+        case .paperBlossoms: PaperBlossomsColors.idle
         }
     }
 }
@@ -1566,6 +1640,13 @@ extension SurroundTheme {
             }
             return [.init(color: ChristmasKeepsakesColors.whiteSurfaceTop, location: 0),
                     .init(color: ChristmasKeepsakesColors.whiteSurfaceBottom, location: 1)]
+        case .paperBlossoms:
+            if color == .black {
+                return [.init(color: PaperBlossomsColors.blackSurfaceTop, location: 0),
+                        .init(color: PaperBlossomsColors.blackSurfaceBottom, location: 1)]
+            }
+            return [.init(color: PaperBlossomsColors.whiteSurfaceTop, location: 0),
+                    .init(color: PaperBlossomsColors.whiteSurfaceBottom, location: 1)]
         }
     }
 
@@ -1584,6 +1665,7 @@ extension SurroundTheme {
         case .feltMeadow: color == .black ? FeltMeadowColors.blackSolid : FeltMeadowColors.whiteGlass
         case .nightGarden: color == .black ? NightGardenColors.blackSolid : NightGardenColors.whiteGlass
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.blackSolid : ChristmasKeepsakesColors.whiteGlass
+        case .paperBlossoms: color == .black ? PaperBlossomsColors.blackSolid : PaperBlossomsColors.whiteGlass
         }
     }
 
@@ -1599,6 +1681,7 @@ extension SurroundTheme {
         case .feltMeadow: color == .black ? FeltMeadowColors.cream : FeltMeadowColors.whiteForeground
         case .nightGarden: color == .black ? NightGardenColors.cream : NightGardenColors.whiteForeground
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.cream : ChristmasKeepsakesColors.whiteForeground
+        case .paperBlossoms: color == .black ? PaperBlossomsColors.cream : PaperBlossomsColors.whiteForeground
         }
     }
 
@@ -1617,6 +1700,7 @@ extension SurroundTheme {
         case .feltMeadow: color == .black ? FeltMeadowColors.blackAccent : FeltMeadowColors.whiteAccent
         case .nightGarden: color == .black ? NightGardenColors.blackAccent : NightGardenColors.whiteAccent
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.blackAccent : ChristmasKeepsakesColors.whiteAccent
+        case .paperBlossoms: color == .black ? PaperBlossomsColors.blackAccent : PaperBlossomsColors.whiteAccent
         }
     }
 
@@ -1624,7 +1708,7 @@ extension SurroundTheme {
     /// Pale night clocks need deeper red; dark clocks use brighter coral.
     func clockSuddenDeathAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark, color == .white { return Color(themeHex: 0x7D293B) }
-        if self == .nightGarden || self == .christmasKeepsakes { return Color(themeHex: color == .white ? 0x7D293B : 0xFFB5AF) }
+        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms { return Color(themeHex: color == .white ? 0x7D293B : 0xFFB5AF) }
         if self == .feltMeadow {
             return Color(themeHex: color == .white ? 0x7D2D2D : 0xFFADA1)
         }
@@ -1644,7 +1728,7 @@ extension SurroundTheme {
     /// The warning badge uses a solid pigment beneath its white text.
     func clockSuddenDeathBadge(scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark { return Color(themeHex: 0x8B3449) }
-        if self == .nightGarden || self == .christmasKeepsakes { return Color(themeHex: 0x8B3449) }
+        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms { return Color(themeHex: 0x8B3449) }
         if self == .frostPine { return Color(themeHex: 0x913748) }
         if self == .feltMeadow { return Color(themeHex: 0x8B3434) }
         if self == .surroundStudio, scheme == .dark {
@@ -1656,7 +1740,7 @@ extension SurroundTheme {
     /// Scoring acceptance remains green, with a deeper pigment on night ivory.
     func clockAgreementAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark, color == .white { return Color(themeHex: 0x284B31) }
-        if self == .nightGarden || self == .christmasKeepsakes { return Color(themeHex: color == .white ? 0x284B31 : 0xBDDEA9) }
+        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms { return Color(themeHex: color == .white ? 0x284B31 : 0xBDDEA9) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xBCE7B8 : 0x254C30)
         }
@@ -1673,7 +1757,7 @@ extension SurroundTheme {
     /// The auto-resign countdown and disconnected label share an amber accent.
     func clockDisconnectedAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark, color == .white { return Color(themeHex: 0x633D15) }
-        if self == .nightGarden || self == .christmasKeepsakes { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
+        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xF2D09C : 0x603814)
         }
@@ -1692,7 +1776,7 @@ extension SurroundTheme {
         if isFlowingInk, scheme == .dark {
             return Color(themeHex: color == .black ? 0xE8C891 : 0x6B431C)
         }
-        if self == .nightGarden || self == .christmasKeepsakes { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
+        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xF2D09C : 0x603814)
         }
@@ -1708,7 +1792,7 @@ extension SurroundTheme {
     /// The full undo badge needs its own darker amber beneath white text.
     func clockUndoBadge(scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark { return Color(themeHex: 0x795022) }
-        if self == .nightGarden || self == .christmasKeepsakes { return Color(themeHex: 0x79501F) }
+        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms { return Color(themeHex: 0x79501F) }
         if self == .frostPine { return Color(themeHex: 0x795022) }
         if self == .feltMeadow { return Color(themeHex: 0x73511E) }
         if self == .surroundStudio, scheme == .dark {
@@ -1735,6 +1819,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.turnOutline
         case .nightGarden: NightGardenColors.turnOutline
         case .christmasKeepsakes: ChristmasKeepsakesColors.turnOutline
+        case .paperBlossoms: PaperBlossomsColors.turnOutline
         }
     }
 
@@ -1751,6 +1836,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.turnGlow
         case .nightGarden: NightGardenColors.turnGlow
         case .christmasKeepsakes: ChristmasKeepsakesColors.turnGlow
+        case .paperBlossoms: PaperBlossomsColors.turnGlow
         }
     }
 
@@ -1769,6 +1855,7 @@ extension SurroundTheme {
         case .feltMeadow: FeltMeadowColors.action
         case .nightGarden: NightGardenColors.action
         case .christmasKeepsakes: ChristmasKeepsakesColors.action
+        case .paperBlossoms: PaperBlossomsColors.action
         }
     }
 
@@ -1808,6 +1895,10 @@ extension SurroundTheme {
             color == .black
                 ? [ChristmasKeepsakesColors.blackSurfaceTop, ChristmasKeepsakesColors.blackSurfaceBottom]
                 : [ChristmasKeepsakesColors.whiteSurfaceTop, ChristmasKeepsakesColors.whiteSurfaceBottom]
+        case .paperBlossoms:
+            color == .black
+                ? [PaperBlossomsColors.blackSurfaceTop, PaperBlossomsColors.blackSurfaceBottom]
+                : [PaperBlossomsColors.whiteSurfaceTop, PaperBlossomsColors.whiteSurfaceBottom]
         }
     }
 
@@ -1841,6 +1932,10 @@ extension SurroundTheme {
             color == .black
                 ? ChristmasKeepsakesColors.blackBorder.opacity(0.3)
                 : ChristmasKeepsakesColors.whiteBorder.opacity(0.35)
+        case .paperBlossoms:
+            color == .black
+                ? PaperBlossomsColors.blackBorder.opacity(0.3)
+                : PaperBlossomsColors.whiteBorder.opacity(0.35)
         }
     }
 
@@ -1856,6 +1951,7 @@ extension SurroundTheme {
         case .feltMeadow: color == .black ? FeltMeadowColors.cream : FeltMeadowColors.whiteForeground
         case .nightGarden: color == .black ? NightGardenColors.cream : NightGardenColors.whiteForeground
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.cream : ChristmasKeepsakesColors.whiteForeground
+        case .paperBlossoms: color == .black ? PaperBlossomsColors.cream : PaperBlossomsColors.whiteForeground
         }
     }
 
@@ -1879,6 +1975,8 @@ extension SurroundTheme {
             color == .black ? NightGardenColors.blackSecondary : NightGardenColors.whiteSecondary
         case .christmasKeepsakes:
             color == .black ? ChristmasKeepsakesColors.blackSecondary : ChristmasKeepsakesColors.whiteSecondary
+        case .paperBlossoms:
+            color == .black ? PaperBlossomsColors.blackSecondary : PaperBlossomsColors.whiteSecondary
         }
     }
 
@@ -1963,6 +2061,21 @@ extension SurroundTheme {
             }
             return darkSurface ? ChristmasKeepsakesColors.darkOrdinary : ChristmasKeepsakesColors.lightOrdinary
         }
+        if self == .paperBlossoms {
+            if player.isOGSModerator || player.isOGSAdmin {
+                return darkSurface ? PaperBlossomsColors.darkModerator : PaperBlossomsColors.lightModerator
+            }
+            if player.isOGSProfessional {
+                return darkSurface ? PaperBlossomsColors.darkProfessional : PaperBlossomsColors.lightProfessional
+            }
+            if player.isOGSSupporter {
+                return darkSurface ? PaperBlossomsColors.darkSupporter : PaperBlossomsColors.lightSupporter
+            }
+            if player.isBot == true || player.uiClass?.contains("bot") == true {
+                return identitySecondary(color)
+            }
+            return darkSurface ? PaperBlossomsColors.darkOrdinary : PaperBlossomsColors.lightOrdinary
+        }
         // Match OGSUser.uiColor's priority, including lightweight ui_class
         // payloads: moderator/admin, professional, supporter, then bot.
         if player.isOGSModerator || player.isOGSAdmin {
@@ -1997,6 +2110,7 @@ extension SurroundTheme {
             flowingInkSelection
         case .nightGarden: NightGardenColors.conditional
         case .christmasKeepsakes: ChristmasKeepsakesColors.conditional
+        case .paperBlossoms: PaperBlossomsColors.selection
         default: actionTint ?? .accentColor
         }
     }
@@ -2021,6 +2135,323 @@ extension SurroundTheme {
         // appearance, just as a white stone remains white in Dark Mode.
         let traits = UITraitCollection(userInterfaceStyle: surface == .black ? .dark : .light)
         return Color(uiColor: UIColor(player.uiColor).resolvedColor(with: traits))
+    }
+}
+
+// MARK: - Paper Blossoms
+
+/// Paper artwork never includes grid geometry or game marks. Static images
+/// keep their identity through clock ticks, panel transitions and resizing.
+private enum PaperBlossomsAssets {
+    static let board = UIImage(named: "PaperBlossomsBoard")
+        .map { BoardTexture(image: $0, mapping: .board) }
+    static let stones: StoneImages? = {
+        guard let black = UIImage(named: "PaperBlossomsBlackStone"),
+              let white = UIImage(named: "PaperBlossomsWhiteStone") else { return nil }
+        return StoneImages(black: [black], white: [white], blackFaceGain: 1.3)
+    }()
+    private final class ResourceBundle {}
+    static let turnedCorner = UIImage(named: "PaperBlossomsTurnedCorner",
+                                      in: Bundle(for: ResourceBundle.self), compatibleWith: nil)
+    static let portrait = UIImage(named: "PaperBlossomsScenePortrait")
+    static let landscape = UIImage(named: "PaperBlossomsSceneLandscape")
+}
+
+/// Warm matte pigments keep labels independent of the red garden. The
+/// black/ivory player identities remain the same in both system appearances.
+private enum PaperBlossomsColors {
+    private static func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {
+        Color(uiColor: UIColor { traits in
+            let value = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: CGFloat((value >> 16) & 255) / 255,
+                           green: CGFloat((value >> 8) & 255) / 255,
+                           blue: CGFloat(value & 255) / 255, alpha: 1)
+        })
+    }
+
+    static let page = adaptive(0xF3E5CF, 0x291614)
+    static let panel = adaptive(0xFFF0D9, 0x3B211D)
+    static let foreground = adaptive(0x54271E, 0xF8E8CC)
+    static let detailSecondary = adaptive(0x75513C, 0xDCC1A4)
+    static let panelBorder = adaptive(0x9E664E, 0xD7A985)
+    static let blackGlass = adaptive(0x2D2B26, 0x292521)
+    static let whiteGlass = adaptive(0xF6E8D0, 0xDECEB3)
+    static let whiteIdentityGlass = adaptive(0xFFF0D9, 0xE8D7BC)
+    static let action = adaptive(0x9F3025, 0x93372C)
+    static let chatBubble = adaptive(0xF0D9BB, 0x53332B)
+    static let selection = adaptive(0x8A2D24, 0xF1C298)
+    static let conditional = adaptive(0x714416, 0xEAD09B)
+    static let cream = adaptive(0xFFF3DD, 0xF4E5CC)
+    static let keyline = adaptive(0xFFF3DD, 0x291614)
+    static let treeGuide = adaptive(0x96664F, 0xCFAC8C)
+    static let idle = adaptive(0xDBC3A6, 0x68473A)
+    static let blackSurfaceTop = adaptive(0x35332D, 0x302923)
+    static let blackSurfaceBottom = adaptive(0x25241F, 0x211C18)
+    static let whiteSurfaceTop = adaptive(0xF2DFC0, 0xD8C4A5)
+    static let whiteSurfaceBottom = adaptive(0xFFF1DA, 0xE9D8BA)
+    static let blackSolid = adaptive(0x2D2B26, 0x292521)
+    static let whiteForeground = adaptive(0x54271E, 0x44231B)
+    static let blackAccent = adaptive(0xF2C5A0, 0xEFC6A2)
+    static let whiteAccent = adaptive(0x8D3026, 0x752B22)
+    static let turnOutline = adaptive(0xAD392B, 0xEAB98D)
+    static let turnGlow = adaptive(0xC75A3D, 0xDAA174)
+    static let blackBorder = adaptive(0xCBB99B, 0xBFA78A)
+    static let whiteBorder = adaptive(0x9F6249, 0x865B43)
+    static let blackSecondary = adaptive(0xDED1BB, 0xD8C8B1)
+    static let whiteSecondary = adaptive(0x79503A, 0x674530)
+    static let darkModerator = adaptive(0xE5C5ED, 0xE2C1EB)
+    static let lightModerator = adaptive(0x6E3376, 0x56265F)
+    static let darkProfessional = adaptive(0xC3DEA9, 0xBCD6A4)
+    static let lightProfessional = adaptive(0x35502B, 0x2C4426)
+    static let darkSupporter = adaptive(0xF1D29D, 0xEACB99)
+    static let lightSupporter = adaptive(0x754416, 0x603916)
+    static let darkOrdinary = adaptive(0xBBD9E5, 0xBCD5DF)
+    static let lightOrdinary = adaptive(0x28505D, 0x244650)
+}
+
+/// One turned corner, shared by full cards and compact headers. The face-only
+/// path follows the crease so the turn ring stays on readable ink/ivory paper.
+struct PaperBlossomsControlShape: InsettableShape {
+    var cornerRadius: CGFloat = 12
+    var compact = false
+    var faceOnly = false
+    var folded = true
+    private var insetAmount: CGFloat = 0
+
+    init(cornerRadius: CGFloat = 12, compact: Bool = false, faceOnly: Bool = false, folded: Bool = true) {
+        self.cornerRadius = cornerRadius
+        self.compact = compact
+        self.faceOnly = faceOnly
+        self.folded = folded
+    }
+
+    static func foldLength(in size: CGSize, compact: Bool) -> CGFloat {
+        max(0, min(compact ? 12 : 20, min(size.width, size.height) / 2))
+    }
+
+    static func contentClearance(compact: Bool) -> CGFloat { compact ? 14 : 22 }
+
+    func path(in rect: CGRect) -> Path {
+        let bounds = rect.insetBy(dx: insetAmount, dy: insetAmount)
+        guard bounds.width > 0, bounds.height > 0 else { return Path() }
+        let radius = max(0, min(cornerRadius - insetAmount, min(bounds.width, bounds.height) / 2))
+        guard folded else {
+            return RoundedRectangle(cornerRadius: radius).path(in: bounds)
+        }
+        let fold = min(Self.foldLength(in: rect.size, compact: compact),
+                       min(bounds.width, bounds.height) / 2)
+        let left = bounds.minX, right = bounds.maxX
+        let top = bounds.minY, bottom = bounds.maxY
+        return Path { path in
+            path.move(to: CGPoint(x: left + radius, y: top))
+            path.addLine(to: CGPoint(x: right - radius, y: top))
+            path.addQuadCurve(to: CGPoint(x: right, y: top + radius),
+                              control: CGPoint(x: right, y: top))
+            path.addLine(to: CGPoint(x: right, y: bottom - fold))
+            if faceOnly {
+                path.addCurve(to: CGPoint(x: right - fold, y: bottom),
+                              control1: CGPoint(x: right - fold * 0.9, y: bottom - fold),
+                              control2: CGPoint(x: right - fold, y: bottom - fold * 0.9))
+            } else {
+                path.addLine(to: CGPoint(x: right - fold, y: bottom))
+            }
+            path.addLine(to: CGPoint(x: left + radius, y: bottom))
+            path.addQuadCurve(to: CGPoint(x: left, y: bottom - radius),
+                              control: CGPoint(x: left, y: bottom))
+            path.addLine(to: CGPoint(x: left, y: top + radius))
+            path.addQuadCurve(to: CGPoint(x: left + radius, y: top),
+                              control: CGPoint(x: left, y: top))
+            path.closeSubpath()
+        }
+    }
+
+    func inset(by amount: CGFloat) -> Self {
+        var result = self
+        result.insetAmount += amount
+        return result
+    }
+}
+
+/// Flat ink/ivory paper with an actual clipped tip and a vermilion reverse.
+/// The artwork is confined to its reserved corner; the broad face stays solid.
+struct PaperBlossomsControlSurface: View {
+    let color: StoneColor
+    var cornerRadius: CGFloat = 12
+    var compact = false
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    private var showsFold: Bool { contrast != .increased && !reduceTransparency }
+
+    var body: some View {
+        let shape = PaperBlossomsControlShape(cornerRadius: cornerRadius, compact: compact,
+                                              folded: showsFold)
+        shape.fill(SurroundTheme.paperBlossoms.clockSolidSurface(color))
+            .overlay {
+                GeometryReader { geometry in
+                    let length = PaperBlossomsControlShape.foldLength(in: geometry.size, compact: compact)
+                    Group {
+                        if let image = PaperBlossomsAssets.turnedCorner {
+                            Image(uiImage: image).resizable()
+                        } else {
+                            // A solid reverse also keeps the silhouette intact
+                            // in resource-light hosts such as isolated previews.
+                            PaperBlossomsColors.action
+                        }
+                    }
+                    .frame(width: length, height: length)
+                    .background(PaperBlossomsColors.action)
+                    .clipShape(PaperBlossomsCornerFold())
+                    .shadow(color: .black.opacity(0.22), radius: 0.8, x: -0.4, y: -0.4)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                }
+                .opacity(showsFold ? 1 : 0)
+            }
+            .clipShape(shape)
+            .compositingGroup()
+            .shadow(color: .black.opacity(showsFold ? 0.2 : 0), radius: 1, x: 0, y: 0.8)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
+/// The same crease as the face path, in the corner artwork's own coordinates.
+private struct PaperBlossomsCornerFold: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            path.addCurve(to: CGPoint(x: rect.maxX, y: rect.minY),
+                          control1: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.1),
+                          control2: CGPoint(x: rect.minX + rect.width * 0.1, y: rect.minY))
+            path.closeSubpath()
+        }
+    }
+}
+
+/// The four edges share a uniform scale. Extra width or height opens quiet
+/// red paper between them, preserving lanterns and village on narrow windows
+/// and divided displays without stretching or cropping their silhouettes.
+struct PaperBlossomsSceneLayout: Equatable {
+    enum Composition: CaseIterable {
+        case portrait, landscape
+
+        var sourceSize: CGSize {
+            self == .portrait ? CGSize(width: 1024, height: 1536) : CGSize(width: 1536, height: 1024)
+        }
+
+        var assetName: String {
+            self == .portrait ? "PaperBlossomsScenePortrait" : "PaperBlossomsSceneLandscape"
+        }
+    }
+
+    enum Corner: CaseIterable {
+        case topLeft, topRight, bottomLeft, bottomRight
+
+        var isTrailing: Bool { self == .topRight || self == .bottomRight }
+        var isBottom: Bool { self == .bottomLeft || self == .bottomRight }
+    }
+
+    let size: CGSize
+    let composition: Composition
+    let scale: CGFloat
+    let imageSize: CGSize
+
+    init(size: CGSize) {
+        let width = size.width.isFinite ? max(0, size.width) : 0
+        let height = size.height.isFinite ? max(0, size.height) : 0
+        self.size = CGSize(width: width, height: height)
+        composition = width > height ? .landscape : .portrait
+        let source = composition.sourceSize
+        scale = min(width / source.width, height / source.height)
+        imageSize = CGSize(width: source.width * scale, height: source.height * scale)
+    }
+
+    func frame(for corner: Corner) -> CGRect {
+        CGRect(x: corner.isTrailing ? size.width - imageSize.width : 0,
+               y: corner.isBottom ? size.height - imageSize.height : 0,
+               width: imageSize.width, height: imageSize.height)
+    }
+}
+
+private struct PaperBlossomsScene: View {
+    let scheme: ColorScheme
+
+    var body: some View {
+        GeometryReader { geometry in
+            PaperBlossomsSceneContent(size: geometry.size, scheme: scheme).equatable()
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct PaperBlossomsSceneContent: View, Equatable {
+    let size: CGSize
+    let scheme: ColorScheme
+
+    private var legacyChrome: Bool {
+        if #available(iOS 26, *) { return false }
+        return true
+    }
+
+    var body: some View {
+        let layout = PaperBlossomsSceneLayout(size: size)
+        let paper = Color(themeHex: 0xC21B08)
+        let chrome = Color(themeHex: scheme == .dark ? 0x291614 : 0xF3E5CF)
+        ZStack {
+            ZStack(alignment: .topLeading) {
+                paper
+                if let image = layout.composition == .portrait
+                    ? PaperBlossomsAssets.portrait : PaperBlossomsAssets.landscape {
+                    ForEach(PaperBlossomsSceneLayout.Corner.allCases, id: \.self) { corner in
+                        let frame = layout.frame(for: corner)
+                        Image(uiImage: image)
+                            .resizable()
+                            .frame(width: frame.width, height: frame.height)
+                            .mask(fade(keepsStart: !corner.isTrailing, start: .leading, end: .trailing))
+                            .mask(fade(keepsStart: !corner.isBottom, start: .top, end: .bottom))
+                            .position(x: frame.midX, y: frame.midY)
+                    }
+                }
+            }
+            .frame(width: layout.size.width, height: layout.size.height)
+            .compositingGroup()
+            .saturation(scheme == .dark ? 0.72 : 1)
+            .colorMultiply(scheme == .dark ? Color(themeHex: 0x87665F) : .white)
+            // Keep support close to bare status/navigation ink. The matte
+            // game controls carry their own text, so the garden can stay
+            // visible beneath them instead of a broad cream wash.
+            VStack(spacing: 0) {
+                LinearGradient(stops: [
+                    .init(color: chrome.opacity(legacyChrome ? 0.88 : 0.65), location: 0),
+                    .init(color: chrome.opacity(legacyChrome ? 0.68 : 0.25),
+                          location: legacyChrome ? 0.48 : 0.3),
+                    .init(color: .clear, location: 1)
+                ], startPoint: .top, endPoint: .bottom)
+                .frame(height: min(legacyChrome ? 96 : 64, layout.size.height * 0.25))
+                Spacer(minLength: 0)
+                LinearGradient(stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: chrome.opacity(legacyChrome ? 0.48 : 0.12), location: 0.6),
+                    .init(color: chrome.opacity(legacyChrome ? 0.82 : 0.4), location: 1)
+                ], startPoint: .top, endPoint: .bottom)
+                .frame(height: min(legacyChrome ? 56 : 44, layout.size.height * 0.2))
+            }
+        }
+        .frame(width: layout.size.width, height: layout.size.height)
+        .clipped()
+    }
+
+    private func fade(keepsStart: Bool, start: UnitPoint, end: UnitPoint) -> LinearGradient {
+        let first = keepsStart ? Color.white : .clear
+        let last = keepsStart ? Color.clear : .white
+        return LinearGradient(stops: [
+            .init(color: first, location: 0),
+            .init(color: first, location: 0.42),
+            .init(color: last, location: 0.58),
+            .init(color: last, location: 1)
+        ], startPoint: start, endPoint: end)
     }
 }
 
@@ -2280,7 +2711,7 @@ private struct GameDetailThemeModifier: ViewModifier {
             .environment(\.boardAppearance, theme.board(for: theme.colorScheme ?? systemColorScheme))
             .environment(\.colorScheme, theme.colorScheme ?? systemColorScheme)
             .foregroundColor(theme.usesLightSceneSurfaces ? theme.foreground : nil)
-            .modifier(GameDetailLegacyTint(color: (theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes) ? theme.foreground : .accentColor))
+            .modifier(GameDetailLegacyTint(color: (theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms) ? theme.foreground : .accentColor))
             .toolbarColorScheme(theme.colorScheme, for: .navigationBar, .bottomBar)
             .background(WindowInterfaceStyle(colorScheme: ownsWindow ? theme.colorScheme : nil))
     }
@@ -2398,22 +2829,32 @@ private enum WindowStyleRequests {
 /// A flat, stone-contrasting turn cue that also reads when a compact clock
 /// omits its status label or shows a score estimate. The stroke stays inside
 /// the solid clock face, so landscape colors cannot reduce its contrast.
-struct FlowingInkClockOutline: View {
+struct GameDetailMatteClockOutline: View {
     let color: StoneColor
     let isRunning: Bool
+    var isWarning = false
     var cornerRadius: CGFloat = 12
+    var paperCompact = false
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.surroundTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         let increased = contrast == .increased
-        RoundedRectangle(cornerRadius: cornerRadius)
-            .strokeBorder(
-                theme.clockForeground(color, scheme: colorScheme)
-                    .opacity(isRunning ? 1 : (increased ? 0.5 : 0.22)),
-                lineWidth: isRunning ? (increased ? 4 : 3) : (increased ? 2 : 1)
-            )
+        let foreground = theme.clockForeground(color, scheme: colorScheme)
+        let runningInk = theme == .paperBlossoms
+            ? (isWarning ? theme.clockSuddenDeathAccent(color, scheme: colorScheme) : theme.clockAccent(color))
+            : foreground
+        let ink = isRunning ? runningInk : foreground.opacity(increased ? 0.5 : 0.22)
+        let width: CGFloat = isRunning ? (increased ? 4 : 3) : (increased ? 2 : 1)
+        if theme == .paperBlossoms {
+            PaperBlossomsControlShape(cornerRadius: cornerRadius, compact: paperCompact,
+                                      faceOnly: true, folded: !increased && !reduceTransparency)
+                .strokeBorder(ink, lineWidth: width)
+        } else {
+            RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(ink, lineWidth: width)
+        }
     }
 }
 
@@ -2442,7 +2883,7 @@ struct GameDetailSecondaryText: ViewModifier {
     @Environment(\.surroundTheme) private var theme
 
     @ViewBuilder func body(content: Content) -> some View {
-        if theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes {
+        if theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms {
             content.foregroundStyle(theme.detailSecondaryForeground)
         } else {
             content.foregroundStyle(.secondary)
@@ -2481,6 +2922,8 @@ struct GameDetailBackdrop: View {
             NightGardenScene(scheme: colorScheme)
         case .christmasKeepsakes:
             ChristmasKeepsakesScene(scheme: colorScheme)
+        case .paperBlossoms:
+            PaperBlossomsScene(scheme: colorScheme)
         case .frostPine:
             FrostPineScene(scheme: colorScheme)
         }

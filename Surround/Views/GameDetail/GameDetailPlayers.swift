@@ -161,7 +161,7 @@ struct GameDetailClockPair: View {
     /// The width a full card needs to keep its periods and captures on one
     /// line, card padding included, for the game's current values. Both cards
     /// share the widest so the pair keeps one height.
-    static func fullFooterWidth(game: Game, scale: CGFloat) -> CGFloat {
+    static func fullFooterWidth(game: Game, scale: CGFloat, theme: SurroundTheme) -> CGFloat {
         let font = UIFont.systemFont(ofSize: 13 * scale)
         let emphasizedFont = UIFont.systemFont(ofSize: 13 * scale, weight: .semibold)
         func width(_ text: String, _ font: UIFont) -> CGFloat {
@@ -179,8 +179,8 @@ struct GameDetailClockPair: View {
                     + (state.paused ? ceil(13 * scale) + 3 : 0)
             }
             let captures = width(String(localized: "\(state.captures) captures"), font)
-            // Two 4 pt gaps around the spacer, and 12 pt card padding per side.
-            return detail + captures + 8 + 24
+            // Two 4 pt gaps around the spacer, plus the actual face insets.
+            return detail + captures + 8 + horizontalContentPadding(theme: theme, leading: 12, compact: false)
         }.max() ?? 0
     }
 
@@ -191,7 +191,8 @@ struct GameDetailClockPair: View {
 
     /// The parts of a two-line chip at full size for the game's time system
     /// and text size: its widest countdown, widest turn badge and komi.
-    private static func compactChipParts(game: Game, scale: CGFloat, spacious: Bool) -> CompactChipParts {
+    private static func compactChipParts(game: Game, scale: CGFloat, spacious: Bool,
+                                         theme: SurroundTheme) -> CompactChipParts {
         func width(_ text: String, _ font: UIFont) -> CGFloat {
             text.isEmpty ? 0 : ceil((text as NSString).size(withAttributes: [.font: font]).width)
         }
@@ -219,24 +220,35 @@ struct GameDetailClockPair: View {
             width(String(localized: "\(gameDetailPoints($0.komi)) komi"),
                   UIFont.systemFont(ofSize: (spacious ? 13 : 11) * scale))
         } ?? 0
-        // Card padding per side: 8 pt, or 14 pt on a spacious chip.
-        return CompactChipParts(padding: spacious ? 28 : 16, countdown: countdown, badge: badge, komi: komi)
+        let padding = horizontalContentPadding(theme: theme, leading: spacious ? 14 : 8, compact: true)
+        return CompactChipParts(padding: padding, countdown: countdown, badge: badge, komi: komi)
+    }
+
+    /// Measurement and rendering share the fold clearance, including narrow
+    /// column cards whose metadata can require an extra line.
+    static func trailingContentPadding(theme: SurroundTheme, leading: CGFloat, compact: Bool) -> CGFloat {
+        theme == .paperBlossoms
+            ? max(leading, PaperBlossomsControlShape.contentClearance(compact: compact)) : leading
+    }
+
+    static func horizontalContentPadding(theme: SurroundTheme, leading: CGFloat, compact: Bool) -> CGFloat {
+        leading + trailingContentPadding(theme: theme, leading: leading, compact: compact)
     }
 
     /// The width a two-line chip needs to keep its time, turn badge and komi
     /// on one line, for the game's time system at this text size (rule 12:
     /// the badge never truncates and both chips keep the same time size).
     /// Chips narrower than this put the badge on its own row, both of them.
-    static func compactLineWidth(game: Game, scale: CGFloat) -> CGFloat {
-        let parts = compactChipParts(game: game, scale: scale, spacious: false)
+    static func compactLineWidth(game: Game, scale: CGFloat, theme: SurroundTheme) -> CGFloat {
+        let parts = compactChipParts(game: game, scale: scale, spacious: false, theme: theme)
         // 4 pt between the parts.
         return parts.padding + parts.countdown + 4 + parts.badge + parts.komiPart
     }
 
     /// The width a narrow two-line chip needs at full size: its first row
     /// holds the badge and White's komi, the second the time.
-    static func narrowChipWidth(game: Game, scale: CGFloat, spacious: Bool = false) -> CGFloat {
-        let parts = compactChipParts(game: game, scale: scale, spacious: spacious)
+    static func narrowChipWidth(game: Game, scale: CGFloat, spacious: Bool = false, theme: SurroundTheme) -> CGFloat {
+        let parts = compactChipParts(game: game, scale: scale, spacious: spacious, theme: theme)
         return parts.padding + max(parts.countdown, parts.badge + parts.komiPart)
     }
 
@@ -399,6 +411,14 @@ private struct GameDetailClockCard: View {
     }
     private var clockCornerRadius: CGFloat { spaciousCompact ? 14 : 12 }
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: clockCornerRadius) }
+    private var compactPaperCorner: Bool { style != .full }
+    private var leadingContentPadding: CGFloat {
+        spaciousCompact ? 14 : (style == .full ? (columnCard ? 10 : 12) : 8)
+    }
+    private var trailingContentPadding: CGFloat {
+        GameDetailClockPair.trailingContentPadding(theme: theme, leading: leadingContentPadding,
+                                                   compact: compactPaperCorner)
+    }
 
     private var alignment: HorizontalAlignment { mirrored ? .trailing : .leading }
     private var frameAlignment: Alignment { mirrored ? .trailing : .leading }
@@ -428,7 +448,7 @@ private struct GameDetailClockCard: View {
         if state.reconnecting {
             // Reconnecting has replaced the undo label; its badge pigment
             // is too dark as text on night slate or charcoal felt clocks.
-            return theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || (theme == .surroundStudio && colorScheme == .dark)
+            return theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || (theme == .surroundStudio && colorScheme == .dark)
                 ? foreground : badgeBackground
         }
         return theme.clockUndoAccent(color, scheme: colorScheme)
@@ -445,7 +465,8 @@ private struct GameDetailClockCard: View {
                 .padding(.top, columnCard ? 4 * scale : 0)
                 .frame(maxHeight: columnCard ? .infinity : nil, alignment: .top)
                 .foregroundStyle(foreground)
-                .padding(.horizontal, spaciousCompact ? 14 : (style == .full ? (columnCard ? 10 : 12) : 8))
+                .padding(.leading, leadingContentPadding)
+                .padding(.trailing, trailingContentPadding)
                 .frame(minWidth: 44, maxWidth: style == .inline && !cardWidth.isFinite ? nil : .infinity)
                 .frame(height: style == .inline ? max(34, height - 10) : height)
                 .background {
@@ -471,7 +492,7 @@ private struct GameDetailClockCard: View {
                     }
                 }
                 .modifier(GameDetailClearGlass(shape: shape,
-                                               enabled: !theme.isFlowingInk && theme != .feltMeadow && !reduceTransparency
+                                               enabled: !theme.isFlowingInk && theme != .feltMeadow && theme != .paperBlossoms && !reduceTransparency
                                                    && (!theme.usesLightSceneSurfaces || contrast != .increased),
                                                tint: showsThemeGlass ? theme.clockGlassTint(color) : nil))
                 .frame(height: height)
@@ -601,8 +622,10 @@ private struct GameDetailClockCard: View {
     }
 
     @ViewBuilder private var surface: some View {
-        if theme.isFlowingInk {
-            // Ink clocks stay opaque and flat, whether scenery is visible or not.
+        if theme == .paperBlossoms {
+            PaperBlossomsControlSurface(color: color, cornerRadius: clockCornerRadius,
+                                        compact: compactPaperCorner)
+        } else if theme.isFlowingInk {
             shape.fill(theme.clockSolidSurface(color))
         } else if theme == .feltMeadow {
             FeltControlSurface(color: color, shape: shape)
@@ -622,14 +645,15 @@ private struct GameDetailClockCard: View {
         }
     }
 
-    // Flowing Ink uses an opaque, contrasting ring. Other themes keep their
+    // Matte themes use an opaque, contrasting ring. Other themes keep their
     // halo and outline in the glass's foreground content so the native
     // compositor cannot cover them.
     private var clockOutline: some View {
         ZStack {
-            if theme.isFlowingInk {
-                FlowingInkClockOutline(color: color, isRunning: state.running,
-                                       cornerRadius: clockCornerRadius)
+            if theme.isFlowingInk || theme == .paperBlossoms {
+                GameDetailMatteClockOutline(color: color, isRunning: state.running,
+                                           isWarning: state.suddenDeath,
+                                           cornerRadius: clockCornerRadius, paperCompact: compactPaperCorner)
             } else {
                 if state.running && contrast != .increased {
                     shape.strokeBorder(turnGlow.opacity(colorScheme == .dark ? 0.6 : 0.55), lineWidth: 6)
@@ -774,7 +798,8 @@ private struct GameDetailClockCard: View {
         } else {
             statusWidth = 12 * scale
         }
-        return cardWidth >= ceil(16 + countdownWidth + detailWidth + statusWidth + 8)
+        return cardWidth >= ceil(leadingContentPadding + trailingContentPadding
+                                 + countdownWidth + detailWidth + statusWidth + 8)
     }
 
     @ViewBuilder private var inlineTurnIndicator: some View {
@@ -1379,7 +1404,9 @@ struct GameDetailPlayerIdentity: View {
                 identityContent
             }
         }
-        .padding(vertical ? (compactColumn ? 5 : columnPadding) : (compactHeader ? 0 : (accessibleRow ? 6 : 4)))
+        .padding(.trailing, theme == .paperBlossoms
+                 ? max(0, PaperBlossomsControlShape.contentClearance(compact: compactPaperCorner) - chipPadding) : 0)
+        .padding(chipPadding)
         .frame(minHeight: 44)
         // Paint the whole two-line reservation, keeping unused name space
         // inside the identity instead of enlarging its gap to the clock.
@@ -1399,8 +1426,16 @@ struct GameDetailPlayerIdentity: View {
             }
         }
         .background {
-            if theme.isFlowingInk {
-                // Player chips share the clocks' flat ink-and-paper treatment.
+            if theme == .paperBlossoms {
+                PaperBlossomsControlSurface(color: color, cornerRadius: chipCornerRadius,
+                                            compact: compactPaperCorner)
+                    .overlay {
+                        PaperBlossomsControlShape(cornerRadius: chipCornerRadius, compact: compactPaperCorner,
+                                                  faceOnly: true,
+                                                  folded: !reduceTransparency && contrast != .increased)
+                            .strokeBorder(theme.identityChipBorder(color), lineWidth: 1)
+                    }
+            } else if theme.isFlowingInk {
                 RoundedRectangle(cornerRadius: chipCornerRadius)
                     .fill(theme.clockSolidSurface(color))
                     .overlay {
@@ -1479,6 +1514,10 @@ struct GameDetailPlayerIdentity: View {
     }
 
     private var chipCornerRadius: CGFloat { compactColumn ? 9 : (vertical ? 12 : 10) }
+    private var compactPaperCorner: Bool { !vertical || compactColumn || navigationHeader || compactHeader || avatarOnly }
+    private var chipPadding: CGFloat {
+        vertical ? (compactColumn ? 5 : columnPadding) : (compactHeader ? 0 : (accessibleRow ? 6 : 4))
+    }
 
     /// Scene chips in a glass theme; the navigation header sits on the bar's
     /// glass, and accessibility settings keep the solid chip.

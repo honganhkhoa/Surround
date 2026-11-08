@@ -95,7 +95,7 @@ private enum MarkerAuditFixtures {
             let members = selected.filter { $0.group == group }
             // Large and rectangular boards retain their actual cell size in a
             // single-sample panel instead of sharing a clipped 7×7 tile.
-            if group == "board-sizes" {
+            if group == "board-sizes" || group == "dense-position" {
                 return members.enumerated().map { ("\(group)-\($0.offset + 1)", [$0.element]) }
             }
             return stride(from: 0, to: members.count, by: 4).map { start in
@@ -396,7 +396,35 @@ private enum MarkerAuditFixtures {
         }
     }()
 
-    static var selectableSamples: [MarkerAuditSample] { samples + boardSizeSamples }
+    /// A draw-only material stress sample, deliberately near full. This is
+    /// not a legal game or an input to move validation: it checks adjacent
+    /// stone silhouettes, open intersections and labels at native cell sizes.
+    static let densePositionSamples: [MarkerAuditSample] = {
+        let position = BoardPosition(width: 19, height: 19)
+        var stoneCount = 0
+        for row in 0..<19 {
+            for column in 0..<19 where (row * 5 + column * 3) % 11 != 0 {
+                let color: StoneColor = (row / 3 + column / 3).isMultiple(of: 2) ? .black : .white
+                position[[row, column]] = .hasStone(color)
+                stoneCount += 1
+            }
+        }
+        position.lastMove = .placeStone(9, 9)
+        position.lastMoveColor = .black
+        let markups: BoardMarkups = [
+            .init(row: 8, column: 8): .init(shapes: [.triangle]),
+            .init(row: 8, column: 11): .init(shapes: [.square]),
+            .init(row: 11, column: 8): .init(label: "A"),
+            .init(row: 11, column: 10): .init(label: "99"),
+        ]
+        return [.init(id: "dense-19x19", group: "dense-position",
+                      title: "Dense 19×19 · \(stoneCount) stones", position: position,
+                      markups: markups, coordinates: true,
+                      targets: [[9, 9], [8, 8], [8, 11], [11, 8], [11, 10]],
+                      notes: "Synthetic draw-only material stress sample, not a legal game. Near-full clusters and small gaps check stone separation, native grid geometry, last move and labels at the requested cell size.")]
+    }()
+
+    static var selectableSamples: [MarkerAuditSample] { samples + boardSizeSamples + densePositionSamples }
 }
 
 @MainActor

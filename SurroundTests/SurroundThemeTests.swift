@@ -1267,20 +1267,21 @@ final class SurroundThemeTests: XCTestCase {
     /// this same view. The UI audit separately exercises the system's read-only
     /// Increase Contrast environment through the supported simulator setting.
     @MainActor
-    func testFlowingInkRunningClockOutlineRemainsVisibleAtEverySize() throws {
-        for theme: SurroundTheme in [.flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain] {
+    func testMatteThemeRunningClockOutlineRemainsVisibleAtEverySize() throws {
+        for theme: SurroundTheme in [.flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain, .paperBlossoms] {
             for scheme: ColorScheme in [.light, .dark] {
                 for color: StoneColor in [.black, .white] {
                     for size in [CGSize(width: 88, height: 32), CGSize(width: 132, height: 48),
                                  CGSize(width: 178, height: 88)] {
                         for scale: CGFloat in [2, 3] {
+                          for warning in [false, true] {
                             var widths: [Int] = []
                             for running in [false, true] {
                                 let image = try nativeMaterialPixels(
                                     RoundedRectangle(cornerRadius: 12)
                                         .fill(theme.clockSolidSurface(color))
-                                        .overlay { FlowingInkClockOutline(color: color, isRunning: running,
-                                                                          cornerRadius: 12) }
+                                        .overlay { GameDetailMatteClockOutline(color: color, isRunning: running,
+                                                                               isWarning: warning, cornerRadius: 12) }
                                         .frame(width: size.width, height: size.height)
                                         .environment(\.surroundTheme, theme)
                                         .environment(\.colorScheme, scheme), scale: scale)
@@ -1291,7 +1292,7 @@ final class SurroundThemeTests: XCTestCase {
                                                  blue: Double(image.pixels[i + 2]) / 255)
                                 }
                                 let interior = pixel(image.height / 2)
-                                let detail = "\(theme) \(scheme) \(color) \(size) scale=\(scale)"
+                                let detail = "\(theme) \(scheme) \(color) \(size) scale=\(scale) warning=\(warning)"
                                 if running {
                                     XCTAssertGreaterThanOrEqual(contrast(pixel(Int(scale)), interior), 3, detail)
                                 }
@@ -1301,6 +1302,7 @@ final class SurroundThemeTests: XCTestCase {
                             }
                             XCTAssertGreaterThan(widths[1], widths[0], "Running is wider than idle")
                             XCTAssertGreaterThanOrEqual(widths[1], Int(2.5 * scale))
+                          }
                         }
                     }
                 }
@@ -1445,6 +1447,342 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    func testPaperBlossomsKeepsPaperAndFoldedStonesReadableInBothAppearances() throws {
+        let theme = SurroundTheme.paperBlossoms
+        XCTAssertTrue(theme.isDebugOnly)
+        XCTAssertEqual(theme.title, "Paper Blossoms")
+        XCTAssertNil(theme.colorScheme, "The surrounding interface follows the chosen appearance")
+        for scheme: ColorScheme in [.light, .dark] {
+            let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+            let board = theme.board(for: scheme)
+            XCTAssertEqual(board.gridStyle, .straight, "The native grid keeps precise playing intersections")
+            XCTAssertLessThanOrEqual(board.gridLineScale, 1, "The vermilion grid stays fine")
+            XCTAssertNil(board.boardDepth, "Paper does not introduce a thick slab or move the playing surface")
+            XCTAssertNil(board.boardReflection, "The paper playing surface stays matte")
+            XCTAssertGreaterThanOrEqual(contrast(theme.detailSecondaryForeground, theme.panel, style: style), 4.5,
+                                       "The empty Chat composer's placeholder remains readable on paper")
+            XCTAssertGreaterThan(contrast(board.black.flat, board.white.flat, style: style), 7)
+            XCTAssertGreaterThan(contrast(board.black.flat, board.surfaceColor(detailed: false), style: style), 7)
+            XCTAssertGreaterThanOrEqual(contrast(try XCTUnwrap(board.white.outline),
+                                               board.surfaceColor(detailed: false), style: style), 3)
+            for stone in [board.black, board.white] {
+                XCTAssertGreaterThanOrEqual(contrast(stone.label, stone.flat, style: style), 4.5)
+                XCTAssertGreaterThanOrEqual(contrast(stone.lastMove, stone.flat, style: style), 3)
+                let casing = try XCTUnwrap(stone.detailedMarkerCasing)
+                XCTAssertGreaterThanOrEqual(contrast(stone.label, casing, style: style), 4.5,
+                                           "Labels retain a readable edge across folded-paper facets")
+            }
+            try assertNightControlFallbacksKeepReadableTextAndRoles(theme, scheme: scheme)
+        }
+    }
+
+    func testPaperBlossomsArtworkKeepsNaturalProportionsAcrossGameLayouts() {
+        // Phone, short landscape, tablet, square previews, narrow iPad and
+        // wide/tall Duo-style slots exercise the actual scene geometry.
+        let sizes = [CGSize(width: 375, height: 548), CGSize(width: 375, height: 1000),
+                     CGSize(width: 402, height: 874), CGSize(width: 874, height: 402),
+                     CGSize(width: 820, height: 1180), CGSize(width: 1180, height: 820),
+                     CGSize(width: 320, height: 320), CGSize(width: 2000, height: 500),
+                     CGSize(width: 500, height: 2000)]
+        for size in sizes {
+            let layout = PaperBlossomsSceneLayout(size: size)
+            let source = layout.composition.sourceSize
+            XCTAssertEqual(layout.imageSize.width / source.width,
+                           layout.imageSize.height / source.height, accuracy: 0.000001,
+                           "Blossoms, circular lanterns and village buildings must never stretch")
+            XCTAssertGreaterThan(layout.scale, 0)
+            XCTAssertEqual(layout.frame(for: .topLeft).minX, 0, accuracy: 0.001)
+            XCTAssertEqual(layout.frame(for: .topLeft).minY, 0, accuracy: 0.001)
+            XCTAssertEqual(layout.frame(for: .bottomRight).maxX, size.width, accuracy: 0.001)
+            XCTAssertEqual(layout.frame(for: .bottomRight).maxY, size.height, accuracy: 0.001)
+            for corner: PaperBlossomsSceneLayout.Corner in [.topLeft, .topRight, .bottomLeft, .bottomRight] {
+                let frame = layout.frame(for: corner)
+                XCTAssertGreaterThan(frame.intersection(CGRect(origin: .zero, size: size)).width, 0)
+                XCTAssertGreaterThan(frame.intersection(CGRect(origin: .zero, size: size)).height, 0)
+            }
+        }
+        for size in [CGSize.zero, CGSize(width: -1, height: 100),
+                     CGSize(width: CGFloat.infinity, height: 100), CGSize(width: 100, height: CGFloat.nan)] {
+            let layout = PaperBlossomsSceneLayout(size: size)
+            for corner: PaperBlossomsSceneLayout.Corner in [.topLeft, .topRight, .bottomLeft, .bottomRight] {
+                let frame = layout.frame(for: corner)
+                XCTAssertTrue([frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite))
+                XCTAssertGreaterThanOrEqual(frame.width, 0)
+                XCTAssertGreaterThanOrEqual(frame.height, 0)
+            }
+        }
+    }
+
+    func testPaperBlossomsArtworkSeparatesOpaquePaperFromTransparentStones() throws {
+        let bundle = Bundle(for: Self.self)
+        func image(_ name: String) throws -> UIImage {
+            try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
+        }
+        for name in ["PaperBlossomsBoard", "PaperBlossomsScenePortrait", "PaperBlossomsSceneLandscape"] {
+            let source = try XCTUnwrap(image(name).cgImage, name)
+            XCTAssertGreaterThanOrEqual(min(source.width, source.height), 1024)
+            let pixels = try rgbaPixels(for: source, side: 128)
+            XCTAssertTrue(stride(from: 3, to: pixels.count, by: 4).allSatisfy { pixels[$0] == 255 },
+                          "The paper must not reveal decoration or grid from a lower layer: \(name)")
+            if name.hasSuffix("Portrait") { XCTAssertGreaterThan(source.height, source.width) }
+            if name.hasSuffix("Landscape") { XCTAssertGreaterThan(source.width, source.height) }
+        }
+        let black = try image("PaperBlossomsBlackStone")
+        let white = try image("PaperBlossomsWhiteStone")
+        XCTAssertNotEqual(black.pngData(), white.pngData(), "The two folded-paper colors need distinct artwork")
+        for (name, stone) in [("black", black), ("white", white)] {
+            let source = try XCTUnwrap(stone.cgImage)
+            XCTAssertEqual(source.width, source.height)
+            XCTAssertGreaterThanOrEqual(source.width, 256)
+            let pixels = try rgbaPixels(for: source, side: 128)
+            XCTAssertEqual(pixels[3], 0, "\(name) stone padding must be transparent")
+            XCTAssertGreaterThan(pixels[(64 * 128 + 64) * 4 + 3], 250,
+                                 "\(name) stone center must be opaque beneath its marker")
+        }
+    }
+
+    @MainActor
+    func testPaperBlossomsBlackFacetLiftPreservesOtherRendering() throws {
+        typealias Raster = (pixels: [UInt8], width: Int, height: Int)
+        let scale: CGFloat = 3
+        let bundle = Bundle(for: Self.self)
+        let black = try XCTUnwrap(UIImage(named: "PaperBlossomsBlackStone", in: bundle, compatibleWith: nil))
+        let white = try XCTUnwrap(UIImage(named: "PaperBlossomsWhiteStone", in: bundle, compatibleWith: nil))
+        // The unit target compiles Stone.swift, not the complete board view.
+        // Native marker-gallery exports cover the board Canvas and game ink.
+        func render(_ appearance: BoardAppearance, color: StoneColor, cell: CGFloat) throws -> Raster {
+            let content = Stone(color: color, shadowRadius: 1)
+                .frame(width: cell, height: cell).padding(8)
+                .environment(\.boardAppearance, appearance)
+                .environment(\.displayScale, scale)
+            return try nativeMaterialPixels(content, scale: scale)
+        }
+        func brightness(_ pixels: [UInt8], _ offset: Int) -> Double {
+            0.2126 * Double(pixels[offset]) + 0.7152 * Double(pixels[offset + 1])
+                + 0.0722 * Double(pixels[offset + 2])
+        }
+
+        for scheme: ColorScheme in [.light, .dark] {
+            var lifted = SurroundTheme.paperBlossoms.board(for: scheme)
+            // Assets live in the unit-test bundle, not the app's main bundle.
+            lifted.stoneImages = StoneImages(black: [black], white: [white],
+                tint: scheme == .dark ? Color(themeHex: 0xE8DFD0) : .white, blackFaceGain: 1.3)
+            var original = lifted
+            original.stoneImages?.blackFaceGain = 1
+            for color: StoneColor in [.black, .white] {
+                for cell: CGFloat in [13, 20] {
+                    let before = try render(original, color: color, cell: cell)
+                    let after = try render(lifted, color: color, cell: cell)
+                    let detail = "\(scheme) \(color), \(cell) pt"
+                    XCTAssertEqual(after.width, before.width, detail)
+                    XCTAssertEqual(after.height, before.height, detail)
+                    if color == .white || cell < 14 {
+                        XCTAssertEqual(after.pixels, before.pixels,
+                                       "White artwork and compact solids must remain identical: \(detail)")
+                        continue
+                    }
+                    var interiorLift = 0.0, interiorCount = 0, shadowCount = 0
+                    var alphaDelta = 0, exteriorDelta = 0
+                    for y in 0..<before.height {
+                        for x in 0..<before.width {
+                            let offset = (y * before.width + x) * 4
+                            let dx = (CGFloat(x) + 0.5 - CGFloat(before.width) / 2) / scale
+                            let dy = (CGFloat(y) + 0.5 - CGFloat(before.height) / 2) / scale
+                            let radiusSquared = dx * dx + dy * dy
+                            alphaDelta = max(alphaDelta,
+                                abs(Int(after.pixels[offset + 3]) - Int(before.pixels[offset + 3])))
+                            // The normalized paper asset's interior alpha is
+                            // 252–254; do not discard its near-opaque face.
+                            if radiusSquared < cell * cell / 16, before.pixels[offset + 3] > 250 {
+                                interiorLift += brightness(after.pixels, offset) - brightness(before.pixels, offset)
+                                interiorCount += 1
+                            }
+                            if radiusSquared > (cell / 2 + 1) * (cell / 2 + 1) {
+                                if before.pixels[offset + 3] > 0 { shadowCount += 1 }
+                                for channel in 0..<4 {
+                                    exteriorDelta = max(exteriorDelta,
+                                        abs(Int(after.pixels[offset + channel]) - Int(before.pixels[offset + channel])))
+                                }
+                            }
+                        }
+                    }
+                    XCTAssertGreaterThan(interiorCount, 20, detail)
+                    XCTAssertGreaterThan(interiorLift / Double(max(1, interiorCount)), 2,
+                                         "Native black folds need a visible lift: \(detail)")
+                    XCTAssertLessThanOrEqual(alphaDelta, 1, "Preserve silhouette alpha: \(detail)")
+                    XCTAssertGreaterThan(shadowCount, 0, "Sample the actual native shadow: \(detail)")
+                    XCTAssertLessThanOrEqual(exteriorDelta, 1,
+                                             "Neither shadows nor transparent padding may brighten: \(detail)")
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testPaperBlossomsTurnedCornerKeepsTextAndTurnRingReadable() throws {
+        let theme = SurroundTheme.paperBlossoms
+        let scale: CGFloat = 2
+        let asset = try XCTUnwrap(UIImage(named: "PaperBlossomsTurnedCorner",
+                                         in: Bundle(for: Self.self), compatibleWith: nil))
+        XCTAssertNotNil(asset.cgImage, "The actual vermilion reverse must ship in the theme catalog")
+        let linear = (0...255).map { byte -> Double in
+            let value = Double(byte) / 255
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        func pixelLuminance(_ pixels: [UInt8], _ offset: Int) -> Double {
+            let red = linear[Int(pixels[offset])]
+            let green = linear[Int(pixels[offset + 1])]
+            let blue = linear[Int(pixels[offset + 2])]
+            return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+        }
+        let players = [OGSUser(username: "ordinary", id: 1),
+                       OGSUser(username: "moderator", id: 2, isModerator: true),
+                       OGSUser(username: "professional", id: 3, professional: true),
+                       OGSUser(username: "supporter", id: 4, supporter: true)]
+        let sizes: [(CGSize, CGFloat, Bool)] = [
+            (CGSize(width: 88, height: 34), 12, true),
+            (CGSize(width: 178, height: 88), 12, false),
+            (CGSize(width: 126, height: 140), 9, false)
+        ]
+        for scheme: ColorScheme in [.light, .dark] {
+            let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+            for color: StoneColor in [.black, .white] {
+                let inks = [theme.clockForeground(color, scheme: scheme), theme.identitySecondary(color),
+                            theme.clockAccent(color), theme.clockSuddenDeathAccent(color, scheme: scheme),
+                            theme.clockAgreementAccent(color, scheme: scheme),
+                            theme.clockDisconnectedAccent(color, scheme: scheme),
+                            theme.clockUndoAccent(color, scheme: scheme)]
+                    + players.map { theme.roleColor(for: $0, on: color) }
+                for (size, radius, compact) in sizes {
+                    let fold: CGFloat = compact ? 12 : 20
+                    let clearance: CGFloat = compact ? 14 : 22
+                    let flat = try nativeMaterialPixels(theme.clockSolidSurface(color)
+                        .frame(width: size.width, height: size.height)
+                        .environment(\.colorScheme, scheme), scale: scale)
+                    let interior = try nativeMaterialPixels(PaperBlossomsControlShape(
+                        cornerRadius: radius, compact: compact).inset(by: 1).fill(.white)
+                        .frame(width: size.width, height: size.height), scale: scale)
+                    // Native stroke coverage avoids counting pixels that only
+                    // partly intersect an antialiased curved crease.
+                    let protectedPerimeter = try nativeMaterialPixels(PaperBlossomsControlShape(
+                        cornerRadius: radius, compact: compact, faceOnly: true)
+                        .strokeBorder(.white, lineWidth: 4)
+                        .frame(width: size.width, height: size.height), scale: scale)
+                    let ring = try nativeMaterialPixels(GameDetailMatteClockOutline(
+                        color: color, isRunning: true, cornerRadius: radius, paperCompact: compact)
+                        .frame(width: size.width, height: size.height)
+                        .environment(\.surroundTheme, theme)
+                        .environment(\.colorScheme, scheme), scale: scale)
+                    // Accessibility flags are read-only SwiftUI environment
+                    // values; fallback selection is reviewed in production.
+                    let rendered = try nativeMaterialPixels(PaperBlossomsControlSurface(
+                        color: color, cornerRadius: radius, compact: compact)
+                        .frame(width: size.width, height: size.height)
+                        .environment(\.colorScheme, scheme), scale: scale)
+                    let detail = "\(scheme) \(color) \(size)"
+                    XCTAssertEqual(rendered.width, flat.width, detail)
+                    XCTAssertEqual(rendered.height, flat.height, detail)
+                    var minimum = Double.infinity, maximum = 0.0
+                    var opaqueFailures = 0, textSamples = 0, flatFaceDelta = 0
+                    var tipSamples = 0, tipAlpha = 0, redPixels = 0, misplacedRed = 0
+                    var perimeterSamples = 0, redUnderPerimeter = 0, cornerRingSamples = 0
+                    var ringOverTransparency = 0, ringOutsideFacePerimeter = 0
+                    var nonOpaqueRingPixels: [String] = []
+                    var minimumRingContrast = Double.infinity
+                    for y in 0..<rendered.height {
+                        for x in 0..<rendered.width {
+                            let offset = (y * rendered.width + x) * 4
+                            let point = CGPoint(x: (CGFloat(x) + 0.5) / scale,
+                                                y: (CGFloat(y) + 0.5) / scale)
+                            let alpha = Int(rendered.pixels[offset + 3])
+                            if interior.pixels[offset + 3] == 255 && alpha != 255 {
+                                opaqueFailures += 1
+                            }
+                            // The selected shape removes the original tip;
+                            // decoration alone on a rectangular card cannot pass.
+                            if point.x > size.width - fold / 4 && point.y > size.height - fold / 4 {
+                                tipSamples += 1
+                                tipAlpha = max(tipAlpha, alpha)
+                            }
+                            let red = Int(rendered.pixels[offset])
+                            let green = Int(rendered.pixels[offset + 1])
+                            let blue = Int(rendered.pixels[offset + 2])
+                            let isVermilion = alpha == 255 && red > green + 20 && red > blue + 20
+                            if isVermilion {
+                                redPixels += 1
+                                if point.x < size.width - fold - 1 || point.y < size.height - fold - 1 {
+                                    misplacedRed += 1
+                                }
+                            }
+                            // Text is inset from the corner. Keep the broad
+                            // face unchanged, excluding only its local shadow.
+                            if interior.pixels[offset + 3] == 255,
+                               point.x < size.width - clearance - 2 {
+                                textSamples += 1
+                                for channel in 0..<4 {
+                                    flatFaceDelta = max(flatFaceDelta,
+                                        abs(Int(rendered.pixels[offset + channel]) - Int(flat.pixels[offset + channel])))
+                                }
+                                let value = pixelLuminance(rendered.pixels, offset)
+                                minimum = min(minimum, value)
+                                maximum = max(maximum, value)
+                            }
+                            if protectedPerimeter.pixels[offset + 3] == 255 {
+                                perimeterSamples += 1
+                                if isVermilion { redUnderPerimeter += 1 }
+                            }
+                            if ring.pixels[offset + 3] == 255 {
+                                let perimeterCoverage = protectedPerimeter.pixels[offset + 3]
+                                if perimeterCoverage == 0 { ringOutsideFacePerimeter += 1 }
+                                // At the three ordinary rounded corners, the
+                                // native 3pt stroke can be opaque while the
+                                // 4pt mask is 254 and clipped paper is 250. Those
+                                // are antialiased edge samples, not paper holes.
+                                if alpha == 0 || (perimeterCoverage == 255 && alpha != 255) {
+                                    ringOverTransparency += 1
+                                    if nonOpaqueRingPixels.count < 12 {
+                                        nonOpaqueRingPixels.append("(\(x),\(y)):alpha=\(alpha),interior=\(interior.pixels[offset + 3]),perimeter=\(protectedPerimeter.pixels[offset + 3])")
+                                    }
+                                }
+                                let ink = pixelLuminance(ring.pixels, offset)
+                                let backing = pixelLuminance(rendered.pixels, offset)
+                                let ratio = (max(ink, backing) + 0.05) / (min(ink, backing) + 0.05)
+                                minimumRingContrast = min(minimumRingContrast, ratio)
+                                if point.x > size.width - fold - 4 && point.y > size.height - fold - 4 {
+                                    cornerRingSamples += 1
+                                }
+                            }
+                        }
+                    }
+                    XCTAssertEqual(opaqueFailures, 0, "Paper face and reverse must be opaque: \(detail)")
+                    XCTAssertGreaterThan(tipSamples, 3, detail)
+                    XCTAssertEqual(tipAlpha, 0, "The dog-ear must cut the actual silhouette: \(detail)")
+                    XCTAssertGreaterThan(redPixels, 8, "Show a visible vermilion reverse: \(detail)")
+                    XCTAssertEqual(misplacedRed, 0, "Keep the ornament out of the text face: \(detail)")
+                    XCTAssertGreaterThan(textSamples, 500, detail)
+                    XCTAssertLessThanOrEqual(flatFaceDelta, 1, "No broad facet shading may return: \(detail)")
+                    XCTAssertGreaterThan(perimeterSamples, 100, detail)
+                    XCTAssertEqual(redUnderPerimeter, 0, "The ring must stay on ink/ivory, including the crease: \(detail)")
+                    XCTAssertGreaterThan(cornerRingSamples, 4, "The native ring follows the turned corner: \(detail)")
+                    XCTAssertEqual(ringOutsideFacePerimeter, 0,
+                                   "The native ring must follow the paper's crease perimeter: \(detail)")
+                    XCTAssertEqual(ringOverTransparency, 0,
+                                   "The turn ring stays inside the paper: \(detail); \(nonOpaqueRingPixels)")
+                    XCTAssertGreaterThanOrEqual(minimumRingContrast, 3,
+                                               "The actual ring must contrast beside the red reverse: \(detail)")
+                    for ink in inks {
+                        let value = luminance(ink, style: style)
+                        for surface in [minimum, maximum] {
+                            XCTAssertGreaterThanOrEqual((max(value, surface) + 0.05)
+                                / (min(value, surface) + 0.05), 4.5,
+                                "Every role and state must read on the reserved text face: \(detail)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     func testAnUnknownStoredThemeFallsBackToStandard() {
         XCTAssertEqual(SurroundTheme.current(storedID: "unknown"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: ""), .standard)
@@ -1456,6 +1794,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "feltMeadow"), .feltMeadow)
         XCTAssertEqual(SurroundTheme.current(storedID: "nightGarden"), .nightGarden)
         XCTAssertEqual(SurroundTheme.current(storedID: "christmasKeepsakes"), .christmasKeepsakes)
+        XCTAssertEqual(SurroundTheme.current(storedID: "paperBlossoms"), .paperBlossoms)
         #else
         XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl"), .nebulaPearl)
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .rakedGarden)
@@ -1464,6 +1803,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "feltMeadow"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "nightGarden"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "christmasKeepsakes"), .standard)
+        XCTAssertEqual(SurroundTheme.current(storedID: "paperBlossoms"), .standard)
         #endif
     }
 
@@ -1472,7 +1812,7 @@ final class SurroundThemeTests: XCTestCase {
     func testPickersOfferTheReleasedThemesFirst() {
         XCTAssertEqual(SurroundTheme.released, [.standard, .surroundStudio, .rakedGarden, .nebulaPearl])
         let unreleased: [SurroundTheme] = [.frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes,
-                                          .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain]
+                                          .paperBlossoms, .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain]
         XCTAssertEqual(SurroundTheme.allCases.filter(\.isDebugOnly), unreleased)
         #if DEBUG
         XCTAssertEqual(SurroundTheme.available, SurroundTheme.released + unreleased)
@@ -2252,7 +2592,7 @@ final class SurroundThemeTests: XCTestCase {
                 XCTAssertGreaterThan(contrast(theme.clockAccent(color), surface, style: style), 4.5)
                 XCTAssertGreaterThanOrEqual(
                     contrast(theme.clockSuddenDeathAccent(color, scheme: scheme), surface, style: style), 4.5)
-                if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes {
+                if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms {
                     for (state, accent) in [
                         ("Accepted", theme.clockAgreementAccent(color, scheme: scheme)),
                         ("Disconnected", theme.clockDisconnectedAccent(color, scheme: scheme)),
@@ -2275,7 +2615,7 @@ final class SurroundThemeTests: XCTestCase {
         }
         XCTAssertGreaterThan(contrast(.white, try XCTUnwrap(theme.actionTint), style: style), 4.5)
         XCTAssertGreaterThan(contrast(.white, theme.statusBadge, style: style), 4.5)
-        if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes {
+        if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms {
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockUndoBadge(scheme: scheme), style: style), 4.5,
                                        "The Undo badge keeps its white text readable")
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockSuddenDeathBadge(scheme: scheme), style: style), 4.5,
@@ -2643,7 +2983,7 @@ final class SurroundThemeTests: XCTestCase {
         for scheme: ColorScheme in [.light, .dark] {
             for theme in SurroundTheme.allCases {
                 XCTAssertEqual(theme.board(for: scheme).imageStoneShading,
-                               theme == .surroundStudio ? .clamshellShoulder
+                               (theme == .surroundStudio || theme == .paperBlossoms) ? .clamshellShoulder
                                    : (theme == .frostPine ? .iceEdge : .artwork))
             }
             var board = SurroundTheme.surroundStudio.board(for: scheme)

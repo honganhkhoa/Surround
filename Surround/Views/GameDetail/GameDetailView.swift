@@ -1191,17 +1191,30 @@ private struct GameToolbarLayout: ViewModifier {
     }
 
     private var compactNavigationTitle: some View {
-        compactNavigationTitleContent
-            .padding(.horizontal, theme.isFlowingInk ? 10 : 0)
-            .padding(.vertical, theme.isFlowingInk ? 5 : 0)
+        let needsPaperBacking = theme.isFlowingInk
+            || (theme == .paperBlossoms && compactNavigationTitleHasContent)
+        return compactNavigationTitleContent
+            .padding(.horizontal, needsPaperBacking ? 10 : 0)
+            .padding(.vertical, needsPaperBacking ? 5 : 0)
             .background {
-                // Mountain ink can sit behind the title in landscape. Keep
-                // only its text on a small paper surface, leaving the scene
+                // Ink and red paper can sit behind the title. Keep only
+                // its text on a small paper surface, leaving the scene
                 // visible across the rest of the native navigation bar.
-                if theme.isFlowingInk {
+                if needsPaperBacking {
                     Capsule().fill(theme.panel.opacity(0.96))
                 }
             }
+    }
+
+    private var compactNavigationTitleHasContent: Bool {
+        if game.gamePhase == .stoneRemoval || game.gamePhase == .finished {
+            return true
+        }
+        if game.isUserPlaying, let color = game.userStoneColor,
+           game.currentPlayer(with: color.opponentColor()) != nil {
+            return true
+        }
+        return !(game.gameName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty
     }
 
     @ViewBuilder private var compactNavigationTitleContent: some View {
@@ -1272,7 +1285,7 @@ private struct GameToolbarLayout: ViewModifier {
         }
         .toggleStyle(.button)
         .labelStyle(.iconOnly)
-        .modifier(GameDetailLegacyTint(color: (theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes) && !analyzingIsPresented
+        .modifier(GameDetailLegacyTint(color: (theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms) && !analyzingIsPresented
             ? theme.foreground : .accentColor))
         .accessibilityIdentifier(
             compact
@@ -1640,7 +1653,7 @@ private struct GameToolbarChatButton: View {
     private var iconColor: Color {
         if isSelected { return colorScheme == .dark ? .black : .white }
         if #available(iOS 26.0, macCatalyst 26.0, *) { return .primary }
-        return (theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes) ? theme.foreground : .accentColor
+        return (theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms) ? theme.foreground : .accentColor
     }
 
     var body: some View {

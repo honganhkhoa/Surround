@@ -261,9 +261,10 @@ struct HomeClockChip<Leading: View>: View {
     @ViewBuilder
     private var ring: some View {
         if state.running || lowOnTime {
-            let ringColor = warning ? warningColor : theme.turnOutline(scheme: colorScheme)
+            let ringColor = warning ? warningColor
+                : (theme == .paperBlossoms ? theme.clockAccent(color) : theme.turnOutline(scheme: colorScheme))
             let glowColor = warning ? warningColor : theme.turnGlow
-            shape.strokeBorder(ringColor, lineWidth: 1)
+            shape.strokeBorder(ringColor, lineWidth: theme == .paperBlossoms ? 3 : 1)
                 .background {
                     shape.inset(by: -2.5).stroke(glowColor.opacity(colorScheme == .dark ? 0.5 : 0.4), lineWidth: 3)
                 }

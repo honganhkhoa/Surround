@@ -395,12 +395,14 @@ struct GameDetailColumnDetailLayouts: Equatable {
     /// `fullCards`: the column cards (12 pt detail, 10 pt padding); otherwise
     /// the column's two-line chips (Zen, larger text; 11 pt, 8 pt).
     init(game: Game, fullCards: Bool, cardWidth: CGFloat, scale: CGFloat,
-         clockOverride: OGSClock? = nil, isConnected: Bool = true) {
+         clockOverride: OGSClock? = nil, isConnected: Bool = true,
+         horizontalPadding: CGFloat? = nil) {
         guard cardWidth > 0 else { return }
         func layout(_ color: StoneColor) -> GameDetailColumnDetailLayout {
             let state = GameDetailClockState(game: game, color: color, clockOverride: clockOverride,
                                              isConnected: isConnected)
-            return Self.layout(of: state, fullCards: fullCards, cardWidth: cardWidth, scale: scale)
+            return Self.layout(of: state, fullCards: fullCards, cardWidth: cardWidth, scale: scale,
+                               horizontalPadding: horizontalPadding)
         }
         black = layout(.black)
         white = layout(.white)
@@ -418,12 +420,13 @@ struct GameDetailColumnDetailLayouts: Equatable {
     /// than 75% of the 12 pt width ("vor Zug 3 · 2 Gefangene": 102.8 pt
     /// scaled, 106.6 pt at 9 pt in a 106 pt line, drawn with an ellipsis).
     static func layout(of state: GameDetailClockState, fullCards: Bool,
-                       cardWidth: CGFloat, scale: CGFloat) -> GameDetailColumnDetailLayout {
+                       cardWidth: CGFloat, scale: CGFloat,
+                       horizontalPadding: CGFloat? = nil) -> GameDetailColumnDetailLayout {
         guard let line = state.cardDetail(full: fullCards), !line.text.isEmpty else { return .oneLine }
         let size = (fullCards ? 12 : 11) * scale
         let minimumFont = UIFont.systemFont(ofSize: size * 0.75, weight: line.emphasized ? .semibold : .regular)
-        let padding: CGFloat = fullCards ? 10 : 8
-        let available = cardWidth - padding * 2 - (line.symbol == nil ? 0 : ceil(size) + 3)
+        let padding = horizontalPadding ?? (fullCards ? 20 : 16)
+        let available = cardWidth - padding - (line.symbol == nil ? 0 : ceil(size) + 3)
         func fits(_ text: String) -> Bool {
             (text as NSString).size(withAttributes: [.font: minimumFont]).width <= available - 0.5
         }

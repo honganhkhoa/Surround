@@ -84,11 +84,34 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         // iPadOS remembers the real size from the opt-in narrow-window audit.
         // Apple's native window gesture restores it without app-side overrides:
         // https://support.apple.com/guide/ipad/ipad08c9970c/ipados
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
-            .withOffset(CGVector(dx: 0, dy: 8)).doubleTap()
-        let restored = pollUntil(timeout: 8) {
+        func isFullSize() -> Bool {
             let frame = window.frame
             return frame.minX <= 4 && frame.minY <= 40 && min(frame.width, frame.height) >= 700
+        }
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
+            .withOffset(CGVector(dx: 0, dy: 8)).doubleTap()
+        var restored = pollUntil(timeout: 8) { isFullSize() }
+        if !restored {
+            // Floating-window captures show the native green traffic light
+            // at this offset. It belongs to SpringBoard rather than the
+            // app's accessibility tree; use its actual native hit target.
+            window.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: 51, dy: 32)).tap()
+            restored = pollUntil(timeout: 3) { isFullSize() }
+            if !restored {
+                let system = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+                let nativeChrome = XCTAttachment(string: system.debugDescription)
+                nativeChrome.name = "native-window-controls-after-green-button"
+                nativeChrome.lifetime = .keepAlways
+                add(nativeChrome)
+                let maximize = system.buttons.matching(NSPredicate(
+                    format: "label == 'Full Screen' OR label == 'Enter Full Screen' OR label == 'Zoom'"
+                )).allElementsBoundByIndex.first { $0.isHittable }
+                if let maximize {
+                    maximize.tap()
+                    restored = pollUntil(timeout: 8) { isFullSize() }
+                }
+            }
         }
         if !restored { capture(0, "Full-window restoration failed", in: app, note: "Before: \(before)") }
         XCTAssertTrue(restored, "Expected a full-size native iPad window; got \(window.frame)")
@@ -616,6 +639,49 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
     func testFeltMeadowNightThemeOrientations() {
         auditThemeOrientations(theme: "feltMeadow", title: "Felt Meadow at night", suffix: "-felt-meadow-night",
                                appearance: .dark)
+    }
+
+    func testPaperBlossomsThemeOrientations() {
+        auditThemeOrientations(theme: "paperBlossoms", title: "Paper Blossoms",
+                               suffix: "-paper-blossoms", appearance: .light)
+    }
+
+    func testPaperBlossomsThemePanels() {
+        auditThemePanels(theme: "paperBlossoms", title: "Paper Blossoms",
+                         suffix: "-paper-blossoms", appearance: .light)
+    }
+
+    func testPaperBlossomsNightThemePanels() {
+        auditThemePanels(theme: "paperBlossoms", title: "Paper Blossoms in Dark Mode",
+                         suffix: "-paper-blossoms-night", appearance: .dark)
+    }
+
+    func testPaperBlossomsChatPlaceholderInBothAppearances() {
+        defer { XCUIDevice.shared.orientation = .landscapeLeft }
+        for appearance: SurroundUITestContract.Appearance in [.light, .dark] {
+            for (number, portrait) in [(3, false), (14, true)] {
+                let app = launchGame(artboard: number, portrait: portrait,
+                                     theme: "paperBlossoms", appearance: appearance)
+                setSidebarCollapsed(true, in: app)
+                auditChat(true, in: app)
+                dismissSoftwareKeyboardIfNeeded(in: app)
+                let input = element(ID.gameChatInput, in: app, matching: .textField)
+                XCTAssertTrue(input.isEnabled, "An empty draft remains editable even while Send is disabled")
+                capture(number, "Paper Blossoms empty Chat composer", in: app,
+                        suffix: "-paper-blossoms-chat-\(appearance.rawValue)")
+                app.terminate()
+            }
+        }
+    }
+
+    func testPaperBlossomsThemeNarrowWindow() {
+        auditNarrowNativeWindowArtboard(theme: "paperBlossoms", suffix: "-paper-blossoms",
+                                       appearance: .light)
+    }
+
+    func testPaperBlossomsThemeTallWindow() {
+        auditNarrowNativeWindowArtboard(theme: "paperBlossoms", suffix: "-paper-blossoms-tall",
+                                       appearance: .light, requestedSize: CGSize(width: 375, height: 1000))
     }
 
     func testFlowingInkJadeThemeOrientations() {
@@ -1524,7 +1590,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                                                  requestedSize: CGSize = CGSize(width: 375, height: 548)) {
         let app = launchGame(artboard: 84, portrait: true, theme: theme, appearance: appearance)
         defer {
-            if theme?.hasPrefix("flowingInk") == true {
+            if theme?.hasPrefix("flowingInk") == true || theme == "paperBlossoms" {
                 restoreFullWindow(in: app)
                 app.terminate()
             }

@@ -107,9 +107,10 @@ struct AnalyzeTreeSlice: View {
                             Stone(color: lastMoveColor, shadowRadius: 2)
                                 .frame(width: 30, height: 30)
                                 .overlay {
-                                    // The charcoal wool needs a quiet edge on
-                                    // the night panel, independently of marks.
-                                    if theme == .feltMeadow, colorScheme == .dark, lastMoveColor == .black {
+                                    // Charcoal materials need a quiet edge on
+                                    // their night panels, independently of marks.
+                                    if (theme == .feltMeadow || theme == .paperBlossoms),
+                                       colorScheme == .dark, lastMoveColor == .black {
                                         Circle().strokeBorder(appearance.white.flat.opacity(0.55), lineWidth: 0.75)
                                             .allowsHitTesting(false)
                                     }
@@ -141,7 +142,7 @@ struct AnalyzeTreeSlice: View {
 //                                .font(.system(size: 30))
                                 // The board's label pigment keeps this icon
                                 // readable on each colored board material.
-                                .foregroundColor(theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || (theme == .surroundStudio && colorScheme == .dark)
+                                .foregroundColor(theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || (theme == .surroundStudio && colorScheme == .dark)
                                     ? appearance.emptyPointMarker : nil)
                                 .background(appearance.boardColor.cornerRadius(2))
                                 .onTapGesture {

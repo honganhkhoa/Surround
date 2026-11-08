@@ -921,7 +921,9 @@ struct SingleGameView: View {
         func columnDetail(fullCards: Bool) -> GameDetailColumnDetailLayouts {
             GameDetailColumnDetailLayouts(game: game, fullCards: fullCards, cardWidth: 126,
                                           scale: min(clockScale, 1.65),
-                                          clockOverride: frozenClock, isConnected: connected)
+                                          clockOverride: frozenClock, isConnected: connected,
+                                          horizontalPadding: GameDetailClockPair.horizontalContentPadding(
+                                            theme: theme, leading: fullCards ? 10 : 8, compact: !fullCards))
         }
         return GameDetailLayoutPlan(
             size: geometry.size, compact: compact, zen: zen ?? zenMode,
@@ -943,11 +945,11 @@ struct SingleGameView: View {
             opponentSharesStatusWhenFolded: compact && UIDevice.current.userInterfaceIdiom == .pad
                 && availablePanelDivision(in: geometry) == nil,
             recoveryHeight: recoveryHeight,
-            fullClockFooterWidth: GameDetailClockPair.fullFooterWidth(game: game, scale: min(clockScale, 1.65)),
-            compactClockLineWidth: GameDetailClockPair.compactLineWidth(game: game, scale: min(clockScale, 1.65)),
-            narrowChipWidth: GameDetailClockPair.narrowChipWidth(game: game, scale: min(clockScale, 1.65)),
+            fullClockFooterWidth: GameDetailClockPair.fullFooterWidth(game: game, scale: min(clockScale, 1.65), theme: theme),
+            compactClockLineWidth: GameDetailClockPair.compactLineWidth(game: game, scale: min(clockScale, 1.65), theme: theme),
+            narrowChipWidth: GameDetailClockPair.narrowChipWidth(game: game, scale: min(clockScale, 1.65), theme: theme),
             spaciousNarrowChipWidth: GameDetailClockPair.narrowChipWidth(game: game, scale: min(clockScale, 1.65),
-                                                                         spacious: true),
+                                                                         spacious: true, theme: theme),
             compactColumnIdentityHeight: GameDetailPlayerIdentity.compactColumnHeight(
                 dynamicTypeSize: dynamicTypeSize,
                 secondLine: GameDetailPlayerIdentity.columnChipsHaveSecondLine(game: game, hidesRank: hidesRank)),
