@@ -2470,7 +2470,7 @@ final class OGSServiceEventTests: XCTestCase {
         let game = Game(ogsGame: try makeEmptyGameData(id: 59, phase: "finished"))
         game.ogs = service
         var coordinator: GameDetailConnectionCoordinator? = GameDetailConnectionCoordinator()
-        weak var retainedCoordinator = coordinator
+        let isCoordinatorReleased = { [weak coordinator] in coordinator == nil }
 
         coordinator?.connect(to: game, using: service)
         socket.emissions.removeAll()
@@ -2478,7 +2478,7 @@ final class OGSServiceEventTests: XCTestCase {
         // A covered game route can disappear without another onDisappear call.
         coordinator = nil
 
-        XCTAssertNil(retainedCoordinator)
+        XCTAssertTrue(isCoordinatorReleased())
         socket.deliver(name: "game/59/phase", data: "play")
         XCTAssertEqual(game.gamePhase, .finished)
         XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "chat/part"])
@@ -2584,7 +2584,7 @@ final class OGSServiceEventTests: XCTestCase {
         let game = Game(ogsGame: try makeEmptyGameData(id: 62))
         let router = StackRouter()
         var coordinator: GameDetailConnectionCoordinator? = GameDetailConnectionCoordinator()
-        weak var retainedCoordinator = coordinator
+        let isCoordinatorReleased = { [weak coordinator] in coordinator == nil }
         var acquisitions = 0
         coordinator?.observeLifetime(in: router, route: nil) { _ in acquisitions += 1 }
         coordinator?.connect(to: game, using: service)
@@ -2604,7 +2604,7 @@ final class OGSServiceEventTests: XCTestCase {
 
         coordinator = nil
 
-        XCTAssertNil(retainedCoordinator, "The router's subscription must not retain the game owner.")
+        XCTAssertTrue(isCoordinatorReleased(), "The router's subscription must not retain the game owner.")
         socket.emissions.removeAll()
         router.setActive(true)
         XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })

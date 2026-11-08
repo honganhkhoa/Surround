@@ -805,13 +805,13 @@ final class StackRouterTests: XCTestCase {
 
     func testRootPickerRegistrationDoesNotRetainRouter() {
         var router: Router? = Router()
-        weak var retainedRouter = router
+        let isRouterReleased = { [weak router] in router == nil }
         let registration = router!.registerRootPicker(user: .constant(nil))
 
         router = nil
 
         withExtendedLifetime(registration) {
-            XCTAssertNil(retainedRouter)
+            XCTAssertTrue(isRouterReleased())
         }
     }
 

@@ -667,7 +667,7 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
         data: Any? = nil,
         resultCallback: OGSWebsocketResultCallback? = nil
     ) {
-        scheduler.async {
+        scheduler.async { [self] in
             guard !self.isClosed else {
                 resultCallback?(nil, [
                     "connection": "WebSocket was closed",

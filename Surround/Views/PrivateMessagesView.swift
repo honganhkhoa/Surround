@@ -203,7 +203,7 @@ struct PrivateMessagesView: View {
         let label: Text = if searching {
             Text("Searching…")
         } else if ogs.friendsLoading && ogs.friendInvitationsLoading {
-            Text("Loading friends…") + Text(verbatim: ", ") + Text("Loading friend requests…")
+            Text("\(Text("Loading friends…")), \(Text("Loading friend requests…"))")
         } else if ogs.friendInvitationsLoading {
             Text("Loading friend requests…")
         } else {
@@ -561,7 +561,7 @@ struct MessagesConversationView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(Text("View \(peer.username)’s profile"))
         .accessibilityValue(ogs.friendship(for: peer.id) == .friends
-            ? Text(verbatim: "\(peer.formattedRank) ") + Text("· Friend")
+            ? Text("\(Text(verbatim: peer.formattedRank)) \(Text("· Friend"))")
             : Text(verbatim: peer.formattedRank))
         .accessibilityIdentifier("messages.conversation.profile.\(peer.id)")
     }

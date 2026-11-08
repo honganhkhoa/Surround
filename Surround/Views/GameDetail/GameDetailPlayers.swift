@@ -930,9 +930,10 @@ private struct GameDetailClockCard: View {
     }
 
     private var scoreValue: Text {
-        if state.score == nil { return Text(verbatim: state.scoreValue).font(mainFont) }
-        return Text(verbatim: state.scoreValue).font(mainFont)
-            + Text(" pts").font(detailFont).foregroundColor(foreground.opacity(0.75))
+        let score = Text(verbatim: state.scoreValue).font(mainFont)
+        if state.score == nil { return score }
+        let points = Text(" pts").font(detailFont).foregroundColor(foreground.opacity(0.75))
+        return Text("\(score)\(points)")
     }
 
     private var compactScoringIndicator: some View {
@@ -1037,8 +1038,9 @@ private struct GameDetailClockCard: View {
     private func tintedCompactDetail(_ detail: String, tint: Color) -> Text {
         let captures = String(localized: "\(state.captures) captures")
         let detailText = Text(verbatim: detail).foregroundColor(tint)
-        return mirrored ? Text(verbatim: captures + compactDetailSeparator) + detailText
-            : detailText + Text(verbatim: compactDetailSeparator + captures)
+        let capturesText = Text(verbatim: mirrored ? captures + compactDetailSeparator
+                                                   : compactDetailSeparator + captures)
+        return mirrored ? Text("\(capturesText)\(detailText)") : Text("\(detailText)\(capturesText)")
     }
 
     @ViewBuilder private var captures: some View {
@@ -1845,9 +1847,11 @@ private struct GameDetailTeamRows: View {
                             Stone(color: color, shadowRadius: 0)
                                 .frame(width: 11, height: 11).offset(x: 3, y: 2)
                         }
-                        (Text(verbatim: player.username).fontWeight(.semibold)
+                        let name = Text(verbatim: player.username).fontWeight(.semibold)
                             .foregroundColor(gameDetailProfileColor(player, dark: colorScheme == .dark))
-                            + Text(verbatim: hidesRank ? "" : " [\(player.formattedRank)]").foregroundColor(theme.detailSecondaryForeground))
+                        let rank = Text(verbatim: hidesRank ? "" : " [\(player.formattedRank)]")
+                            .foregroundColor(theme.detailSecondaryForeground)
+                        Text("\(name)\(rank)")
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 4)
@@ -2036,9 +2040,11 @@ private struct GameDetailInformationContent: View {
                     Stone(color: color, shadowRadius: 0).frame(width: 10, height: 10).offset(x: 3, y: 2)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    (Text(verbatim: player?.username ?? "—")
+                    let name = Text(verbatim: player?.username ?? "—")
                         .foregroundColor(gameDetailProfileColor(player, dark: colorScheme == .dark))
-                        + Text(verbatim: !hidesRank ? " [\(player?.formattedRank ?? "—")]" : "").foregroundColor(theme.detailSecondaryForeground))
+                    let rank = Text(verbatim: !hidesRank ? " [\(player?.formattedRank ?? "—")]" : "")
+                        .foregroundColor(theme.detailSecondaryForeground)
+                    Text("\(name)\(rank)")
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                     if showsClocks { clockReadout(color) }

@@ -1995,8 +1995,8 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
     private func assertSearch(_ value: String, playerID: Int, in app: XCUIApplication) {
         XCTAssertTrue(waitForValue(value, in: element("messages.playerSearchField", in: app, matching: .textField),
                                    timeout: stateSettleTimeout))
-        visibleElement("messages.search.profile.\(playerID)", in: app)
-        visibleElement("messages.search.message.\(playerID)", in: app)
+        _ = visibleElement("messages.search.profile.\(playerID)", in: app)
+        _ = visibleElement("messages.search.message.\(playerID)", in: app)
         element("messages.cancelPlayerSearch", in: app, matching: .button)
     }
 

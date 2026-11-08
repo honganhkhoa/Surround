@@ -751,9 +751,9 @@ struct HomeView: View {
             } header: {
                 // The sentence Preferred Settings shows when it is empty. Menu
                 // items stop at three lines; the header keeps all of it.
-                Text("No preferred settings yet", comment: "Homeview - star menu header when no preferred settings are saved")
-                    + Text(verbatim: "\n")
-                    + Text("Add your preferred game settings to create a game with the exact settings you want faster.")
+                let title = Text("No preferred settings yet", comment: "Homeview - star menu header when no preferred settings are saved")
+                let explanation = Text("\(Text(verbatim: "\n"))\(Text("Add your preferred game settings to create a game with the exact settings you want faster."))")
+                Text("\(title)\(explanation)")
             }
         } else {
             Section {

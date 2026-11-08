@@ -426,7 +426,7 @@ private struct BoardReflectionView: View {
 /// so the two repeats do not line up.
 @MainActor
 private enum BoardReflectionTile {
-    static let side: CGFloat = 384
+    nonisolated static let side: CGFloat = 384
 
     private struct Key: Hashable {
         let dust: CGFloat

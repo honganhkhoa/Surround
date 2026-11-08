@@ -328,9 +328,7 @@ struct AnalyzeControlBar: View {
                 SurroundUITestContract.AccessibilityID.gameAnalyzeAddConditional
             )
             .accessibilityLabel(
-                Text("Add to conditional moves")
-                    + Text(verbatim: ", ")
-                    + Text("Replaces conflicting variations"),
+                Text("\(Text("Add to conditional moves")), \(Text("Replaces conflicting variations"))"),
                 isEnabled: addReplacesConditionalVariations
             )
 
@@ -429,9 +427,7 @@ struct AnalyzeControlBar: View {
         .help(Text(title))
         .accessibilityLabel(
             includesReplacementWarning
-                ? Text(title)
-                    + Text(verbatim: ", ")
-                    + Text("Replaces conflicting variations")
+                ? Text("\(Text(title)), \(Text("Replaces conflicting variations"))")
                 : Text(title)
         )
         .accessibilityIdentifier(accessibilityIdentifier)

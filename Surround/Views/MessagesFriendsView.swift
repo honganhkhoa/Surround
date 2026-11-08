@@ -49,8 +49,7 @@ struct MessagesRequestRow: View {
     private var profileAccessibilityValue: Text {
         let rank = Text(verbatim: invitation.fromUser.formattedRank)
         guard let created = invitation.created else { return rank }
-        return rank + Text(verbatim: ", ")
-            + Text(created, format: .relative(presentation: .named))
+        return Text("\(rank), \(Text(created, format: .relative(presentation: .named)))")
     }
 
     var body: some View {
@@ -445,7 +444,7 @@ private struct MessagesSearchPlayerRow: View {
     private var profileAccessibilityValue: Text {
         let rank = Text(verbatim: user.formattedRank)
         guard let relationshipText else { return rank }
-        return rank + Text(verbatim: " ") + relationshipText
+        return Text("\(rank) \(relationshipText)")
     }
 
     private func refreshRelationship() async {

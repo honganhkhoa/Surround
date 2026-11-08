@@ -374,7 +374,7 @@ final class ChallengeTests: XCTestCase {
         encoder.keyEncodingStrategy = .convertToSnakeCase
         let encodedChallenge = try! encoder.encode(challenge)
         
-        var redecodedChallenge = try! decoder.decode(OGSChallengeTemplate.self, from: encodedChallenge)
+        let redecodedChallenge = try! decoder.decode(OGSChallengeTemplate.self, from: encodedChallenge)
         
         // Surround overrides komiAuto and komi when decoding, which is a different behavior than OGS, so no need to check these
 //        redecodedChallenge.game.komi = challenge.game.komi

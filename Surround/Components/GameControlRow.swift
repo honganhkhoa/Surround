@@ -291,7 +291,7 @@ struct GameControlRow: View {
                    let gamesWaiting = nextGameCount {
                     Button(action: goToNextGame) {
                         Label {
-                            Text("Next") + Text(verbatim: " (\(gamesWaiting))")
+                            Text("\(Text("Next"))\(Text(verbatim: " (\(gamesWaiting))"))")
                         } icon: {
                             Image(systemName: "arrow.right")
                         }
