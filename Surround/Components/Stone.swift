@@ -147,12 +147,16 @@ enum ImageStoneShadowStyle: Equatable {
     case raisedGlass
 }
 
-/// A small surface accent for artwork whose shallow shoulder disappears
-/// when reduced to phone size. Large stones keep their original lighting.
+/// A surface accent for artwork whose shallow shoulder is hard to separate
+/// from its neighbors. Each material controls its own size response.
 enum ImageStoneShading: Equatable {
     case artwork
     case clamshellShoulder
     case iceEdge
+    case cranberryGlassEdge
+
+    /// Reflected edge light stays on the surface and casts no extra shadow.
+    var keepsAccentOutOfShadow: Bool { self == .iceEdge || self == .cranberryGlassEdge }
 
     func opacity(for color: StoneColor, cellSize: CGFloat, diameter: CGFloat) -> Double {
         guard cellSize.isFinite, diameter.isFinite,
@@ -164,6 +168,11 @@ enum ImageStoneShading: Equatable {
             return color == .white ? 0.18 * Double(min(1, max(0, (32 - diameter) / 12))) : 0
         case .iceEdge:
             return 0.38 * Double(min(1, max(0, (32 - diameter) / 10)))
+        case .cranberryGlassEdge:
+            guard color == .black else { return 0 }
+            // Dark glass still needs a readable shoulder in large groups;
+            // retain a gentler reflection as the original art gains detail.
+            return 0.48 - 0.14 * Double(min(1, max(0, (diameter - 22) / 22)))
         }
     }
 
@@ -171,6 +180,27 @@ enum ImageStoneShading: Equatable {
               cellSize: CGFloat, lightDirection: StoneLightDirection) {
         let strength = opacity(for: color, cellSize: cellSize, diameter: rect.width)
         guard strength > 0 else { return }
+        if self == .cranberryGlassEdge {
+            let width = min(1.2, max(0.65, rect.width * 0.035))
+            // The glass artwork's shoulder sits slightly inside its nominal
+            // circular footprint. Scale this clearance with the image so the
+            // reflection never fills its transparent fringe on larger stones.
+            let inset = width / 2 + max(0.3, rect.width * 0.024)
+            let edge = Path(ellipseIn: rect.insetBy(dx: inset, dy: inset))
+            let lit = CGPoint(x: lightDirection == .upperLeft ? rect.minX : rect.maxX, y: rect.minY)
+            let shaded = CGPoint(x: lightDirection == .upperLeft ? rect.maxX : rect.minX, y: rect.maxY)
+            let reflection = Color(red: 0.96, green: 0.57, blue: 0.59)
+            // An asymmetric cranberry reflection follows the glass shoulder,
+            // fading before the existing bright lower refraction. It stays
+            // inside the silhouette and leaves the face beneath marks clear.
+            context.stroke(edge, with: .linearGradient(Gradient(stops: [
+                .init(color: reflection.opacity(strength), location: 0),
+                .init(color: reflection.opacity(strength * 0.8), location: 0.35),
+                .init(color: reflection.opacity(strength * 0.25), location: 0.65),
+                .init(color: .clear, location: 0.9)
+            ]), startPoint: lit, endPoint: shaded), lineWidth: width)
+            return
+        }
         if self == .iceEdge {
             // A narrow shoulder separates adjacent ice stones without
             // darkening their faces or broadening their contact shadows.
@@ -316,7 +346,7 @@ struct BoardReflection: Equatable {
 /// The material visible on a board's lower face, below the playing surface.
 struct BoardDepth: Equatable {
     enum EdgeStyle: Equatable {
-        case cut, frosted
+        case cut, frosted, rolledTin
     }
 
     var upperFace: Color
@@ -1022,9 +1052,8 @@ struct Stone: View {
                             .colorMultiply(images.tint)
                             .frame(width: imageSize / images.footprint, height: imageSize / images.footprint)
                             .frame(width: imageSize, height: imageSize)
-                            // Ice's thin contour must not cast its own blurred
-                            // ring. Other materials retain their composition.
-                            .shadow(color: .black.opacity(appearance.imageStoneShading == .iceEdge ? 0.35 : 0), radius: shadowRadius,
+                            // Reflected contours must not cast a blurred ring.
+                            .shadow(color: .black.opacity(appearance.imageStoneShading.keepsAccentOutOfShadow ? 0.35 : 0), radius: shadowRadius,
                                     x: shadowXSign * shadowRadius / 2, y: shadowRadius)
                             .overlay {
                                 if appearance.imageStoneShading != .artwork {
@@ -1038,7 +1067,7 @@ struct Stone: View {
                                     .accessibilityHidden(true)
                                 }
                             }
-                            .shadow(color: .black.opacity(appearance.imageStoneShading == .iceEdge ? 0 : 0.35), radius: shadowRadius,
+                            .shadow(color: .black.opacity(appearance.imageStoneShading.keepsAccentOutOfShadow ? 0 : 0.35), radius: shadowRadius,
                                     x: shadowXSign * shadowRadius / 2, y: shadowRadius)
                             .frame(width: size, height: size)
                     } else {

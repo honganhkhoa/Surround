@@ -56,6 +56,9 @@ private struct MarkerAuditSample: Identifiable {
     var auditState: BoardMarkerAuditState? = nil
     var renderingMode: WidgetRenderingMode = .fullColor
     var renderingModeName = "fullColor"
+    /// Same-build material comparisons use the real board renderer, changing
+    /// only its optional image accent. Never used by ordinary game views.
+    var imageStoneShadingOverride: ImageStoneShading? = nil
     /// Points that carry the sample's main mark, for artwork-variant provenance.
     var targets: [[Int]] = []
     var notes = ""
@@ -424,11 +427,42 @@ private enum MarkerAuditFixtures {
                       notes: "Synthetic draw-only material stress sample, not a legal game. Near-full clusters and small gaps check stone separation, native grid geometry, last move and labels at the requested cell size.")]
     }()
 
-    static var selectableSamples: [MarkerAuditSample] { samples + boardSizeSamples + densePositionSamples }
+    /// Dense material comparisons are opt-in so the everyday marker matrix
+    /// stays bounded. Both samples share stones, marks, shadows and geometry.
+    static let stoneGroupSamples: [MarkerAuditSample] = {
+        let black = (0..<5).flatMap { row in
+            (0..<5).compactMap { column -> [Int]? in
+                ([row, column] == [1, 1] || [row, column] == [3, 3]) ? nil : [row, column]
+            }
+        } + [[6, 5]]
+        let white = (0..<5).map { [$0, 6] } + [[6, 1], [6, 2], [6, 3], [6, 6]]
+        let board = position(black: black, white: white, last: [4, 4])
+        board.removedStones = [[6, 5], [6, 6]]
+        let marks: BoardMarkups = [
+            BoardPoint(row: 0, column: 0): BoardMarkup(shapes: [.triangle]),
+            BoardPoint(row: 2, column: 2): BoardMarkup(label: "17"),
+            BoardPoint(row: 2, column: 6): BoardMarkup(shapes: [.square]),
+        ]
+        return [false, true].map { artworkOnly in
+            MarkerAuditSample(
+                id: artworkOnly ? "glass-group-artwork" : "glass-group",
+                group: "stone-groups",
+                title: artworkOnly ? "Glass group · artwork only" : "Glass group · current rendering",
+                position: board, markups: marks,
+                imageStoneShadingOverride: artworkOnly ? .artwork : nil,
+                targets: [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [2, 5], [2, 6], [6, 5], [6, 6]],
+                notes: "Dense black group has two one-point eyes; an empty column separates it from white stones. Triangle, label 17, last-move ring and white square check marks. Bottom-right black and white stones are removed. The artwork-only companion disables imageStoneShading alone; all source art, footprints, tints and cast shadows are shared.")
+        }
+    }()
+
+    static var selectableSamples: [MarkerAuditSample] {
+        samples + boardSizeSamples + densePositionSamples + stoneGroupSamples
+    }
 }
 
 @MainActor
 private struct MarkerAuditSampleView: View {
+    @Environment(\.boardAppearance) private var appearance
     let sample: MarkerAuditSample
     let cellSize: CGFloat
     var showsIdentifier = false
@@ -444,12 +478,21 @@ private struct MarkerAuditSampleView: View {
         return view
     }
 
+    private var sampleAppearance: BoardAppearance {
+        var sampleAppearance = appearance
+        if let shading = sample.imageStoneShadingOverride {
+            sampleAppearance.imageStoneShading = shading
+        }
+        return sampleAppearance
+    }
+
     var body: some View {
         let size = sample.containerSize(for: cellSize)
         VStack(alignment: .leading, spacing: 4) {
             Text(sample.title).font(.caption2.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
             if showsIdentifier { Text(sample.id).font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary) }
             board.frame(width: size.width, height: size.height)
+                .environment(\.boardAppearance, sampleAppearance)
         }
     }
 }
@@ -653,6 +696,7 @@ private enum MarkerAuditExporter {
         let boardHeight: Int
         let coordinates: Bool
         let renderingMode: String
+        let imageStoneShadingOverride: String?
         let targets: [TargetRecord]
     }
     private struct PanelRecord: Encodable {
@@ -847,7 +891,9 @@ private enum MarkerAuditExporter {
         return SampleRecord(id: sample.id, group: sample.group, title: sample.title, notes: sample.notes,
                             boardSize: position.width == position.height ? position.width : nil,
                             boardWidth: position.width, boardHeight: position.height, coordinates: sample.coordinates,
-                            renderingMode: sample.renderingModeName, targets: points.map { point in
+                            renderingMode: sample.renderingModeName,
+                            imageStoneShadingOverride: sample.imageStoneShadingOverride.map { String(describing: $0) },
+                            targets: points.map { point in
             let color: String
             let variant: Int?
             if case .hasStone(let stoneColor) = position[point] {

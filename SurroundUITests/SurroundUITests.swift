@@ -5108,6 +5108,13 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         ])
     }
 
+    func testChristmasKeepsakesBoardDepthKeepsMovesAligned() {
+        auditThemedBoardDepth(appearances: [
+            (theme: "christmasKeepsakes", appearance: "light"),
+            (theme: "christmasKeepsakes", appearance: "dark"),
+        ])
+    }
+
     private func auditThemedBoardDepth(appearances: [(theme: String, appearance: String)]) {
         #if targetEnvironment(macCatalyst)
         let orientations: [(name: String, value: UIDeviceOrientation)] = [("window", .unknown)]

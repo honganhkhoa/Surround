@@ -664,13 +664,31 @@ private struct BoardDepthView: View {
             let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .circular)
             ZStack(alignment: .bottom) {
                 shape.fill(material.upperFace)
-                LinearGradient(colors: [material.upperFace, material.lowerFace],
-                               startPoint: .topLeading, endPoint: .bottomTrailing)
-                    .frame(height: thickness + 1 / displayScale)
+                Group {
+                    if material.edgeStyle == .rolledTin {
+                        // The lid supplies the metal highlight. Keep its wall
+                        // continuous and darker toward the contact edge;
+                        // repeated bright bands read as stacked thin plates.
+                        LinearGradient(stops: [
+                            .init(color: material.upperFace, location: 0),
+                            .init(color: material.lowerFace, location: 0.78),
+                            .init(color: material.lowerFace, location: 1)
+                        ], startPoint: .top, endPoint: .bottom)
+                        .overlay {
+                            LinearGradient(colors: [.white.opacity(0.06), .clear, .black.opacity(0.10)],
+                                           startPoint: .leading, endPoint: .trailing)
+                        }
+                    } else {
+                        LinearGradient(colors: [material.upperFace, material.lowerFace],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing)
+                    }
+                }
+                .frame(height: thickness + 1 / displayScale)
             }
             .overlay {
-                BoardBorder(start: .clear, middle: material.shade.opacity(0.15),
-                            end: material.shade.opacity(0.6),
+                let outline = material.edgeStyle == .rolledTin ? material.lowerFace : material.shade
+                BoardBorder(start: .clear, middle: outline.opacity(0.15),
+                            end: outline.opacity(0.6),
                             width: min(1 / displayScale, thickness * 0.2), cornerRadius: cornerRadius)
             }
             .clipShape(shape)
@@ -705,6 +723,33 @@ private struct FrostedBoardEdge: View {
             BoardBorder(start: material.highlight,
                         middle: material.highlight.opacity(0.50), end: material.highlight.opacity(0.72),
                         width: min(1, min(cellSize * 0.045, thickness * 0.3)), cornerRadius: cornerRadius)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// One directional reflection gives the enamel board a rolled metal lip.
+/// The inset pressed channel stays in the unused half-cell board margin;
+/// strips and corner patches avoid a board-sized gradient stroke on resize.
+private struct RolledTinBoardEdge: View {
+    let material: BoardDepth
+    let cellSize: CGFloat
+    let thickness: CGFloat
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        let lip = min(2, min(cellSize * 0.08, thickness * 0.42))
+        let seam = min(0.5, thickness * 0.09)
+        let inset = lip
+        ZStack {
+            BoardBorder(start: material.highlight.opacity(0.85),
+                        middle: material.highlight.opacity(0.45), end: material.shade,
+                        width: lip, cornerRadius: cornerRadius)
+            BoardBorder(start: material.shade.opacity(0.38),
+                        middle: material.shade.opacity(0.25), end: material.shade.opacity(0.18),
+                        width: seam, cornerRadius: max(0, cornerRadius - inset))
+                .padding(inset)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -749,6 +794,13 @@ private struct ImageStoneCanvas: View, Equatable {
             // retain the theme's full raised profile and light direction.
             let glass = shadowStyle == .raisedGlass
             let shadowScale = min(1, max(glass ? 0.5 : 0.35, (cellSize - 10) / 30))
+            // Broad dark halos join dense cranberry groups at phone size.
+            // Keep a tight contact there, returning to the original raised
+            // glass treatment continuously by a 32 pt cell.
+            let phoneGlass = glass ? min(1, max(0, (32 - cellSize) / 10)) : 0
+            func glassValue(_ original: CGFloat, phone: CGFloat) -> CGFloat {
+                original + (phone - original) * phoneGlass
+            }
 
             if shadowStyle == .ice {
                 drawShadow(in: context, radius: min(1.8, max(0.65, cellSize * 0.04)),
@@ -757,19 +809,19 @@ private struct ImageStoneCanvas: View, Equatable {
             } else if shadowStyle != .contact {
                 // A full-footprint cast stays visible against wood grain at
                 // phone size. Cap its spread so larger boards do not float.
-                drawShadow(in: context, radius: min(3, max(1.8, cellSize * 0.07)) * shadowScale,
-                           x: min(2, max(0.8, cellSize * 0.035)) * shadowScale,
-                           y: min(3, max(1.6, cellSize * 0.065)) * shadowScale,
-                           inset: 0, opacity: 0.34)
+                drawShadow(in: context, radius: glassValue(min(3, max(1.8, cellSize * 0.07)) * shadowScale, phone: 0.6),
+                           x: glassValue(min(2, max(0.8, cellSize * 0.035)) * shadowScale, phone: 0.2),
+                           y: glassValue(min(3, max(1.6, cellSize * 0.065)) * shadowScale, phone: 0.4),
+                           inset: 0, opacity: Double(glassValue(0.34, phone: 0.18)))
                 // The tighter edge keeps the curved stone grounded; the
                 // cast above is softer than the default contact-only shadow.
                 // Glass needs a distinct contact edge on dark enamel even
                 // at phone size. Keep it tight so the stone stays centered.
                 drawShadow(in: context,
-                           radius: min(1, max(glass ? 0.5 : 0.45, cellSize * (glass ? 0.025 : 0.02))),
-                           x: min(glass ? 0.9 : 0.5, cellSize * (glass ? 0.025 : 0.01)),
-                           y: min(glass ? 1.5 : 0.8, cellSize * (glass ? 0.045 : 0.02)),
-                           inset: glass ? 0.1 : 0.2, opacity: glass ? 0.5 : 0.32)
+                           radius: glassValue(min(1, max(glass ? 0.5 : 0.45, cellSize * (glass ? 0.025 : 0.02))), phone: 0.35),
+                           x: glassValue(min(glass ? 0.9 : 0.5, cellSize * (glass ? 0.025 : 0.01)), phone: 0.2),
+                           y: glassValue(min(glass ? 1.5 : 0.8, cellSize * (glass ? 0.045 : 0.02)), phone: 0.4),
+                           inset: glass ? 0.1 : 0.2, opacity: Double(glassValue(glass ? 0.5 : 0.32, phone: 0.34)))
             } else {
                 drawShadow(in: context, radius: max(0.6, cellSize * 0.06 * shadowScale),
                            x: cellSize * 0.03 * shadowScale, y: cellSize * 0.06 * shadowScale,
@@ -1663,7 +1715,7 @@ struct BoardView: View {
                             if let texture = appearance.boardTexture {
                                 BoardTextureImage(texture: texture, lifted: false, boardSize: geometry.size)
                                     .overlay {
-                                        if appearance.boardBevel {
+                                        if appearance.boardBevel && appearance.boardDepth?.edgeStyle != .rolledTin {
                                             // Lift the existing mineral detail only in the margin,
                                             // fading before the outer grid line half a cell in.
                                             let fade = 0.45 / (max(width, height) + (showsCoordinate ? 1 : 0))
@@ -1716,6 +1768,10 @@ struct BoardView: View {
                                             FrostedBoardEdge(material: depth, cellSize: depthGeometry.cellSize,
                                                              thickness: depthGeometry.thickness,
                                                              cornerRadius: faceRadius)
+                                        } else if let depth = appearance.boardDepth, depth.edgeStyle == .rolledTin {
+                                            RolledTinBoardEdge(material: depth, cellSize: depthGeometry.cellSize,
+                                                               thickness: depthGeometry.thickness,
+                                                               cornerRadius: faceRadius)
                                         } else {
                                             BoardBorder(start: appearance.boardDepth?.highlight ?? .white.opacity(0.18), middle: .clear,
                                                         end: appearance.boardDepth?.shade ?? .black.opacity(0.45),

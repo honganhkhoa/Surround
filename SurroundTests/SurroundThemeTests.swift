@@ -14,7 +14,9 @@ final class SurroundThemeTests: XCTestCase {
         let night = try XCTUnwrap(SurroundTheme.surroundStudio.board(for: .dark).boardDepth)
         let frostDay = try XCTUnwrap(SurroundTheme.frostPine.board(for: .light).boardDepth)
         let frostNight = try XCTUnwrap(SurroundTheme.frostPine.board(for: .dark).boardDepth)
-        for depth in [nebula, day, night, frostDay, frostNight] {
+        let tinDay = try XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .light).boardDepth)
+        let tinNight = try XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .dark).boardDepth)
+        for depth in [nebula, day, night, frostDay, frostNight, tinDay, tinNight] {
             XCTAssertGreaterThan(depth.thicknessRatio, 0)
             XCTAssertGreaterThan(depth.maximumThickness, 0)
         }
@@ -25,60 +27,77 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertNotEqual(day.lowerFace, night.lowerFace)
         XCTAssertEqual(frostDay.thicknessRatio, frostNight.thicknessRatio)
         XCTAssertEqual(frostDay.maximumThickness, frostNight.maximumThickness)
+        XCTAssertEqual(tinDay.thicknessRatio, tinNight.thicknessRatio)
+        XCTAssertEqual(tinDay.maximumThickness, tinNight.maximumThickness)
+        XCTAssertEqual(tinDay.edgeStyle, .rolledTin)
+        XCTAssertEqual(tinNight.edgeStyle, tinDay.edgeStyle)
+        XCTAssertNotEqual(tinDay.upperFace, tinNight.upperFace)
+        XCTAssertNotEqual(tinDay.lowerFace, tinNight.lowerFace)
     }
 
     /// What lines up with a board follows what BoardView draws in its frame:
     /// the face and the sidewall below it, never the shadow's fade.
     func testBoardDepthPlacementReportsTheDrawnFaceAndSidewall() throws {
-        let depth = try XCTUnwrap(SurroundTheme.surroundStudio.board(for: .light).boardDepth)
-        let frame = CGRect(x: 30, y: 120, width: 700, height: 700)
-        let placement = BoardDepthPlacement(boardWidth: 19, boardHeight: 19, showsCoordinates: true,
-                                            displayScale: 2, depth: depth)
-        let geometry = BoardDepthGeometry(containerSize: frame.size, boardWidth: 19, boardHeight: 19,
-                                          showsCoordinates: true, displayScale: 2, depth: depth)
-        let drawn = placement.visibleBoard(in: frame)
-        XCTAssertGreaterThan(geometry.thickness, 0)
-        XCTAssertEqual(drawn.minX, frame.minX + geometry.faceRect.minX, accuracy: 0.001)
-        XCTAssertEqual(drawn.width, geometry.faceRect.width, accuracy: 0.001)
-        XCTAssertEqual(drawn.minY, frame.minY + geometry.faceRect.minY, accuracy: 0.001)
-        XCTAssertEqual(drawn.maxY, frame.minY + geometry.faceRect.maxY + geometry.thickness, accuracy: 0.001)
-        XCTAssertLessThan(drawn.maxY, frame.maxY, "The shadow fades below the sidewall")
+        for theme: SurroundTheme in [.surroundStudio, .christmasKeepsakes] {
+            for scheme: ColorScheme in [.light, .dark] {
+                let depth = try XCTUnwrap(theme.board(for: scheme).boardDepth)
+                let frame = CGRect(x: 30, y: 120, width: 700, height: 700)
+                let placement = BoardDepthPlacement(boardWidth: 19, boardHeight: 19, showsCoordinates: true,
+                                                    displayScale: 2, depth: depth)
+                let geometry = BoardDepthGeometry(containerSize: frame.size, boardWidth: 19, boardHeight: 19,
+                                                  showsCoordinates: true, displayScale: 2, depth: depth)
+                let drawn = placement.visibleBoard(in: frame)
+                XCTAssertGreaterThan(geometry.thickness, 0)
+                XCTAssertEqual(drawn.minX, frame.minX + geometry.faceRect.minX, accuracy: 0.001)
+                XCTAssertEqual(drawn.width, geometry.faceRect.width, accuracy: 0.001)
+                XCTAssertEqual(drawn.minY, frame.minY + geometry.faceRect.minY, accuracy: 0.001)
+                XCTAssertEqual(drawn.maxY, frame.minY + geometry.faceRect.maxY + geometry.thickness, accuracy: 0.001)
+                XCTAssertLessThan(drawn.maxY, frame.maxY, "The shadow fades below the sidewall")
 
-        var flat = placement
-        flat.depth = nil
-        XCTAssertEqual(flat.visibleBoard(in: frame), frame)
-        // 10 pt cells are below the detail threshold, where boards have no depth.
-        let compact = CGRect(x: 4, y: 4, width: 200, height: 200)
-        XCTAssertEqual(placement.visibleBoard(in: compact), compact)
-        XCTAssertEqual(placement.visibleBoard(in: .zero), .zero)
+                var flat = placement
+                flat.depth = nil
+                XCTAssertEqual(flat.visibleBoard(in: frame), frame)
+                // 10 pt cells are below the detail threshold, where boards have no depth.
+                let compact = CGRect(x: 4, y: 4, width: 200, height: 200)
+                XCTAssertEqual(placement.visibleBoard(in: compact), compact)
+                XCTAssertEqual(placement.visibleBoard(in: .zero), .zero)
+            }
+        }
     }
 
     /// Public games' cards and Home's Large tiles: the players' rows above and
     /// below a board that spans the column run edge to edge with it as drawn.
     func testBoardColumnRowsMeetTheDrawnBoard() throws {
-        let depth = try XCTUnwrap(SurroundTheme.surroundStudio.board(for: .light).boardDepth)
-        let board = BoardDepthPlacement(boardWidth: 19, boardHeight: 19, showsCoordinates: false,
-                                        displayScale: 3, depth: depth)
-        // A 337 pt card on an iPhone, with nothing limiting its height.
-        let column = BoardColumnLayout.Column(width: 337, height: nil, rows: 60, board: board)
-        let drawn = board.visibleBoard(in: CGRect(x: 0, y: 0, width: 337, height: 337))
-        XCTAssertEqual(column.side, 337)
-        XCTAssertEqual(column.rowWidth, drawn.width, accuracy: 0.001)
-        XCTAssertLessThan(column.rowWidth, 337 - 8, "Studio insets each side by about 5 pt")
-        XCTAssertEqual(BoardColumnLayout.Column(width: 337, height: 600, rows: 60, board: board), column)
-        XCTAssertEqual(BoardColumnLayout.Column(width: 337, height: .infinity, rows: 60, board: board), column)
+        for theme: SurroundTheme in [.surroundStudio, .christmasKeepsakes] {
+            for scheme: ColorScheme in [.light, .dark] {
+                let depth = try XCTUnwrap(theme.board(for: scheme).boardDepth)
+                let board = BoardDepthPlacement(boardWidth: 19, boardHeight: 19, showsCoordinates: false,
+                                                displayScale: 3, depth: depth)
+                // A 337 pt card on an iPhone, with nothing limiting its height.
+                let column = BoardColumnLayout.Column(width: 337, height: nil, rows: 60, board: board)
+                let drawn = board.visibleBoard(in: CGRect(x: 0, y: 0, width: 337, height: 337))
+                XCTAssertEqual(column.side, 337)
+                XCTAssertEqual(column.rowWidth, drawn.width, accuracy: 0.001)
+                XCTAssertLessThan(column.rowWidth, column.side, "The rows follow this material's inset face")
+                if theme == .surroundStudio {
+                    XCTAssertLessThan(column.rowWidth, 337 - 8, "Studio insets each side by about 5 pt")
+                }
+                XCTAssertEqual(BoardColumnLayout.Column(width: 337, height: 600, rows: 60, board: board), column)
+                XCTAssertEqual(BoardColumnLayout.Column(width: 337, height: .infinity, rows: 60, board: board), column)
 
-        // A board shorter than the column's width leaves the rows at that width.
-        let short = BoardColumnLayout.Column(width: 337, height: 300, rows: 60, board: board)
-        XCTAssertEqual(short.side, 240)
-        XCTAssertEqual(short.rowWidth, 337)
+                // A board shorter than the column's width leaves the rows at that width.
+                let short = BoardColumnLayout.Column(width: 337, height: 300, rows: 60, board: board)
+                XCTAssertEqual(short.side, 240)
+                XCTAssertEqual(short.rowWidth, 337)
 
-        // Flat themes keep the rows a VStack gives them.
-        var flat = board
-        flat.depth = nil
-        let flatColumn = BoardColumnLayout.Column(width: 337, height: nil, rows: 60, board: flat)
-        XCTAssertEqual(flatColumn.side, 337)
-        XCTAssertEqual(flatColumn.rowWidth, 337)
+                // Flat themes keep the rows a VStack gives them.
+                var flat = board
+                flat.depth = nil
+                let flatColumn = BoardColumnLayout.Column(width: 337, height: nil, rows: 60, board: flat)
+                XCTAssertEqual(flatColumn.side, 337)
+                XCTAssertEqual(flatColumn.rowWidth, 337)
+            }
+        }
     }
 
     /// Compact boards keep their exact slot, including rectangular previews;
@@ -88,7 +107,9 @@ final class SurroundThemeTests: XCTestCase {
                                     SurroundTheme.surroundStudio.board(for: .light).boardDepth,
                                     SurroundTheme.surroundStudio.board(for: .dark).boardDepth,
                                     SurroundTheme.frostPine.board(for: .light).boardDepth,
-                                    SurroundTheme.frostPine.board(for: .dark).boardDepth]
+                                    SurroundTheme.frostPine.board(for: .dark).boardDepth,
+                                    SurroundTheme.christmasKeepsakes.board(for: .light).boardDepth,
+                                    SurroundTheme.christmasKeepsakes.board(for: .dark).boardDepth]
         for depth in depths {
             for boardSize in [9, 13, 19] {
                 for coordinates in [false, true] {
@@ -129,7 +150,9 @@ final class SurroundThemeTests: XCTestCase {
                           XCTUnwrap(SurroundTheme.surroundStudio.board(for: .light).boardDepth),
                           XCTUnwrap(SurroundTheme.surroundStudio.board(for: .dark).boardDepth),
                           XCTUnwrap(SurroundTheme.frostPine.board(for: .light).boardDepth),
-                          XCTUnwrap(SurroundTheme.frostPine.board(for: .dark).boardDepth)]
+                          XCTUnwrap(SurroundTheme.frostPine.board(for: .dark).boardDepth),
+                          XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .light).boardDepth),
+                          XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .dark).boardDepth)]
         for depth in depths {
             for boardSize in [9, 13, 19] {
                 for coordinates in [false, true] {
@@ -178,7 +201,9 @@ final class SurroundThemeTests: XCTestCase {
     /// a fixed inset on the frame where detailed rendering becomes active.
     func testBoardDepthStartsContinuouslyAtTheDetailThreshold() throws {
         let depths = try [XCTUnwrap(SurroundTheme.nebulaPearl.board.boardDepth),
-                          XCTUnwrap(SurroundTheme.surroundStudio.board.boardDepth)]
+                          XCTUnwrap(SurroundTheme.surroundStudio.board.boardDepth),
+                          XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .light).boardDepth),
+                          XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .dark).boardDepth)]
         let epsilon: CGFloat = 0.0001
         for depth in depths {
             for count in [9, 10, 13, 14, 19, 20] {
@@ -222,7 +247,9 @@ final class SurroundThemeTests: XCTestCase {
     /// detail. Such boards must not shrink to reserve an invisible sidewall.
     func testRectangularCoordinateBoardsKeepTheirCompactFootprint() throws {
         let depths = try [XCTUnwrap(SurroundTheme.nebulaPearl.board.boardDepth),
-                          XCTUnwrap(SurroundTheme.surroundStudio.board.boardDepth)]
+                          XCTUnwrap(SurroundTheme.surroundStudio.board.boardDepth),
+                          XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .light).boardDepth),
+                          XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .dark).boardDepth)]
         let cases: [(Int, Int, CGFloat)] = [(9, 19, 285), (9, 19, 290),
                                           (19, 9, 285), (19, 9, 290), (13, 19, 285)]
         for depth in depths {
@@ -252,7 +279,9 @@ final class SurroundThemeTests: XCTestCase {
     func testBoardDepthCellSizeMatchesTheRenderedGridForRectangularBoards() throws {
         let depths = try [XCTUnwrap(SurroundTheme.nebulaPearl.board.boardDepth),
                           XCTUnwrap(SurroundTheme.surroundStudio.board(for: .light).boardDepth),
-                          XCTUnwrap(SurroundTheme.surroundStudio.board(for: .dark).boardDepth)]
+                          XCTUnwrap(SurroundTheme.surroundStudio.board(for: .dark).boardDepth),
+                          XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .light).boardDepth),
+                          XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .dark).boardDepth)]
         let sizes = [CGSize(width: 290, height: 290), CGSize(width: 400, height: 400),
                      CGSize(width: 600, height: 600), CGSize(width: 390, height: 844),
                      CGSize(width: 844, height: 390)]
@@ -706,9 +735,9 @@ final class SurroundThemeTests: XCTestCase {
         for scheme: ColorScheme in [.light, .dark] {
             let images = try XCTUnwrap(SurroundTheme.frostPine.board(for: scheme).stoneImages)
             XCTAssertGreaterThan(images.smallStoneInset, 0)
-            for theme in SurroundTheme.allCases where theme != .frostPine {
+            for theme in SurroundTheme.allCases where theme != .frostPine && theme != .christmasKeepsakes {
                 XCTAssertEqual(theme.board(for: scheme).stoneImages?.smallStoneInset ?? 0, 0,
-                               "Other themes keep their existing stone packing")
+                               "Only Frost & Pine and Christmas Keepsakes opt into phone stone spacing")
             }
             for cell: CGFloat in [7, 13.99, 14, 14.001, 15, 16, 20, 22, 27, 31.999, 32, 48] {
                 let padding: CGFloat = cell < 10 ? 0 : 1
@@ -2114,6 +2143,187 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    func testChristmasKeepsakesCranberryBodyBrightensWithoutChangingIvoryOrSilhouettes() throws {
+        let bundle = Bundle(for: Self.self)
+        let originalBlack = try XCTUnwrap(UIImage(named: "ChristmasKeepsakesRubyStone", in: bundle, compatibleWith: nil))
+        let originalWhite = try XCTUnwrap(UIImage(named: "ChristmasKeepsakesIvoryStone", in: bundle, compatibleWith: nil))
+        let sourceBlack = try XCTUnwrap(originalBlack.cgImage)
+        let sourceWhite = try XCTUnwrap(originalWhite.cgImage)
+        let before = try rgbaPixels(for: sourceBlack, side: sourceBlack.width)
+        let ivory = try rgbaPixels(for: sourceWhite, side: sourceWhite.width)
+        let day = try XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .light).stoneImages)
+        let night = try XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .dark).stoneImages)
+
+        XCTAssertEqual(day.footprint, night.footprint)
+        XCTAssertEqual(day.smallStoneInset, night.smallStoneInset)
+        XCTAssertEqual(day.smallStoneInset, 0.45, "Brightening retains the accepted phone packing")
+        try assertEqualAlphaStoneFootprints(day)
+
+        func brightness(_ pixels: [UInt8], _ offset: Int) -> Double {
+            0.2126 * Double(pixels[offset]) + 0.7152 * Double(pixels[offset + 1])
+                + 0.0722 * Double(pixels[offset + 2])
+        }
+        let center = Double(sourceBlack.width) / 2
+        let bodyRadius = Double(sourceBlack.width) * Double(day.footprint) / 2 * 0.65
+        var body: [Int] = [], highlights: [Int] = []
+        for y in 0..<sourceBlack.height {
+            for x in 0..<sourceBlack.width {
+                let offset = (y * sourceBlack.width + x) * 4
+                // This glass is almost opaque (usually alpha 252–253), and
+                // its body is much darker than the localized reflections.
+                guard before[offset + 3] >= 250 else { continue }
+                if hypot(Double(x) + 0.5 - center, Double(y) + 0.5 - center) < bodyRadius {
+                    body.append(offset)
+                }
+                if brightness(before, offset) >= 120 { highlights.append(offset) }
+            }
+        }
+        XCTAssertGreaterThan(body.count, 1000, "Measure the dark central glass, not only bright edge glints")
+        XCTAssertGreaterThan(highlights.count, 100, "The source must include actual reflected highlights")
+        let bodyBefore = body.reduce(0.0) { $0 + brightness(before, $1) } / Double(max(1, body.count))
+
+        for images in [day, night] {
+            XCTAssertEqual(images.black.count, 1)
+            XCTAssertEqual(images.white.count, 1)
+            let black = try XCTUnwrap(images.black.first)
+            let white = try XCTUnwrap(images.white.first)
+            let graded = try XCTUnwrap(black.cgImage)
+            let untouchedWhite = try XCTUnwrap(white.cgImage)
+            XCTAssertEqual(graded.width, sourceBlack.width)
+            XCTAssertEqual(graded.height, sourceBlack.height)
+            XCTAssertEqual(black.scale, originalBlack.scale)
+            XCTAssertEqual(black.imageOrientation, originalBlack.imageOrientation)
+            XCTAssertEqual(untouchedWhite.width, sourceWhite.width)
+            XCTAssertEqual(untouchedWhite.height, sourceWhite.height)
+            let after = try rgbaPixels(for: graded, side: sourceBlack.width)
+            XCTAssertEqual(stride(from: 3, to: before.count, by: 4).map { before[$0] },
+                           stride(from: 3, to: after.count, by: 4).map { after[$0] },
+                           "Body grading preserves every alpha value and the original silhouette")
+            XCTAssertEqual(try rgbaPixels(for: untouchedWhite, side: sourceWhite.width), ivory,
+                           "Ivory artwork remains byte-for-byte unchanged")
+
+            let bodyAfter = body.reduce(0.0) { $0 + brightness(after, $1) } / Double(max(1, body.count))
+            let redLift = body.reduce(0.0) { $0 + Double(after[$1]) - Double(before[$1]) } / Double(max(1, body.count))
+            XCTAssertGreaterThan(bodyAfter - bodyBefore, 5, "The body needs a visible lift beyond its existing rim")
+            XCTAssertGreaterThan(redLift, 18, "The black player should read as brighter cranberry glass")
+            let bodyRed = body.reduce(0.0) { $0 + Double(after[$1]) } / Double(max(1, body.count))
+            let bodyOther = body.reduce(0.0) { $0 + Double(max(after[$1 + 1], after[$1 + 2])) } / Double(max(1, body.count))
+            XCTAssertGreaterThan(bodyRed, bodyOther * 3, "Retain a deep cranberry body rather than a pale wash")
+            let reflected = highlights.reduce(0.0) { $0 + brightness(after, $1) } / Double(max(1, highlights.count))
+            XCTAssertGreaterThan(reflected, bodyAfter + 60,
+                                 "The source reflections must remain distinct from the lifted body")
+        }
+        for scheme: ColorScheme in [.light, .dark, .light, .dark] {
+            let resolved = try XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: scheme).stoneImages)
+            for (actual, cached) in zip(resolved.black + resolved.white, day.black + day.white) {
+                XCTAssertTrue(actual === cached, "Both appearances reuse the once-graded artwork")
+            }
+        }
+    }
+
+    @MainActor
+    func testChristmasKeepsakesPhoneStoneSpacingPreservesCentersAndCompactBoards() throws {
+        for scheme: ColorScheme in [.light, .dark] {
+            let images = try XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: scheme).stoneImages)
+            for cell: CGFloat in [7, 13.99, 14, 14.001, 15, 16, 17, 20, 24, 31.999, 32, 40, 64] {
+                let padding: CGFloat = cell < 10 ? 0 : 1
+                let nominal = CGRect(x: cell * 3 + padding, y: cell * 4 + padding,
+                                     width: cell - padding * 2, height: cell - padding * 2)
+                let visible = images.displayRect(in: nominal, cellSize: cell)
+                XCTAssertEqual(visible.midX, nominal.midX, accuracy: 0.000001)
+                XCTAssertEqual(visible.midY, nominal.midY, accuracy: 0.000001)
+                XCTAssertEqual(visible.width, visible.height, accuracy: 0.000001)
+                XCTAssertTrue(nominal.contains(visible))
+                if cell <= 14 || cell >= 32 {
+                    XCTAssertEqual(visible, nominal, "Compact and large stones retain their existing size")
+                } else {
+                    XCTAssertLessThan(visible.width, nominal.width)
+                    XCTAssertLessThan(nominal.width - visible.width, 1,
+                                      "Both colors need breathing room without looking undersized")
+                }
+                if cell == 14.001 || cell == 31.999 {
+                    XCTAssertLessThan(nominal.width - visible.width, 0.001,
+                                      "Crossing either taper endpoint must not jump the silhouette")
+                }
+            }
+            let first = images.displayRect(in: CGRect(x: 1, y: 1, width: 18, height: 18), cellSize: 20)
+            let next = images.displayRect(in: CGRect(x: 21, y: 1, width: 18, height: 18), cellSize: 20)
+            XCTAssertGreaterThanOrEqual(next.minX - first.maxX, 2.8,
+                                        "Phone groups need a visible strip of board between adjacent stones")
+            XCTAssertLessThan(next.minX - first.maxX, 3)
+            XCTAssertEqual(next.midX - first.midX, 20, accuracy: 0.000001,
+                           "Spacing does not move intersections or marker centers")
+        }
+    }
+
+    @MainActor
+    func testChristmasKeepsakesCranberryEdgesPreserveFacesSilhouettesAndFlatStones() throws {
+        for scheme: ColorScheme in [.light, .dark] {
+            let board = SurroundTheme.christmasKeepsakes.board(for: scheme)
+            let images = try XCTUnwrap(board.stoneImages)
+            for scale: CGFloat in [2, 3] {
+                for color: StoneColor in [.black, .white] {
+                    for (diameter, shadow): (CGFloat, CGFloat) in [
+                        (7, 1), (13.99, 1), (14, 1), (17, 1), (20, 0),
+                        (20, 1), (24, 1), (40, 1), (64, 1)
+                    ] {
+                        func render(_ shading: ImageStoneShading) throws -> (pixels: [UInt8], width: Int, height: Int) {
+                            var appearance = board
+                            appearance.imageStoneShading = shading
+                            return try nativeMaterialPixels(Stone(color: color, shadowRadius: shadow)
+                                .frame(width: diameter, height: diameter).padding(4)
+                                .environment(\.boardAppearance, appearance)
+                                .environment(\.colorScheme, scheme), scale: scale)
+                        }
+                        let actual = try render(board.imageStoneShading), plain = try render(.artwork)
+                        let detail = "\(scheme), \(color), \(diameter) pt, \(scale)×, shadow \(shadow)"
+                        XCTAssertEqual(actual.width, plain.width, detail)
+                        XCTAssertEqual(actual.height, plain.height, detail)
+                        if color == .white || diameter < 14 || shadow == 0 {
+                            XCTAssertEqual(actual.pixels, plain.pixels,
+                                           "Ivory, compact and shadowless stones remain unchanged: \(detail)")
+                            continue
+                        }
+
+                        let visible = images.displayRect(in: CGRect(x: 0, y: 0, width: diameter, height: diameter),
+                                                         cellSize: diameter)
+                        let radius = Double(visible.width * scale) / 2
+                        let centerX = Double(actual.width) / 2, centerY = Double(actual.height) / 2
+                        var changedPixels = 0, brightenedPixels = 0
+                        var maximumCenterDelta = 0, maximumExteriorDelta = 0, maximumAlphaDelta = 0
+                        for y in 0..<actual.height {
+                            for x in 0..<actual.width {
+                                let offset = (y * actual.width + x) * 4
+                                let distance = hypot(Double(x) + 0.5 - centerX, Double(y) + 0.5 - centerY)
+                                let differences = (0..<4).map { Int(actual.pixels[offset + $0]) - Int(plain.pixels[offset + $0]) }
+                                let delta = differences.map(abs).max() ?? 0
+                                if delta > 1 { changedPixels += 1 }
+                                if differences.prefix(3).reduce(0, +) > 3 { brightenedPixels += 1 }
+                                if distance < radius * 0.65 { maximumCenterDelta = max(maximumCenterDelta, delta) }
+                                // Ignore only the antialiased boundary; the
+                                // accent must not extend the cast shadow.
+                                if distance > radius + 2 { maximumExteriorDelta = max(maximumExteriorDelta, delta) }
+                                if abs(distance - radius) > 2 {
+                                    maximumAlphaDelta = max(maximumAlphaDelta, abs(differences[3]))
+                                }
+                            }
+                        }
+                        XCTAssertGreaterThan(changedPixels, 10,
+                                             "The shoulder must remain visible on phone and large stones: \(detail)")
+                        XCTAssertGreaterThan(brightenedPixels, 10,
+                                             "Separation comes from reflected light, not a darker connecting shadow: \(detail)")
+                        XCTAssertLessThanOrEqual(maximumCenterDelta, 1,
+                                                 "Preserve the glass face beneath game marks: \(detail)")
+                        XCTAssertLessThanOrEqual(maximumExteriorDelta, 1,
+                                                 "Preserve the silhouette and external shadow: \(detail)")
+                        XCTAssertLessThanOrEqual(maximumAlphaDelta, 1,
+                                                 "Preserve opacity away from the antialiased edge: \(detail)")
+                    }
+                }
+            }
+        }
+    }
+
     @MainActor
     func testChristmasKeepsakesWindowLightPreservesRenderedBoardsAtEveryDetailSize() throws {
         let scene = CGSize(width: 440, height: 520)
@@ -2453,11 +2663,26 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(night.gridStyle, day.gridStyle)
         XCTAssertEqual(night.gridLineScale, day.gridLineScale)
         XCTAssertEqual(night.stoneLightDirection, day.stoneLightDirection)
-        XCTAssertEqual(night.boardDepth?.thicknessRatio, day.boardDepth?.thicknessRatio)
-        XCTAssertEqual(night.boardDepth?.maximumThickness, day.boardDepth?.maximumThickness)
+        let dayDepth = try XCTUnwrap(day.boardDepth)
+        let nightDepth = try XCTUnwrap(night.boardDepth)
+        XCTAssertEqual(nightDepth.thicknessRatio, dayDepth.thicknessRatio)
+        XCTAssertEqual(nightDepth.maximumThickness, dayDepth.maximumThickness)
         for board in [day, night] {
-            XCTAssertNil(board.boardDepth, "The lacquered board keeps a thin edge")
-            XCTAssertFalse(board.boardBevel)
+            XCTAssertEqual(board.boardDepth?.edgeStyle, .rolledTin)
+            XCTAssertTrue(board.boardBevel)
+        }
+        for size in [CGSize(width: 260, height: 260), CGSize(width: 330, height: 330),
+                     CGSize(width: 440, height: 440), CGSize(width: 834, height: 834)] {
+            for coordinates in [false, true] {
+                for scale: CGFloat in [2, 3] {
+                    let dayLayout = BoardDepthGeometry(containerSize: size, boardWidth: 19, boardHeight: 19,
+                        showsCoordinates: coordinates, displayScale: scale, depth: dayDepth)
+                    let nightLayout = BoardDepthGeometry(containerSize: size, boardWidth: 19, boardHeight: 19,
+                        showsCoordinates: coordinates, displayScale: scale, depth: nightDepth)
+                    XCTAssertEqual(dayLayout, nightLayout,
+                                   "Appearance changes light and material pigments, never the board's inset or hit geometry")
+                }
+            }
         }
         // Asset integrity uses the test bundle below. The cached main-bundle
         // image wrappers may be nil in this unhosted unit target.
@@ -2882,6 +3107,342 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testChristmasKeepsakeOrnamentTextRegionsStayOpaqueAndReadable() throws {
+        let theme = SurroundTheme.christmasKeepsakes
+        let scale = 3
+        let linear = (0...255).map { byte -> Double in
+            let value = Double(byte) / 255
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        let players = [OGSUser(username: "ordinary", id: 1),
+                       OGSUser(username: "moderator", id: 2, isModerator: true),
+                       OGSUser(username: "admin", id: 3, isSuperuser: true),
+                       OGSUser(username: "professional", id: 4, professional: true),
+                       OGSUser(username: "supporter", id: 5, supporter: true),
+                       OGSUser(username: "bot", id: 6, isBot: true)]
+        // Explicit roles and actual caller reserves: the same wood material
+        // must protect each layout independently. Full/compact clocks keep
+        // 12/8 pt horizontal and 4 pt vertical padding. A normal identity has
+        // 4 pt outside a 44 pt row, with its name
+        // stack centered vertically; compact columns have 5 pt and full vertical
+        // columns have 8 pt. The header has no spare outside strip for a ribbon.
+        let cases: [(name: String, role: ChristmasOrnamentRole, size: CGSize,
+                     inset: CGSize, decoration: Bool, compact: Bool)] = [
+            ("Home clock", .clock, CGSize(width: 140, height: 28), CGSize(width: 9, height: 5), false, true),
+            ("inline clock", .clock, CGSize(width: 320, height: 34), CGSize(width: 8, height: 6), false, true),
+            ("compact clock", .clock, CGSize(width: 160, height: 52), CGSize(width: 8, height: 4), true, false),
+            ("full clock", .clock, CGSize(width: 190, height: 96), CGSize(width: 12, height: 4), true, false),
+            ("narrow clock", .clock, CGSize(width: 104, height: 144), CGSize(width: 10, height: 8), false, true),
+            ("wide clock", .clock, CGSize(width: 420, height: 96), CGSize(width: 12, height: 4), true, false),
+            ("large clock", .clock, CGSize(width: 680, height: 144), CGSize(width: 12, height: 4), true, false),
+            ("row player", .player, CGSize(width: 156, height: 52), CGSize(width: 4, height: 8), true, false),
+            ("short row player", .player, CGSize(width: 108, height: 52), CGSize(width: 4, height: 8), true, false),
+            ("compact column player", .player, CGSize(width: 126, height: 84), CGSize(width: 5, height: 5), false, true),
+            ("full vertical player", .player, CGSize(width: 156, height: 144), CGSize(width: 8, height: 8), false, true),
+            ("wide vertical player", .player, CGSize(width: 240, height: 160), CGSize(width: 8, height: 8), false, true),
+            // The header's 32 pt avatar and single name/rank line are vertically
+            // centered in the 44 pt hit target; its decorative side tab is off.
+            ("header player", .player, CGSize(width: 220, height: 44), CGSize(width: 4, height: 8), false, true)
+        ]
+        for scheme: ColorScheme in [.light, .dark] {
+            let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+            for color: StoneColor in [.black, .white] {
+                let playerSolid = try XCTUnwrap(theme.identityChipColors(color).first)
+                let identityInks: [(String, Color)] = [
+                    ("identity", theme.identityForeground(color)),
+                    ("secondary", theme.identitySecondary(color))
+                ] + players.map { ($0.username, theme.roleColor(for: $0, on: color)) }
+                let clockInks: [(String, Color)] = [
+                    ("clock", theme.clockForeground(color, scheme: scheme)),
+                    ("accent", theme.clockAccent(color)),
+                    ("sudden death", theme.clockSuddenDeathAccent(color, scheme: scheme)),
+                    ("agreement", theme.clockAgreementAccent(color, scheme: scheme)),
+                    ("disconnected", theme.clockDisconnectedAccent(color, scheme: scheme)),
+                    ("undo", theme.clockUndoAccent(color, scheme: scheme)),
+                    ("Home active", theme.homeChipAccent(color))
+                ] + identityInks
+                for sample in cases {
+                    let solid = sample.role == .player ? playerSolid : theme.clockSolidSurface(color)
+                    let plain = try nativeMaterialPixels(ChristmasOrnamentOutline(role: sample.role).fill(solid)
+                        .frame(width: sample.size.width, height: sample.size.height)
+                        .environment(\.colorScheme, scheme))
+                    for detailed in [false, true] {
+                        let material = ChristmasOrnamentMaterial(color: color, role: sample.role,
+                            attachment: .leading, showsDecoration: sample.decoration,
+                            colorScheme: scheme, showsDetail: detailed, compact: sample.compact)
+                        let actual = try nativeMaterialPixels(material
+                            .frame(width: sample.size.width, height: sample.size.height)
+                            .environment(\.colorScheme, scheme))
+                        let message = "\(sample.name), \(scheme), \(color), detailed=\(detailed)"
+                        XCTAssertEqual(actual.width, Int(sample.size.width) * scale, message)
+                        XCTAssertEqual(actual.height, Int(sample.size.height) * scale, message)
+                        let textRect = CGRect(origin: .zero, size: sample.size)
+                            .insetBy(dx: sample.inset.width, dy: sample.inset.height)
+                        var minimum = Double.infinity, maximum = 0.0
+                        var minimumAlpha: UInt8 = 255
+                        var fallbackDifference = 0
+                        for y in Int(textRect.minY) * scale..<Int(textRect.maxY) * scale {
+                            for x in Int(textRect.minX) * scale..<Int(textRect.maxX) * scale {
+                                let offset = (y * actual.width + x) * 4
+                                minimumAlpha = min(minimumAlpha, actual.pixels[offset + 3])
+                                let value = 0.2126 * linear[Int(actual.pixels[offset])]
+                                    + 0.7152 * linear[Int(actual.pixels[offset + 1])]
+                                    + 0.0722 * linear[Int(actual.pixels[offset + 2])]
+                                minimum = min(minimum, value)
+                                maximum = max(maximum, value)
+                                if !detailed {
+                                    for channel in 0..<4 {
+                                        fallbackDifference = max(fallbackDifference,
+                                            abs(Int(actual.pixels[offset + channel]) - Int(plain.pixels[offset + channel])))
+                                    }
+                                }
+                            }
+                        }
+                        XCTAssertEqual(minimumAlpha, 255, "The caller's entire text reserve stays opaque: \(message)")
+                        for (name, ink) in sample.role == .player ? identityInks : clockInks {
+                            let value = luminance(ink, style: style)
+                            let nearest = min(maximum, max(minimum, value))
+                            XCTAssertGreaterThanOrEqual((max(value, nearest) + 0.05)
+                                / (min(value, nearest) + 0.05), 4.5,
+                                "\(name) must read over every native material tone in the actual text reserve: \(message)")
+                        }
+                        if !detailed {
+                            XCTAssertEqual(actual.pixels, plain.pixels,
+                                "Fallback is the exact solid outline with no bevel, grain or cord: \(message)")
+                            XCTAssertEqual(fallbackDifference, 0,
+                                "Accessibility fallback uses the exact solid role-specific pigment, without relief or grain: \(message)")
+                            XCTAssertLessThan(maximum - minimum, 0.001, message)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testChristmasKeepsakeOrnamentsKeepVisibleWoodAndSafeAttachments() throws {
+        let scale = 3, padding = 12
+        // Caller-selected profiles, not a height heuristic. The regular clock
+        // and row player may have depth/cords; constrained surfaces keep all
+        // ornament detail inside their original bounds.
+        let cases: [(role: ChristmasOrnamentRole, size: CGSize, inset: CGSize, compact: Bool)] = [
+            (.clock, CGSize(width: 140, height: 28), CGSize(width: 9, height: 5), true),
+            (.clock, CGSize(width: 160, height: 52), CGSize(width: 8, height: 4), false),
+            (.clock, CGSize(width: 190, height: 96), CGSize(width: 12, height: 4), false),
+            (.clock, CGSize(width: 104, height: 144), CGSize(width: 10, height: 8), true),
+            (.player, CGSize(width: 156, height: 52), CGSize(width: 4, height: 8), false),
+            (.player, CGSize(width: 126, height: 84), CGSize(width: 5, height: 5), true),
+            (.player, CGSize(width: 156, height: 144), CGSize(width: 8, height: 8), true),
+            (.player, CGSize(width: 220, height: 44), CGSize(width: 4, height: 8), true)
+        ]
+        for scheme: ColorScheme in [.light, .dark] {
+            for color: StoneColor in [.black, .white] {
+                for role in ChristmasOrnamentRole.allCases {
+                    for sample in cases where sample.role == role {
+                        let size = sample.size
+                        func render(_ attachment: ChristmasOrnamentAttachment, decorated: Bool = true,
+                                    detailed: Bool = true) throws -> (pixels: [UInt8], width: Int, height: Int) {
+                            try nativeMaterialPixels(ChristmasOrnamentMaterial(color: color, role: role,
+                                attachment: attachment, showsDecoration: decorated,
+                                colorScheme: scheme, showsDetail: detailed, compact: sample.compact)
+                                .frame(width: size.width, height: size.height).padding(CGFloat(padding))
+                                .environment(\.colorScheme, scheme))
+                        }
+                        let plain = try render(.none)
+                        let message = "\(role), \(scheme), \(color), \(size), compact=\(sample.compact)"
+                        func encodedLuma(_ pixels: [UInt8], _ offset: Int) -> Double {
+                            0.2126 * Double(pixels[offset]) + 0.7152 * Double(pixels[offset + 1])
+                                + 0.0722 * Double(pixels[offset + 2])
+                        }
+
+                        // The wood is a real exposed edge, not merely a change
+                        // to the face pigment. Compare straight-edge pixels with
+                        // the adjacent paint, avoiding corners and antialiasing.
+                        var visibleEdge = 0, edgeCount = 0
+                        var edgeTones: [Double] = []
+                        for x in (padding + Int(size.width / 4)) * scale..<(padding + Int(size.width * 3 / 4)) * scale {
+                            for top in [true, false] {
+                                let edgeY = (padding + (top ? 1 : Int(size.height) - 2)) * scale
+                                let faceY = (padding + (top ? 6 : Int(size.height) - 7)) * scale
+                                let edgeOffset = (edgeY * plain.width + x) * 4
+                                let faceOffset = (faceY * plain.width + x) * 4
+                                let difference = (0..<3).map {
+                                    abs(Int(plain.pixels[edgeOffset + $0]) - Int(plain.pixels[faceOffset + $0]))
+                                }.max()!
+                                if difference >= 8 { visibleEdge += 1 }
+                                edgeCount += 1
+                                edgeTones.append(encodedLuma(plain.pixels, edgeOffset))
+                            }
+                        }
+                        XCTAssertGreaterThan(Double(visibleEdge) / Double(edgeCount), 0.5,
+                            "Exposed bare wood must visibly separate from the paint: \(message)")
+                        let edgeMaximum = try XCTUnwrap(edgeTones.max())
+                        let edgeMinimum = try XCTUnwrap(edgeTones.min())
+                        XCTAssertGreaterThan(edgeMaximum - edgeMinimum, 10,
+                            "The bevel must retain visible wood/light relief: \(message)")
+
+                        // Average native pixels to logical phone points and
+                        // remove a planar gradient. This checks that the paint's
+                        // real grain is visible, rather than letting a smooth
+                        // gradient or an almost-transparent texture pass.
+                        let face = CGRect(origin: .zero, size: size).insetBy(dx: 16, dy: 8)
+                        let centerX = (face.minX + face.maxX - 1) / 2
+                        let centerY = (face.minY + face.maxY - 1) / 2
+                        var samples: [(x: Double, y: Double, value: Double)] = []
+                        for y in Int(face.minY)..<Int(face.maxY) {
+                            for x in Int(face.minX)..<Int(face.maxX) {
+                                var value = 0.0
+                                for py in (padding + y) * scale..<(padding + y + 1) * scale {
+                                    for px in (padding + x) * scale..<(padding + x + 1) * scale {
+                                        value += encodedLuma(plain.pixels, (py * plain.width + px) * 4)
+                                    }
+                                }
+                                samples.append((Double(CGFloat(x) - centerX), Double(CGFloat(y) - centerY),
+                                                value / Double(scale * scale)))
+                            }
+                        }
+                        let mean = samples.reduce(0) { $0 + $1.value } / Double(samples.count)
+                        let slopeX = samples.reduce(0) { $0 + $1.x * ($1.value - mean) }
+                            / samples.reduce(0) { $0 + $1.x * $1.x }
+                        let slopeY = samples.reduce(0) { $0 + $1.y * ($1.value - mean) }
+                            / samples.reduce(0) { $0 + $1.y * $1.y }
+                        let residuals = samples.map { $0.value - mean - slopeX * $0.x - slopeY * $0.y }.sorted()
+                        let spread = residuals[(residuals.count - 1) * 9 / 10]
+                            - residuals[(residuals.count - 1) / 10]
+                        let rms = sqrt(residuals.reduce(0) { $0 + $1 * $1 } / Double(residuals.count))
+                        // Selected reference paint has fine, quieter brush
+                        // relief than the first rough-grain candidate. This
+                        // lower bound still rejects a flat/gradient-only face;
+                        // it is not a requirement for coarse wood texture.
+                        XCTAssertGreaterThanOrEqual(spread, 3,
+                            "Broad paint/grain variation must remain visible at logical1x: \(message), spread=\(spread)")
+                        XCTAssertGreaterThanOrEqual(rms, 0.8,
+                            "Isolated pixels cannot substitute for painted wood texture: \(message), rms=\(rms)")
+
+                        let leading = try render(.leading), trailing = try render(.trailing)
+                        let suppressed = try render(.leading, decorated: false)
+                        let fallback = try render(.leading, detailed: false)
+                        XCTAssertEqual(suppressed.pixels, plain.pixels,
+                            "Suppressing a gutter cord must remove it completely: \(message)")
+                        var contentDifference = 0
+                        for y in (padding + Int(sample.inset.height)) * scale..<(padding + Int(size.height - sample.inset.height)) * scale {
+                            for x in (padding + Int(sample.inset.width)) * scale..<(padding + Int(size.width - sample.inset.width)) * scale {
+                                let offset = (y * plain.width + x) * 4
+                                for channel in 0..<4 {
+                                    contentDifference = max(contentDifference,
+                                        max(abs(Int(leading.pixels[offset + channel]) - Int(plain.pixels[offset + channel])),
+                                            abs(Int(trailing.pixels[offset + channel]) - Int(plain.pixels[offset + channel]))))
+                                }
+                            }
+                        }
+                        XCTAssertEqual(contentDifference, 0,
+                            "Both attachment directions must leave the whole text face unchanged: \(message)")
+                        var leadingInk = 0, trailingInk = 0, depthInk = 0
+                        var undecoratedAlpha: UInt8 = 0, fallbackAlpha: UInt8 = 0
+                        var wrongSideDifference = 0
+                        var beyondGutterAlpha: UInt8 = 0
+                        for y in 0..<plain.height {
+                            for x in 0..<plain.width {
+                                let outsideLeft = x < padding * scale
+                                let outsideRight = x >= (padding + Int(size.width)) * scale
+                                let outsideVertical = y < padding * scale || y >= (padding + Int(size.height)) * scale
+                                guard outsideLeft || outsideRight || outsideVertical else { continue }
+                                let offset = (y * plain.width + x) * 4
+                                undecoratedAlpha = max(undecoratedAlpha, plain.pixels[offset + 3])
+                                fallbackAlpha = max(fallbackAlpha, fallback.pixels[offset + 3])
+                                if plain.pixels[offset + 3] >= 64 { depthInk += 1 }
+                                let leadingDifference = abs(Int(leading.pixels[offset + 3]) - Int(plain.pixels[offset + 3]))
+                                let trailingDifference = abs(Int(trailing.pixels[offset + 3]) - Int(plain.pixels[offset + 3]))
+                                if outsideLeft {
+                                    if leadingDifference >= 32 { leadingInk += 1 }
+                                    wrongSideDifference = max(wrongSideDifference, trailingDifference)
+                                }
+                                if outsideRight {
+                                    if trailingDifference >= 32 { trailingInk += 1 }
+                                    wrongSideDifference = max(wrongSideDifference, leadingDifference)
+                                }
+                                // Regular ornaments legitimately extend their
+                                // wood depth/contact shade and corner cord, but
+                                // all details must stay in the 7pt free envelope.
+                                if x < (padding - 7) * scale || x >= (padding + Int(size.width) + 7) * scale
+                                    || y < (padding - 7) * scale || y >= (padding + Int(size.height) + 7) * scale {
+                                    beyondGutterAlpha = max(beyondGutterAlpha,
+                                        max(plain.pixels[offset + 3], max(leading.pixels[offset + 3], trailing.pixels[offset + 3])))
+                                }
+                            }
+                        }
+                        XCTAssertEqual(fallbackAlpha, 0, "Solid fallback has no cord, bevel or exterior decoration: \(message)")
+                        XCTAssertEqual(wrongSideDifference, 0, "Cord must not change the opposite side's wood depth: \(message)")
+                        XCTAssertEqual(beyondGutterAlpha, 0, "Depth and cord stay in the bounded free envelope: \(message)")
+                        if sample.compact {
+                            XCTAssertEqual(undecoratedAlpha, 0, "Constrained ornaments have no exterior depth: \(message)")
+                            XCTAssertEqual(leading.pixels, plain.pixels, "Compact profile suppresses even explicitly requested cords: \(message)")
+                            XCTAssertEqual(trailing.pixels, plain.pixels, "Compact profile suppresses both cord directions: \(message)")
+                        } else {
+                            XCTAssertGreaterThan(depthInk, 20, "Regular ornament thickness must visibly extend beyond the paint bounds: \(message)")
+                            XCTAssertGreaterThan(leadingInk, 20, "Leading cord must add visible pixels beyond the wood depth: \(message)")
+                            XCTAssertGreaterThan(trailingInk, 20, "Trailing cord must add visible pixels beyond the wood depth: \(message)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testChristmasKeepsakeOrnamentAssetsLoadOpaqueCachedTextures() throws {
+        let bundle = Bundle(for: Self.self)
+        var sourceFields: [Data] = []
+        for name in ["ChristmasKeepsakesPaintedWood", "ChristmasKeepsakesBareWood"] {
+            let source = try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil)?.cgImage, name)
+            XCTAssertEqual(source.width, 512, name)
+            XCTAssertEqual(source.height, 512, name)
+            let pixels = try rgbaPixels(for: source, side: 512)
+            XCTAssertTrue(stride(from: 3, to: pixels.count, by: 4).allSatisfy { pixels[$0] == 255 },
+                          "The actual bundled wood source is opaque: \(name)")
+            let tones = stride(from: 0, to: pixels.count, by: 4).map {
+                0.2126 * Double(pixels[$0]) + 0.7152 * Double(pixels[$0 + 1]) + 0.0722 * Double(pixels[$0 + 2])
+            }.sorted()
+            XCTAssertGreaterThan(tones[(tones.count - 1) * 9 / 10] - tones[(tones.count - 1) / 10], 5,
+                                 "Bundled source must contain real material variation, not a placeholder fill: \(name)")
+            sourceFields.append(Data(pixels))
+        }
+        XCTAssertNotEqual(sourceFields[0], sourceFields[1], "Paint and exposed wood need separate source fields")
+        var cacheIdentities = Set<ObjectIdentifier>()
+        for scheme: ColorScheme in [.light, .dark] {
+            var sharedWood: UIImage?
+            for role in ChristmasOrnamentRole.allCases {
+                for color: StoneColor in [.black, .white] {
+                    for kind in ChristmasOrnamentTexture.Kind.allCases {
+                        let image = try XCTUnwrap(ChristmasOrnamentTexture.image(kind: kind, color: color,
+                            role: role, scheme: scheme), "Missing actual runtime material must not pass via solid fallback")
+                        let repeated = try XCTUnwrap(ChristmasOrnamentTexture.image(kind: kind, color: color,
+                            role: role, scheme: scheme))
+                        XCTAssertTrue(image === repeated, "Clock ticks must reuse the prepared image")
+                        cacheIdentities.insert(ObjectIdentifier(image))
+                        let source = try XCTUnwrap(image.cgImage)
+                        XCTAssertEqual(source.width, 512)
+                        XCTAssertEqual(source.height, 512)
+                        XCTAssertGreaterThan(image.size.width, 0)
+                        XCTAssertTrue(image.size.width.isFinite)
+                        let pixels = try rgbaPixels(for: source, side: 512)
+                        XCTAssertTrue(stride(from: 3, to: pixels.count, by: 4).allSatisfy { pixels[$0] == 255 },
+                                      "The image actually used by the material remains opaque")
+                        if kind == .bareWood {
+                            if let sharedWood {
+                                XCTAssertTrue(image === sharedWood,
+                                    "Unpainted wood is shared across role and stone color within an appearance")
+                            } else { sharedWood = image }
+                        }
+                    }
+                }
+            }
+        }
+        XCTAssertLessThanOrEqual(cacheIdentities.count, 10,
+            "The finite role/color/appearance palette must not retain duplicate material maps")
+    }
+
     /// Cream clamshell needs a contour against golden kaya in thumbnails;
     /// actual moves and scoring marks must remain stronger than the texture.
     func testStudioStonesAndNativeMarksRemainReadable() throws {
@@ -2984,7 +3545,8 @@ final class SurroundThemeTests: XCTestCase {
             for theme in SurroundTheme.allCases {
                 XCTAssertEqual(theme.board(for: scheme).imageStoneShading,
                                (theme == .surroundStudio || theme == .paperBlossoms) ? .clamshellShoulder
-                                   : (theme == .frostPine ? .iceEdge : .artwork))
+                                   : (theme == .frostPine ? .iceEdge
+                                      : (theme == .christmasKeepsakes ? .cranberryGlassEdge : .artwork)))
             }
             var board = SurroundTheme.surroundStudio.board(for: scheme)
             let tint = board.stoneImages?.tint ?? .white

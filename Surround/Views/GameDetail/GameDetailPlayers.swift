@@ -492,7 +492,9 @@ private struct GameDetailClockCard: View {
                     }
                 }
                 .modifier(GameDetailClearGlass(shape: shape,
-                                               enabled: !theme.isFlowingInk && theme != .feltMeadow && theme != .paperBlossoms && !reduceTransparency
+                                               enabled: !theme.isFlowingInk && theme != .feltMeadow
+                                                   && theme != .paperBlossoms && theme != .christmasKeepsakes
+                                                   && !reduceTransparency
                                                    && (!theme.usesLightSceneSurfaces || contrast != .increased),
                                                tint: showsThemeGlass ? theme.clockGlassTint(color) : nil))
                 .frame(height: height)
@@ -613,7 +615,8 @@ private struct GameDetailClockCard: View {
     /// Scene clocks in a glass theme; header chips already sit on the bar's
     /// glass, and accessibility settings keep the solid surfaces.
     private var showsThemeGlass: Bool {
-        guard !theme.isFlowingInk, theme.usesGlassControls, style != .inline,
+        guard !theme.isFlowingInk, theme != .christmasKeepsakes,
+              theme.usesGlassControls, style != .inline,
               !reduceTransparency, contrast != .increased else {
             return false
         }
@@ -629,6 +632,11 @@ private struct GameDetailClockCard: View {
             shape.fill(theme.clockSolidSurface(color))
         } else if theme == .feltMeadow {
             FeltControlSurface(color: color, shape: shape)
+        } else if theme == .christmasKeepsakes {
+            ChristmasOrnamentSurface(color: color, role: .clock,
+                                     attachment: color == .black ? .leading : .trailing,
+                                     showsDecoration: style != .inline && !columnCard && !narrowFullCard && !narrowCompactCard,
+                                     compact: style == .inline || columnCard || narrowFullCard || narrowCompactCard)
         } else if showsThemeGlass {
             Color.clear
         } else if reduceTransparency || contrast == .increased {
@@ -659,12 +667,16 @@ private struct GameDetailClockCard: View {
                     shape.strokeBorder(turnGlow.opacity(colorScheme == .dark ? 0.6 : 0.55), lineWidth: 6)
                         .blur(radius: style == .inline ? 6 : (colorScheme == .dark ? 9 : 8))
                 }
-                shape.strokeBorder(
-                    state.running
-                        ? turnOutline.opacity(contrast == .increased ? 1 : (colorScheme == .dark ? 0.85 : 0.7))
-                        : (contrast == .increased ? foreground.opacity(0.5) : theme.panelBorder),
-                    lineWidth: contrast == .increased ? 2 : 1
-                )
+                // The ornament's wooden edge supplies its idle boundary; only
+                // turn and accessibility outlines need another stroke.
+                if theme != .christmasKeepsakes || state.running || contrast == .increased {
+                    shape.strokeBorder(
+                        state.running
+                            ? turnOutline.opacity(contrast == .increased ? 1 : (colorScheme == .dark ? 0.85 : 0.7))
+                            : (contrast == .increased ? foreground.opacity(0.5) : theme.panelBorder),
+                        lineWidth: contrast == .increased ? 2 : 1
+                    )
+                }
             }
         }
         .allowsHitTesting(false)
@@ -1448,6 +1460,11 @@ struct GameDetailPlayerIdentity: View {
                         RoundedRectangle(cornerRadius: chipCornerRadius)
                             .strokeBorder(theme.identityChipBorder(color), lineWidth: 1)
                     }
+            } else if theme == .christmasKeepsakes {
+                ChristmasOrnamentSurface(color: color, role: .player,
+                                        attachment: avatarLeads ? .leading : .trailing,
+                                        showsDecoration: !navigationHeader && !compactHeader && !avatarOnly && !vertical,
+                                        compact: navigationHeader || compactHeader || avatarOnly || vertical)
             } else if !showsThemeGlass {
                 let translucentScene = theme.usesLightSceneSurfaces && !navigationHeader
                     && !reduceTransparency && contrast != .increased
@@ -1522,7 +1539,8 @@ struct GameDetailPlayerIdentity: View {
     /// Scene chips in a glass theme; the navigation header sits on the bar's
     /// glass, and accessibility settings keep the solid chip.
     private var showsThemeGlass: Bool {
-        guard !theme.isFlowingInk, theme.usesGlassControls, !navigationHeader,
+        guard !theme.isFlowingInk, theme != .christmasKeepsakes,
+              theme.usesGlassControls, !navigationHeader,
               !reduceTransparency, contrast != .increased else {
             return false
         }

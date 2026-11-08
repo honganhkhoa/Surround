@@ -159,6 +159,11 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             night.boardColor = Color(themeHex: 0x667F6C)
             night.compactBoardColor = Color(themeHex: 0x667F6C)
             night.boardEdge = Color(themeHex: 0xBFA981)
+            night.boardDepth = BoardDepth(
+                upperFace: Color(themeHex: 0x566B5C), lowerFace: Color(themeHex: 0x203B2E),
+                highlight: Color(themeHex: 0xD8CBAE).opacity(0.9),
+                shade: Color(themeHex: 0x344638), shadow: Color(themeHex: 0x130F0A).opacity(0.44),
+                thicknessRatio: 0.012, maximumThickness: 7, edgeStyle: .rolledTin)
             // Keep medium pine under the dark grid as the room dims.
             night.boardTexture?.tint = Color(themeHex: 0xF8F8F8)
             night.stoneImages?.tint = Color(themeHex: 0xE8E5DC)
@@ -666,12 +671,19 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 compactBoardColor: Color(themeHex: 0x6D8975),
                 boardEdge: Color(themeHex: 0xD9C29A),
                 boardTexture: ChristmasKeepsakesAssets.board,
-                // Winter Window keeps the enamel calm: a fine dark-pine
-                // grid and a champagne edge, with no raised slab or bevel.
+                boardBevel: true,
+                boardDepth: BoardDepth(
+                    upperFace: Color(themeHex: 0x738573), lowerFace: Color(themeHex: 0x354B3D),
+                    highlight: Color(themeHex: 0xF1E5CC), shade: Color(themeHex: 0x53604E),
+                    shadow: Color(themeHex: 0x2B190D).opacity(0.36),
+                    thicknessRatio: 0.012, maximumThickness: 7, edgeStyle: .rolledTin),
+                // A rolled biscuit-tin lip and shallow sidewall frame the
+                // calm pine enamel; the dark-pine grid keeps its fine weight.
                 gridLineScale: 0.85,
                 stoneImages: ChristmasKeepsakesAssets.stones,
                 stoneLightDirection: .upperLeft,
                 imageStoneShadow: .raisedGlass,
+                imageStoneShading: .cranberryGlassEdge,
                 gridColor: Color(themeHex: 0x10291C),
                 coordinateColor: Color(themeHex: 0x020D06),
                 black: StonePalette(
@@ -830,18 +842,36 @@ private enum NightGardenColors {
 
 /// Top-down glass cutouts share the native stone footprint; all decoration
 /// belongs to the separate viewport scene, never the playable board image.
-private enum ChristmasKeepsakesAssets {
+private final class ChristmasKeepsakesAssets {
+    private init() {}
+    private static let bundle = Bundle(for: ChristmasKeepsakesAssets.self)
+
     static let stones: StoneImages? = {
-        guard let black = UIImage(named: "ChristmasKeepsakesRubyStone"),
-              let white = UIImage(named: "ChristmasKeepsakesIvoryStone") else { return nil }
-        return StoneImages(black: [black], white: [white])
+        guard let black = UIImage(named: "ChristmasKeepsakesRubyStone", in: bundle, compatibleWith: nil),
+              let white = UIImage(named: "ChristmasKeepsakesIvoryStone", in: bundle, compatibleWith: nil) else { return nil }
+        return StoneImages(black: [liftCranberryBody(black)], white: [white], smallStoneInset: 0.45)
     }()
+
+    /// Bring the nearly black glass body into cranberry midtones while
+    /// retaining the source's highlight ordering and transparent silhouette.
+    /// Cache the graded bitmap once for both appearances; Night keeps its tint.
+    private static func liftCranberryBody(_ image: UIImage) -> UIImage {
+        guard let source = image.cgImage,
+              let sRGB = CGColorSpace(name: CGColorSpace.sRGB) else { return image }
+        let context = CIContext(options: [.workingColorSpace: sRGB, .outputColorSpace: sRGB])
+        let input = CIImage(cgImage: source, options: [.colorSpace: sRGB])
+        let graded = input.applyingFilter("CIGammaAdjust", parameters: ["inputPower": Float(0.72)])
+        guard let output = context.createCGImage(graded, from: input.extent,
+                                                format: .RGBA8, colorSpace: sRGB) else { return image }
+        return UIImage(cgImage: output, scale: image.scale, orientation: image.imageOrientation)
+    }
+
     // The muted enamel has a narrow luminance range so the fine dark-pine
     // grid and coordinates stay legible across the entire playing surface.
-    static let board = UIImage(named: "ChristmasKeepsakesBoardSurface")
+    static let board = UIImage(named: "ChristmasKeepsakesBoardSurface", in: bundle, compatibleWith: nil)
         .map { BoardTexture(image: $0, mapping: .board) }
     static func room(for composition: ChristmasKeepsakesRoomLayout.Composition) -> UIImage? {
-        UIImage(named: composition.assetName)
+        UIImage(named: composition.assetName, in: bundle, compatibleWith: nil)
     }
 }
 
@@ -873,10 +903,12 @@ private enum ChristmasKeepsakesColors {
     static let keyline = adaptive(0xFFF4DF, 0x201610)
     static let treeGuide = adaptive(0x846A43, 0xBDA77D)
     static let idle = adaptive(0xD5C6AA, 0x534431)
-    static let blackSurfaceTop = adaptive(0x6E2939, 0x522031)
-    static let blackSurfaceBottom = adaptive(0x480D21, 0x340C1B)
-    static let whiteSurfaceTop = adaptive(0xEAD5B6, 0xCBBBA3)
-    static let whiteSurfaceBottom = adaptive(0xFFF2D8, 0xE4D5BA)
+    // Cranberry and ivory painted wood. The generated brush/grain relief
+    // stays inside these readable pigment bounds; exposed wood frames it.
+    static let blackSurfaceTop = adaptive(0x85273B, 0x702536)
+    static let blackSurfaceBottom = adaptive(0x66182D, 0x4B1729)
+    static let whiteSurfaceTop = adaptive(0xFFF3DD, 0xE6DACA)
+    static let whiteSurfaceBottom = adaptive(0xE0C9AB, 0xCCBAA0)
     static let blackSolid = adaptive(0x700F26, 0x520E20)
     static let whiteForeground = adaptive(0x35251C, 0x2B211A)
     static let blackAccent = adaptive(0xF3D39B, 0xE8C991)
@@ -1300,8 +1332,9 @@ extension SurroundTheme {
     /// Whether the scene includes decorative artwork behind its surfaces.
     var showsSceneArt: Bool { hasScene && self != .flowingInkJadePlain && self != .flowingInkPlain }
 
-    /// Clocks, player chips and the main action are tinted Liquid Glass,
-    /// letting the scene show through; other themes keep solid surfaces.
+    /// Native glass is available to the scene's controls. Christmas clocks
+    /// and player chips override it with opaque painted wooden ornaments; its main
+    /// action keeps glass.
     var usesGlassControls: Bool { self != .standard && self != .feltMeadow && self != .paperBlossoms && !isFlowingInk }
 
     /// The natural scenes use their own foregrounds, translucent pigment
