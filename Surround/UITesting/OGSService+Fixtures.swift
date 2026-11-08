@@ -480,24 +480,26 @@ private struct AppStoreScreenshotPublicClockFixture {
 }
 
 private struct AppStoreScreenshotActiveClockFixture {
-    let daysPerMove: Int
+    let timeControl: TimeControlSystem
     let blackTimeRemaining: Int
     let whiteTimeRemaining: Int
 
-    var secondsPerMove: Int {
-        daysPerMove * 86_400
-    }
-
     init(
-        daysPerMove: Int,
+        timeControl: TimeControlSystem,
         blackTimeRemaining: Int,
         whiteTimeRemaining: Int
     ) {
-        precondition(daysPerMove > 0)
-        let secondsPerMove = daysPerMove * 86_400
+        let maximumTime: Int
+        switch timeControl {
+        case .Simple(let perMove): maximumTime = perMove
+        case .Fischer(_, _, let maxTime): maximumTime = maxTime
+        default:
+            preconditionFailure("Active-game screenshot clocks require Simple or Fischer timing.")
+        }
+        precondition(maximumTime > 0)
         precondition(
-            (1..<secondsPerMove).contains(blackTimeRemaining)
-                && (1..<secondsPerMove).contains(whiteTimeRemaining),
+            (1..<maximumTime).contains(blackTimeRemaining)
+                && (1..<maximumTime).contains(whiteTimeRemaining),
             "Active-game clocks must have believable partial time remaining."
         )
         precondition(
@@ -506,7 +508,7 @@ private struct AppStoreScreenshotActiveClockFixture {
                 && !whiteTimeRemaining.isMultiple(of: 3_600),
             "Active-game screenshot clocks must use distinct, non-round times."
         )
-        self.daysPerMove = daysPerMove
+        self.timeControl = timeControl
         self.blackTimeRemaining = blackTimeRemaining
         self.whiteTimeRemaining = whiteTimeRemaining
     }
@@ -645,9 +647,7 @@ private struct AppStoreScreenshotProfileGame {
         gameJSON.removeValue(forKey: "auto_scoring_done")
 
         gameJSON["time_control"] = jsonObject(
-            TimeControlSystem
-                .Simple(perMove: clock.secondsPerMove)
-                .timeControlObject
+            clock.timeControl.timeControlObject
         )
 
         let nowMilliseconds = now.timeIntervalSince1970 * 1_000
@@ -2549,9 +2549,7 @@ extension OGSService {
             gameData.winner = nil
             gameData.disableAnalysis = disableAnalysis
 
-            gameData.timeControl = TimeControlSystem
-                .Simple(perMove: clock.secondsPerMove)
-                .timeControlObject
+            gameData.timeControl = clock.timeControl.timeControlObject
 
             let currentPlayerColor: StoneColor = gameData.moves.count.isMultiple(of: 2)
                 ? .black
@@ -2667,23 +2665,32 @@ extension OGSService {
             return try! decoder.decode(OGSChatLine.self, from: data)
         }
 
+        guard let correspondenceClock = OGSQuickMatchClockPreset.preset(
+            boardSize: 19, speed: .correspondence, system: .fischer
+        )?.timeControl else {
+            preconditionFailure("The primary screenshot game requires the correspondence Quick Match preset.")
+        }
         let copperKoiClock = AppStoreScreenshotActiveClockFixture(
-            daysPerMove: 2,
-            blackTimeRemaining: 38_820,  // 10h 47m
-            whiteTimeRemaining: 112_320  // 31h 12m
+            timeControl: correspondenceClock,
+            blackTimeRemaining: 211_620,  // 2d 10h 47m, including the last move's 1-day increment
+            whiteTimeRemaining: 198_720  // 2d 7h 12m
         )
+        // Home sorts opponent-turn cards by the user's remaining time. The
+        // alignment journey needs CopperKoi, IndigoCrane, then CobaltFox so
+        // the two planned games occupy neighboring columns before the no-plan game.
+        let alignsHomeBoards = SurroundUITestContract.simulatesHomeBoardAlignment
         let cobaltFoxClock = AppStoreScreenshotActiveClockFixture(
-            daysPerMove: 3,
+            timeControl: .Simple(perMove: 3 * 86_400),
             blackTimeRemaining: 66_360,  // 18h 26m
-            whiteTimeRemaining: 184_080  // 51h 08m
+            whiteTimeRemaining: alignsHomeBoards ? 241_680 : 184_080  // 67h 08m / 51h 08m
         )
         let indigoCraneClock = AppStoreScreenshotActiveClockFixture(
-            daysPerMove: 3,
+            timeControl: .Simple(perMove: 3 * 86_400),
             blackTimeRemaining: 207_780,  // 57h 43m
-            whiteTimeRemaining: 80_340  // 22h 19m
+            whiteTimeRemaining: alignsHomeBoards ? 224_340 : 80_340  // 62h 19m / 22h 19m
         )
         let mapleRidgeClock = AppStoreScreenshotActiveClockFixture(
-            daysPerMove: 4,
+            timeControl: .Simple(perMove: 4 * 86_400),
             blackTimeRemaining: 276_540,  // 76h 49m
             whiteTimeRemaining: 129_960  // 36h 06m
         )
