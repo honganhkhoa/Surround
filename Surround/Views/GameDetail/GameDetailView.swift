@@ -436,10 +436,12 @@ struct GameDetailView: View {
         return false
     }
 
+    /// A narrow iPad window arranges its controls like a portrait iPhone:
+    /// modes and Active Games in the bottom bar, leaving the top bar room so
+    /// nothing moves into its More menu.
     private var placesActiveGamesAtTop: Bool {
         #if os(iOS) && !targetEnvironment(macCatalyst)
-        !isVerticalToolbar && (UIDevice.current.userInterfaceIdiom == .pad
-            || !compactLayout || compactLandscape)
+        !isVerticalToolbar && (!compactLayout || compactLandscape)
         #else
         true
         #endif
@@ -1113,11 +1115,27 @@ private struct GameToolbarLayout: ViewModifier {
         compact && !compactLandscape && !placesActiveGamesAtTop && !isVerticalToolbar
     }
 
+    /// Before iOS 26 the custom button carries the unread badge, but a top
+    /// bar that runs out of room cannot move a custom view into its More menu
+    /// and drops Chat. A narrow, landscape-shaped iPad window keeps the top
+    /// bar, so it uses the native Toggle, which overflows.
     private var usesCustomChatButton: Bool {
         if #available(iOS 26.0, macCatalyst 26.0, *) {
             return usesBottomChatToolbar
         }
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        if compact && !usesBottomChatToolbar && UIDevice.current.userInterfaceIdiom == .pad {
+            return false
+        }
+        #endif
         return true
+    }
+
+    /// Before iOS 26 a native toolbar Toggle shows no badge, so its symbol
+    /// carries the unread dot instead.
+    private var nativeChatSymbol: String {
+        if #available(iOS 26.0, macCatalyst 26.0, *) { return "message" }
+        return !chatIsPresented && game.chatUnreadCount > 0 ? "message.badge" : "message"
     }
 
     private var usesCompactNavigationTitle: Bool {
@@ -1220,7 +1238,7 @@ private struct GameToolbarLayout: ViewModifier {
                 get: { chatIsPresented },
                 set: { selected in setChatVisible(selected) }
             )) {
-                Label("Chat", systemImage: "message")
+                Label("Chat", systemImage: nativeChatSymbol)
                     .modifier(GameToolbarMinimumTouchTarget())
             }
             .toggleStyle(.button)
@@ -1449,8 +1467,7 @@ private struct GameToolbarLayout: ViewModifier {
             ToolbarItemGroup(placement: .topBarTrailing) { modeButtons }
             ToolbarItemGroup(placement: .topBarTrailing) { utilityButtons }
         } else {
-            // All iPad windows keep modes and Active Games at the
-            // top, even when a narrow window uses compact content.
+            // Wide windows keep modes and Active Games at the top.
             GameVerticalToolbarGroup(placement: .topBarTrailing) {
                 modeButtons
             }
