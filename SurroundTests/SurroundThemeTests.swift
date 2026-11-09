@@ -2249,80 +2249,39 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
-    func testChristmasKeepsakesCranberryBodyBrightensWithoutChangingIvoryOrSilhouettes() throws {
+    func testChristmasKeepsakesCabochonPreservesAuthoredColorsAndIvory() throws {
         let bundle = Bundle(for: Self.self)
-        let originalBlack = try XCTUnwrap(UIImage(named: "ChristmasKeepsakesRubyStone", in: bundle, compatibleWith: nil))
-        let originalWhite = try XCTUnwrap(UIImage(named: "ChristmasKeepsakesIvoryStone", in: bundle, compatibleWith: nil))
-        let sourceBlack = try XCTUnwrap(originalBlack.cgImage)
-        let sourceWhite = try XCTUnwrap(originalWhite.cgImage)
-        let before = try rgbaPixels(for: sourceBlack, side: sourceBlack.width)
-        let ivory = try rgbaPixels(for: sourceWhite, side: sourceWhite.width)
+        let sourceImages: [UIImage] = try ["ChristmasKeepsakesRubyStone", "ChristmasKeepsakesIvoryStone"].map { name -> UIImage in
+            try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
+        }
+        let sourcePixels = try sourceImages.map { image -> [UInt8] in
+            let source = try XCTUnwrap(image.cgImage)
+            return try rgbaPixels(for: source, side: source.width)
+        }
         let day = try XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .light).stoneImages)
-        let night = try XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .dark).stoneImages)
-
-        XCTAssertEqual(day.footprint, night.footprint)
-        XCTAssertEqual(day.smallStoneInset, night.smallStoneInset)
-        XCTAssertEqual(day.smallStoneInset, 0.45, "Brightening retains the accepted phone packing")
         try assertEqualAlphaStoneFootprints(day)
 
-        func brightness(_ pixels: [UInt8], _ offset: Int) -> Double {
-            0.2126 * Double(pixels[offset]) + 0.7152 * Double(pixels[offset + 1])
-                + 0.0722 * Double(pixels[offset + 2])
-        }
-        let center = Double(sourceBlack.width) / 2
-        let bodyRadius = Double(sourceBlack.width) * Double(day.footprint) / 2 * 0.65
-        var body: [Int] = [], highlights: [Int] = []
-        for y in 0..<sourceBlack.height {
-            for x in 0..<sourceBlack.width {
-                let offset = (y * sourceBlack.width + x) * 4
-                // This glass is almost opaque (usually alpha 252–253), and
-                // its body is much darker than the localized reflections.
-                guard before[offset + 3] >= 250 else { continue }
-                if hypot(Double(x) + 0.5 - center, Double(y) + 0.5 - center) < bodyRadius {
-                    body.append(offset)
-                }
-                if brightness(before, offset) >= 120 { highlights.append(offset) }
-            }
-        }
-        XCTAssertGreaterThan(body.count, 1000, "Measure the dark central glass, not only bright edge glints")
-        XCTAssertGreaterThan(highlights.count, 100, "The source must include actual reflected highlights")
-        let bodyBefore = body.reduce(0.0) { $0 + brightness(before, $1) } / Double(max(1, body.count))
-
-        for images in [day, night] {
+        for scheme: ColorScheme in [.light, .dark, .light, .dark] {
+            let board = SurroundTheme.christmasKeepsakes.board(for: scheme)
+            let images = try XCTUnwrap(board.stoneImages)
+            XCTAssertEqual(board.imageStoneShading, .artwork,
+                           "The authored window reflection must not acquire a second contour")
+            XCTAssertEqual(images.smallStoneInset, 0.45, "Keep the accepted phone packing")
+            XCTAssertEqual(images.footprint, day.footprint)
             XCTAssertEqual(images.black.count, 1)
             XCTAssertEqual(images.white.count, 1)
-            let black = try XCTUnwrap(images.black.first)
-            let white = try XCTUnwrap(images.white.first)
-            let graded = try XCTUnwrap(black.cgImage)
-            let untouchedWhite = try XCTUnwrap(white.cgImage)
-            XCTAssertEqual(graded.width, sourceBlack.width)
-            XCTAssertEqual(graded.height, sourceBlack.height)
-            XCTAssertEqual(black.scale, originalBlack.scale)
-            XCTAssertEqual(black.imageOrientation, originalBlack.imageOrientation)
-            XCTAssertEqual(untouchedWhite.width, sourceWhite.width)
-            XCTAssertEqual(untouchedWhite.height, sourceWhite.height)
-            let after = try rgbaPixels(for: graded, side: sourceBlack.width)
-            XCTAssertEqual(stride(from: 3, to: before.count, by: 4).map { before[$0] },
-                           stride(from: 3, to: after.count, by: 4).map { after[$0] },
-                           "Body grading preserves every alpha value and the original silhouette")
-            XCTAssertEqual(try rgbaPixels(for: untouchedWhite, side: sourceWhite.width), ivory,
-                           "Ivory artwork remains byte-for-byte unchanged")
-
-            let bodyAfter = body.reduce(0.0) { $0 + brightness(after, $1) } / Double(max(1, body.count))
-            let redLift = body.reduce(0.0) { $0 + Double(after[$1]) - Double(before[$1]) } / Double(max(1, body.count))
-            XCTAssertGreaterThan(bodyAfter - bodyBefore, 5, "The body needs a visible lift beyond its existing rim")
-            XCTAssertGreaterThan(redLift, 18, "The black player should read as brighter cranberry glass")
-            let bodyRed = body.reduce(0.0) { $0 + Double(after[$1]) } / Double(max(1, body.count))
-            let bodyOther = body.reduce(0.0) { $0 + Double(max(after[$1 + 1], after[$1 + 2])) } / Double(max(1, body.count))
-            XCTAssertGreaterThan(bodyRed, bodyOther * 3, "Retain a deep cranberry body rather than a pale wash")
-            let reflected = highlights.reduce(0.0) { $0 + brightness(after, $1) } / Double(max(1, highlights.count))
-            XCTAssertGreaterThan(reflected, bodyAfter + 60,
-                                 "The source reflections must remain distinct from the lifted body")
-        }
-        for scheme: ColorScheme in [.light, .dark, .light, .dark] {
-            let resolved = try XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: scheme).stoneImages)
-            for (actual, cached) in zip(resolved.black + resolved.white, day.black + day.white) {
-                XCTAssertTrue(actual === cached, "Both appearances reuse the once-graded artwork")
+            for (index, color) in [StoneColor.black, .white].enumerated() {
+                let image = try XCTUnwrap(images.variants(color).first)
+                let source = try XCTUnwrap(sourceImages[index].cgImage)
+                let rendered = try XCTUnwrap(image.cgImage)
+                XCTAssertEqual(rendered.width, source.width)
+                XCTAssertEqual(rendered.height, source.height)
+                XCTAssertEqual(image.scale, sourceImages[index].scale)
+                XCTAssertEqual(image.imageOrientation, sourceImages[index].imageOrientation)
+                XCTAssertEqual(try rgbaPixels(for: rendered, side: source.width), sourcePixels[index],
+                               "Keep the cabochon's authored color and alpha, and the unchanged ivory source")
+                XCTAssertTrue(image === (try XCTUnwrap(day.variants(color).first)),
+                              "Appearance changes and clock ticks reuse the authored glass")
             }
         }
     }
@@ -2363,7 +2322,7 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     @MainActor
-    func testChristmasKeepsakesCranberryEdgesPreserveFacesSilhouettesAndFlatStones() throws {
+    func testCranberryGlassAccentPreservesFacesSilhouettesAndFlatStones() throws {
         for scheme: ColorScheme in [.light, .dark] {
             let board = SurroundTheme.christmasKeepsakes.board(for: scheme)
             let images = try XCTUnwrap(board.stoneImages)
@@ -2381,7 +2340,9 @@ final class SurroundThemeTests: XCTestCase {
                                 .environment(\.boardAppearance, appearance)
                                 .environment(\.colorScheme, scheme), scale: scale)
                         }
-                        let actual = try render(board.imageStoneShading), plain = try render(.artwork)
+                        // The cabochon selects its authored artwork alone;
+                        // retain coverage for the optional contour renderer.
+                        let actual = try render(.cranberryGlassEdge), plain = try render(.artwork)
                         let detail = "\(scheme), \(color), \(diameter) pt, \(scale)×, shadow \(shadow)"
                         XCTAssertEqual(actual.width, plain.width, detail)
                         XCTAssertEqual(actual.height, plain.height, detail)
@@ -3730,8 +3691,7 @@ final class SurroundThemeTests: XCTestCase {
             for theme in SurroundTheme.allCases {
                 XCTAssertEqual(theme.board(for: scheme).imageStoneShading,
                                (theme == .surroundStudio || theme == .paperBlossoms) ? .clamshellShoulder
-                                   : (theme == .frostPine ? .iceEdge
-                                      : (theme == .christmasKeepsakes ? .cranberryGlassEdge : .artwork)))
+                                   : (theme == .frostPine ? .iceEdge : .artwork))
             }
             var board = SurroundTheme.surroundStudio.board(for: scheme)
             let tint = board.stoneImages?.tint ?? .white

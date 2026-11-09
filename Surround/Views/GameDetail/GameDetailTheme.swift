@@ -683,7 +683,9 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 stoneImages: ChristmasKeepsakesAssets.stones,
                 stoneLightDirection: .upperLeft,
                 imageStoneShadow: .raisedGlass,
-                imageStoneShading: .cranberryGlassEdge,
+                // The cabochon artwork contains its broad window reflection
+                // and transmitted red light; an extra contour would double it.
+                imageStoneShading: .artwork,
                 gridColor: Color(themeHex: 0x10291C),
                 coordinateColor: Color(themeHex: 0x020D06),
                 black: StonePalette(
@@ -849,22 +851,10 @@ private final class ChristmasKeepsakesAssets {
     static let stones: StoneImages? = {
         guard let black = UIImage(named: "ChristmasKeepsakesRubyStone", in: bundle, compatibleWith: nil),
               let white = UIImage(named: "ChristmasKeepsakesIvoryStone", in: bundle, compatibleWith: nil) else { return nil }
-        return StoneImages(black: [liftCranberryBody(black)], white: [white], smallStoneInset: 0.45)
+        // The selected cabochon is authored at its final brightness. Reuse
+        // the source in both appearances; Night applies only its scene tint.
+        return StoneImages(black: [black], white: [white], smallStoneInset: 0.45)
     }()
-
-    /// Bring the nearly black glass body into cranberry midtones while
-    /// retaining the source's highlight ordering and transparent silhouette.
-    /// Cache the graded bitmap once for both appearances; Night keeps its tint.
-    private static func liftCranberryBody(_ image: UIImage) -> UIImage {
-        guard let source = image.cgImage,
-              let sRGB = CGColorSpace(name: CGColorSpace.sRGB) else { return image }
-        let context = CIContext(options: [.workingColorSpace: sRGB, .outputColorSpace: sRGB])
-        let input = CIImage(cgImage: source, options: [.colorSpace: sRGB])
-        let graded = input.applyingFilter("CIGammaAdjust", parameters: ["inputPower": Float(0.72)])
-        guard let output = context.createCGImage(graded, from: input.extent,
-                                                format: .RGBA8, colorSpace: sRGB) else { return image }
-        return UIImage(cgImage: output, scale: image.scale, orientation: image.imageOrientation)
-    }
 
     // The muted enamel has a narrow luminance range so the fine dark-pine
     // grid and coordinates stay legible across the entire playing surface.
