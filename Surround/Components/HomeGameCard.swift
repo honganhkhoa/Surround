@@ -84,24 +84,11 @@ struct HomeGameFacts {
     }
 
     /// Time until the user's own clock runs out, counting byo-yomi periods
-    /// and the current Canadian block.
+    /// and the current Canadian block. Activity orders games by the same
+    /// value.
     var userTimeUntilTimeout: TimeInterval? {
-        guard let userColor, let clock = game.clock, clock.started,
-              let system = game.gameData?.timeControl.system else { return nil }
-        let time = userColor == .black ? clock.blackTime : clock.whiteTime
-        let main = time.thinkingTimeLeft ?? 0
-        switch system {
-        case .ByoYomi:
-            if main > 0 { return main + Double(time.periods ?? 0) * (time.periodTime ?? 0) }
-            let periodsAfter = max(0, (time.periodsLeft ?? 1) - 1)
-            return (time.periodTimeLeft ?? 0) + Double(periodsAfter) * (time.periodTime ?? 0)
-        case .Canadian(_, let period, _):
-            return main > 0 ? main + Double(period) : time.blockTimeLeft
-        case .None, .Unknown:
-            return nil
-        default:
-            return time.thinkingTimeLeft
-        }
+        guard let userColor else { return nil }
+        return game.timeUntilTimeout(for: userColor)
     }
 
     /// Low time is only ever the user's own running clock, and only where

@@ -28,6 +28,9 @@
 		4A70F0CEAA1A421A91A36B87 /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
 		4D1739ECA3104C94BEEA82BB /* ArtboardPhoneAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 466027D4E066495A9A16693D /* ArtboardPhoneAuditTests.swift */; };
 		4FE5842749544ABF9C79D912 /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
+		AC7100012026110900000001 /* ActivityModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC7100022026110900000002 /* ActivityModel.swift */; };
+		AC7100032026110900000003 /* ActivityModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC7100022026110900000002 /* ActivityModel.swift */; };
+		AC7100042026110900000004 /* ActivityModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC7100052026110900000005 /* ActivityModelTests.swift */; };
 		517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00052026102700000005 /* StonePlacementSoundTests.swift */; };
@@ -539,6 +542,8 @@
 		466027D4E066495A9A16693D /* ArtboardPhoneAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtboardPhoneAuditTests.swift; sourceTree = "<group>"; };
 		4C16B1C83F38A637972CA7A3 /* GameDetailTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailTheme.swift; sourceTree = "<group>"; };
 		4FB7716AFD83430980B45D64 /* GameControlState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlState.swift; sourceTree = "<group>"; };
+		AC7100022026110900000002 /* ActivityModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityModel.swift; sourceTree = "<group>"; };
+		AC7100052026110900000005 /* ActivityModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityModelTests.swift; sourceTree = "<group>"; };
 		517D00022026102700000002 /* StonePlacementSoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundPlayer.swift; sourceTree = "<group>"; };
 		517D00052026102700000005 /* StonePlacementSoundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundTests.swift; sourceTree = "<group>"; };
 		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
@@ -951,6 +956,7 @@
 				E271DDB41A1044F0BB9E1A1A /* GameDetailInteractionTests.swift */,
 				1C0AD3E8262AC421242AB561 /* SurroundThemeTests.swift */,
 				517D00052026102700000005 /* StonePlacementSoundTests.swift */,
+				AC7100052026110900000005 /* ActivityModelTests.swift */,
 				BCFA1151000000000000000C /* HomeRulesTests.swift */,
 				0189D12871764C28AF2D6CE0 /* GameDetailDesignFixtureTests.swift */,
 				87DB1CF4B22A44B2AA1EBCCE /* GameControlRowMetricsTests.swift */,
@@ -1074,6 +1080,7 @@
 		BC042B3224AB2DD00050B2D1 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				AC7100022026110900000002 /* ActivityModel.swift */,
 				AA1600012026091600000001 /* ChallengeDraft.swift */,
 				AA1700012026091700000001 /* ProfileRating.swift */,
 				AFA600012026100400000001 /* ProfileBiographyDocument.swift */,
@@ -1643,6 +1650,7 @@
 				AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */,
 				AE3000013A00000000000001 /* PlatformServices.swift in Sources */,
 				517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */,
+				AC7100012026110900000001 /* ActivityModel.swift in Sources */,
 				B10A00012026102900000001 /* BetaSimulatorLoginBridge.swift in Sources */,
 				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
 				AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */,
@@ -1771,6 +1779,8 @@
 				96BD71A30B7D334BB8E64426 /* SurroundThemeTests.swift in Sources */,
 				517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */,
 				517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */,
+				AC7100032026110900000003 /* ActivityModel.swift in Sources */,
+				AC7100042026110900000004 /* ActivityModelTests.swift in Sources */,
 				BCFA1151000000000000000B /* HomeRules.swift in Sources */,
 				BCFA1151000000000000000D /* HomeRulesTests.swift in Sources */,
 				C1ACC76C51B9DBE9AC72CBCA /* Stone.swift in Sources */,
