@@ -430,12 +430,18 @@ private enum MarkerAuditFixtures {
     /// Dense material comparisons are opt-in so the everyday marker matrix
     /// stays bounded. Both samples share stones, marks, shadows and geometry.
     static let stoneGroupSamples: [MarkerAuditSample] = {
-        let black = (0..<5).flatMap { row in
-            (0..<5).compactMap { column -> [Int]? in
-                ([row, column] == [1, 1] || [row, column] == [3, 3]) ? nil : [row, column]
+        // Concrete coordinates avoid expensive nested inference on older compilers.
+        var black: [[Int]] = []
+        for row in 0..<5 {
+            for column in 0..<5 {
+                let isEye = (row == 1 && column == 1) || (row == 3 && column == 3)
+                if !isEye { black.append([row, column]) }
             }
-        } + [[6, 5]]
-        let white = (0..<5).map { [$0, 6] } + [[6, 1], [6, 2], [6, 3], [6, 6]]
+        }
+        black.append([6, 5])
+        var white: [[Int]] = []
+        for row in 0..<5 { white.append([row, 6]) }
+        white.append(contentsOf: [[6, 1], [6, 2], [6, 3], [6, 6]])
         let board = position(black: black, white: white, last: [4, 4])
         board.removedStones = [[6, 5], [6, 6]]
         let marks: BoardMarkups = [

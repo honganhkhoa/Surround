@@ -2490,9 +2490,25 @@ final class SurroundThemeTests: XCTestCase {
             XCTAssertEqual(lit.width, baseline.width)
             XCTAssertEqual(lit.height, baseline.height)
             let slabs = frames.map { (rect: $0, radius: CGFloat.zero) }
+            let stoneShoulders = frames.map { frame -> (centers: [CGPoint], radius: CGFloat) in
+                let cell = frame.width / 9
+                guard usesDetailedStoneRendering(at: cell), let images = appearance.stoneImages else {
+                    return ([], 0)
+                }
+                let radius = images.displayRect(in: CGRect(x: 0, y: 0, width: cell, height: cell),
+                                                cellSize: cell).width / 2
+                // Match the centered HStack's two cells and its 2 pt spacing.
+                return ([CGPoint(x: frame.midX - (cell + 2) / 2, y: frame.midY),
+                         CGPoint(x: frame.midX + (cell + 2) / 2, y: frame.midY)], radius)
+            }
             var changedInside = [Int](repeating: 0, count: frames.count)
             var unprotectedChanges = changedInside
             var checkedInside = changedInside
+            var unexpectedChanges = changedInside
+            var shoulderPixels = changedInside
+            var roundedShoulderPixels = changedInside
+            var maximumChannelDelta = changedInside
+            var changedSamples: [[Int]] = []
             var changedOutside = 0
             for y in 0..<lit.height {
                 for x in 0..<lit.width {
@@ -2507,8 +2523,31 @@ final class SurroundThemeTests: XCTestCase {
                         if distance < -1.0 / 3 {
                             inSlab = true
                             checkedInside[index] += 1
-                            if differs { changedInside[index] += 1 }
-                            if (0..<4).contains(where: { unprotected.pixels[offset + $0] != baseline.pixels[offset + $0] }) {
+                            let shoulder = stoneShoulders[index]
+                            let isShoulder = shoulder.centers.contains { center in
+                                let radius = hypot(point.x - center.x, point.y - center.y)
+                                return radius >= shoulder.radius * 0.8 && radius <= shoulder.radius
+                            }
+                            if isShoulder { shoulderPixels[index] += 1 }
+                            if differs {
+                                changedInside[index] += 1
+                                var pixelDelta = 0
+                                for channel in 0..<4 {
+                                    pixelDelta = max(pixelDelta,
+                                        abs(Int(lit.pixels[offset + channel]) - Int(baseline.pixels[offset + channel])))
+                                }
+                                maximumChannelDelta[index] = max(maximumChannelDelta[index], pixelDelta)
+                                if isShoulder, pixelDelta <= 1,
+                                   lit.pixels[offset + 3] == baseline.pixels[offset + 3] {
+                                    roundedShoulderPixels[index] += 1
+                                } else {
+                                    unexpectedChanges[index] += 1
+                                }
+                                if changedSamples.count < 40 { changedSamples.append([index, x, y]) }
+                            }
+                            if (0..<4).contains(where: {
+                                abs(Int(unprotected.pixels[offset + $0]) - Int(baseline.pixels[offset + $0])) > 1
+                            }) {
                                 unprotectedChanges[index] += 1
                             }
                         }
@@ -2516,12 +2555,47 @@ final class SurroundThemeTests: XCTestCase {
                     if !inSlab && differs { changedOutside += 1 }
                 }
             }
+            // iOS 26.5 rounds five tinted-image shoulder pixels by one RGB
+            // byte when the filtered room field is present. Untinted images
+            // and solid stones are exact. Permit this only in the outer 20%
+            // of the detailed stone radius, at <= 0.5% of those pixels.
+            // Pigment, stone centers, compact stones and all alpha stay exact.
+            let roundingFractions = frames.indices.map {
+                Double(roundedShoulderPixels[$0]) / Double(max(1, shoulderPixels[$0]))
+            }
+            if frames.indices.contains(where: { unexpectedChanges[$0] > 0 || roundingFractions[$0] > 0.005 }) {
+                let repeated = try render(light: false)
+                let samples: [[String: Any]] = changedSamples.map { sample in
+                    let offset = (sample[2] * baseline.width + sample[1]) * 4
+                    return ["slab": sample[0], "xy": Array(sample[1...2]),
+                            "baseline_rgba": Array(baseline.pixels[offset..<(offset + 4)]),
+                            "lit_rgba": Array(lit.pixels[offset..<(offset + 4)]),
+                            "repeated_baseline_rgba": Array(repeated.pixels[offset..<(offset + 4)])]
+                }
+                let diagnostic: [String: Any] = [
+                    "appearance": String(describing: scheme),
+                    "changed_inside": changedInside, "maximum_channel_delta": maximumChannelDelta,
+                    "unexpected_changes": unexpectedChanges, "shoulder_pixels": shoulderPixels,
+                    "rounded_shoulder_pixels": roundedShoulderPixels,
+                    "repeated_baseline_identical": repeated.pixels == baseline.pixels,
+                    "samples": samples
+                ]
+                let data = try JSONSerialization.data(withJSONObject: diagnostic, options: [.sortedKeys])
+                let text = try XCTUnwrap(String(data: data, encoding: .utf8))
+                let attachment = XCTAttachment(string: text)
+                attachment.name = "board-light-occlusion-\(scheme).json"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+                print("BOARD_LIGHT_OCCLUSION_DIAGNOSTIC " + text)
+            }
             for index in frames.indices {
                 XCTAssertGreaterThan(checkedInside[index], 1000)
-                XCTAssertEqual(changedInside[index], 0,
-                               "Lighting must preserve every slab and stone pixel at \(frames[index].width / 9) pt")
+                XCTAssertEqual(unexpectedChanges[index], 0,
+                               "Lighting must preserve pigment, stone centers and alpha at \(frames[index].width / 9) pt (\(scheme)); maximum channel delta: \(maximumChannelDelta[index])")
+                XCTAssertLessThanOrEqual(roundingFractions[index], 0.005,
+                                         "One-byte RGB rounding must remain sparse within stone shoulders")
                 XCTAssertGreaterThan(unprotectedChanges[index], 100,
-                                     "Each board fixture must intersect actual lighting so the occlusion check cannot pass vacuously")
+                                     "Each fixture must detect lighting above the rounding allowance, so occlusion cannot pass vacuously")
             }
             XCTAssertGreaterThan(changedOutside, 1000, "The production light remains visible over the surrounding scene")
         }
@@ -3507,10 +3581,15 @@ final class SurroundThemeTests: XCTestCase {
             let pixels = try rgbaPixels(for: source, side: 512)
             XCTAssertTrue(stride(from: 3, to: pixels.count, by: 4).allSatisfy { pixels[$0] == 255 },
                           "The actual bundled wood source is opaque: \(name)")
-            let tones = stride(from: 0, to: pixels.count, by: 4).map {
-                0.2126 * Double(pixels[$0]) + 0.7152 * Double(pixels[$0 + 1]) + 0.0722 * Double(pixels[$0 + 2])
+            let tones: [Double] = stride(from: 0, to: pixels.count, by: 4).map { offset -> Double in
+                let red = 0.2126 * Double(pixels[offset])
+                let green = 0.7152 * Double(pixels[offset + 1])
+                let blue = 0.0722 * Double(pixels[offset + 2])
+                return red + green + blue
             }.sorted()
-            XCTAssertGreaterThan(tones[(tones.count - 1) * 9 / 10] - tones[(tones.count - 1) / 10], 5,
+            let lowerDecile = tones[(tones.count - 1) / 10]
+            let upperDecile = tones[(tones.count - 1) * 9 / 10]
+            XCTAssertGreaterThan(upperDecile - lowerDecile, 5,
                                  "Bundled source must contain real material variation, not a placeholder fill: \(name)")
             sourceFields.append(Data(pixels))
         }
