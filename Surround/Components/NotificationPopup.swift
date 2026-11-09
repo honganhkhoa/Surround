@@ -79,6 +79,41 @@ struct PrivateMessageNotificationButton: View {
     }
 }
 
+private struct GlobalNotificationOverlayKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// Main tab stacks share the root popup; presented stacks do not.
+    var hasGlobalNotificationOverlay: Bool {
+        get { self[GlobalNotificationOverlayKey.self] }
+        set { self[GlobalNotificationOverlayKey.self] = newValue }
+    }
+}
+
+/// Share the popup's row priority with inline titles that occupy its space.
+@MainActor
+struct NotificationPopupVisibility {
+    let showsLiveGames: Bool
+    let showsWaitingGames: Bool
+    let showsChallenge: Bool
+    let showsPrivateMessages: Bool
+    let occupiesNavigationTitle: Bool
+
+    init(ogs: OGSService, nav: NavigationService) {
+        let connected = ogs.socketStatus == .connected
+        let viewingHome = nav.main.rootView == .home && nav.home.activeGame == nil
+        showsLiveGames = connected && !nav.liveGamesNeedingNotice(among: ogs.liveGames).isEmpty
+        showsWaitingGames = connected && !showsLiveGames && ogs.waitingLiveGames > 0 && !viewingHome
+        showsChallenge = connected && !showsLiveGames && !showsWaitingGames
+            && !viewingHome && !nav.visibleGameDetailPlaysLiveGame && !ogs.challengesReceived.isEmpty
+        showsPrivateMessages = PrivateMessageNotificationButton.isVisible(ogs: ogs, nav: nav)
+        // MainView mounts the global popup only for a signed-in account.
+        occupiesNavigationTitle = ogs.isLoggedIn && (nav.connectionBannerVisible
+            || showsLiveGames || showsWaitingGames || showsChallenge || showsPrivateMessages)
+    }
+}
+
 struct NotificationPopup: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
@@ -146,16 +181,8 @@ struct NotificationPopup: View {
         }
     }
     
-    var viewingLiveGames: Bool {
-        nav.visibleGameDetailPlaysLiveGame
-    }
-
     var liveGamesElsewhere: [Game] {
         nav.liveGamesNeedingNotice(among: ogs.liveGames)
-    }
-
-    var viewingHomeView: Bool {
-        return nav.main.rootView == .home && nav.home.activeGame == nil
     }
 
     func goToLiveGames() {
@@ -200,13 +227,6 @@ struct NotificationPopup: View {
         }
     }
     
-    var shouldShowChallengeReceivedPopup: Bool {
-        guard !viewingHomeView && !viewingLiveGames else {
-            return false
-        }
-        return ogs.challengesReceived.count > 0
-    }
-    
     var challengeReceivedPopup: some View {
         Button(action: { nav.main.showWaitingGames = true }) {
             VStack {
@@ -229,6 +249,7 @@ struct NotificationPopup: View {
     }
     
     var body: some View {
+        let visibility = NotificationPopupVisibility(ogs: ogs, nav: nav)
         ZStack(alignment: .top) {
             // The panel shows only while connected, and so does the layer
             // that closes it: offline it would swallow taps on an empty window.
@@ -243,14 +264,14 @@ struct NotificationPopup: View {
                     HStack {
                         // Game Detail owns connection status, but its active
                         // picker does not replace cross-speed live/challenge notices.
-                        if !liveGamesElsewhere.isEmpty {
+                        if visibility.showsLiveGames {
                             liveGamesPopup
-                        } else if ogs.waitingLiveGames > 0 && !viewingHomeView {
+                        } else if visibility.showsWaitingGames {
                             waitingGamesPopup
-                        } else if shouldShowChallengeReceivedPopup {
+                        } else if visibility.showsChallenge {
                             challengeReceivedPopup
                         }
-                        if PrivateMessageNotificationButton.isVisible(ogs: ogs, nav: nav) {
+                        if visibility.showsPrivateMessages {
                             PrivateMessageNotificationButton()
                         }
                     }

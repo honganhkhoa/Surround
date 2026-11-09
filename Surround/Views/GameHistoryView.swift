@@ -235,7 +235,7 @@ struct GameHistoryView: View {
         .onChange(of: queryIdentity) { _, identity in
             resetPages(for: identity)
         }
-        .navigationTitle(Text("Game history"))
+        .modifier(ThemeSceneNavigationTitle(title: Text("Game history"), theme: theme))
     }
 
     private var loadStatus: GameHistoryLoadStatus? {

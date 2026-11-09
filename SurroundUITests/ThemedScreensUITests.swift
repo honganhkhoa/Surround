@@ -9,9 +9,76 @@
 
 import XCTest
 import UIKit
+import Vision
 
 final class ThemedScreensUITests: SurroundJourneyUITestCase {
     private typealias ID = SurroundUITestContract.AccessibilityID
+
+    /// A custom expanded title must not leave a second inline title visible,
+    /// and its native inline replacement must survive collapse and expansion.
+    func testThemedTitleCollapsesAndExpandsWithoutDuplicates() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This journey checks the compact iPhone navigation bar.")
+        #else
+        try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .phone)
+        guard #available(iOS 26.0, *) else { throw XCTSkip("Custom large titles require iOS 26.") }
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument, "settings",
+            SurroundUITestContract.themeLaunchArgument, "nightGarden",
+        ], orientation: .portrait)
+        element(ID.screenSettings, in: app)
+        let bar = app.navigationBars["Settings"].firstMatch
+        XCTAssertTrue(bar.waitForExistence(timeout: 10))
+        let scroll = app.scrollViews.firstMatch
+        XCTAssertTrue(scroll.waitForExistence(timeout: 10))
+        func waitForCondition(_ condition: @escaping () -> Bool) -> Bool {
+            let expectation = XCTNSPredicateExpectation(
+                predicate: NSPredicate { _, _ in condition() }, object: nil
+            )
+            return waitWithFinalCheck(for: [expectation], timeout: 5) == .completed
+        }
+        func assertSingleTitle(_ stage: String) throws {
+            keepScreenshot("Themed title – \(stage)", in: app)
+            // Native title labels are not consistently reported as hittable.
+            // Count the words actually painted inside the navigation bar.
+            let image = try XCTUnwrap(app.screenshot().image.cgImage)
+            let window = app.windows.firstMatch.frame
+            let frame = bar.frame.intersection(window)
+            let scaleX = CGFloat(image.width) / window.width
+            let scaleY = CGFloat(image.height) / window.height
+            let pixels = CGRect(x: (frame.minX - window.minX) * scaleX,
+                                y: (frame.minY - window.minY) * scaleY,
+                                width: frame.width * scaleX, height: frame.height * scaleY).integral
+            let titleImage = try XCTUnwrap(image.cropping(to: pixels))
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            request.recognitionLanguages = ["en-US"]
+            request.usesLanguageCorrection = false
+            try VNImageRequestHandler(cgImage: titleImage, options: [:]).perform([request])
+            let titles = (request.results ?? []).filter {
+                $0.topCandidates(1).first?.string.caseInsensitiveCompare("Settings") == .orderedSame
+            }
+            XCTAssertEqual(titles.count, 1, "\(stage): exactly one rendered navigation title")
+        }
+
+        XCTAssertGreaterThanOrEqual(bar.frame.height, 80)
+        let expandedHeight = bar.frame.height
+        try assertSingleTitle("expanded")
+        for _ in 0..<3 {
+            scroll.swipeUp()
+            if bar.frame.height <= 60 { break }
+        }
+        XCTAssertTrue(waitForCondition { bar.frame.height <= 60 })
+        try assertSingleTitle("collapsed")
+        for _ in 0..<6 {
+            scroll.swipeDown()
+            if bar.frame.height >= expandedHeight - 2 { break }
+        }
+        XCTAssertTrue(waitForCondition { bar.frame.height >= expandedHeight - 2 })
+        try assertSingleTitle("expanded again")
+        #endif
+    }
 
     /// Public games and Game history wear the theme on the whole app: its
     /// scene behind the list and each game on a card, as on Home. In Light

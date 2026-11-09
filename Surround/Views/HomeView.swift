@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import UIKit
 
 /// Gives the same OGS game a distinct identity in each home-screen section.
 /// A game can briefly exist in both an active projection and finished history
@@ -1012,7 +1013,10 @@ struct HomeView: View {
             ).post()
             nav.handle(route: route)
         }
-        .navigationTitle(ogs.isLoggedIn ? String(localized: "Active games") : String(localized: "Welcome"))
+        .modifier(ThemeSceneNavigationTitle(
+            title: Text(ogs.isLoggedIn ? String(localized: "Active games") : String(localized: "Welcome")),
+            theme: theme
+        ))
         .surroundTheme(theme)
         .sheet(isPresented: $nav.home.showingNewGameView) {
             AppNavigationStack {
@@ -1106,39 +1110,207 @@ private struct HomeSkeletonEntry: Identifiable {
     let id: Int
 }
 
-/// The scene behind the screens that wear the theme (Home, Settings, Public
-/// games, Game history), softened under the large title: a
-/// veil in the page color that fades out below it, as on the canvas, so the
-/// title reads while the art still shows through. Its height follows the
-/// title's safe area as it collapses and grows with Dynamic Type, without
-/// replacing the navigation bar's own appearance or scroll-edge effects.
+/// The fixed scene behind Home, Settings, Public games and Game history.
+/// Titles carry their own local backing, leaving the artwork exposed.
 struct ThemeSceneBackdrop: View {
-    @Environment(\.surroundTheme) private var theme
-    private let fadeLength: CGFloat = 72
-
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .top) {
-                GameDetailBackdrop().ignoresSafeArea(.container)
+        GameDetailBackdrop()
+            .overlay { ThemeStatusBarContrast() }
+            .ignoresSafeArea(.container)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Keep native large-title expansion and collapse while backing only the
+/// words. Earlier systems expose custom inline titles only. Native title
+/// metadata remains available for Back, accessibility and Mac windows.
+struct ThemeSceneNavigationTitle: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.hasGlobalNotificationOverlay) private var hasGlobalNotificationOverlay
+    @EnvironmentObject private var ogs: OGSService
+    @EnvironmentObject private var nav: NavigationService
+    let title: Text
+    let theme: SurroundTheme
+
+    private var displayMode: ToolbarTitleDisplayMode {
+        if #available(iOS 26.0, *) { return theme.showsSceneArt ? .large : .automatic }
+        return theme.showsSceneArt ? .inline : .automatic
+    }
+
+    private func legibleTitle(font: Font) -> some View {
+        title
+            .font(font)
+            .foregroundColor(theme.foreground)
+            .lineLimit(1)
+            .modifier(HomeSceneLegibility())
+            .environment(\.surroundTheme, theme)
+            .environment(\.colorScheme, theme.colorScheme ?? colorScheme)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    func body(content: Content) -> some View {
+        let coveredByNotice = hasGlobalNotificationOverlay
+            && NotificationPopupVisibility(ogs: ogs, nav: nav).occupiesNavigationTitle
+        content
+            .navigationTitle(title)
+            .toolbarTitleDisplayMode(displayMode)
+            .toolbar {
                 if theme.showsSceneArt {
-                    let titleArea = geometry.safeAreaInsets.top
-                    let height = titleArea + fadeLength
-                    LinearGradient(
-                        stops: [
-                            .init(color: theme.pageBackground.opacity(0.82), location: 0),
-                            .init(color: theme.pageBackground.opacity(0.62), location: titleArea / height),
-                            .init(color: theme.pageBackground.opacity(0), location: 1),
-                        ],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                    .frame(height: height)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .ignoresSafeArea(.container, edges: .top)
+                    if #available(iOS 26.0, *) {
+                        ToolbarItem(placement: .largeTitle) {
+                            legibleTitle(font: .largeTitle.bold())
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    } else {
+                        ToolbarItem(placement: .principal) {
+                            legibleTitle(font: .headline)
+                                .opacity(coveredByNotice ? 0 : 1)
+                                .accessibilityHidden(coveredByNotice)
+                        }
+                    }
                 }
             }
+            .background {
+                if #available(iOS 26.0, *) {
+                    ThemeNativeInlineTitleStyle(
+                        enabled: theme.showsSceneArt,
+                        foreground: theme.foreground,
+                        backdrop: theme.pageBackground,
+                        colorScheme: theme.colorScheme ?? colorScheme,
+                        hidden: coveredByNotice
+                    )
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                }
+            }
+    }
+}
+
+/// A custom inline toolbar title can remain visible beside the expanded title.
+/// Keep UIKit's native fade and style only its text with a local
+/// shadow; the expanded SwiftUI title retains HomeSceneLegibility's backing.
+private struct ThemeNativeInlineTitleStyle: UIViewControllerRepresentable {
+    let enabled: Bool
+    let foreground: Color
+    let backdrop: Color
+    let colorScheme: ColorScheme
+    let hidden: Bool
+
+    struct Style: Equatable {
+        let foreground: UIColor
+        let backdrop: UIColor
+        let hidden: Bool
+    }
+
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+
+    func updateUIViewController(_ controller: Controller, context: Context) {
+        let traits = UITraitCollection(userInterfaceStyle: colorScheme == .dark ? .dark : .light)
+        controller.style = enabled ? Style(
+            foreground: UIColor(foreground).resolvedColor(with: traits),
+            backdrop: UIColor(backdrop).resolvedColor(with: traits),
+            hidden: hidden
+        ) : nil
+    }
+
+    static func dismantleUIViewController(_ controller: Controller, coordinator: ()) {
+        controller.restore()
+    }
+
+    final class Controller: UIViewController {
+        var style: Style? { didSet { apply() } }
+        private static let slots: [ReferenceWritableKeyPath<UINavigationItem, UINavigationBarAppearance?>] = [
+            \.standardAppearance, \.compactAppearance, \.scrollEdgeAppearance, \.compactScrollEdgeAppearance
+        ]
+        private weak var styledItem: UINavigationItem?
+        private var originals: [UINavigationBarAppearance?] = []
+        private var installed: [UINavigationBarAppearance?] = []
+        private var inherited: [UINavigationBarAppearance?] = []
+        private var appliedStyle: Style?
+        private var applying = false
+
+        override func loadView() {
+            view = UIView()
+            view.isUserInteractionEnabled = false
         }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+
+        override func didMove(toParent parent: UIViewController?) {
+            super.didMove(toParent: parent)
+            apply()
+        }
+
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews()
+            apply()
+        }
+
+        private func target() -> (UINavigationItem, UINavigationBar)? {
+            var ancestor = parent
+            while let owner = ancestor {
+                if let navigation = owner.navigationController,
+                   navigation.viewControllers.contains(where: { $0 === owner }) {
+                    return (owner.navigationItem, navigation.navigationBar)
+                }
+                ancestor = owner.parent
+            }
+            return nil
+        }
+
+        private func apply() {
+            guard !applying else { return }
+            applying = true
+            defer { applying = false }
+            guard let style, let (item, bar) = target() else { restore(); return }
+            if styledItem !== item {
+                restore()
+                styledItem = item
+                originals = Self.slots.map { item[keyPath: $0] }
+            }
+            let current = Self.slots.map { item[keyPath: $0] }
+            let sources: [UINavigationBarAppearance?] = [
+                bar.standardAppearance, bar.compactAppearance, bar.scrollEdgeAppearance, bar.compactScrollEdgeAppearance
+            ]
+            if appliedStyle == style, installed.count == current.count,
+               zip(current, installed).allSatisfy({ $0 === $1 }),
+               zip(sources, inherited).allSatisfy({ $0 === $1 }) { return }
+
+            for index in installed.indices where current[index] !== installed[index] {
+                originals[index] = current[index]
+            }
+            for index in Self.slots.indices {
+                // Leave absent variants nil so UIKit keeps its native fallback,
+                // including the transparent scroll-edge variant of standard.
+                guard let source = originals[index] ?? sources[index] else {
+                    item[keyPath: Self.slots[index]] = nil
+                    continue
+                }
+                let appearance = source.copy()
+                let shadow = NSShadow()
+                shadow.shadowColor = style.hidden ? UIColor.clear : style.backdrop.withAlphaComponent(0.95)
+                shadow.shadowBlurRadius = style.hidden ? 0 : 3
+                shadow.shadowOffset = .zero
+                appearance.titleTextAttributes[.foregroundColor] = style.hidden ? UIColor.clear : style.foreground
+                appearance.titleTextAttributes[.shadow] = shadow
+                item[keyPath: Self.slots[index]] = appearance
+            }
+            installed = Self.slots.map { item[keyPath: $0] }
+            inherited = sources
+            appliedStyle = style
+        }
+
+        func restore() {
+            if let item = styledItem {
+                for index in installed.indices where item[keyPath: Self.slots[index]] === installed[index] {
+                    item[keyPath: Self.slots[index]] = originals[index]
+                }
+            }
+            styledItem = nil
+            originals = []
+            installed = []
+            inherited = []
+            appliedStyle = nil
+        }
     }
 }
 

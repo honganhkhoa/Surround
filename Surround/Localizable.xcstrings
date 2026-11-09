@@ -31524,6 +31524,7 @@
     },
     "game.navigation.versus" : {
       "comment" : "Short prefix before the opponent's name in the compact game navigation title. English omits the period here.",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {

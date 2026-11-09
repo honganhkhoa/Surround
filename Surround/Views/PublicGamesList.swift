@@ -109,7 +109,7 @@ struct PublicGamesList: View {
             }
             await resolvePendingGameOpen(request)
         }
-        .navigationBarTitle(Text("Public live games"))
+        .modifier(ThemeSceneNavigationTitle(title: Text("Public live games"), theme: theme))
     }
 }
 

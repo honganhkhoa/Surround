@@ -217,7 +217,7 @@ struct SettingsView: View {
             }
         }
         .surroundTheme(theme)
-        .navigationTitle("Settings")
+        .modifier(ThemeSceneNavigationTitle(title: Text("Settings"), theme: theme))
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenSettings)
     }
 }

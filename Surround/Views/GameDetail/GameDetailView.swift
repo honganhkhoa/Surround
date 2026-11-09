@@ -700,6 +700,9 @@ struct GameDetailView: View {
         }
 
         let showsActiveGamesButton = canShowActiveGames
+        #if targetEnvironment(macCatalyst)
+        // Keep the document identity in the Mac window title. The game
+        // surface itself has no navigation heading; clocks open its details.
         var title = currentGame.gameName?.trimmingCharacters(
             in: .whitespacesAndNewlines
         ) ?? ""
@@ -720,7 +723,6 @@ struct GameDetailView: View {
         } else if currentGame.gamePhase == .finished {
             title = String(localized: "Game over")
         }
-        #if targetEnvironment(macCatalyst)
         let navigationTitle = title.isEmpty
             ? String(
                 localized: "Game",
@@ -728,12 +730,7 @@ struct GameDetailView: View {
             )
             : title
         #else
-        // The app's connection banner sits in the title slot; the title gives
-        // way while it shows (canvas "Reconnecting in stone removal · iPhone").
-        let showsTitle = !zenMode && !isVerticalToolbar && !showsOpponentInHeader
-            && !showsClocksInHeader && !nav.connectionBannerVisible
-            && (compactLayout || UIDevice.current.userInterfaceIdiom == .phone)
-        let navigationTitle = showsTitle ? title : ""
+        let navigationTitle = ""
         #endif
         
         let result = gameBody(compact: compactLayout, geometry: geometry)
@@ -755,21 +752,8 @@ struct GameDetailView: View {
                 .overlay {
                     GameDetailSceneFoliage(hasTopEdgeClocks: hasActiveVerticalDisplayDivision(in: geometry))
                 }
-                .overlay(alignment: .top) {
-                    let theme = SurroundTheme.current(storedID: gameThemeID)
-                    if theme.isFlowingInk {
-                        // Give status-bar text a paper margin while the
-                        // landscape remains visible below the top chrome.
-                        LinearGradient(stops: [
-                            .init(color: theme.pageBackground, location: 0),
-                            .init(color: theme.pageBackground, location: 0.5),
-                            .init(color: .clear, location: 1)
-                        ], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 72)
-                        .opacity(theme.showsSceneArt ? 1 : 0)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                    }
+                .overlay {
+                    ThemeStatusBarContrast(hidden: hidesZenChrome && hidesStatusBarInZen)
                 }
                 .ignoresSafeArea(.container)
         }
@@ -1107,7 +1091,6 @@ private struct GameToolbarLayout: ViewModifier {
     @Environment(\.isVerticalToolbar) private var isVerticalToolbar
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.dismiss) private var dismiss
-    @Setting(.hidesRank) private var hidesRank: Bool
     @ObservedObject var game: Game
     @ObservedObject var gameControlState: GameControlState
     @Binding var selectedConditionalVariation: ConditionalMoveBranch?
@@ -1173,80 +1156,6 @@ private struct GameToolbarLayout: ViewModifier {
     private var nativeChatSymbol: String {
         if #available(iOS 26.0, macCatalyst 26.0, *) { return "message" }
         return !chatIsPresented && game.chatUnreadCount > 0 ? "message.badge" : "message"
-    }
-
-    private var usesCompactNavigationTitle: Bool {
-        #if targetEnvironment(macCatalyst)
-        return false
-        #else
-        return compact && !isVerticalToolbar
-        #endif
-    }
-
-    /// The app's connection banner sits in the title slot (canvas
-    /// "Reconnecting in stone removal · iPhone"). The title, or the opponent
-    /// standing in for it, gives way; header clock chips stay.
-    private var titleGivesWayToConnectionBanner: Bool {
-        nav.connectionBannerVisible
-    }
-
-    private var compactNavigationTitle: some View {
-        let needsPaperBacking = theme.isFlowingInk
-            || (theme == .paperBlossoms && compactNavigationTitleHasContent)
-        return compactNavigationTitleContent
-            .padding(.horizontal, needsPaperBacking ? 10 : 0)
-            .padding(.vertical, needsPaperBacking ? 5 : 0)
-            .background {
-                // Ink and red paper can sit behind the title. Keep only
-                // its text on a small paper surface, leaving the scene
-                // visible across the rest of the native navigation bar.
-                if needsPaperBacking {
-                    Capsule().fill(theme.panel.opacity(0.96))
-                }
-            }
-    }
-
-    private var compactNavigationTitleHasContent: Bool {
-        if game.gamePhase == .stoneRemoval || game.gamePhase == .finished {
-            return true
-        }
-        if game.isUserPlaying, let color = game.userStoneColor,
-           game.currentPlayer(with: color.opponentColor()) != nil {
-            return true
-        }
-        return !(game.gameName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty
-    }
-
-    @ViewBuilder private var compactNavigationTitleContent: some View {
-        if game.gamePhase == .stoneRemoval {
-            Text("Stone removal").font(.headline)
-        } else if game.gamePhase == .finished {
-            Text("Game over").font(.headline)
-        } else if game.isUserPlaying,
-           let color = game.userStoneColor,
-           let opponent = game.currentPlayer(with: color.opponentColor()) {
-            let teammates = game.gameData?.rengoTeams?[color.opponentColor()].count ?? 0
-            HStack(spacing: 4) {
-                Text(verbatim: String(
-                    localized: "game.navigation.versus",
-                    defaultValue: "vs",
-                    comment: "Short prefix before the opponent's name in the compact game navigation title. English omits the period here."
-                )).fixedSize()
-                Text(verbatim: opponent.username)
-                    .lineLimit(1).truncationMode(.tail)
-                if !hidesRank {
-                    Text(verbatim: "[\(opponent.formattedRank)]").fixedSize()
-                }
-                if game.rengo && teammates > 1 {
-                    Text(verbatim: "+\(teammates - 1)").fixedSize()
-                }
-            }
-            .font(.headline)
-            .accessibilityElement(children: .combine)
-        } else {
-            Text(verbatim: game.gameName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
-                .font(.headline).lineLimit(1).truncationMode(.tail)
-        }
     }
 
     /// The toggle wins over the composer's focus. Leaving chat first ends the
@@ -1446,9 +1355,9 @@ private struct GameToolbarLayout: ViewModifier {
                                  compactHeader: dynamicTypeSize < .xxxLarge)
     }
 
-    /// The title slot: header clocks, the opponent, or the compact title.
+    /// The principal slot holds useful clocks or opponent identity only.
     /// Split from `body` so Xcode 26.2 can type-check the toolbar.
-    private enum PrincipalItem { case clocks, identity, title, none }
+    private enum PrincipalItem { case clocks, identity, none }
 
     private var principalItem: PrincipalItem {
         if showsClocksInHeader && !isVerticalToolbar {
@@ -1457,9 +1366,7 @@ private struct GameToolbarLayout: ViewModifier {
             // proposal instead of painting beneath native items.
             return .clocks
         } else if compact && showsOpponentInHeader && !isVerticalToolbar {
-            return titleGivesWayToConnectionBanner ? .none : .identity
-        } else if usesCompactNavigationTitle {
-            return titleGivesWayToConnectionBanner ? .none : .title
+            return nav.connectionBannerVisible ? .none : .identity
         }
         return .none
     }
@@ -1492,9 +1399,6 @@ private struct GameToolbarLayout: ViewModifier {
         }
         if principalItem == .identity {
             ToolbarItem(placement: .principal) { headerIdentity }
-        }
-        if principalItem == .title {
-            ToolbarItem(placement: .principal) { compactNavigationTitle }
         }
     }
 
@@ -1590,9 +1494,11 @@ private struct GameToolbarLayout: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            // Duo's vertical toolbar carries navigation on the side. Remove
-            // its unused title item so it cannot reserve a horizontal title row.
-            .toolbar(removing: isVerticalToolbar ? .title : nil)
+            // SwiftUI also places custom principal content in its title
+            // slot. Remove only an unused slot, preserving clocks, player
+            // identity and the connection banner when they occupy it.
+            .toolbar(removing: isVerticalToolbar
+                     || (principalItem == .none && !nav.connectionBannerVisible) ? .title : nil)
             .environment(\.compactGameModesInToolbar, !zenMode)
             .toolbar {
                 if zenMode {

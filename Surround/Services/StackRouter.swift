@@ -743,6 +743,7 @@ struct AppNavigationStack<Content: View>: View {
             if navigation.isActive { FriendshipNoticeBanner() }
         }
         .environmentObject(navigation)
+        .environment(\.hasGlobalNotificationOverlay, rootView != nil)
         .environment(\.iPadTabContext, rootView == nil ? nil : iPadTabContext)
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
         // Presented stacks have their own safe area and chrome ownership.

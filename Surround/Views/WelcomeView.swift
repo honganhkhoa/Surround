@@ -182,7 +182,7 @@ struct WelcomeView: View {
                 }
             }
         }
-        .background { GameDetailBackdrop().ignoresSafeArea(.container) }
+        .background { ThemeSceneBackdrop() }
         .onAppear {
             #if DEBUG && MAIN_APP
             if SurroundUITestContract.isEnabled {

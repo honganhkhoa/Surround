@@ -2499,21 +2499,22 @@ private struct PaperBlossomsSceneContent: View, Equatable {
             // Keep support close to bare status/navigation ink. The matte
             // game controls carry their own text, so the garden can stay
             // visible beneath them instead of a broad cream wash.
-            VStack(spacing: 0) {
-                LinearGradient(stops: [
-                    .init(color: chrome.opacity(legacyChrome ? 0.88 : 0.65), location: 0),
-                    .init(color: chrome.opacity(legacyChrome ? 0.68 : 0.25),
-                          location: legacyChrome ? 0.48 : 0.3),
-                    .init(color: .clear, location: 1)
-                ], startPoint: .top, endPoint: .bottom)
-                .frame(height: min(legacyChrome ? 96 : 64, layout.size.height * 0.25))
-                Spacer(minLength: 0)
-                LinearGradient(stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: chrome.opacity(legacyChrome ? 0.48 : 0.12), location: 0.6),
-                    .init(color: chrome.opacity(legacyChrome ? 0.82 : 0.4), location: 1)
-                ], startPoint: .top, endPoint: .bottom)
-                .frame(height: min(legacyChrome ? 56 : 44, layout.size.height * 0.2))
+            if legacyChrome {
+                VStack(spacing: 0) {
+                    LinearGradient(stops: [
+                        .init(color: chrome.opacity(0.88), location: 0),
+                        .init(color: chrome.opacity(0.68), location: 0.48),
+                        .init(color: .clear, location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(96, layout.size.height * 0.25))
+                    Spacer(minLength: 0)
+                    LinearGradient(stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: chrome.opacity(0.48), location: 0.6),
+                        .init(color: chrome.opacity(0.82), location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(56, layout.size.height * 0.2))
+                }
             }
         }
         .frame(width: layout.size.width, height: layout.size.height)
@@ -3309,6 +3310,123 @@ extension View {
 
 // MARK: - Scene
 
+/// Scene art behind bare system status text sometimes needs a narrow
+/// contrast margin. Read the owning window's actual status frame: there is no
+/// band behind Duo's self-backed status tray, hidden-status Zen, Mac windows
+/// or picker art.
+struct ThemeStatusBarContrast: View {
+    @Environment(\.surroundTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
+    var hidden = false
+
+    private var opacity: CGFloat {
+        // Older scenes already back their unglazed navigation controls.
+        if #unavailable(iOS 26.0), !theme.isFlowingInk { return 0 }
+        // Nebula's bright planet sits behind the white battery glyphs.
+        if colorScheme == .dark { return theme == .nebulaPearl ? 0.55 : 0 }
+        return switch theme {
+        case .nightGarden: 0.8
+        case .flowingInk, .flowingInkJade: 0.85
+        case .rakedGarden, .frostPine, .surroundStudio, .paperBlossoms: 0.55
+        default: 0
+        }
+    }
+
+    var body: some View {
+        #if targetEnvironment(macCatalyst)
+        EmptyView()
+        #else
+        if !hidden, theme.showsSceneArt, opacity > 0 {
+            StatusBarContrastSurface(color: UIColor(theme.pageBackground),
+                                     opacity: opacity)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+        #endif
+    }
+}
+
+private struct StatusBarContrastSurface: UIViewRepresentable {
+    let color: UIColor
+    let opacity: CGFloat
+
+    func makeUIView(context: Context) -> StatusBarContrastView {
+        StatusBarContrastView()
+    }
+
+    func updateUIView(_ view: StatusBarContrastView, context: Context) {
+        view.color = color.withAlphaComponent(opacity)
+        view.setNeedsLayout()
+    }
+
+    final class StatusBarContrastView: UIView {
+        var color: UIColor = .clear
+        private let gradient = CAGradientLayer()
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            isUserInteractionEnabled = false
+            layer.addSublayer(gradient)
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            setNeedsLayout()
+        }
+
+        override func safeAreaInsetsDidChange() {
+            super.safeAreaInsetsDidChange()
+            setNeedsLayout()
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            defer { CATransaction.commit() }
+            gradient.isHidden = true
+            guard let window, let scene = window.windowScene, let status = scene.statusBarManager,
+                  !status.isStatusBarHidden, status.statusBarFrame.height > 0 else {
+                return
+            }
+            #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+            if #available(iOS 27.1, *) {
+                // Side bars and divided displays use the system's own status
+                // tray, including the horizontal tray after unfolding.
+                if window.traitCollection.verticalBarEdge != .unspecified
+                    || window.reservedRegions(kind: .division, options: .includeInactive)
+                        .contains(where: { $0.frame.intersects(window.bounds) }) {
+                    return
+                }
+            }
+            #endif
+            let coordinateSpace: any UICoordinateSpace
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                coordinateSpace = scene.effectiveGeometry.coordinateSpace
+            } else {
+                coordinateSpace = scene.coordinateSpace
+            }
+            let windowFrame = window.convert(status.statusBarFrame, from: coordinateSpace)
+            // A narrow tray or vertical rail must never become a full-width
+            // wash. Support only a conventional status band at the window top.
+            guard windowFrame.width > windowFrame.height,
+                  abs(windowFrame.minX - window.bounds.minX) < 1,
+                  abs(windowFrame.maxX - window.bounds.maxX) < 1,
+                  abs(windowFrame.minY - window.bounds.minY) < 1 else { return }
+            let frame = convert(windowFrame, from: window)
+            gradient.isHidden = false
+            gradient.frame = CGRect(x: 0, y: frame.minY, width: bounds.width,
+                                    height: frame.height + 18)
+            gradient.colors = [color.cgColor, color.cgColor, color.withAlphaComponent(0).cgColor]
+            // Keep even the shorter iPad status glyphs on stable pigment,
+            // then feather only the lower edge of their margin.
+            gradient.locations = [0, NSNumber(value: Double(max(0, frame.height - 3) / (frame.height + 18))), 1]
+        }
+    }
+}
+
 /// The page behind Game Detail: the theme's scene, or its plain color.
 struct GameDetailBackdrop: View {
     @Environment(\.surroundTheme) private var theme
@@ -3434,12 +3552,8 @@ private struct ChristmasKeepsakesSceneContent: View, Equatable {
         return true
     }
 
-    private var topFade: Gradient {
-        if #available(iOS 26.0, *) {
-            return Gradient(colors: [chrome.opacity(0.82), chrome.opacity(0.26), .clear])
-        }
-        // Match Raked Garden's support for older, unbacked navigation bars.
-        return Gradient(stops: [
+    private var legacyTopFade: Gradient {
+        Gradient(stops: [
             .init(color: chrome.opacity(0.92), location: 0),
             .init(color: chrome.opacity(0.92), location: 0.62),
             .init(color: .clear, location: 1)
@@ -3462,18 +3576,20 @@ private struct ChristmasKeepsakesSceneContent: View, Equatable {
                            center: .center, startRadius: 0, endRadius: 210)
                 .frame(width: 420, height: 420)
                 .position(layout.lightCenter)
-            // Match the shipping garden's short fade so the window and pine
-            // stay visible beneath the native navigation controls.
-            VStack(spacing: 0) {
-                LinearGradient(gradient: topFade, startPoint: .top, endPoint: .bottom)
-                    .frame(height: min(92, size.height * 0.16))
-                Spacer(minLength: 0)
-                LinearGradient(stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.90 : 0.35), location: 0.5),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.96 : 0.85), location: 1)
-                ], startPoint: .top, endPoint: .bottom)
-                .frame(height: min(96, size.height * 0.16))
+            // Only older unbacked buttons need fades behind their bars.
+            // Modern chrome leaves the winter window and pine exposed.
+            if usesLegacyChrome {
+                VStack(spacing: 0) {
+                    LinearGradient(gradient: legacyTopFade, startPoint: .top, endPoint: .bottom)
+                        .frame(height: min(92, size.height * 0.16))
+                    Spacer(minLength: 0)
+                    LinearGradient(stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: chrome.opacity(0.90), location: 0.5),
+                        .init(color: chrome.opacity(0.96), location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(96, size.height * 0.16))
+                }
             }
             // The opaque room includes both gifts and their contact shadows,
             // so the edge fade and appearance treatment affect them together.
@@ -3525,22 +3641,24 @@ private struct NightGardenSceneContent: View, Equatable {
                 .colorMultiply(scheme == .dark ? Color(themeHex: 0x7C8C84) : .white)
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
                 .clipped()
-            // Pale ledges support dark Light Mode chrome; pond-dark ledges
-            // support the evening chrome. Both leave the central art exposed.
-            VStack(spacing: 0) {
-                LinearGradient(stops: [
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.98 : 0.97), location: 0),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.94 : 0.90), location: 0.68),
-                    .init(color: .clear, location: 1)
-                ], startPoint: .top, endPoint: .bottom)
-                .frame(height: min(190, max(140, size.height * 0.22)))
-                Spacer(minLength: 0)
-                LinearGradient(stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.90 : 0.3), location: 0.5),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.96 : 0.82), location: 1)
-                ], startPoint: .top, endPoint: .bottom)
-                .frame(height: min(96, size.height * 0.16))
+            // Status support belongs to the screen, not the artwork.
+            // Only legacy buttons need fades behind their bars here.
+            if usesLegacyChrome {
+                VStack(spacing: 0) {
+                    LinearGradient(stops: [
+                        .init(color: chrome.opacity(0.98), location: 0),
+                        .init(color: chrome.opacity(0.94), location: 0.68),
+                        .init(color: .clear, location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(110, size.height * 0.22))
+                    Spacer(minLength: 0)
+                    LinearGradient(stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: chrome.opacity(0.90), location: 0.5),
+                        .init(color: chrome.opacity(0.96), location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(96, size.height * 0.16))
+                }
             }
         }
         .frame(width: size.width, height: size.height)
@@ -3599,12 +3717,8 @@ private struct FrostPineSceneContent: View, Equatable {
         return true
     }
 
-    private var topFade: Gradient {
-        if #available(iOS 26.0, *) {
-            return Gradient(colors: [chrome.opacity(0.82), chrome.opacity(0.26), .clear])
-        }
-        // Match Raked Garden's support for older, unbacked navigation bars.
-        return Gradient(stops: [
+    private var legacyTopFade: Gradient {
+        Gradient(stops: [
             .init(color: chrome.opacity(0.92), location: 0),
             .init(color: chrome.opacity(0.92), location: 0.62),
             .init(color: .clear, location: 1)
@@ -3629,18 +3743,20 @@ private struct FrostPineSceneContent: View, Equatable {
                                 groundContact: .pinecone)
             FrostPineDecoration(image: FrostPineAssets.twig, frame: layout.twig, scheme: scheme,
                                 groundContact: .twig)
-            // Clear the native title and toolbar bands without washing out
-            // the snow across the whole game. Older bars have no glass.
-            VStack(spacing: 0) {
-                LinearGradient(gradient: topFade, startPoint: .top, endPoint: .bottom)
-                    .frame(height: min(92, size.height * 0.16))
-                Spacer(minLength: 0)
-                LinearGradient(stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.90 : 0.45), location: 0.55),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.96 : 0.85), location: 1)
-                ], startPoint: .top, endPoint: .bottom)
-                .frame(height: min(96, size.height * 0.16))
+            // Only older toolbar buttons need scene support; modern
+            // controls have their own glass and status support is separate.
+            if usesLegacyChrome {
+                VStack(spacing: 0) {
+                    LinearGradient(gradient: legacyTopFade, startPoint: .top, endPoint: .bottom)
+                        .frame(height: min(92, size.height * 0.16))
+                    Spacer(minLength: 0)
+                    LinearGradient(stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: chrome.opacity(0.90), location: 0.55),
+                        .init(color: chrome.opacity(0.96), location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(96, size.height * 0.16))
+                }
             }
         }
         .frame(width: size.width, height: size.height)
@@ -3722,13 +3838,6 @@ private struct FeltMeadowSceneContent: View, Equatable {
         return true
     }
 
-    /// A short landscape viewport crops the sky. Reserve a quiet band for
-    /// its native navigation controls without moving the hills or flowers.
-    private var shortWideWeight: CGFloat {
-        min(1, max(0, (size.width - size.height) / 160))
-            * min(1, max(0, (600 - size.height) / 120))
-    }
-
     var body: some View {
         ZStack {
             chrome
@@ -3739,21 +3848,22 @@ private struct FeltMeadowSceneContent: View, Equatable {
                 .colorMultiply(scheme == .dark ? Color(themeHex: 0x61765F) : .white)
                 .frame(width: size.width, height: size.height, alignment: .bottomLeading)
                 .clipped()
-            VStack(spacing: 0) {
-                LinearGradient(stops: [
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.94 : 0.85), location: 0),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.92
-                        : 0.28 + 0.5 * Double(shortWideWeight)), location: 0.55),
-                    .init(color: .clear, location: 1)
-                ], startPoint: .top, endPoint: .bottom)
-                .frame(height: max(min(110, size.height * 0.18), 100 * shortWideWeight))
-                Spacer(minLength: 0)
-                LinearGradient(stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.90 : 0.24), location: 0.55),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.94 : 0.78), location: 1)
-                ], startPoint: .top, endPoint: .bottom)
-                .frame(height: min(96, size.height * 0.16))
+            if usesLegacyChrome {
+                VStack(spacing: 0) {
+                    LinearGradient(stops: [
+                        .init(color: chrome.opacity(0.94), location: 0),
+                        .init(color: chrome.opacity(0.92), location: 0.55),
+                        .init(color: .clear, location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(110, size.height * 0.18))
+                    Spacer(minLength: 0)
+                    LinearGradient(stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: chrome.opacity(0.90), location: 0.55),
+                        .init(color: chrome.opacity(0.94), location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(96, size.height * 0.16))
+                }
             }
         }
         .frame(width: size.width, height: size.height)
@@ -3791,19 +3901,6 @@ private struct SurroundStudioSceneContent: View, Equatable {
         return true
     }
 
-    /// Short landscape windows place the unbacked navigation title over
-    /// the shoji rail. Keep a quiet plateau behind that band, blending the
-    /// adjustment continuously away as the window becomes taller or square.
-    private var shortWideChromeWeight: CGFloat {
-        min(1, max(0, (size.width - size.height) / 160))
-            * min(1, max(0, (600 - size.height) / 120))
-    }
-
-    private var topFadeHeight: CGFloat {
-        let ordinaryHeight = min(110, size.height * 0.18)
-        return ordinaryHeight + (max(100, ordinaryHeight) - ordinaryHeight) * shortWideChromeWeight
-    }
-
     var body: some View {
         let tree = SurroundStudioDecorationLayout(size: size).tree
         ZStack {
@@ -3829,21 +3926,22 @@ private struct SurroundStudioSceneContent: View, Equatable {
                 .position(x: tree.midX, y: tree.midY)
             // Support native bars locally, leaving the room and board free
             // of a global scrim. Older toolbars have no glass of their own.
-            VStack(spacing: 0) {
-                LinearGradient(stops: [
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.94 : 0.82), location: 0),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.92
-                        : 0.24 + 0.58 * Double(shortWideChromeWeight)), location: 0.55),
-                    .init(color: .clear, location: 1)
-                ], startPoint: .top, endPoint: .bottom)
-                .frame(height: topFadeHeight)
-                Spacer(minLength: 0)
-                LinearGradient(stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.90 : 0.24), location: 0.55),
-                    .init(color: chrome.opacity(usesLegacyChrome ? 0.94 : 0.78), location: 1)
-                ], startPoint: .top, endPoint: .bottom)
-                .frame(height: min(96, size.height * 0.16))
+            if usesLegacyChrome {
+                VStack(spacing: 0) {
+                    LinearGradient(stops: [
+                        .init(color: chrome.opacity(0.94), location: 0),
+                        .init(color: chrome.opacity(0.92), location: 0.55),
+                        .init(color: .clear, location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(110, size.height * 0.18))
+                    Spacer(minLength: 0)
+                    LinearGradient(stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: chrome.opacity(0.90), location: 0.55),
+                        .init(color: chrome.opacity(0.94), location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(96, size.height * 0.16))
+                }
             }
         }
         .frame(width: size.width, height: size.height)
@@ -4277,13 +4375,17 @@ private struct SurroundStudioFoliageContent: View, Equatable {
             .position(x: layout.foliage.midX, y: layout.foliage.midY)
             .frame(width: size.width, height: size.height)
             .mask {
-                VStack(spacing: 0) {
-                    LinearGradient(stops: [
-                        .init(color: .white.opacity(usesLegacyChrome ? 0.08 : 0.18), location: 0),
-                        .init(color: .white.opacity(usesLegacyChrome ? 0.12 : 0.65), location: 0.55),
-                        .init(color: .white, location: 1)
-                    ], startPoint: .top, endPoint: .bottom)
-                    .frame(height: usesLegacyChrome ? 80 : 100)
+                if usesLegacyChrome {
+                    VStack(spacing: 0) {
+                        LinearGradient(stops: [
+                            .init(color: .white.opacity(0.08), location: 0),
+                            .init(color: .white.opacity(0.12), location: 0.55),
+                            .init(color: .white, location: 1)
+                        ], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 80)
+                        Color.white
+                    }
+                } else {
                     Color.white
                 }
             }
@@ -4309,17 +4411,20 @@ private struct RakedGardenFoliageContent: View, Equatable {
             .colorMultiply(scheme == .dark ? Color(themeHex: 0x8292AC) : .white)
             .frame(width: layout.maple.width, height: layout.maple.height)
             .position(x: layout.maple.midX, y: layout.maple.midY)
-            // Fade the foliage beneath system chrome without putting
-            // a pale scrim over the game content below it.
+            // Earlier toolbar icons need quiet foliage behind them.
+            // Modern controls carry their own glass.
             .mask {
-                VStack(spacing: 0) {
-                    LinearGradient(stops: [
-                        .init(color: .white.opacity(usesLegacyChrome ? 0.08 : 0.18), location: 0),
-                        .init(color: .white.opacity(usesLegacyChrome ? 0.08 : 0.74),
-                              location: usesLegacyChrome ? 0.62 : 0.5),
-                        .init(color: .white, location: 1)
-                    ], startPoint: .top, endPoint: .bottom)
-                    .frame(height: layout.topFadeHeight)
+                if usesLegacyChrome {
+                    VStack(spacing: 0) {
+                        LinearGradient(stops: [
+                            .init(color: .white.opacity(0.08), location: 0),
+                            .init(color: .white.opacity(0.08), location: 0.62),
+                            .init(color: .white, location: 1)
+                        ], startPoint: .top, endPoint: .bottom)
+                        .frame(height: layout.topFadeHeight)
+                        Color.white
+                    }
+                } else {
                     Color.white
                 }
             }
@@ -4424,24 +4529,23 @@ private struct RakedGardenSceneContent: View, Equatable {
     let scheme: ColorScheme
     private var sand: Color { Color(themeHex: scheme == .dark ? 0x0E191F : 0xEFEAE1) }
 
-    private var topFade: Gradient {
-        if #available(iOS 26.0, *) {
-            return Gradient(colors: [sand.opacity(0.82), sand.opacity(0.26), .clear])
-        }
+    private var usesLegacyChrome: Bool {
+        if #available(iOS 26.0, *) { return false }
+        return true
+    }
+
+    private var legacyTopFade: Gradient {
         // Earlier toolbars have no glass backing. Keep their icons on quiet
         // sand while preserving the foliage below the navigation controls.
-        return Gradient(stops: [
+        Gradient(stops: [
             .init(color: sand.opacity(0.92), location: 0),
             .init(color: sand.opacity(0.92), location: 0.62),
             .init(color: .clear, location: 1)
         ])
     }
 
-    private var bottomFade: Gradient {
-        if #available(iOS 26.0, *) {
-            return Gradient(colors: [.clear, sand.opacity(0.24), sand.opacity(0.78)])
-        }
-        return Gradient(stops: [
+    private var legacyBottomFade: Gradient {
+        Gradient(stops: [
             .init(color: .clear, location: 0),
             .init(color: sand.opacity(0.90), location: 0.55),
             .init(color: sand.opacity(0.94), location: 1)
@@ -4475,16 +4579,17 @@ private struct RakedGardenSceneContent: View, Equatable {
                 .colorMultiply(scheme == .dark ? Color(themeHex: 0x566C83) : .white)
                 .frame(width: layout.upperRocks.width, height: layout.upperRocks.height)
                 .position(x: layout.upperRocks.midX, y: layout.upperRocks.midY)
-            // Appearance-matched support stays local to the chrome, leaving
-            // the rock and foliage silhouettes visible in either light.
-            VStack(spacing: 0) {
-                LinearGradient(gradient: topFade,
-                               startPoint: .top, endPoint: .bottom)
-                    .frame(height: layout.topFadeHeight)
-                Spacer(minLength: 0)
-                LinearGradient(gradient: bottomFade,
-                               startPoint: .top, endPoint: .bottom)
-                    .frame(height: layout.bottomFadeHeight)
+            // Only older unbacked controls need support from the scene.
+            if usesLegacyChrome {
+                VStack(spacing: 0) {
+                    LinearGradient(gradient: legacyTopFade,
+                                   startPoint: .top, endPoint: .bottom)
+                        .frame(height: layout.topFadeHeight)
+                    Spacer(minLength: 0)
+                    LinearGradient(gradient: legacyBottomFade,
+                                   startPoint: .top, endPoint: .bottom)
+                        .frame(height: layout.bottomFadeHeight)
+                }
             }
         }
         .frame(width: layout.size.width, height: layout.size.height)
@@ -4496,6 +4601,11 @@ private struct RakedGardenSceneContent: View, Equatable {
 /// behind the board at any window shape: a square sky cropped to fill,
 /// native stars, and a planet and rocks pinned to the corners.
 private struct NebulaPearlScene: View {
+    private var usesLegacyChrome: Bool {
+        if #available(iOS 26.0, *) { return false }
+        return true
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let size = geometry.size
@@ -4520,16 +4630,18 @@ private struct NebulaPearlScene: View {
                         .opacity(fragment.opacity)
                         .position(x: size.width * fragment.x, y: size.height * fragment.y)
                 }
-                // No text sits directly on the scene: the title and the
-                // bottom controls get the ground fading out behind them.
-                VStack(spacing: 0) {
-                    LinearGradient(colors: [Color(themeHex: 0x070A1C).opacity(0.85), .clear],
-                                   startPoint: .top, endPoint: .bottom)
-                        .frame(height: 120)
-                    Spacer(minLength: 0)
-                    LinearGradient(colors: [.clear, Color(themeHex: 0x070A1C).opacity(0.7)],
-                                   startPoint: .top, endPoint: .bottom)
-                        .frame(height: 110)
+                // Modern controls have their own glass. Only older bars
+                // need the scene to fade behind their unbacked icons.
+                if usesLegacyChrome {
+                    VStack(spacing: 0) {
+                        LinearGradient(colors: [Color(themeHex: 0x070A1C).opacity(0.85), .clear],
+                                       startPoint: .top, endPoint: .bottom)
+                            .frame(height: 120)
+                        Spacer(minLength: 0)
+                        LinearGradient(colors: [.clear, Color(themeHex: 0x070A1C).opacity(0.7)],
+                                       startPoint: .top, endPoint: .bottom)
+                            .frame(height: 110)
+                    }
                 }
             }
             .frame(width: size.width, height: size.height)
