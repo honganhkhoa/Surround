@@ -957,6 +957,7 @@ class OGSService: ObservableObject {
     private let automatchReconciliationTimeout: TimeInterval
     private let automatchConfirmationTimeout: TimeInterval
     private let currentTime: () -> TimeInterval
+    private let keepAliveScheduler: OGSWebsocketScheduling
 
     private struct PendingConditionalMoveSubmission {
         let expectedPlan: ConditionalMovePlan
@@ -1472,6 +1473,7 @@ class OGSService: ObservableObject {
         currentTime: @escaping () -> TimeInterval = {
             Date().timeIntervalSince1970
         },
+        keepAliveScheduler: OGSWebsocketScheduling = OGSMainQueueWebsocketScheduler.shared,
         remoteSettings: OGSRemoteSetting? = nil,
         finishedGamePreviewCooldown: FinishedGamePreviewCooldown = FinishedGamePreviewCooldown(),
         initialState: BootstrapState? = nil
@@ -1484,6 +1486,7 @@ class OGSService: ObservableObject {
         self.automatchReconciliationTimeout = automatchReconciliationTimeout
         self.automatchConfirmationTimeout = automatchConfirmationTimeout
         self.currentTime = currentTime
+        self.keepAliveScheduler = keepAliveScheduler
         self.finishedGamePreviewCooldown = finishedGamePreviewCooldown
         self.preferences = preferences
         self.remoteSettingStore = remoteSettings ?? OGSRemoteSetting(preferences: preferences)
@@ -1608,6 +1611,7 @@ class OGSService: ObservableObject {
             seekGraphAwaitingInitialSnapshot = false
             seekGraphConnected = false
             clearSeekGraphSnapshot()
+            stopKeepAliveForOpenLiveChallenges()
             automatchReconciliationGeneration = UUID()
             automatchIDsAwaitingReplay.removeAll()
             pendingRealtimeGameStartedNotifications = nil
@@ -1648,6 +1652,9 @@ class OGSService: ObservableObject {
             )
             reconcileAutomatchAvailabilitySubscription()
             reconcileSeekGraphSubscription()
+            // After a drop the reconnect snapshot restarts it; this covers
+            // challenges the seek graph still lists.
+            startKeepAliveForOpenLiveChallengesIfNeeded()
             invalidateFriendshipSnapshots()
             if enablesAppSideEffects {
                 self.syncRemoteStorage()
@@ -4800,6 +4807,9 @@ class OGSService: ObservableObject {
                 seekGraphReconnectRequiresSnapshot = false
                 reconcileSeekGraphSubscription()
             }
+            // The seek graph is the only source of openChallengeSentById, so
+            // this covers a new send, a reconnect, a relaunch and other windows.
+            startKeepAliveForOpenLiveChallengesIfNeeded()
         }
     }
     
@@ -5427,27 +5437,46 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
-    var sendingKeepAliveSignal = false
-    func sendKeepAliveSignalForOpenLiveChallenges() {
-        guard sendingKeepAliveSignal else {
+    /// The next keepalive tick for this account's open live challenges. At
+    /// most one is pending, so a service never runs two loops; nil means the
+    /// loop is stopped.
+    private var openLiveChallengeKeepAlive: Cancellable?
+
+    /// Starts the keepalive loop if it is stopped. Safe to call from any
+    /// event that may list an open live challenge.
+    func startKeepAliveForOpenLiveChallengesIfNeeded() {
+        guard openLiveChallengeKeepAlive == nil else {
             return
         }
-        
-        guard ogsWebsocket.opened else {
+        sendKeepAliveSignalForOpenLiveChallenges()
+    }
+
+    private func stopKeepAliveForOpenLiveChallenges() {
+        openLiveChallengeKeepAlive?.cancel()
+        openLiveChallengeKeepAlive = nil
+    }
+
+    /// Sends one keepalive per open live challenge and schedules the next
+    /// tick. Every exit leaves the loop either scheduled or stopped, so a
+    /// later event can always start it again.
+    private func sendKeepAliveSignalForOpenLiveChallenges() {
+        stopKeepAliveForOpenLiveChallenges()
+        // Socket authentication starts the loop again.
+        guard ogsWebsocket.opened, ogsWebsocket.authenticated else {
             return
         }
-        
+
         let challenges = openChallengeSentById.values.filter { $0.game.timeControl.speed != .correspondence }
-        guard challenges.count > 0 else {
-            sendingKeepAliveSignal = false
+        // The next seek graph event that lists one starts the loop again.
+        guard !challenges.isEmpty else {
             return
         }
-        
+
         for challenge in challenges {
             ogsWebsocket.emit(command: "challenge/keepalive", data: ["challenge_id": challenge.id, "game_id": challenge.game.id])
         }
-        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {
-            self.sendKeepAliveSignalForOpenLiveChallenges()
+        openLiveChallengeKeepAlive = keepAliveScheduler.schedule(after: 1) { [weak self] in
+            self?.sendKeepAliveSignalForOpenLiveChallenges()
         }
     }
     
@@ -5477,14 +5506,14 @@ class OGSService: ObservableObject {
                     case .success(let data):
                         if let result = data as? [String: Any] {
                             if result["status"] as? String == "ok" {
-                                if let challengeID = result["challenge"] as? Int, let _ = result["game"] as? Int {
+                                // OGS sends the game as an id or as an object
+                                // with one; the web client reads both.
+                                let gameID = (result["game"] as? Int)
+                                    ?? ((result["game"] as? [String: Any])?["id"] as? Int)
+                                if let challengeID = result["challenge"] as? Int, gameID != nil {
+                                    // The seek graph listing an open challenge
+                                    // starts its keepalive, whichever arrives first.
                                     promise(.success(challengeID))
-                                    if opponent == nil && !self.sendingKeepAliveSignal {
-                                        self.sendingKeepAliveSignal = true
-                                        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {
-                                            self.sendKeepAliveSignalForOpenLiveChallenges()
-                                        }
-                                    }
                                     return
                                 }
                             }

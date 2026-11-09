@@ -247,6 +247,7 @@ final class OGSServiceEventTests: XCTestCase {
 
     override func tearDown() {
         QuickMatchStatsURLProtocol.reset()
+        ChallengePostURLProtocol.body = ""
         if let preferenceSuite {
             UserDefaults.standard.removePersistentDomain(forName: preferenceSuite)
         }
@@ -6031,6 +6032,245 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    // MARK: - Open live challenge keepalive
+
+    /// Runs scheduled work only when the test advances it.
+    private final class ManualScheduler: OGSWebsocketScheduling {
+        private final class Cancellation: Cancellable {
+            private var handler: (() -> Void)?
+            init(_ handler: @escaping () -> Void) { self.handler = handler }
+            func cancel() {
+                handler?()
+                handler = nil
+            }
+        }
+
+        private var nextID = 0
+        private var work = [Int: (delay: TimeInterval, block: () -> Void)]()
+
+        var pendingDelays: [TimeInterval] { work.values.map { $0.delay } }
+
+        func async(_ block: @escaping () -> Void) { block() }
+
+        func schedule(after delay: TimeInterval, _ block: @escaping () -> Void) -> Cancellable {
+            nextID += 1
+            let id = nextID
+            work[id] = (delay, block)
+            return Cancellation { [weak self] in self?.work.removeValue(forKey: id) }
+        }
+
+        func scheduleRepeating(every interval: TimeInterval, _ block: @escaping () -> Void) -> Cancellable {
+            preconditionFailure("The keepalive schedules one tick at a time.")
+        }
+
+        /// Runs the work that is due, as if one interval passed.
+        func advance() {
+            let due = work.sorted { $0.key < $1.key }
+            work.removeAll()
+            due.forEach { $0.value.block() }
+        }
+    }
+
+    /// Answers every request with `body`, for the challenge POST.
+    private final class ChallengePostURLProtocol: URLProtocol {
+        static var body = ""
+
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+        override func startLoading() {
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(Self.body.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        }
+
+        override func stopLoading() {}
+    }
+
+    private func keepaliveService() -> (OGSService, FakeWebsocket, ManualScheduler) {
+        let socket = FakeWebsocket()
+        let scheduler = ManualScheduler()
+        let service = makeService(socket: socket, keepAliveScheduler: scheduler)
+        service.user = OGSUser(username: "current", id: 1, rank: 25)
+        service.subscribeToSeekGraph()
+        return (service, socket, scheduler)
+    }
+
+    private func listOwnChallenge(_ id: Int, on socket: FakeWebsocket) {
+        socket.deliver(
+            name: "seekgraph/global",
+            data: [seekGraphChallengePayload(id: id, challengerID: 1)]
+        )
+    }
+
+    private func keptAliveChallengeIDs(_ socket: FakeWebsocket) -> [Int] {
+        socket.emissions
+            .filter { $0.command == "challenge/keepalive" }
+            .compactMap { ($0.data as? [String: Any])?["challenge_id"] as? Int }
+    }
+
+    private func liveChallengeTemplate() -> OGSChallengeTemplate {
+        OGSChallengeTemplate(game: .init(
+            width: 9,
+            height: 9,
+            ranked: false,
+            handicap: 0,
+            disableAnalysis: false,
+            name: "keepalive-test",
+            rules: .japanese,
+            timeControl: TimeControlSystem.Fischer(initialTime: 120, timeIncrement: 30, maxTime: 300).timeControlObject
+        ))
+    }
+
+    /// A tick on a closed socket used to return without rescheduling and leave
+    /// a stale flag set, so nothing could start the loop again.
+    func testOpenLiveChallengeKeepaliveResumesAfterTheSocketDrops() {
+        let (service, socket, scheduler) = keepaliveService()
+        listOwnChallenge(51, on: socket)
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [51])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+
+        socket.dropSocket()
+        XCTAssertTrue(service.openChallengeSentById.isEmpty)
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "A closed socket stops the loop.")
+
+        socket.openSocket(authenticate: true)
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [51], "Nothing is listed until the new snapshot.")
+        listOwnChallenge(51, on: socket)
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [51, 51])
+        scheduler.advance()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [51, 51, 51])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+    }
+
+    /// With the socket gone and no close event yet, the tick stops cleanly,
+    /// and the next authentication starts the loop again.
+    func testAuthenticationRestartsAKeepaliveThatStoppedOnAClosedSocket() {
+        let (_, socket, scheduler) = keepaliveService()
+        listOwnChallenge(52, on: socket)
+        socket.opened = false
+        scheduler.advance()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [52])
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty)
+
+        socket.opened = true
+        socket.markAuthenticated()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [52, 52])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+    }
+
+    /// The loop used to give up for good when its first tick came before the
+    /// seek graph listed the new challenge.
+    func testKeepaliveStartsWhenTheSeekGraphListsASentChallengeLate() throws {
+        ChallengePostURLProtocol.body = #"{"status":"ok","challenge":53,"game":1053}"#
+        let socket = FakeWebsocket()
+        let scheduler = ManualScheduler()
+        let service = makeService(
+            socket: socket,
+            urlProtocolClass: ChallengePostURLProtocol.self,
+            keepAliveScheduler: scheduler
+        )
+        service.ogsUIConfig = try makeUIConfig(jwt: "jwt", userID: 1)
+        socket.openSocket(authenticate: true)
+        service.user = OGSUser(username: "current", id: 1, rank: 25)
+        service.subscribeToSeekGraph()
+        service.onSeekGraphEvent(data: [])
+
+        let sent = expectation(description: "challenge sent")
+        var sentID: Int?
+        let request = service.sendChallenge(opponent: nil, challenge: liveChallengeTemplate()).sink(
+            receiveCompletion: { _ in sent.fulfill() },
+            receiveValue: { sentID = $0 }
+        )
+        wait(for: [sent], timeout: 2)
+        XCTAssertEqual(sentID, 53)
+        scheduler.advance()
+        XCTAssertTrue(keptAliveChallengeIDs(socket).isEmpty)
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty)
+
+        listOwnChallenge(53, on: socket)
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [53])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+        request.cancel()
+    }
+
+    /// A fresh service that never posted, as after a relaunch or in another
+    /// window, keeps its own live open challenge alive too.
+    func testKeepaliveCoversALiveOpenChallengeThisServiceDidNotSend() {
+        let (service, socket, scheduler) = keepaliveService()
+        var correspondence = seekGraphChallengePayload(id: 56, challengerID: 1)
+        correspondence["time_control_parameters"] = [
+            "per_move": 86_400, "pause_on_weekends": false, "speed": "correspondence",
+            "system": "simple", "time_control": "simple",
+        ] as [String: Any]
+        socket.deliver(name: "seekgraph/global", data: [
+            seekGraphChallengePayload(id: 55, challengerID: 1),
+            correspondence,
+            seekGraphChallengePayload(id: 57, challengerID: 2),
+        ])
+        XCTAssertEqual(Set(service.openChallengeSentById.keys), [55, 56])
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [55])
+
+        service.onSeekGraphEvent(data: [["challenge_id": 55, "delete": 1]])
+        scheduler.advance()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [55])
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "Nothing live is left, so the loop stops.")
+    }
+
+    func testKeepaliveWaitsForAnAuthenticatedSocket() {
+        let (_, socket, scheduler) = keepaliveService()
+        socket.authenticated = false
+        listOwnChallenge(60, on: socket)
+        XCTAssertTrue(keptAliveChallengeIDs(socket).isEmpty)
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty)
+
+        socket.markAuthenticated()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [60])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+    }
+
+    func testKeepaliveNeverRunsTwoLoops() {
+        let (service, socket, scheduler) = keepaliveService()
+        listOwnChallenge(58, on: socket)
+        listOwnChallenge(58, on: socket)
+        socket.deliver(name: "seekgraph/global", data: [seekGraphChallengePayload(id: 59, challengerID: 2)])
+        socket.markAuthenticated()
+        service.startKeepAliveForOpenLiveChallengesIfNeeded()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [58])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+
+        scheduler.advance()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [58, 58])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+    }
+
+    func testSendChallengeAcceptsTheGameAsAnObject() throws {
+        ChallengePostURLProtocol.body = #"{"status":"ok","challenge":54,"game":{"id":1054}}"#
+        let service = makeService(socket: FakeWebsocket(), urlProtocolClass: ChallengePostURLProtocol.self)
+        service.ogsUIConfig = try makeUIConfig(jwt: "jwt", userID: 1)
+
+        let finished = expectation(description: "challenge sent")
+        var outcome: Result<Int, Error>?
+        let request = service.sendChallenge(opponent: nil, challenge: liveChallengeTemplate()).sink(
+            receiveCompletion: { completion in
+                if case .failure(let error) = completion {
+                    outcome = .failure(error)
+                }
+                finished.fulfill()
+            },
+            receiveValue: { outcome = .success($0) }
+        )
+        wait(for: [finished], timeout: 2)
+        XCTAssertEqual(try outcome?.get(), 54)
+        request.cancel()
+    }
+
     // MARK: - Challenge send holds
 
     private func seekGraphHoldService() -> (OGSService, FakeWebsocket) {
@@ -6237,7 +6477,10 @@ final class OGSServiceEventTests: XCTestCase {
         conditionalMoveSubmissionTimeout: TimeInterval = 10,
         automatchReconciliationTimeout: TimeInterval = 5,
         automatchConfirmationTimeout: TimeInterval = 8,
-        currentTime: TimeInterval = 2_000_000_000
+        currentTime: TimeInterval = 2_000_000_000,
+        // A scheduler nobody advances, so a test that lists its own live
+        // challenge never leaves a keepalive loop running after it ends.
+        keepAliveScheduler: OGSWebsocketScheduling = ManualScheduler()
     ) -> OGSService {
         preferenceSuite = "com.honganhkhoa.Surround.EventTests.\(UUID().uuidString)"
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
@@ -6272,6 +6515,7 @@ final class OGSServiceEventTests: XCTestCase {
             automatchReconciliationTimeout: automatchReconciliationTimeout,
             automatchConfirmationTimeout: automatchConfirmationTimeout,
             currentTime: { currentTime },
+            keepAliveScheduler: keepAliveScheduler,
             initialState: initialState
         )
     }
