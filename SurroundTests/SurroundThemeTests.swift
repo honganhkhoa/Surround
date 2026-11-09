@@ -919,6 +919,112 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testFrostPineWoodPlatesKeepTextReadableAcrossSizesAndAccessibility() throws {
+        _ = try XCTUnwrap(UIImage(named: "FrostPineControlWood", in: Bundle(for: Self.self), compatibleWith: nil),
+                          "The material audit must include the bundled pine grain")
+        let theme = SurroundTheme.frostPine
+        let scale = 3
+        let linear = (0...255).map { byte -> Double in
+            let value = Double(byte) / 255
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        let players = [OGSUser(username: "ordinary", id: 1),
+                       OGSUser(username: "moderator", id: 2, isModerator: true),
+                       OGSUser(username: "professional", id: 3, professional: true),
+                       OGSUser(username: "supporter", id: 4, supporter: true),
+                       OGSUser(username: "bot", id: 5, isBot: true)]
+        let cases: [(name: String, role: FrostPineWoodPlateSurface.Role, size: CGSize,
+                     inset: CGSize, radius: CGFloat, compact: Bool, player: Bool)] = [
+            ("full clock", .clock, CGSize(width: 190, height: 96), CGSize(width: 12, height: 4), 12, false, false),
+            ("narrow clock", .clock, CGSize(width: 104, height: 144), CGSize(width: 10, height: 4), 12, false, false),
+            ("inline clock", .clock, CGSize(width: 140, height: 28), CGSize(width: 8, height: 4), 12, true, false),
+            ("wide inline clock", .clock, CGSize(width: 320, height: 34), CGSize(width: 8, height: 4), 12, true, false),
+            ("row player", .player, CGSize(width: 156, height: 52), CGSize(width: 4, height: 4), 10, false, true),
+            ("column player", .player, CGSize(width: 126, height: 84), CGSize(width: 5, height: 5), 9, true, true),
+            ("vertical player", .player, CGSize(width: 156, height: 144), CGSize(width: 8, height: 8), 12, false, true),
+            ("header player", .player, CGSize(width: 220, height: 44), CGSize(width: 4, height: 8), 10, true, true)
+        ]
+        let modes: [(name: String, reduced: Bool, contrast: ColorSchemeContrast)] = [
+            ("standard", false, .standard),
+            ("reduced transparency", true, .standard),
+            ("increased contrast", false, .increased)
+        ]
+        for scheme: ColorScheme in [.light, .dark] {
+            let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+            for color: StoneColor in [.black, .white] {
+                let identityInks: [(String, Color)] = [
+                    ("identity", theme.identityForeground(color)),
+                    ("secondary", theme.identitySecondary(color))
+                ] + players.map { ($0.username, theme.roleColor(for: $0, on: color)) }
+                let clockInks: [(String, Color)] = [
+                    ("clock", theme.clockForeground(color, scheme: scheme)),
+                    ("accent", theme.clockAccent(color)),
+                    ("sudden death", theme.clockSuddenDeathAccent(color, scheme: scheme)),
+                    ("agreement", theme.clockAgreementAccent(color, scheme: scheme)),
+                    ("disconnected", theme.clockDisconnectedAccent(color, scheme: scheme)),
+                    ("undo", theme.clockUndoAccent(color, scheme: scheme))
+                ]
+                for sample in cases {
+                    for mode in modes {
+                        let rendered = try nativeMaterialPixels(FrostPineWoodPlateMaterial(
+                            color: color, cornerRadius: sample.radius,
+                            role: sample.role, compact: sample.compact, scheme: scheme,
+                            reduceTransparency: mode.reduced, contrast: mode.contrast)
+                            .frame(width: sample.size.width, height: sample.size.height)
+                            .environment(\.colorScheme, scheme))
+                        let message = "\(sample.name), \(scheme), \(color), \(mode.name)"
+                        XCTAssertEqual(rendered.width, Int(sample.size.width) * scale, message)
+                        XCTAssertEqual(rendered.height, Int(sample.size.height) * scale, message)
+                        // Check the real text reserve rather than the decorative
+                        // rim: every frost fragment or grain stroke under a label
+                        // must retain its contrast, including the narrow clocks.
+                        let textRect = CGRect(origin: .zero, size: sample.size)
+                            .insetBy(dx: sample.inset.width, dy: sample.inset.height)
+                        // Padding reserves a rounded interior, not the corner
+                        // cutouts or their outline. Retain the full straight
+                        // bottom reserve, where metadata can reach within 4 pt.
+                        let edgeInset = min(sample.inset.width, sample.inset.height)
+                        let roundedReserve = RoundedRectangle(cornerRadius: max(0, sample.radius - edgeInset),
+                                                              style: .circular)
+                            .path(in: CGRect(origin: .zero, size: sample.size)
+                                .insetBy(dx: edgeInset, dy: edgeInset))
+                        var minimum = Double.infinity, maximum = 0.0
+                        var darkestPoint = CGPoint.zero, brightestPoint = CGPoint.zero
+                        var minimumAlpha: UInt8 = 255
+                        for y in Int(textRect.minY) * scale..<Int(textRect.maxY) * scale {
+                            for x in Int(textRect.minX) * scale..<Int(textRect.maxX) * scale {
+                                let point = CGPoint(x: (CGFloat(x) + 0.5) / CGFloat(scale),
+                                                    y: (CGFloat(y) + 0.5) / CGFloat(scale))
+                                guard roundedReserve.contains(point) else { continue }
+                                let offset = (y * rendered.width + x) * 4
+                                minimumAlpha = min(minimumAlpha, rendered.pixels[offset + 3])
+                                let red = linear[Int(rendered.pixels[offset])]
+                                let green = linear[Int(rendered.pixels[offset + 1])]
+                                let blue = linear[Int(rendered.pixels[offset + 2])]
+                                let value = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+                                if value < minimum { minimum = value; darkestPoint = point }
+                                if value > maximum { maximum = value; brightestPoint = point }
+                            }
+                        }
+                        XCTAssertEqual(minimumAlpha, 255, "The text backing stays opaque: \(message)")
+                        for (name, ink) in sample.player ? identityInks : clockInks {
+                            let value = luminance(ink, style: style)
+                            let nearest = min(maximum, max(minimum, value))
+                            XCTAssertGreaterThanOrEqual((max(value, nearest) + 0.05)
+                                / (min(value, nearest) + 0.05), 4.5,
+                                "\(name): \(message); dark \(minimum) at \(darkestPoint), light \(maximum) at \(brightestPoint)")
+                        }
+                        if mode.reduced || mode.contrast == .increased {
+                            XCTAssertLessThan(maximum - minimum, 0.001,
+                                              "Accessibility text backing stays solid: \(message)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Home wears the theme Game Detail shows: its ink and names on panels,
     /// its clock chips with the low-time red, and New game's white on the
     /// action color. Names and clock times are 14 pt or larger and semibold,

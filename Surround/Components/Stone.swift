@@ -683,7 +683,7 @@ struct EngravedGridGeometry: Equatable {
     var dimpleCoreDiameter: CGFloat { dimpleDiameter - 0.8 }
 }
 
-/// Rough ice-cut lips around a continuous blue-gray core. Relief stays in a
+/// Rough ice-cut lips around a continuous pigment core. Relief stays in a
 /// narrow strip along each cut, leaving the playing field and intersections clear.
 struct EngravedGobanGrid: View, Equatable {
     var geometry: EngravedGridGeometry
@@ -698,7 +698,7 @@ struct EngravedGobanGrid: View, Equatable {
             upperWall.fill(chips, with: .color(color.opacity(0.3)))
             var lowerWall = context
             lowerWall.translateBy(x: 0.5, y: 0.5)
-            lowerWall.fill(chips, with: .color(.white.opacity(0.62)))
+            lowerWall.fill(chips, with: .color(.white.opacity(0.52)))
             context.fill(chips, with: .color(color.opacity(0.64)))
             // The pigment is drawn last, so neither relief wall interrupts it.
             context.stroke(geometry.innerPath, with: .color(color), lineWidth: 0.45 * geometry.lineScale)

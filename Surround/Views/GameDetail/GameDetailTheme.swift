@@ -208,13 +208,13 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         }
         if self == .frostPine, scheme == .dark {
             var night = board
-            night.boardColor = Color(themeHex: 0xB0C1CB)
-            night.compactBoardColor = Color(themeHex: 0x9BAFB9)
+            night.boardColor = Color(themeHex: 0xADB2B1)
+            night.compactBoardColor = Color(themeHex: 0x9FA9A5)
             night.boardEdge = Color(themeHex: 0xBDD6E5).opacity(0.7)
-            night.boardTexture?.tint = Color(themeHex: 0xA5B8C5)
-            night.boardTexture?.opacity = 0.4
+            night.boardTexture?.tint = Color(themeHex: 0xE2DCD0)
+            night.boardTexture?.opacity = 0.22
             night.surfaceFrost?.tint = Color(themeHex: 0xA5B8C5)
-            night.surfaceFrost?.opacity = 0.56
+            night.surfaceFrost?.opacity = 0.52
             night.stoneImages?.tint = Color(themeHex: 0xD5E2EE)
             night.boardDepth = BoardDepth(
                 upperFace: Color(themeHex: 0xA6BCC9), lowerFace: Color(themeHex: 0x6C8596),
@@ -222,8 +222,8 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 shade: Color(themeHex: 0x344F63).opacity(0.42),
                 shadow: Color(themeHex: 0x07121C).opacity(0.35),
                 thicknessRatio: 0.008, maximumThickness: 5, edgeStyle: .frosted)
-            night.gridColor = Color(themeHex: 0x253E4C)
-            night.coordinateColor = Color(themeHex: 0x172E3C)
+            night.gridColor = Color(themeHex: 0x3A4947)
+            night.coordinateColor = Color(themeHex: 0x263A3D)
             night.black.flat = Color(themeHex: 0x102E43)
             // Bright enough to stand apart from the night board's slate.
             night.white.flat = Color(themeHex: 0xE4EFF6)
@@ -718,30 +718,30 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             )
         case .frostPine:
             return BoardAppearance(
-                boardColor: Color(themeHex: 0xD2DDE2),
-                // Small boards take the frosted board's lower face, so the
-                // flat ice stones read brighter than the board, not darker.
-                compactBoardColor: Color(themeHex: 0xB3C4CE),
+                // A quiet silver face separates the blue stones by hue as
+                // well as value; the rim retains the colder ice reflections.
+                boardColor: Color(themeHex: 0xCBCBC1),
+                compactBoardColor: Color(themeHex: 0xBBC0B9),
                 boardEdge: Color(themeHex: 0xF6FCFF).opacity(0.85),
                 boardTexture: FrostPineAssets.board,
                 boardBevel: true,
                 boardDepth: BoardDepth(
-                    upperFace: Color(themeHex: 0xE4ECEF), lowerFace: Color(themeHex: 0xB3C4CE),
+                    upperFace: Color(themeHex: 0xDDE5E5), lowerFace: Color(themeHex: 0xB5C4CA),
                     highlight: Color(themeHex: 0xFCFDFA).opacity(0.92),
                     shade: Color(themeHex: 0x738796).opacity(0.32),
                     shadow: Color(themeHex: 0x253F51).opacity(0.24),
                     thicknessRatio: 0.008, maximumThickness: 5, edgeStyle: .frosted),
                 surfaceFrost: FrostPineAssets.surfaceFrost,
-                // Polished clear ice leaves the field quiet; recessed engraved
-                // cores and recessed hoshi remain native, aligned geometry.
+                // Keep the existing chipped cuts and recessed hoshi; graphite
+                // cores ground the engraving in the more neutral playing face.
                 gridLineScale: 1,
                 gridStyle: .engraved,
                 stoneImages: FrostPineAssets.stones,
                 stoneLightDirection: .upperLeft,
                 imageStoneShadow: .ice,
                 imageStoneShading: .iceEdge,
-                gridColor: Color(themeHex: 0x52616A),
-                coordinateColor: Color(themeHex: 0x344F62),
+                gridColor: Color(themeHex: 0x58615C),
+                coordinateColor: Color(themeHex: 0x344742),
                 black: StonePalette(
                     highlight: Color(themeHex: 0x4D799A), shade: Color(themeHex: 0x071C2E),
                     flat: Color(themeHex: 0x123449), outline: Color(themeHex: 0x081F31),
@@ -1007,11 +1007,54 @@ private final class FrostPineAssets {
         return day
     }()
 
-    // Broad clear-ice depth stays quiet beneath the engraved grid. The
-    // crystalline perimeter is a separate, softer surface layer.
-    static let board = UIImage(named: "FrostPineBoard").map { BoardTexture(image: $0, mapping: .board, opacity: 0.48) }
+    // Reuse the ice artwork at a quieter blend with a warm-neutral tint.
+    // The colder crystalline perimeter remains a separate layer.
+    static let board = UIImage(named: "FrostPineBoard").map {
+        BoardTexture(image: $0, mapping: .board, tint: Color(themeHex: 0xFFF5E7), opacity: 0.22)
+    }
     static let surfaceFrost = UIImage(named: "FrostPineBoardFrost").map {
-        BoardSurfaceOverlay(image: $0, opacity: 0.76, perimeterFadeFraction: 0.045)
+        BoardSurfaceOverlay(image: $0, opacity: 0.68, perimeterFadeFraction: 0.045)
+    }
+    // Give the generated fibers a useful tonal range without letting a bright
+    // splinter or dark check compromise text anywhere on a resized control.
+    // Both grades are cached once; no image processing runs on clock ticks.
+    private static let controlWoodGrades: (black: UIImage, white: UIImage)? = {
+        guard let image = UIImage(named: "FrostPineControlWood", in: bundle, compatibleWith: nil),
+              let source = image.cgImage,
+              let sRGB = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        let context = CIContext(options: [.workingColorSpace: sRGB, .outputColorSpace: sRGB])
+        let input = CIImage(cgImage: source, options: [.colorSpace: sRGB])
+        let fibers = input.applyingFilter("CIColorControls", parameters: [
+            "inputSaturation": 0, "inputContrast": 4.2
+        ]).applyingFilter("CIColorClamp", parameters: [
+            "inputMinComponents": CIVector(x: 0, y: 0, z: 0, w: 1),
+            "inputMaxComponents": CIVector(x: 1, y: 1, z: 1, w: 1)
+        ])
+        func grade(low: UInt32, high: UInt32) -> UIImage? {
+            func channel(_ value: UInt32, shift: UInt32) -> CGFloat {
+                CGFloat((value >> shift) & 255) / 255
+            }
+            func vector(_ shift: UInt32) -> CIVector {
+                let span = channel(high, shift: shift) - channel(low, shift: shift)
+                return CIVector(x: span * 0.2126, y: span * 0.7152, z: span * 0.0722, w: 0)
+            }
+            let tinted = fibers.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": vector(16), "inputGVector": vector(8), "inputBVector": vector(0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+                "inputBiasVector": CIVector(x: channel(low, shift: 16), y: channel(low, shift: 8),
+                                            z: channel(low, shift: 0), w: 0)
+            ])
+            guard let output = context.createCGImage(tinted, from: input.extent,
+                                                     format: .RGBA8, colorSpace: sRGB) else { return nil }
+            return UIImage(cgImage: output, scale: image.scale, orientation: image.imageOrientation)
+        }
+        guard let black = grade(low: 0x202722, high: 0x4A4F45),
+              let white = grade(low: 0xD0D1C5, high: 0xF0EDE3) else { return nil }
+        return (black, white)
+    }()
+
+    static func controlWood(_ color: StoneColor) -> UIImage? {
+        color == .black ? controlWoodGrades?.black : controlWoodGrades?.white
     }
     static let snow = UIImage(named: "FrostPineSnow")
     static let pine = UIImage(named: "FrostPinePine")
@@ -1152,7 +1195,7 @@ private enum FrostPineColors {
     static let foreground = adaptive(0x263F50, 0xE3EEF5)
     static let panelBorder = adaptive(0x6B8798, 0xA1BDCE)
     static let blackGlass = adaptive(0x14394F, 0x102D43)
-    static let whiteGlass = adaptive(0xC5DFEF, 0xA7C7DE)
+    static let whiteGlass = adaptive(0xE1DED4, 0xD5D7CF)
     static let whiteIdentityGlass = adaptive(0xD3E7F3, 0xB2CEE1)
     static let action = adaptive(0x43553B, 0x3F614D)
     static let chatBubble = adaptive(0xD6E3E8, 0x293F4B)
@@ -1162,18 +1205,19 @@ private enum FrostPineColors {
     static let keyline = adaptive(0xF3FAFF, 0x152A39)
     static let treeGuide = adaptive(0x526A7A, 0xAAC1D0)
     static let idle = adaptive(0xCBDCE4, 0x2C4352)
-    static let blackSurfaceTop = adaptive(0x214D67, 0x20445D)
-    static let blackSurfaceBottom = adaptive(0x0C263B, 0x0C2233)
-    static let whiteSurfaceTop = adaptive(0xB5D2E6, 0x9BBBD3)
-    static let whiteSurfaceBottom = adaptive(0xE3F1F9, 0xBDD6E8)
-    static let blackSolid = adaptive(0x13374F, 0x142F45)
+    // Weathered pine controls retain warm cut wood beneath the winter wash.
+    static let blackSurfaceTop = adaptive(0x3D403B, 0x333B37)
+    static let blackSurfaceBottom = adaptive(0x292E2C, 0x242A28)
+    static let whiteSurfaceTop = adaptive(0xDAD8CE, 0xD0D1C8)
+    static let whiteSurfaceBottom = adaptive(0xE8E5DB, 0xDCDDD4)
+    static let blackSolid = adaptive(0x313631, 0x29302C)
     static let whiteForeground = adaptive(0x173A50, 0x112E43)
     static let blackAccent = adaptive(0xD1E4C6, 0xD7E9CE)
     static let whiteAccent = adaptive(0x3F583A, 0x2C472F)
     static let turnOutline = adaptive(0x526A43, 0xB5D1A1)
     static let turnGlow = adaptive(0xB3CB9E, 0xB7D2AA)
-    static let blackBorder = adaptive(0xAECADD, 0x9DBFD5)
-    static let whiteBorder = adaptive(0x526E82, 0x36586E)
+    static let blackBorder = adaptive(0xBCB7A8, 0xA5A99C)
+    static let whiteBorder = adaptive(0x736C5F, 0x62695F)
     static let blackSecondary = adaptive(0xD2E3EC, 0xCBDDE9)
     static let whiteSecondary = adaptive(0x3D596D, 0x2D4A5F)
     static let darkModerator = adaptive(0xE6CBFA, 0xE6CBFA)
@@ -1332,9 +1376,9 @@ extension SurroundTheme {
     /// Whether the scene includes decorative artwork behind its surfaces.
     var showsSceneArt: Bool { hasScene && self != .flowingInkJadePlain && self != .flowingInkPlain }
 
-    /// Native glass is available to the scene's controls. Christmas clocks
-    /// and player chips override it with opaque painted wooden ornaments; its main
-    /// action keeps glass.
+    /// Native glass is available to the scene's controls. Frost clocks/chips
+    /// use pine plates and Christmas uses painted ornaments; their main actions
+    /// keep glass.
     var usesGlassControls: Bool { self != .standard && self != .feltMeadow && self != .paperBlossoms && !isFlowingInk }
 
     /// The natural scenes use their own foregrounds, translucent pigment
@@ -2855,6 +2899,339 @@ private enum WindowStyleRequests {
         } else {
             entries[key] = nil
             window.overrideUserInterfaceStyle = entry.original
+        }
+    }
+}
+
+/// Weathered pine with frayed edges, worn fibers and accumulated upper snow. The
+/// material owns no layout or interaction; clock and identity content sit above it.
+struct FrostPineWoodPlateSurface: View {
+    enum Role: Equatable { case clock, player }
+
+    let color: StoneColor
+    let cornerRadius: CGFloat
+    let role: Role
+    var compact = false
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    var body: some View {
+        FrostPineWoodPlateMaterial(color: color, cornerRadius: cornerRadius, role: role,
+                                  compact: compact, scheme: colorScheme,
+                                  reduceTransparency: reduceTransparency, contrast: contrast)
+    }
+}
+
+/// Explicit appearance inputs keep the drawing independent of clock updates.
+struct FrostPineWoodPlateMaterial: View {
+    let color: StoneColor
+    let cornerRadius: CGFloat
+    let role: FrostPineWoodPlateSurface.Role
+    var compact = false
+    let scheme: ColorScheme
+    let reduceTransparency: Bool
+    let contrast: ColorSchemeContrast
+
+    var body: some View {
+        Group {
+            if reduceTransparency || contrast == .increased {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(SurroundTheme.frostPine.clockSolidSurface(color))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .strokeBorder(SurroundTheme.frostPine.identityChipBorder(color),
+                                          lineWidth: contrast == .increased ? 2 : 1)
+                    }
+            } else {
+                FrostPineWoodPlateDrawing(color: color, cornerRadius: cornerRadius,
+                                          role: role, compact: compact, scheme: scheme)
+                    .equatable()
+                    .shadow(color: Color(themeHex: 0x242A27).opacity(scheme == .dark ? 0.23 : 0.17),
+                            radius: compact ? 0.65 : 1.25, x: compact ? 0.2 : 0.4, y: compact ? 0.5 : 0.8)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct FrostPineWoodPlateDrawing: View, Equatable {
+    let color: StoneColor
+    let cornerRadius: CGFloat
+    let role: FrostPineWoodPlateSurface.Role
+    let compact: Bool
+    let scheme: ColorScheme
+
+    private var darkStone: Bool { color == .black }
+    private var seed: UInt32 {
+        role == .clock ? (darkStone ? 17 : 83) : (darkStone ? 139 : 211)
+    }
+    private var frostOverflow: CGFloat { compact ? 3 : 6 }
+
+    var body: some View {
+        Canvas { context, size in
+            guard size.width > 8, size.height > 8 else { return }
+            // Extra drawing room lets the frost stand above the plate without
+            // moving its original face, content, or interaction bounds.
+            let outer = CGRect(origin: CGPoint(x: frostOverflow + 0.5, y: frostOverflow + 0.5),
+                               size: CGSize(width: size.width - frostOverflow * 2 - 1,
+                                            height: size.height - frostOverflow * 2 - 1))
+            guard outer.width > 8, outer.height > 8 else { return }
+            let depth = compact ? 0.6 : min(1.35, outer.height * 0.022)
+            let face = CGRect(x: outer.minX, y: outer.minY,
+                              width: outer.width, height: outer.height - depth)
+            let radius = min(cornerRadius, face.height / 2, face.width / 2)
+            let facePath = woodPath(face, radius: radius)
+
+            // A shallow raw-pine cut warms the lower edge. The face and all
+            // decoration stay inside the existing layout and text reservation.
+            context.fill(woodPath(outer, radius: radius), with: .linearGradient(
+                Gradient(colors: [Color(themeHex: 0xD5C3A4), Color(themeHex: 0x827761),
+                                  Color(themeHex: 0xB7A17D)]),
+                startPoint: CGPoint(x: outer.minX, y: outer.minY),
+                endPoint: CGPoint(x: outer.maxX, y: outer.maxY)))
+            context.fill(facePath, with: .linearGradient(
+                Gradient(stops: SurroundTheme.frostPine.clockSurfaceStops(color, scheme: scheme)),
+                startPoint: CGPoint(x: face.minX, y: face.minY),
+                endPoint: CGPoint(x: face.minX + face.width * 0.35, y: face.maxY)))
+
+            var faceContext = context
+            faceContext.clip(to: facePath)
+            if let wood = FrostPineAssets.controlWood(color) {
+                // Tile in points, never stretch the grain to the control's
+                // aspect ratio. Each player and role gets a stable cut of wood.
+                var grainContext = faceContext
+                grainContext.opacity = 0.90
+                grainContext.fill(facePath, with: .tiledImage(Image(uiImage: wood),
+                    origin: CGPoint(x: face.minX - CGFloat(seed % 97),
+                                    y: face.minY - CGFloat(seed % 173)), scale: 0.625))
+            }
+
+            drawSurfaceWear(context: &faceContext, rect: face)
+            let rimWidth: CGFloat = compact ? 1.8 : 3
+            var rim = woodPath(outer, radius: radius)
+            rim.addPath(path(outer.insetBy(dx: rimWidth, dy: rimWidth),
+                             radius: max(0, radius - rimWidth)))
+            var rimContext = faceContext
+            rimContext.clip(to: rim, style: FillStyle(eoFill: true))
+            // Keep the edge broken and fibrous rather than outlining the wood
+            // with a smooth polished bevel. The warm cut remains below it.
+            rimContext.stroke(facePath, with: .color(Color(themeHex: 0x383A31).opacity(0.40)),
+                              lineWidth: 0.45)
+            drawWeatheredEdges(context: &rimContext, rect: face, radius: radius)
+
+            // The inner rounded reserve excludes bright powder even at the
+            // curved corners; the outer context preserves its raised silhouette.
+            var frostContext = context
+            var frostRegion = Path(CGRect(origin: .zero, size: size))
+            frostRegion.addPath(path(outer.insetBy(dx: rimWidth, dy: rimWidth),
+                                     radius: max(0, radius - rimWidth)))
+            frostContext.clip(to: frostRegion, style: FillStyle(eoFill: true))
+            drawTopFrost(context: &frostContext, rect: face, radius: radius)
+        }
+        .padding(-frostOverflow)
+    }
+
+    private func path(_ rect: CGRect, radius: CGFloat) -> Path {
+        RoundedRectangle(cornerRadius: radius, style: .circular).path(in: rect)
+    }
+
+    /// Erosion stays inside the existing control bounds. Sampling in points
+    /// keeps small bites visible on both compact chips and wide clock plates.
+    private func woodPath(_ rect: CGRect, radius: CGFloat) -> Path {
+        var points: [CGPoint] = []
+        let reach: CGFloat = compact ? 0.55 : 1.15
+        func append(_ point: CGPoint, inward: CGVector) {
+            let phase = (point.x - rect.minX) * 0.23 + (point.y - rect.minY) * 0.47 + CGFloat(seed)
+            let chips = 0.12 + 0.20 * (0.5 + 0.5 * sin(phase * 2.7))
+                + 0.68 * pow(max(0, sin(phase * 0.61)), 5)
+            points.append(CGPoint(x: point.x + inward.dx * reach * chips,
+                                  y: point.y + inward.dy * reach * chips))
+        }
+        func line(_ first: CGPoint, _ last: CGPoint, inward: CGVector) {
+            let count = max(1, Int(hypot(last.x - first.x, last.y - first.y) / 1.25))
+            for index in 0..<count {
+                let t = CGFloat(index) / CGFloat(count)
+                append(CGPoint(x: first.x + (last.x - first.x) * t,
+                               y: first.y + (last.y - first.y) * t), inward: inward)
+            }
+        }
+        func corner(_ center: CGPoint, start: CGFloat) {
+            let count = max(3, Int(radius * .pi / 2 / 1.25))
+            for index in 0..<count {
+                let angle = start + CGFloat(index) / CGFloat(count) * .pi / 2
+                append(CGPoint(x: center.x + cos(angle) * radius,
+                               y: center.y + sin(angle) * radius),
+                       inward: CGVector(dx: -cos(angle), dy: -sin(angle)))
+            }
+        }
+        line(CGPoint(x: rect.minX + radius, y: rect.minY),
+             CGPoint(x: rect.maxX - radius, y: rect.minY), inward: CGVector(dx: 0, dy: 1))
+        corner(CGPoint(x: rect.maxX - radius, y: rect.minY + radius), start: -.pi / 2)
+        line(CGPoint(x: rect.maxX, y: rect.minY + radius),
+             CGPoint(x: rect.maxX, y: rect.maxY - radius), inward: CGVector(dx: -1, dy: 0))
+        corner(CGPoint(x: rect.maxX - radius, y: rect.maxY - radius), start: 0)
+        line(CGPoint(x: rect.maxX - radius, y: rect.maxY),
+             CGPoint(x: rect.minX + radius, y: rect.maxY), inward: CGVector(dx: 0, dy: -1))
+        corner(CGPoint(x: rect.minX + radius, y: rect.maxY - radius), start: .pi / 2)
+        line(CGPoint(x: rect.minX, y: rect.maxY - radius),
+             CGPoint(x: rect.minX, y: rect.minY + radius), inward: CGVector(dx: 1, dy: 0))
+        corner(CGPoint(x: rect.minX + radius, y: rect.minY + radius), start: .pi)
+        return polygon(points)
+    }
+
+    private func drawSurfaceWear(context: inout GraphicsContext, rect: CGRect) {
+        var random = Grain(seed: seed ^ 0x325D)
+        // These pigments share the cached grain's bounded range, so a shallow
+        // check or a small pit can cross the face without weakening its labels.
+        let groove = Color(themeHex: darkStone ? 0x202722 : 0xD0D1C5)
+        let fiber = Color(themeHex: darkStone ? 0x4A4F45 : 0xF0EDE3)
+        for index in 0..<(compact ? 3 : 7) {
+            let fraction = (CGFloat(index) + 0.3 + random.next() * 0.5) / CGFloat(compact ? 3 : 7)
+            let y = rect.minY + rect.height * fraction
+            let length = min(rect.width * 0.48, compact ? 34 : 92) * (0.55 + random.next() * 0.45)
+            let x = rect.minX + random.next() * max(0, rect.width - length)
+            let depth: CGFloat = compact ? 0.55 : 1.1
+            let check = polygon([
+                CGPoint(x: x, y: y),
+                CGPoint(x: x + length * 0.28, y: y - depth * 0.45),
+                CGPoint(x: x + length * 0.68, y: y + depth * 0.15),
+                CGPoint(x: x + length, y: y - depth * 0.3),
+                CGPoint(x: x + length * 0.74, y: y + depth * 0.5),
+                CGPoint(x: x + length * 0.34, y: y + depth)
+            ])
+            context.fill(check, with: .color(groove.opacity(0.65 + Double(random.next()) * 0.30)))
+            var lip = Path()
+            lip.move(to: CGPoint(x: x + length * 0.20, y: y + depth))
+            lip.addLine(to: CGPoint(x: x + length * 0.75, y: y + depth * 0.6))
+            context.stroke(lip, with: .color(fiber.opacity(0.70)), lineWidth: compact ? 0.35 : 0.5)
+        }
+        let count = min(90, max(12, Int(rect.width * rect.height / 240)))
+        for _ in 0..<count {
+            let x = rect.minX + random.next() * rect.width
+            let y = rect.minY + random.next() * rect.height
+            let width = 0.7 + random.next() * 2.4
+            let depth = 0.25 + random.next() * (compact ? 0.25 : 0.45)
+            context.fill(Path(ellipseIn: CGRect(x: x, y: y, width: width, height: depth)),
+                         with: .color(groove.opacity(0.35 + Double(random.next()) * 0.5)))
+        }
+    }
+
+    private func drawWeatheredEdges(context: inout GraphicsContext, rect: CGRect, radius: CGFloat) {
+        var random = Grain(seed: seed ^ 0x74B1)
+        let reach: CGFloat = compact ? 1.5 : 3.5
+        for index in 0..<(compact ? 3 : 6) {
+            let fromLeft = (index + Int(seed)) % 2 == 0
+            let upper = index < (compact ? 1 : 3)
+            let length = min(rect.width * 0.38, compact ? 30 : 72) * (0.65 + random.next() * 0.35)
+            let x = fromLeft ? rect.minX + radius * 0.25 : rect.maxX - radius * 0.25
+            let direction: CGFloat = fromLeft ? 1 : -1
+            let y = upper ? rect.minY + reach * (0.25 + random.next() * 0.5)
+                          : rect.maxY - reach * (0.25 + random.next() * 0.5)
+            let split = polygon([
+                CGPoint(x: x, y: y - 0.35),
+                CGPoint(x: x + direction * length * 0.35, y: y + reach * 0.15),
+                CGPoint(x: x + direction * length, y: y - reach * 0.18),
+                CGPoint(x: x + direction * length * 0.55, y: y + reach * 0.25),
+                CGPoint(x: x, y: y + (compact ? 0.6 : 1.2))
+            ])
+            context.fill(split, with: .color(Color(themeHex: 0x292B25).opacity(0.85)))
+            var splinter = Path()
+            splinter.move(to: CGPoint(x: x, y: y + reach * 0.5))
+            splinter.addLine(to: CGPoint(x: x + direction * length * 0.36, y: y + reach * 0.35))
+            splinter.addLine(to: CGPoint(x: x + direction * length * 0.76, y: y + reach * 0.15))
+            context.stroke(splinter, with: .color(Color(themeHex: 0xDCC8A3).opacity(0.80)),
+                           style: StrokeStyle(lineWidth: compact ? 0.65 : 1, lineCap: .butt))
+        }
+        // Raw fibers appear in broken runs along upper, lower and side edges.
+        for index in 0..<(compact ? 18 : 44) {
+            let fraction = random.next()
+            let upper = index % 3 == 0
+            let x = rect.minX + fraction * rect.width
+            let top = topEdge(at: x, rect: rect, radius: radius)
+            let y = upper ? top + random.next() * reach
+                          : rect.maxY - (top - rect.minY) - random.next() * reach
+            var fiber = Path()
+            fiber.move(to: CGPoint(x: x, y: y))
+            fiber.addLine(to: CGPoint(x: x + 1 + random.next() * (compact ? 5 : 11), y: y - 0.4))
+            context.stroke(fiber, with: .color(Color(themeHex: 0xDED9C7).opacity(0.40 + Double(random.next()) * 0.40)),
+                           lineWidth: compact ? 0.45 : 0.7)
+        }
+    }
+
+    private func drawTopFrost(context: inout GraphicsContext, rect: CGRect, radius: CGFloat) {
+        let deposits: [(center: CGFloat, fraction: CGFloat, limit: CGFloat)]
+        switch (role, color) {
+        case (.clock, .black): deposits = [(0.22, 0.48, 200), (0.73, 0.43, 180)]
+        case (.clock, .white): deposits = [(0.16, 0.32, 132), (0.64, 0.57, 220), (0.96, 0.10, 34)]
+        case (.player, .black): deposits = [(0.27, 0.58, 110), (0.82, 0.28, 58)]
+        case (.player, .white): deposits = [(0.14, 0.28, 40), (0.66, 0.62, 100)]
+        }
+        let height: CGFloat = compact ? 2 : 4.8
+        let inward: CGFloat = compact ? 1.1 : 2.3
+        for (index, deposit) in deposits.enumerated() {
+            var random = Grain(seed: (seed ^ 0xA591) &+ UInt32(index) &* 709)
+            let width = min(deposit.limit, rect.width * deposit.fraction)
+            let start = max(rect.minX + 1, min(rect.maxX - width - 1,
+                rect.minX + rect.width * deposit.center - width / 2))
+            let phase = random.next() * .pi * 2
+            func envelope(_ t: CGFloat) -> CGFloat {
+                pow(max(0, sin(t * .pi)), 0.32)
+                    * (0.76 + 0.13 * sin(t * .pi * 5 + phase) + 0.11 * sin(t * .pi * 9 - phase))
+            }
+            var crown: [CGPoint] = [], underside: [CGPoint] = []
+            let samples = max(8, Int(width / 0.75))
+            for sample in 0...samples {
+                let t = CGFloat(sample) / CGFloat(samples)
+                let x = start + width * t
+                let edge = topEdge(at: x, rect: rect, radius: radius)
+                let body = envelope(t)
+                crown.append(CGPoint(x: x, y: edge - height * body * (0.55 + random.next() * 0.45)))
+                underside.append(CGPoint(x: x, y: edge + inward * body * (0.45 + random.next() * 0.55)))
+            }
+            let depositPath = polygon(crown + Array(underside.reversed()))
+            var contact = context
+            contact.translateBy(x: 0.25, y: compact ? 0.6 : 0.9)
+            contact.fill(depositPath, with: .color(Color(themeHex: 0x536F7C).opacity(0.58)))
+            context.fill(depositPath, with: .linearGradient(
+                Gradient(colors: [Color(themeHex: 0xFFFEF8), Color(themeHex: 0xCBE5F3)]),
+                startPoint: CGPoint(x: start, y: rect.minY - height),
+                endPoint: CGPoint(x: start, y: rect.minY + inward)))
+            for _ in 0..<max(8, Int(width * 1.5)) {
+                let t = random.next()
+                let x = start + t * width
+                let body = envelope(t)
+                let y = topEdge(at: x, rect: rect, radius: radius) - body * height * random.next()
+                let grain = (compact ? 0.35 : 0.65) + random.next() * (compact ? 0.40 : 0.75)
+                context.fill(polygon([CGPoint(x: x - grain, y: y),
+                                      CGPoint(x: x, y: y - grain * 0.8),
+                                      CGPoint(x: x + grain, y: y + grain * 0.2),
+                                      CGPoint(x: x, y: y + grain * 0.6)]),
+                             with: .color(.white.opacity(0.62 + Double(random.next()) * 0.35)))
+            }
+        }
+    }
+
+    private func topEdge(at x: CGFloat, rect: CGRect, radius: CGFloat) -> CGFloat {
+        let dx = max(rect.minX + radius - x, x - (rect.maxX - radius), 0)
+        return rect.minY + radius - sqrt(max(0, radius * radius - dx * dx))
+    }
+
+    private func polygon(_ points: [CGPoint]) -> Path {
+        Path { path in
+            guard let first = points.first else { return }
+            path.move(to: first)
+            for point in points.dropFirst() { path.addLine(to: point) }
+            path.closeSubpath()
+        }
+    }
+
+    private struct Grain {
+        var seed: UInt32
+        mutating func next() -> CGFloat {
+            seed = seed &* 1_664_525 &+ 1_013_904_223
+            return CGFloat(seed >> 8) / CGFloat(0x00FF_FFFF)
         }
     }
 }

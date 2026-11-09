@@ -480,20 +480,9 @@ private struct GameDetailClockCard: View {
                         }
                 }
                 .overlay { clockOutline }
-                // Like the turn outline, frost belongs to the glass's
-                // foreground content, before the container captures it.
-                .overlay {
-                    if theme == .frostPine && !reduceTransparency && contrast != .increased {
-                        GameDetailControlRime(cornerRadius: spaciousCompact ? 14 : 12,
-                                              profile: color == .black ? .midnightClock : .paleClock)
-                            .equatable()
-                            .allowsHitTesting(false)
-                            .accessibilityHidden(true)
-                    }
-                }
                 .modifier(GameDetailClearGlass(shape: shape,
                                                enabled: !theme.isFlowingInk && theme != .feltMeadow
-                                                   && theme != .paperBlossoms && theme != .christmasKeepsakes
+                                                   && theme != .paperBlossoms && theme != .christmasKeepsakes && theme != .frostPine
                                                    && !reduceTransparency
                                                    && (!theme.usesLightSceneSurfaces || contrast != .increased),
                                                tint: showsThemeGlass ? theme.clockGlassTint(color) : nil))
@@ -615,7 +604,7 @@ private struct GameDetailClockCard: View {
     /// Scene clocks in a glass theme; header chips already sit on the bar's
     /// glass, and accessibility settings keep the solid surfaces.
     private var showsThemeGlass: Bool {
-        guard !theme.isFlowingInk, theme != .christmasKeepsakes,
+        guard !theme.isFlowingInk, theme != .christmasKeepsakes, theme != .frostPine,
               theme.usesGlassControls, style != .inline,
               !reduceTransparency, contrast != .increased else {
             return false
@@ -625,7 +614,10 @@ private struct GameDetailClockCard: View {
     }
 
     @ViewBuilder private var surface: some View {
-        if theme == .paperBlossoms {
+        if theme == .frostPine {
+            FrostPineWoodPlateSurface(color: color, cornerRadius: clockCornerRadius, role: .clock,
+                                     compact: style == .inline)
+        } else if theme == .paperBlossoms {
             PaperBlossomsControlSurface(color: color, cornerRadius: clockCornerRadius,
                                         compact: compactPaperCorner)
         } else if theme.isFlowingInk {
@@ -667,9 +659,9 @@ private struct GameDetailClockCard: View {
                     shape.strokeBorder(turnGlow.opacity(colorScheme == .dark ? 0.6 : 0.55), lineWidth: 6)
                         .blur(radius: style == .inline ? 6 : (colorScheme == .dark ? 9 : 8))
                 }
-                // The ornament's wooden edge supplies its idle boundary; only
-                // turn and accessibility outlines need another stroke.
-                if theme != .christmasKeepsakes || state.running || contrast == .increased {
+                // Ice and wood supply their own idle boundary; only turn and
+                // accessibility outlines need another stroke on these surfaces.
+                if (theme != .christmasKeepsakes && theme != .frostPine) || state.running || contrast == .increased {
                     shape.strokeBorder(
                         state.running
                             ? turnOutline.opacity(contrast == .increased ? 1 : (colorScheme == .dark ? 0.85 : 0.7))
@@ -1094,173 +1086,6 @@ private struct GameDetailClockCard: View {
     }
 }
 
-/// Crystalline deposits sit above the glass, with a little relief outside its
-/// silhouette. Their grain is measured in points, never stretched with a card.
-/// Broken clusters leave the face and the status outline largely clear.
-private struct GameDetailControlRime: View, Equatable {
-    let cornerRadius: CGFloat
-    let profile: Profile
-
-    /// Each surface has its own accumulation pattern, not just different grain
-    /// over the same three islands. Chips collect frost around a corner; clocks
-    /// have a broader dominant patch and smaller, separated deposits.
-    enum Profile: UInt32 {
-        case midnightClock = 17, paleClock = 83
-        case midnightIdentity = 139, paleIdentity = 211
-
-        var isClock: Bool { self == .midnightClock || self == .paleClock }
-
-        var deposits: [Deposit] {
-            switch self {
-            case .midnightClock:
-                return [Deposit(center: 0.17, fraction: 0.40, limit: 104, weight: 1),
-                        Deposit(center: 0.79, fraction: 0.23, limit: 58, weight: 0.72)]
-            case .paleClock:
-                return [Deposit(center: 0.075, fraction: 0.16, limit: 40, weight: 0.57),
-                        Deposit(center: 0.46, fraction: 0.10, limit: 28, weight: 0.48),
-                        Deposit(center: 0.85, fraction: 0.36, limit: 98, weight: 1)]
-            case .midnightIdentity:
-                return [Deposit(center: 0.15, fraction: 0.53, limit: 72, weight: 1)]
-            case .paleIdentity:
-                return [Deposit(center: 0.35, fraction: 0.15, limit: 23, weight: 0.60),
-                        Deposit(center: 0.89, fraction: 0.34, limit: 46, weight: 1)]
-            }
-        }
-    }
-
-    struct Deposit {
-        let center: CGFloat
-        let fraction: CGFloat
-        let limit: CGFloat
-        let weight: CGFloat
-    }
-
-    var body: some View {
-        Canvas { context, size in
-            // The extra drawing room holds the few outward-growing crystals.
-            let rect = CGRect(origin: CGPoint(x: 3, y: 3),
-                              size: CGSize(width: max(0, size.width - 6), height: max(0, size.height - 6)))
-            guard rect.width > 24, rect.height > 24 else { return }
-            let radius = min(cornerRadius, rect.height / 2, rect.width / 2)
-            let depth: CGFloat = profile.isClock
-                ? (rect.height < 40 ? 3.2 : (rect.height < 90 ? 6 : 9.5)) : 6.2
-            for (index, deposit) in profile.deposits.enumerated() {
-                let clusterSeed = profile.rawValue &+ UInt32(index) &* 709
-                var placement = Grain(seed: clusterSeed)
-                let width = min(deposit.limit, rect.width * deposit.fraction)
-                let drift = (placement.next() - 0.5) * min(10, rect.width * 0.04)
-                let start = max(rect.minX + 0.5, min(rect.maxX - width - 0.5,
-                    rect.minX + rect.width * deposit.center - width / 2 + drift))
-                drawCluster(context: &context, rect: rect, radius: radius, start: start,
-                            width: width, depth: depth * deposit.weight, seed: clusterSeed)
-            }
-        }
-        .padding(-3)
-    }
-
-    private func drawCluster(context: inout GraphicsContext, rect: CGRect, radius: CGFloat,
-                             start: CGFloat, width: CGFloat, depth: CGFloat, seed: UInt32) {
-        // A thin irregular skin joins the crystals to the edge. Separate
-        // islands, rather than a full stroke, avoid a snowy rim or ledge.
-        // Independent streams keep a width change from reseeding the other
-        // clusters or the facets when the skin needs another sample.
-        var random = Grain(seed: seed)
-        let phase = random.next() * .pi * 2
-        var crown: [CGPoint] = []
-        var underside: [CGPoint] = []
-        let samples = max(8, Int(width / 0.8))
-        for sample in 0...samples {
-            let t = CGFloat(sample) / CGFloat(samples)
-            let x = start + t * width
-            let edge = topEdge(at: x, in: rect, radius: radius)
-            let envelope = accumulation(at: t, phase: phase)
-            crown.append(CGPoint(x: x, y: edge - envelope * (0.55 + random.next() * 1.6)))
-            underside.append(CGPoint(x: x, y: edge + envelope * depth * (0.45 + random.next() * 0.35)))
-        }
-        let crust = polygon(crown + Array(underside.reversed()))
-        var contact = context
-        contact.translateBy(x: 0.15, y: 0.6)
-        contact.fill(crust, with: .color(Color(red: 0.25, green: 0.48, blue: 0.59).opacity(0.48)))
-        context.fill(crust, with: .linearGradient(
-            Gradient(colors: [Color.white, Color(red: 0.80, green: 0.92, blue: 0.98).opacity(0.80)]),
-            startPoint: CGPoint(x: start, y: rect.minY - 1),
-            endPoint: CGPoint(x: start, y: rect.minY + depth)))
-
-        // Dendrites and overlapping angular platelets break up the skin at
-        // native scale. No complete snowflake symbols or repeated raster tile.
-        random = Grain(seed: seed ^ 0xA37F)
-        let count = max(12, Int(width * 2.7))
-        for _ in 0..<count {
-            let t = random.next()
-            let x = start + t * width
-            let edge = topEdge(at: x, in: rect, radius: radius)
-            let envelope = accumulation(at: t, phase: phase)
-            let y = edge + (random.next() * depth * 0.60 - 0.6) * envelope
-            let length = (0.55 + random.next() * 1.95) * (0.45 + envelope * 0.55)
-            let breadth = 0.25 + random.next() * 0.65
-            let slant = (random.next() - 0.5) * 1.3
-            let facet = polygon([
-                CGPoint(x: x - breadth, y: y),
-                CGPoint(x: x + slant, y: y - length * 0.35),
-                CGPoint(x: x + breadth, y: y + length * 0.4),
-                CGPoint(x: x + slant * 0.3, y: y + length)
-            ])
-            context.fill(facet, with: .color(.white.opacity(0.46 + Double(random.next()) * 0.49)))
-        }
-        random = Grain(seed: seed ^ 0xC591)
-        for _ in 0..<max(4, Int(width / 3.4)) {
-            let t = 0.06 + random.next() * 0.88
-            let x = start + t * width
-            let edge = topEdge(at: x, in: rect, radius: radius)
-            let length = depth * (0.65 + random.next() * 0.3) * accumulation(at: t, phase: phase)
-            let lean = (random.next() - 0.5) * length
-            let root = CGPoint(x: x, y: edge + 0.4)
-            var crystal = Path()
-            crystal.move(to: root)
-            crystal.addLine(to: CGPoint(x: x + lean, y: root.y + length))
-            for fraction in [CGFloat(0.3), 0.55, 0.76] {
-                let join = CGPoint(x: x + lean * fraction, y: root.y + length * fraction)
-                let branch = length * (1 - fraction) * 0.5
-                crystal.move(to: join)
-                crystal.addLine(to: CGPoint(x: join.x - branch, y: join.y + branch * 0.65))
-                crystal.move(to: join)
-                crystal.addLine(to: CGPoint(x: join.x + branch, y: join.y + branch * 0.8))
-            }
-            context.stroke(crystal, with: .color(.white.opacity(0.66)),
-                           style: StrokeStyle(lineWidth: 0.4, lineCap: .round))
-        }
-    }
-
-    /// Larger uneven lobes interrupt the powder body; the fine crystals retain
-    /// their point size and stable phase as the control changes width.
-    private func accumulation(at t: CGFloat, phase: CGFloat) -> CGFloat {
-        let lobes = 0.82 + 0.14 * sin(t * .pi * 3 + phase) + 0.12 * sin(t * .pi * 7 - phase)
-        return pow(max(0, sin(t * .pi)), 0.6) * min(1, lobes)
-    }
-
-    private func topEdge(at x: CGFloat, in rect: CGRect, radius: CGFloat) -> CGFloat {
-        let dx = max(rect.minX + radius - x, x - (rect.maxX - radius), 0)
-        return rect.minY + radius - sqrt(max(0, radius * radius - dx * dx))
-    }
-
-    private func polygon(_ points: [CGPoint]) -> Path {
-        Path { path in
-            guard let first = points.first else { return }
-            path.move(to: first)
-            for point in points.dropFirst() { path.addLine(to: point) }
-            path.closeSubpath()
-        }
-    }
-
-    private struct Grain {
-        var seed: UInt32
-        mutating func next() -> CGFloat {
-            seed = seed &* 1_664_525 &+ 1_013_904_223
-            return CGFloat(seed >> 8) / CGFloat(0x00FF_FFFF)
-        }
-    }
-}
-
 private struct GameDetailClearGlass: ViewModifier {
     let shape: RoundedRectangle
     let enabled: Bool
@@ -1438,7 +1263,10 @@ struct GameDetailPlayerIdentity: View {
             }
         }
         .background {
-            if theme == .paperBlossoms {
+            if theme == .frostPine {
+                FrostPineWoodPlateSurface(color: color, cornerRadius: chipCornerRadius, role: .player,
+                                         compact: navigationHeader || compactHeader || avatarOnly || compactColumn)
+            } else if theme == .paperBlossoms {
                 PaperBlossomsControlSurface(color: color, cornerRadius: chipCornerRadius,
                                             compact: compactPaperCorner)
                     .overlay {
@@ -1487,16 +1315,6 @@ struct GameDetailPlayerIdentity: View {
         .modifier(GameDetailClearGlass(shape: RoundedRectangle(cornerRadius: chipCornerRadius),
                                        enabled: showsThemeGlass,
                                        tint: theme.identityGlassTint(color), interactive: false))
-        .overlay {
-            if theme == .frostPine && !navigationHeader && !avatarOnly
-                && !reduceTransparency && contrast != .increased {
-                GameDetailControlRime(cornerRadius: chipCornerRadius,
-                                      profile: color == .black ? .midnightIdentity : .paleIdentity)
-                    .equatable()
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
-        }
         .foregroundStyle(theme.identityForeground(color))
         #if DEBUG && MAIN_APP
         .onGeometryChange(for: CGSize.self) { $0.size } action: {
@@ -1539,7 +1357,7 @@ struct GameDetailPlayerIdentity: View {
     /// Scene chips in a glass theme; the navigation header sits on the bar's
     /// glass, and accessibility settings keep the solid chip.
     private var showsThemeGlass: Bool {
-        guard !theme.isFlowingInk, theme != .christmasKeepsakes,
+        guard !theme.isFlowingInk, theme != .christmasKeepsakes, theme != .frostPine,
               theme.usesGlassControls, !navigationHeader,
               !reduceTransparency, contrast != .increased else {
             return false
