@@ -182,6 +182,9 @@ struct MainView: View {
                 onAccountSheet: { nav.main.accountSheet = $0 },
                 content: hostedTabContent
             )
+            #if DEBUG
+            .withNoticesHostProbe(places: nav.activityPlaces)
+            #endif
             .ignoresSafeArea()
         } else {
             #if canImport(SwiftUI, _version: 8.0)
@@ -192,6 +195,9 @@ struct MainView: View {
                     messagesBadgeCount: messagesBadgeCount,
                     content: hostedTabContent
                 )
+                #if DEBUG
+                .withNoticesHostProbe(places: nav.activityPlaces)
+                #endif
                 // UIKit owns the window and keyboard avoidance.
                 .ignoresSafeArea()
             } else {

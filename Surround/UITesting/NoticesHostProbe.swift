@@ -537,4 +537,182 @@ private struct NoticesProbeSubtitle: ViewModifier {
         }
     }
 }
+
+// MARK: - UIKit containers
+
+#if !targetEnvironment(macCatalyst)
+/// UIKit's bottom accessory content: a hosted placeholder bar. Deliberately
+/// not a child controller, so a device run shows whether content hosted this
+/// way still presents and still receives its placement.
+final class NoticesPlaceholderAccessoryView: UIView {
+    private let host = UIHostingController(rootView: NoticesPlaceholderBar(host: .uiKitAccessory, root: nil))
+
+    init() {
+        super.init(frame: .zero)
+        host.view.backgroundColor = .clear
+        host.view.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(host.view)
+        NSLayoutConstraint.activate([
+            host.view.leadingAnchor.constraint(equalTo: leadingAnchor),
+            host.view.trailingAnchor.constraint(equalTo: trailingAnchor),
+            host.view.topAnchor.constraint(equalTo: topAnchor),
+            host.view.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
+/// Owned by DuoTabContainer's and IPadTabContainer's coordinators: sets and
+/// clears the UIKit accessory, applies the Duo's minimize behavior and puts
+/// the Now section in the iPad sidebar's bottom bar. It decides from state
+/// (the tab bar request, the registry's settled state, a settled sidebar
+/// transition), never from geometry.
+@MainActor
+final class NoticesHostProbeUIKit {
+    struct State {
+        var root: RootView
+        var tabBarHidden: Bool
+        var sidebar: ActivityHostPolicy.Sidebar
+    }
+
+    /// Nil unless a notices host flag is present.
+    static func make(container: ActivityHostPolicy.Container,
+                     places: ActivityPlaceRegistry?) -> NoticesHostProbeUIKit? {
+        guard let probe = SurroundUITestContract.noticesHostProbe else { return nil }
+        return NoticesHostProbeUIKit(probe: probe, container: container, places: places)
+    }
+
+    /// A deferred accessory change waits for the next main turn. Until then
+    /// IPadTabContainer samples no closed baselines.
+    private(set) var changePending = false
+
+    private let probe: SurroundUITestContract.NoticesHostProbe
+    private let container: ActivityHostPolicy.Container
+    private let places: ActivityPlaceRegistry?
+    private weak var controller: UITabBarController?
+    private var state: (() -> State?)?
+    private var subscription: AnyCancellable?
+    private var nowHost: UIHostingController<NoticesPlaceholderNow>?
+    private lazy var accessory = NoticesPlaceholderAccessoryView()
+    private var afterLaunch = false
+    private var afterLaunchScheduled = false
+
+    private init(probe: SurroundUITestContract.NoticesHostProbe, container: ActivityHostPolicy.Container,
+                 places: ActivityPlaceRegistry?) {
+        self.probe = probe
+        self.container = container
+        self.places = places
+    }
+
+    func install(on controller: UITabBarController, state: @escaping () -> State?) {
+        self.controller = controller
+        self.state = state
+        if container == .duoTabContainer { applyMinimize(phase: "install") }
+        if container == .iPadTabContainer, probe.showsNow {
+            let host = UIHostingController(rootView: NoticesPlaceholderNow(host: .iPadSidebar) { [weak self] in
+                self?.reassignNow()
+            })
+            host.sizingOptions = .intrinsicContentSize
+            host.view.backgroundColor = .clear
+            controller.sidebar.bottomBarView = host.view
+            nowHost = host
+        }
+        subscription = places?.stateDidChange.sink { [weak self] _ in self?.refresh(reason: "registry") }
+        refresh(reason: "install")
+    }
+
+    /// Right before setTabBarHidden: the `before` order changes the accessory here.
+    func tabBarWillChange(hidden: Bool) {
+        guard probe.barOrder == .before else { return }
+        apply(tabBarHidden: hidden, reason: "tabBarWillChange")
+    }
+
+    /// Right after setTabBarHidden: `after` changes the accessory here;
+    /// `deferred` waits for the next main turn.
+    func tabBarDidChange(hidden: Bool) {
+        switch probe.barOrder {
+        case .before:
+            break
+        case .after:
+            apply(tabBarHidden: hidden, reason: "tabBarDidChange")
+        case .deferred:
+            changePending = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.changePending = false
+                self.refresh(reason: "deferred")
+            }
+        }
+    }
+
+    func refresh(reason: String) {
+        guard !changePending, let state = state?() else { return }
+        apply(tabBarHidden: state.tabBarHidden, reason: reason)
+    }
+
+    /// The Duo with on-scroll-down-after-launch: once the controller is in a
+    /// window, switch to .onScrollDown a main turn later.
+    func controllerDidLayout() {
+        guard container == .duoTabContainer, probe.tabBarMinimize == .onScrollDownAfterLaunch,
+              !afterLaunchScheduled, controller?.view.window != nil else { return }
+        afterLaunchScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.afterLaunch = true
+            self.applyMinimize(phase: "afterLaunch")
+        }
+    }
+
+    /// IPadTabContainer's closed-baseline sampling, logged from measureLayout.
+    /// It only logs.
+    func baselineSample(root: RootView, insets: UIEdgeInsets, recorded: Bool, revealing: Bool,
+                        tabBarHidden: Bool) {
+        let number = NoticesHostProbeLog.number
+        let flag = NoticesHostProbeLog.flag
+        NoticesHostProbeLog.event("ipad.baseline", [
+            ("root", root.rawValue),
+            ("insets", [insets.top, insets.left, insets.bottom, insets.right].map(number).joined(separator: ",")),
+            ("recorded", flag(recorded)), ("revealing", flag(revealing)), ("tabBarHidden", flag(tabBarHidden)),
+            ("accessory", flag(controller?.hasActivityAccessory == true)), ("pending", flag(changePending)),
+        ], key: "ipad.baseline.\(root.rawValue)")
+    }
+
+    private func applyMinimize(phase: String) {
+        guard let controller else { return }
+        let minimize = ActivityHostPolicy.hosts(for: .current(container),
+                                                overrides: .init(probe, afterLaunch: afterLaunch)).minimize
+        controller.setActivityMinimizeBehavior(minimize)
+        NoticesHostProbeLog.event("minimize.applied", [
+            ("container", container.rawValue), ("minimize", minimize?.rawValue ?? "untouched"), ("phase", phase),
+        ])
+    }
+
+    private func apply(tabBarHidden: Bool, reason: String) {
+        guard let controller, let state = state?() else { return }
+        let facts = ActivityHostPolicy.Facts.current(container, sidebar: state.sidebar)
+        let hosts = ActivityHostPolicy.hosts(for: facts, overrides: .init(probe, afterLaunch: afterLaunch))
+        let hides = places?.hidesActivity(in: state.root) ?? false
+        let wanted = probe.showsBar && hosts.bar == .uiKitAccessory && !tabBarHidden && !hides
+        let had = controller.hasActivityAccessory
+        controller.setActivityAccessory(wanted ? accessory : nil, animated: controller.view.window != nil)
+        let action = wanted == had ? "kept" : wanted ? "set" : "cleared"
+        let flag = NoticesHostProbeLog.flag
+        NoticesHostProbeLog.event("bar.accessory", [
+            ("container", container.rawValue), ("action", action), ("reason", reason),
+            ("order", probe.barOrder.rawValue), ("tabBarHidden", flag(tabBarHidden)), ("hides", flag(hides)),
+            ("root", state.root.rawValue), ("sidebar", state.sidebar.rawValue),
+        ], key: action == "kept" ? "bar.accessory.kept.\(container.rawValue)" : nil)
+        NoticesHostProbeLog.event("host.decision", NoticesHostProbeLog.fields(facts, hosts),
+                                  key: "decision.\(container.rawValue)")
+    }
+
+    /// Reassigns the sidebar's bottom bar, for its resizing check.
+    private func reassignNow() {
+        guard let controller, let view = nowHost?.view else { return }
+        controller.sidebar.bottomBarView = nil
+        controller.sidebar.bottomBarView = view
+    }
+}
+#endif
 #endif
