@@ -56,6 +56,10 @@ struct SurroundApp: App {
         )
         .windowResizability(.contentMinSize)
         #endif
+        #if DEBUG && MAIN_APP
+        // The placeholder cover's Debug menu; empty without its launch flag.
+        .commands { NoticesPlaceholderCoverCommands() }
+        #endif
     }
 
     private var appContent: some View {
@@ -73,6 +77,10 @@ struct SurroundApp: App {
             #endif
             .modifier(WholeAppThemeAppearance())
             .modifier(FixtureColorScheme(colorScheme: fixtureColorScheme))
+            #if DEBUG && MAIN_APP
+            // One placeholder cover per scene; nothing without its launch flag.
+            .modifier(NoticesPlaceholderCoverProbe())
+            #endif
     }
 
     private var fixtureColorScheme: ColorScheme? {
