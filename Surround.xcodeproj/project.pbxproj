@@ -49,6 +49,9 @@
 		5C0E00082026110900000008 /* NoticesPlaceholderCoverContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00072026110900000007 /* NoticesPlaceholderCoverContract.swift */; };
 		5C0E00092026110900000009 /* NoticesPlaceholderCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E000A2026110900000010 /* NoticesPlaceholderCover.swift */; };
 		5C0E000B2026110900000011 /* NoticesPlaceholderCoverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E000C2026110900000012 /* NoticesPlaceholderCoverTests.swift */; };
+		C5A700022026110900000002 /* ConnectionStatusModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700012026110900000001 /* ConnectionStatusModel.swift */; };
+		C5A700032026110900000003 /* ConnectionStatusModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700012026110900000001 /* ConnectionStatusModel.swift */; };
+		C5A7000A202611090000000A /* ConnectionStatusModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700092026110900000009 /* ConnectionStatusModelTests.swift */; };
 		517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00052026102700000005 /* StonePlacementSoundTests.swift */; };
@@ -582,6 +585,8 @@
 		5C0E00072026110900000007 /* NoticesPlaceholderCoverContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesPlaceholderCoverContract.swift; sourceTree = "<group>"; };
 		5C0E000A2026110900000010 /* NoticesPlaceholderCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesPlaceholderCover.swift; sourceTree = "<group>"; };
 		5C0E000C2026110900000012 /* NoticesPlaceholderCoverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesPlaceholderCoverTests.swift; sourceTree = "<group>"; };
+		C5A700012026110900000001 /* ConnectionStatusModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusModel.swift; sourceTree = "<group>"; };
+		C5A700092026110900000009 /* ConnectionStatusModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusModelTests.swift; sourceTree = "<group>"; };
 		517D00022026102700000002 /* StonePlacementSoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundPlayer.swift; sourceTree = "<group>"; };
 		517D00052026102700000005 /* StonePlacementSoundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundTests.swift; sourceTree = "<group>"; };
 		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
@@ -1009,6 +1014,7 @@
 				A7F100052026110900000005 /* ActivityFixturesTests.swift */,
 				6A7E00052026110900000005 /* ActivityHostPolicyTests.swift */,
 				5C0E000C2026110900000012 /* NoticesPlaceholderCoverTests.swift */,
+				C5A700092026110900000009 /* ConnectionStatusModelTests.swift */,
 				BCFA1151000000000000000C /* HomeRulesTests.swift */,
 				0189D12871764C28AF2D6CE0 /* GameDetailDesignFixtureTests.swift */,
 				87DB1CF4B22A44B2AA1EBCCE /* GameControlRowMetricsTests.swift */,
@@ -1136,6 +1142,7 @@
 			children = (
 				AC7100022026110900000002 /* ActivityModel.swift */,
 				6A7E00022026110900000002 /* ActivityHostPolicy.swift */,
+				C5A700012026110900000001 /* ConnectionStatusModel.swift */,
 				AA1600012026091600000001 /* ChallengeDraft.swift */,
 				AA1700012026091700000001 /* ProfileRating.swift */,
 				AFA600012026100400000001 /* ProfileBiographyDocument.swift */,
@@ -1723,6 +1730,7 @@
 				5C0E00032026110900000003 /* SceneCoverPolicy.swift in Sources */,
 				5C0E00062026110900000006 /* NoticesPlaceholderCoverContract.swift in Sources */,
 				5C0E00092026110900000009 /* NoticesPlaceholderCover.swift in Sources */,
+				C5A700022026110900000002 /* ConnectionStatusModel.swift in Sources */,
 				B10A00012026102900000001 /* BetaSimulatorLoginBridge.swift in Sources */,
 				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
 				AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */,
@@ -1863,6 +1871,8 @@
 				5C0E00052026110900000005 /* SceneCoverPolicy.swift in Sources */,
 				5C0E00082026110900000008 /* NoticesPlaceholderCoverContract.swift in Sources */,
 				5C0E000B2026110900000011 /* NoticesPlaceholderCoverTests.swift in Sources */,
+				C5A700032026110900000003 /* ConnectionStatusModel.swift in Sources */,
+				C5A7000A202611090000000A /* ConnectionStatusModelTests.swift in Sources */,
 				BCFA1151000000000000000B /* HomeRules.swift in Sources */,
 				BCFA1151000000000000000D /* HomeRulesTests.swift in Sources */,
 				C1ACC76C51B9DBE9AC72CBCA /* Stone.swift in Sources */,
