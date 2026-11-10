@@ -197,6 +197,9 @@ struct GameDetailView: View {
         return windowGeometry.keyboardOverlap(keyboardScreenFrame)
     }
 
+    /// The Active games slot's rule today. Phase 4 replaces it, together with
+    /// `GameDetailNotificationContext.listsLiveGames`, through
+    /// `activeGamesSlot(in:isShown:)`.
     var canShowActiveGames: Bool {
         guard allowsActiveGamesCarousel else {
             return false
@@ -447,15 +450,26 @@ struct GameDetailView: View {
         return false
     }
 
-    /// A narrow iPad window arranges its controls like a portrait iPhone:
-    /// modes and Active Games in the bottom bar, leaving the top bar room so
-    /// nothing moves into its More menu.
-    private var placesActiveGamesAtTop: Bool {
+    /// Which of Game Detail's four toolbar arrangements this layout uses.
+    private var toolbarArrangement: GameToolbarArrangement {
         #if os(iOS) && !targetEnvironment(macCatalyst)
-        !isVerticalToolbar && (!compactLayout || compactLandscape)
+        let isCatalyst = false
         #else
-        true
+        let isCatalyst = true
         #endif
+        return GameToolbarArrangement(isVerticalToolbar: isVerticalToolbar, compact: compactLayout,
+                                      compactLandscape: compactLandscape, isCatalyst: isCatalyst)
+    }
+
+    /// The Active games slot in this arrangement. Every arrangement emits it
+    /// at its own place (GameActiveGamesSlotItems); phase 4's in-game control
+    /// replaces its view and rule here, never in the arrangements.
+    private func activeGamesSlot(in arrangement: GameToolbarArrangement,
+                                 isShown: Bool) -> GameActiveGamesSlot {
+        let placement = arrangement.activeGamesPlacement(
+            compact: compactLayout, navigationBarHidden: hidesNavigationBarInDuoWide)
+        return GameActiveGamesSlot(placement: placement, isShown: isShown,
+                                   view: AnyView(activeGamesButton))
     }
     
     func updateDetailOfCurrentGameIfNecessary() {
@@ -700,6 +714,7 @@ struct GameDetailView: View {
         }
 
         let showsActiveGamesButton = canShowActiveGames
+        let toolbarArrangement = self.toolbarArrangement
         #if targetEnvironment(macCatalyst)
         // Keep the document identity in the Mac window title. The game
         // surface itself has no navigation heading; clocks open its details.
@@ -881,7 +896,7 @@ struct GameDetailView: View {
                 showsCompactChatBoard: $showsCompactChatBoard,
                 showSettings: $showSettings,
                 compact: compactLayout,
-                compactLandscape: compactLandscape,
+                arrangement: toolbarArrangement,
                 zenMode: zenMode,
                 exitsZenFromContent: hidesZenChrome,
                 navigationBarHidden: hidesNavigationBarInDuoWide,
@@ -891,9 +906,7 @@ struct GameDetailView: View {
                 showsCurrentPlayerClockInHeader: showsCurrentPlayerClockInHeader,
                 keyboardVisible: effectiveAttachedKeyboardVisible || chatSession.wantsInputFocus,
                 softwareKeyboardVisible: effectiveAttachedKeyboardVisible,
-                showsActiveGamesButton: showsActiveGamesButton,
-                placesActiveGamesAtTop: placesActiveGamesAtTop,
-                activeGamesButton: AnyView(activeGamesButton),
+                activeGamesSlot: activeGamesSlot(in: toolbarArrangement, isShown: showsActiveGamesButton),
                 cycleFlowingInk: cycleFlowingInkTheme,
                 dismissChatInput: chatSession.dismissInput,
                 enterZenMode: enterZenMode,
@@ -1098,7 +1111,7 @@ private struct GameToolbarLayout: ViewModifier {
     @Binding var showsCompactChatBoard: Bool
     @Binding var showSettings: Bool
     let compact: Bool
-    let compactLandscape: Bool
+    let arrangement: GameToolbarArrangement
     let zenMode: Bool
     let exitsZenFromContent: Bool
     let navigationBarHidden: Bool
@@ -1109,9 +1122,8 @@ private struct GameToolbarLayout: ViewModifier {
     let keyboardVisible: Bool
     /// An on-screen keyboard; a hardware keyboard leaves nothing to dismiss.
     let softwareKeyboardVisible: Bool
-    let showsActiveGamesButton: Bool
-    let placesActiveGamesAtTop: Bool
-    let activeGamesButton: AnyView
+    /// The Active games slot; every arrangement emits it at its own place.
+    let activeGamesSlot: GameActiveGamesSlot
     let cycleFlowingInk: () -> Void
     let dismissChatInput: () -> Void
     let enterZenMode: () -> Void
@@ -1132,7 +1144,7 @@ private struct GameToolbarLayout: ViewModifier {
     }
 
     private var usesBottomChatToolbar: Bool {
-        compact && !compactLandscape && !placesActiveGamesAtTop && !isVerticalToolbar
+        arrangement == .bottomBar
     }
 
     /// Before iOS 26 the custom button carries the unread badge, but a top
@@ -1402,94 +1414,103 @@ private struct GameToolbarLayout: ViewModifier {
         }
     }
 
-    /// Modes, utilities and Active Games for each toolbar arrangement. The
-    /// bottom-bar items stay in this one builder (see the spacer note).
+    /// Modes, utilities and the Active games slot. Each arrangement's builder
+    /// keeps its bar items in order, the slot composed in place, never through
+    /// a separate `.toolbar` (whose items coalesce before a spacer). Split by
+    /// arrangement so Xcode 26.2 can type-check each.
     @ToolbarContentBuilder private var controlItems: some ToolbarContent {
-        if !isVerticalToolbar {
+        if arrangement != .vertical {
             flowingInkItems(placement: .topBarTrailing)
         }
-        if isVerticalToolbar {
-            if compact {
-                flowingInkItems(placement: .topBarTrailing)
-                // Closed keeps utilities beside upper navigation
-                // and modes in their own lower native group.
-                if interaction.panel == .chat || !analyzingIsPresented {
-                    ToolbarItem(placement: pinnedUtilityPlacement) {
-                        utilityModeButton
-                    }
-                }
-                GameVerticalToolbarGroup(placement: .topBarTrailing) {
-                    optionsButton
-                }
-                GameVerticalToolbarGroup(placement: .topBarTrailing) {
-                    modeButtons
-                }
-            } else if navigationBarHidden {
-                // Duo wide hides the navigation bar, whose band held
-                // only the system sidebar toggle. The controls move
-                // to the vertical bar's lower group, which stays;
-                // the game draws Back at the top of the bar itself.
-                flowingInkItems(placement: .bottomBar)
-                GameVerticalToolbarGroup(placement: .bottomBar) {
-                    if !drawsBackInContent { backButton }
-                    modeButtons
-                    utilityButtons
-                }
-                // Active Games keeps its own circle at the bottom.
-                #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
-                if #available(iOS 26.0, *) {
-                    ToolbarSpacer(.flexible, placement: .bottomBar)
-                }
-                #endif
-            } else {
-                flowingInkItems(placement: .topBarTrailing)
-                GameVerticalToolbarGroup(placement: .topBarTrailing) {
-                    modeButtons
-                    utilityButtons
-                }
-            }
-            if showsActiveGamesButton {
-                GameVerticalToolbarGroup(placement: .bottomBar) {
-                    activeGamesButton
-                }
-            }
-        } else if compact && !compactLandscape && !placesActiveGamesAtTop {
-            ToolbarItemGroup(placement: .topBarTrailing) { utilityButtons }
-            if showsActiveGamesButton {
-                ToolbarItem(placement: .bottomBar) { activeGamesButton }
-            }
-            // All bottom content belongs to this toolbar builder;
-            // separate builders coalesce items before their spacer.
-            #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
-            if #available(iOS 26.0, *) {
-                ToolbarSpacer(.flexible, placement: .bottomBar)
-            } else {
-                ToolbarItem(placement: .bottomBar) { Spacer() }
-            }
-            #else
-            ToolbarItem(placement: .bottomBar) { Spacer() }
-            #endif
-            ToolbarItemGroup(placement: .bottomBar) { modeButtons }
-        } else if compactLandscape {
-            if showsActiveGamesButton {
-                ToolbarItem(placement: .topBarTrailing) { activeGamesButton }
-            }
-            ToolbarItemGroup(placement: .topBarTrailing) { modeButtons }
-            ToolbarItemGroup(placement: .topBarTrailing) { utilityButtons }
+        if arrangement == .vertical {
+            verticalControlItems
+        } else if arrangement == .bottomBar {
+            bottomBarControlItems
+        } else if arrangement == .compactLandscape {
+            compactLandscapeControlItems
         } else {
-            // Wide windows keep modes and Active Games at the top.
+            wideControlItems
+        }
+    }
+
+    /// Duo's vertical toolbar, with Active games in its own group at the bottom.
+    @ToolbarContentBuilder private var verticalControlItems: some ToolbarContent {
+        if compact {
+            flowingInkItems(placement: .topBarTrailing)
+            // Closed keeps utilities beside upper navigation
+            // and modes in their own lower native group.
+            if interaction.panel == .chat || !analyzingIsPresented {
+                ToolbarItem(placement: pinnedUtilityPlacement) {
+                    utilityModeButton
+                }
+            }
+            GameVerticalToolbarGroup(placement: .topBarTrailing) {
+                optionsButton
+            }
             GameVerticalToolbarGroup(placement: .topBarTrailing) {
                 modeButtons
             }
-            if placesActiveGamesAtTop && showsActiveGamesButton {
-                GameVerticalToolbarGroup(placement: .topBarTrailing) {
-                    activeGamesButton
-                }
+        } else if navigationBarHidden {
+            // Duo wide hides the navigation bar, whose band held
+            // only the system sidebar toggle. The controls move
+            // to the vertical bar's lower group, which stays;
+            // the game draws Back at the top of the bar itself.
+            flowingInkItems(placement: .bottomBar)
+            GameVerticalToolbarGroup(placement: .bottomBar) {
+                if !drawsBackInContent { backButton }
+                modeButtons
+                utilityButtons
             }
-            ToolbarItemGroup(placement: .topBarTrailing) {
+            // The slot's own spacer keeps Active Games in its circle.
+        } else {
+            flowingInkItems(placement: .topBarTrailing)
+            GameVerticalToolbarGroup(placement: .topBarTrailing) {
+                modeButtons
                 utilityButtons
             }
         }
+        activeGamesItems
+    }
+
+    /// Compact portrait: utilities at the top; Active games, a spacer and the
+    /// modes in the bottom bar, all in this one builder.
+    @ToolbarContentBuilder private var bottomBarControlItems: some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarTrailing) { utilityButtons }
+        activeGamesItems
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+        if #available(iOS 26.0, *) {
+            ToolbarSpacer(.flexible, placement: .bottomBar)
+        } else {
+            ToolbarItem(placement: .bottomBar) { Spacer() }
+        }
+        #else
+        ToolbarItem(placement: .bottomBar) { Spacer() }
+        #endif
+        ToolbarItemGroup(placement: .bottomBar) { modeButtons }
+    }
+
+    /// Compact landscape: Active games, then the modes and the utilities, at the top.
+    @ToolbarContentBuilder private var compactLandscapeControlItems: some ToolbarContent {
+        activeGamesItems
+        ToolbarItemGroup(placement: .topBarTrailing) { modeButtons }
+        ToolbarItemGroup(placement: .topBarTrailing) { utilityButtons }
+    }
+
+    /// Wide windows and the Mac: modes, Active games and utilities at the top.
+    @ToolbarContentBuilder private var wideControlItems: some ToolbarContent {
+        // Wide windows keep modes and Active Games at the top.
+        GameVerticalToolbarGroup(placement: .topBarTrailing) {
+            modeButtons
+        }
+        activeGamesItems
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            utilityButtons
+        }
+    }
+
+    /// The one Active games unit every arrangement emits.
+    private var activeGamesItems: GameActiveGamesSlotItems {
+        GameActiveGamesSlotItems(slot: activeGamesSlot)
     }
 
     func body(content: Content) -> some View {
@@ -1624,6 +1645,47 @@ private struct GameVerticalToolbarGroup<Content: View>: ToolbarContent {
         #else
         ToolbarItemGroup(placement: placement, content: content)
         #endif
+    }
+}
+
+/// What fills Game Detail's Active games slot: today the Active games button
+/// and its popover. Phase 4's in-game control replaces it.
+private struct GameActiveGamesSlot {
+    var placement: GameActiveGamesPlacement
+    /// `GameDetailView.canShowActiveGames` today.
+    var isShown: Bool
+    var view: AnyView
+}
+
+/// The Active games slot at the place its arrangement gives it. Every
+/// arrangement emits this one unit, so the slot changes here and in
+/// `GameDetailView.activeGamesSlot(in:isShown:)`, never in the arrangements.
+private struct GameActiveGamesSlotItems: ToolbarContent {
+    let slot: GameActiveGamesSlot
+
+    var body: some ToolbarContent {
+        // Duo's wide poses keep Active games in its own circle at the bottom
+        // of the rail. The spacer stays without the slot, as it did before.
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+        if slot.placement == .railSeparated {
+            if #available(iOS 26.0, *) {
+                ToolbarSpacer(.flexible, placement: .bottomBar)
+            }
+        }
+        #endif
+        // Independent conditions (one is true at most), as in principalItems.
+        if slot.isShown && slot.placement.form == .rail {
+            GameVerticalToolbarGroup(placement: .bottomBar) { slot.view }
+        }
+        if slot.isShown && slot.placement == .bottomBar {
+            ToolbarItem(placement: .bottomBar) { slot.view }
+        }
+        if slot.isShown && slot.placement == .topBarBeforeModes {
+            ToolbarItem(placement: .topBarTrailing) { slot.view }
+        }
+        if slot.isShown && slot.placement == .topBarAfterModes {
+            GameVerticalToolbarGroup(placement: .topBarTrailing) { slot.view }
+        }
     }
 }
 

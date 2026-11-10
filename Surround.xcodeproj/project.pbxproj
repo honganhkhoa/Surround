@@ -109,6 +109,9 @@
 		AE6000013B00000000000101 /* GameDetailDisplayReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000105 /* GameDetailDisplayReset.swift */; };
 		AE6000023B00000000000002 /* GameDetailConnectionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */; };
 		AE6000023B00000000000102 /* GameDetailDisplayReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000105 /* GameDetailDisplayReset.swift */; };
+		7B5A00012026110900000001 /* GameToolbarArrangement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A00022026110900000002 /* GameToolbarArrangement.swift */; };
+		7B5A00032026110900000003 /* GameToolbarArrangement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A00022026110900000002 /* GameToolbarArrangement.swift */; };
+		7B5A00042026110900000004 /* GameToolbarArrangementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A00052026110900000005 /* GameToolbarArrangementTests.swift */; };
 		AE6000033B00000000000003 /* GameHistoryPaginationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000063B00000000000006 /* GameHistoryPaginationState.swift */; };
 		AE6000043B00000000000004 /* GameHistoryPaginationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000063B00000000000006 /* GameHistoryPaginationState.swift */; };
 		AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1000023D00000000000002 /* AnalyzeControlBar.swift */; };
@@ -607,6 +610,8 @@
 		AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailConnectionCoordinator.swift; sourceTree = "<group>"; };
 		AE6000053B00000000000105 /* GameDetailDisplayReset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailDisplayReset.swift; sourceTree = "<group>"; };
+		7B5A00022026110900000002 /* GameToolbarArrangement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameToolbarArrangement.swift; sourceTree = "<group>"; };
+		7B5A00052026110900000005 /* GameToolbarArrangementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameToolbarArrangementTests.swift; sourceTree = "<group>"; };
 		AE6000063B00000000000006 /* GameHistoryPaginationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameHistoryPaginationState.swift; sourceTree = "<group>"; };
 		AF1000023D00000000000002 /* AnalyzeControlBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyzeControlBar.swift; sourceTree = "<group>"; };
 		AF2000063E00000000000006 /* OGSConditionalMoves.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSConditionalMoves.swift; sourceTree = "<group>"; };
@@ -961,6 +966,7 @@
 				0189D12871764C28AF2D6CE0 /* GameDetailDesignFixtureTests.swift */,
 				87DB1CF4B22A44B2AA1EBCCE /* GameControlRowMetricsTests.swift */,
 				38FC39EF8A664FC6865B488D /* GameDetailLayoutTests.swift */,
+				7B5A00052026110900000005 /* GameToolbarArrangementTests.swift */,
 				DB6E63D75AB347B8BACD9A02 /* GameDetailClockStateTests.swift */,
 				78D0AC1C5BE94978AB949160 /* GameControlStateTests.swift */,
 				A0982EB6654F4DB084896E94 /* ChatSessionStateTests.swift */,
@@ -1208,6 +1214,7 @@
 				BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */,
 				AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */,
 				AE6000053B00000000000105 /* GameDetailDisplayReset.swift */,
+				7B5A00022026110900000002 /* GameToolbarArrangement.swift */,
 				BC463B0C266353D700D40D3A /* SingleGameView.swift */,
 				BC62A89B2664A6F500BF5F78 /* AnalyzeTreeView.swift */,
 			);
@@ -1645,6 +1652,7 @@
 				BC8346B3A100495EB9BAA832 /* GameControlState.swift in Sources */,
 				B6F7514611BD405D81540CA9 /* ChatSessionState.swift in Sources */,
 				AE6000013B00000000000101 /* GameDetailDisplayReset.swift in Sources */,
+				7B5A00012026110900000001 /* GameToolbarArrangement.swift in Sources */,
 				AD0800012026090800000001 /* SurroundAnimationDiagnostics.swift in Sources */,
 				AF2000013E00000000000001 /* OGSConditionalMoves.swift in Sources */,
 				AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */,
@@ -1794,6 +1802,8 @@
 				822153073E0C4D8593067A7D /* GameControlState.swift in Sources */,
 				C42D11E94B9A48AEB3E62EC6 /* ChatSessionState.swift in Sources */,
 				AE6000023B00000000000102 /* GameDetailDisplayReset.swift in Sources */,
+				7B5A00032026110900000003 /* GameToolbarArrangement.swift in Sources */,
+				7B5A00042026110900000004 /* GameToolbarArrangementTests.swift in Sources */,
 				C0D100032026082900000003 /* CorrespondenceWidgetGridLayout.swift in Sources */,
 				C0D100052026082900000005 /* CorrespondenceWidgetGridLayoutTests.swift in Sources */,
 				C0D100072026082900000007 /* AppRouteTests.swift in Sources */,
