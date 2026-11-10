@@ -194,3 +194,104 @@ final class ActivityHostPolicyTests: XCTestCase {
         XCTAssertEqual(combinations, 324)
     }
 }
+
+#if DEBUG
+extension ActivityHostPolicyTests {
+    private typealias Probe = SurroundUITestContract.NoticesHostProbe
+    private typealias C = SurroundUITestContract
+
+    func testNoticesHostProbeIsNilWithoutItsFlags() throws {
+        XCTAssertNil(try Probe.parse(["Surround", "--surround-ui-testing"]))
+        XCTAssertNil(try Probe.parse([]))
+    }
+
+    func testNoticesHostProbeParsesEachFlag() throws {
+        let arguments = ["Surround",
+                         C.noticesPlaceholderBarLaunchArgument,
+                         C.noticesPlaceholderBarOrderLaunchArgument, "deferred",
+                         C.noticesPlaceholderBarKeyboardLaunchArgument, "hide",
+                         C.noticesTabBarMinimizeLaunchArgument, "on-scroll-down-after-launch",
+                         C.noticesPlaceholderNowLaunchArgument,
+                         C.noticesPlaceholderSubtitleLaunchArgument, "cycle",
+                         C.noticesNavigationBarMinimizeLaunchArgument, "never"]
+        let expected = Probe(showsBar: true, forcesCustomBar: false, barOrder: .deferred, barKeyboard: .hide,
+                             tabBarMinimize: .onScrollDownAfterLaunch, showsNow: true, subtitle: .cycle,
+                             navigationBarMinimize: .never)
+        XCTAssertEqual(try Probe.parse(arguments), expected)
+        var forced = expected
+        forced.forcesCustomBar = true
+        XCTAssertEqual(try Probe.parse(arguments + [C.noticesForceCustomBarLaunchArgument]), forced)
+    }
+
+    func testForcingTheCustomBarShowsThePlaceholderBar() throws {
+        XCTAssertEqual(try Probe.parse([C.noticesForceCustomBarLaunchArgument]),
+                       Probe(showsBar: true, forcesCustomBar: true))
+        XCTAssertEqual(try Probe.parse([C.noticesForceCustomBarLaunchArgument,
+                                        C.noticesPlaceholderBarOrderLaunchArgument, "after"])?.barOrder, .after)
+    }
+
+    func testCompanionFlagsNeedTheirPrimary() {
+        let cases: [([String], Probe.ParseError)] = [
+            ([C.noticesPlaceholderBarOrderLaunchArgument, "after"],
+             .needs(flag: C.noticesPlaceholderBarOrderLaunchArgument, primary: C.noticesPlaceholderBarLaunchArgument)),
+            ([C.noticesPlaceholderBarKeyboardLaunchArgument, "ignore"],
+             .needs(flag: C.noticesPlaceholderBarKeyboardLaunchArgument, primary: C.noticesPlaceholderBarLaunchArgument)),
+            ([C.noticesNavigationBarMinimizeLaunchArgument, "never"],
+             .needs(flag: C.noticesNavigationBarMinimizeLaunchArgument,
+                    primary: C.noticesPlaceholderSubtitleLaunchArgument)),
+        ]
+        for (arguments, error) in cases {
+            XCTAssertThrowsError(try Probe.parse(arguments), "\(arguments)") {
+                XCTAssertEqual($0 as? Probe.ParseError, error)
+            }
+        }
+    }
+
+    func testMalformedProbeValuesThrow() {
+        let flag = C.noticesTabBarMinimizeLaunchArgument
+        XCTAssertThrowsError(try Probe.parse([C.noticesPlaceholderBarLaunchArgument, flag])) {
+            XCTAssertEqual($0 as? Probe.ParseError, .missingValue(flag: flag))
+        }
+        XCTAssertThrowsError(try Probe.parse([flag, "sometimes"])) {
+            XCTAssertEqual($0 as? Probe.ParseError, .invalidValue(flag: flag, value: "sometimes"))
+        }
+        XCTAssertThrowsError(try Probe.parse([flag, C.noticesPlaceholderBarLaunchArgument])) {
+            XCTAssertEqual($0 as? Probe.ParseError,
+                           .invalidValue(flag: flag, value: C.noticesPlaceholderBarLaunchArgument))
+        }
+        XCTAssertThrowsError(try Probe.parse([C.noticesPlaceholderSubtitleLaunchArgument, "Status"])) {
+            XCTAssertEqual($0 as? Probe.ParseError,
+                           .invalidValue(flag: C.noticesPlaceholderSubtitleLaunchArgument, value: "Status"))
+        }
+    }
+
+    func testTheFirstFlagOccurrenceWins() throws {
+        let flag = C.noticesTabBarMinimizeLaunchArgument
+        XCTAssertEqual(try Probe.parse([flag, "never", flag, "automatic"])?.tabBarMinimize, .never)
+        XCTAssertEqual(try Probe.parse([C.noticesPlaceholderSubtitleLaunchArgument, "retry",
+                                        C.noticesPlaceholderSubtitleLaunchArgument, "cycle"])?.subtitle, .retry)
+    }
+
+    func testProbeOverridesSwitchMinimizingAfterLaunch() throws {
+        let probe = try XCTUnwrap(try Probe.parse([C.noticesTabBarMinimizeLaunchArgument,
+                                                   "on-scroll-down-after-launch"]))
+        XCTAssertEqual(Policy.Overrides(probe, afterLaunch: false), .init(forcesCustomBar: false, minimize: .never))
+        XCTAssertEqual(Policy.Overrides(probe, afterLaunch: true), .init(forcesCustomBar: false, minimize: .onScrollDown))
+        XCTAssertEqual(Policy.Overrides(nil, afterLaunch: true), Policy.Overrides())
+        XCTAssertEqual(Policy.Overrides(nil, afterLaunch: false), Policy.Overrides())
+        for (value, minimize) in [("automatic", Policy.Minimize.automatic), ("never", .never),
+                                  ("on-scroll-down", .onScrollDown), ("on-scroll-up", .onScrollUp)] {
+            let probe = try XCTUnwrap(try Probe.parse([C.noticesTabBarMinimizeLaunchArgument, value]))
+            XCTAssertEqual(Policy.Overrides(probe, afterLaunch: false).minimize, minimize, value)
+            XCTAssertEqual(Policy.Overrides(probe, afterLaunch: true).minimize, minimize, value)
+        }
+        let forced = try XCTUnwrap(try Probe.parse([C.noticesForceCustomBarLaunchArgument]))
+        XCTAssertEqual(Policy.Overrides(forced, afterLaunch: true), .init(forcesCustomBar: true, minimize: nil))
+        // The iPhone TabView on 26.1 goes from .never to .onScrollDown once the window appears.
+        let facts = Policy.Facts(platform: .iPhone, container: .swiftUITabView, release: .iOS26_1,
+                                 sdkHasHostAPIs: true)
+        XCTAssertEqual(Policy.hosts(for: facts, overrides: .init(probe, afterLaunch: false)).minimize, .never)
+        XCTAssertEqual(Policy.hosts(for: facts, overrides: .init(probe, afterLaunch: true)).minimize, .onScrollDown)
+    }
+}
+#endif

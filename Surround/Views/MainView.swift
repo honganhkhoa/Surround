@@ -280,6 +280,9 @@ struct MainView: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .modifier(MainTabPlacement(horizontalSizeClass: horizontalSizeClass))
+        #if DEBUG
+        .modifier(NoticesHostProbeTabs(places: nav.activityPlaces, root: nav.main.rootView))
+        #endif
     }
 
     var body: some View {

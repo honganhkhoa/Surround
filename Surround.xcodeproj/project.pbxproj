@@ -41,6 +41,7 @@
 		6A7E00032026110900000003 /* ActivityHostPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7E00022026110900000002 /* ActivityHostPolicy.swift */; };
 		6A7E00042026110900000004 /* ActivityHostPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7E00052026110900000005 /* ActivityHostPolicyTests.swift */; };
 		6A7E00062026110900000006 /* ActivityHostSDK.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7E00072026110900000007 /* ActivityHostSDK.swift */; };
+		6A7E00082026110900000008 /* NoticesHostProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7E00092026110900000009 /* NoticesHostProbe.swift */; };
 		517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00052026102700000005 /* StonePlacementSoundTests.swift */; };
@@ -564,6 +565,7 @@
 		6A7E00022026110900000002 /* ActivityHostPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityHostPolicy.swift; sourceTree = "<group>"; };
 		6A7E00052026110900000005 /* ActivityHostPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityHostPolicyTests.swift; sourceTree = "<group>"; };
 		6A7E00072026110900000007 /* ActivityHostSDK.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityHostSDK.swift; sourceTree = "<group>"; };
+		6A7E00092026110900000009 /* NoticesHostProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesHostProbe.swift; sourceTree = "<group>"; };
 		517D00022026102700000002 /* StonePlacementSoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundPlayer.swift; sourceTree = "<group>"; };
 		517D00052026102700000005 /* StonePlacementSoundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundTests.swift; sourceTree = "<group>"; };
 		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
@@ -890,6 +892,7 @@
 				AE3100083A00000000000008 /* OGSService+Fixtures.swift */,
 				A7F100022026110900000002 /* ActivityFixtures.swift */,
 				AE3100043A00000000000004 /* SurroundUITestContract.swift */,
+				6A7E00092026110900000009 /* NoticesHostProbe.swift */,
 				AE3100053A00000000000005 /* SurroundUITestOfflineServices.swift */,
 			);
 			path = UITesting;
@@ -1686,6 +1689,7 @@
 				ACA1D0012026110900000001 /* ActivityPlaceRegistry.swift in Sources */,
 				6A7E00012026110900000001 /* ActivityHostPolicy.swift in Sources */,
 				6A7E00062026110900000006 /* ActivityHostSDK.swift in Sources */,
+				6A7E00082026110900000008 /* NoticesHostProbe.swift in Sources */,
 				B10A00012026102900000001 /* BetaSimulatorLoginBridge.swift in Sources */,
 				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
 				AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */,

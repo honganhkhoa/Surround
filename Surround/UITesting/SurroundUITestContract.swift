@@ -133,6 +133,16 @@ enum SurroundUITestContract {
         "--surround-structured-chat-formats"
     static let appReviewPresentationLaunchArgument =
         "--surround-app-review-presentation"
+    /// DEBUG notices host probes (TESTING.md); any Debug run, with or without
+    /// `--surround-ui-testing`.
+    static let noticesPlaceholderBarLaunchArgument = "--surround-notices-placeholder-bar"
+    static let noticesPlaceholderBarOrderLaunchArgument = "--surround-notices-placeholder-bar-order"
+    static let noticesPlaceholderBarKeyboardLaunchArgument = "--surround-notices-placeholder-bar-keyboard"
+    static let noticesForceCustomBarLaunchArgument = "--surround-notices-force-custom-bar"
+    static let noticesTabBarMinimizeLaunchArgument = "--surround-notices-tab-bar-minimize"
+    static let noticesPlaceholderNowLaunchArgument = "--surround-notices-placeholder-now"
+    static let noticesPlaceholderSubtitleLaunchArgument = "--surround-notices-placeholder-subtitle"
+    static let noticesNavigationBarMinimizeLaunchArgument = "--surround-notices-navigation-bar-minimize"
     static let preferencesSuite = "com.honganhkhoa.Surround.UITests"
     static let appStoreScreenshotWidgetGameCount = 3
     static let compatibilityWidgetGameCount = 4
@@ -681,6 +691,11 @@ enum SurroundUITestContract {
             screenshotWidgetFixtureCleanupLaunchArgument
         )
     }
+
+    static let noticesHostProbe: NoticesHostProbe? = {
+        do { return try NoticesHostProbe.parse(ProcessInfo.processInfo.arguments) }
+        catch { preconditionFailure("Invalid notices host probe flags: \(error)") }
+    }()
     #else
     static let isEnabled = false
     static let isCapturingAppStoreScreenshots = false
@@ -1159,3 +1174,100 @@ enum SurroundUITestContract {
         static let newGameOptionPicker = "newGame.option"
     }
 }
+
+#if DEBUG
+extension SurroundUITestContract {
+    /// The notices host probe flags, parsed. Foundation only: this file also
+    /// builds into SurroundTests, SurroundUITests and the widget extension.
+    struct NoticesHostProbe: Equatable {
+        enum TabBarMinimize: String, CaseIterable {
+            case automatic, never, onScrollDown = "on-scroll-down", onScrollUp = "on-scroll-up"
+            /// .never until the window first appears, then .onScrollDown, a
+            /// workaround to try for the first tab's animation at launch.
+            case onScrollDownAfterLaunch = "on-scroll-down-after-launch"
+        }
+        /// When a UIKit container sets or clears its accessory, relative to
+        /// setTabBarHidden. Deferred also stops IPadTabContainer sampling closed
+        /// baselines until the change lands.
+        enum BarOrder: String, CaseIterable { case before, after, deferred }
+        /// The custom bar with a docked software keyboard: a plain safeAreaInset;
+        /// the root ignoring the keyboard safe area; hidden while it shows.
+        enum BarKeyboard: String, CaseIterable { case standard, ignore, hide }
+        /// "Reconnecting…"; "Can’t reach OGS" + Retry; or the status alternating
+        /// with an empty subtitle every 4 s.
+        enum Subtitle: String, CaseIterable { case status, retry, cycle }
+        enum NavigationBarMinimize: String, CaseIterable { case automatic, never }
+        enum ParseError: Error, Equatable {
+            case missingValue(flag: String), invalidValue(flag: String, value: String)
+            case needs(flag: String, primary: String)
+        }
+        enum AccessibilityID {
+            static let bar = "notices.placeholderBar", barLine1 = "notices.placeholderBar.line1"
+            static let barLine2 = "notices.placeholderBar.line2", barSheet = "notices.placeholderBar.sheet"
+            static let barPopover = "notices.placeholderBar.popover", barPresented = "notices.placeholderBar.presented"
+            static let now = "notices.placeholderNow", nowRetry = "notices.placeholderNow.retry"
+            static func nowRow(_ index: Int) -> String { "notices.placeholderNow.row.\(index)" }
+            static let nowAdd = "notices.placeholderNow.add", nowRemove = "notices.placeholderNow.remove"
+            static let nowReassign = "notices.placeholderNow.reassign", nowAll = "notices.placeholderNow.all"
+            static let nowAllContent = "notices.placeholderNow.allContent"
+            static let subtitleRetry = "notices.placeholderSubtitle.retry"
+            static let subtitleLargeRetry = "notices.placeholderSubtitle.largeRetry"
+        }
+
+        var showsBar = false
+        var forcesCustomBar = false
+        var barOrder = BarOrder.before
+        var barKeyboard = BarKeyboard.standard
+        var tabBarMinimize: TabBarMinimize?
+        var showsNow = false
+        var subtitle: Subtitle?
+        var navigationBarMinimize: NavigationBarMinimize?
+
+        /// Nil without any notices host flag. A malformed value, or a companion
+        /// flag without its primary, throws. The first occurrence of a flag wins.
+        static func parse(_ arguments: [String]) throws -> NoticesHostProbe? {
+            typealias C = SurroundUITestContract
+            var probe = NoticesHostProbe()
+            probe.forcesCustomBar = arguments.contains(C.noticesForceCustomBarLaunchArgument)
+            probe.showsBar = probe.forcesCustomBar || arguments.contains(C.noticesPlaceholderBarLaunchArgument)
+            probe.showsNow = arguments.contains(C.noticesPlaceholderNowLaunchArgument)
+            probe.tabBarMinimize = try value(C.noticesTabBarMinimizeLaunchArgument, in: arguments)
+            probe.subtitle = try value(C.noticesPlaceholderSubtitleLaunchArgument, in: arguments)
+            if let order: BarOrder = try value(C.noticesPlaceholderBarOrderLaunchArgument, in: arguments) {
+                try require(probe.showsBar, C.noticesPlaceholderBarOrderLaunchArgument, C.noticesPlaceholderBarLaunchArgument)
+                probe.barOrder = order
+            }
+            if let keyboard: BarKeyboard = try value(C.noticesPlaceholderBarKeyboardLaunchArgument, in: arguments) {
+                try require(probe.showsBar, C.noticesPlaceholderBarKeyboardLaunchArgument, C.noticesPlaceholderBarLaunchArgument)
+                probe.barKeyboard = keyboard
+            }
+            if let bar: NavigationBarMinimize = try value(C.noticesNavigationBarMinimizeLaunchArgument, in: arguments) {
+                try require(probe.subtitle != nil, C.noticesNavigationBarMinimizeLaunchArgument,
+                            C.noticesPlaceholderSubtitleLaunchArgument)
+                probe.navigationBarMinimize = bar
+            }
+            return probe == NoticesHostProbe() ? nil : probe
+        }
+
+        private static func require(_ condition: Bool, _ flag: String, _ primary: String) throws {
+            guard condition else { throw ParseError.needs(flag: flag, primary: primary) }
+        }
+
+        private static func value<Value: RawRepresentable>(_ flag: String, in arguments: [String]) throws -> Value?
+        where Value.RawValue == String {
+            guard let index = arguments.firstIndex(of: flag) else { return nil }
+            guard arguments.indices.contains(index + 1) else { throw ParseError.missingValue(flag: flag) }
+            guard let value = Value(rawValue: arguments[index + 1]) else {
+                throw ParseError.invalidValue(flag: flag, value: arguments[index + 1])
+            }
+            return value
+        }
+    }
+
+    /// UI tests: extra probe flags from SURROUND_UI_NOTICES_HOST_PROBE (Xcode
+    /// passes TEST_RUNNER_SURROUND_UI_NOTICES_HOST_PROBE), split on whitespace.
+    static func noticesHostProbeArguments(_ environment: [String: String]) -> [String] {
+        (environment["SURROUND_UI_NOTICES_HOST_PROBE"] ?? "").split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+}
+#endif

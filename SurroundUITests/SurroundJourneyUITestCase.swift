@@ -58,6 +58,9 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         app.launchArguments = languageLaunchArguments + [
             SurroundUITestContract.launchArgument,
         ] + additionalLaunchArguments
+        #if DEBUG
+        app.launchArguments += SurroundUITestContract.noticesHostProbeArguments(ProcessInfo.processInfo.environment)
+        #endif
         if animationDiagnosticsEnabled {
             app.launchArguments.append(
                 SurroundUITestContract.animationDiagnosticsLaunchArgument

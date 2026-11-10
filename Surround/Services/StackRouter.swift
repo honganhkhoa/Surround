@@ -810,10 +810,16 @@ struct AppNavigationStack<Content: View>: View {
     var body: some View {
         NavigationStack(path: $navigation.path) {
             content()
+                #if DEBUG
+                .modifier(NoticesHostProbeRoot(rootView: rootView))
+                #endif
                 .modifier(AppNavigationContentLayout())
                 .environment(\.owningStackRoute, nil)
                 .navigationDestination(for: StackRoute.self) { route in
                     destination(for: route)
+                        #if DEBUG && targetEnvironment(macCatalyst)
+                        .modifier(NoticesHostProbeDestination())
+                        #endif
                         .modifier(AppNavigationContentLayout(overlaysIPadSidebar: route.showsGameDetail))
                         .environment(\.owningStackRoute, route)
                 }

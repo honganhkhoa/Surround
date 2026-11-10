@@ -114,3 +114,23 @@ enum ActivityHostPolicy {
         return hosts
     }
 }
+
+#if DEBUG
+extension ActivityHostPolicy.Overrides {
+    /// The probe flags as the policy reads them; `afterLaunch` is false until
+    /// the window first appears.
+    init(_ probe: SurroundUITestContract.NoticesHostProbe?, afterLaunch: Bool) {
+        self.init()
+        guard let probe else { return }
+        forcesCustomBar = probe.forcesCustomBar
+        switch probe.tabBarMinimize {
+        case nil: minimize = nil
+        case .automatic?: minimize = .automatic
+        case .never?: minimize = .never
+        case .onScrollDown?: minimize = .onScrollDown
+        case .onScrollUp?: minimize = .onScrollUp
+        case .onScrollDownAfterLaunch?: minimize = afterLaunch ? .onScrollDown : .never
+        }
+    }
+}
+#endif
