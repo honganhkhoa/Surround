@@ -257,6 +257,13 @@ class NavigationService: ObservableObject {
     /// what each shows; correspondence and spectator screens still need
     /// notices. Each window has its own service.
     @Published var gameDetailNotificationContexts: [UUID: GameDetailNotificationContext] = [:]
+    #if MAIN_APP || TESTING
+    /// This window's screens that hide Activity's bar: Game Detail and
+    /// conversations, pushed or in Messages' side pane. A constant, so its
+    /// changes never publish through this service. Only Activity's hosts
+    /// observe the registry, which settles a main-queue turn later.
+    let activityPlaces = ActivityPlaceRegistry()
+    #endif
     /// The Reconnecting… badges each Game Detail context is rendering. The
     /// app's connection banner gives way only while a visible game shows one;
     /// in stone removal, after the game, in Analyze's glow-only chips or a

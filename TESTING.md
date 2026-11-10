@@ -591,6 +591,8 @@ The slot keeps its frame, but clocks, player chips, action rows and panels that 
 
 `--surround-ui-hides-rank` (Debug, offline UI testing only) starts the isolated UI-test preferences suite with **Hide ranks and ratings** on; it never changes a signed-in app's preferences. `testHiddenRanksAndRatings` uses it on iPhone and, with `TEST_RUNNER_SURROUND_EXPECT_CLOSED_DUO_LANDSCAPE=1`, on Duo Closed landscape. `testLocalizedClockFit` accepts `TEST_RUNNER_SURROUND_HIDES_RANK=1` and `TEST_RUNNER_SURROUND_FIT_ZEN=1`; on Duo Closed landscape it also checks that no column card line truncates and that the column chips drop their rank line exactly when the cards grow for a wrapped line.
 
+`--surround-activity-hidden-log` (Debug; any run, including on a device) logs each settled change to the window-level signal that hides Activity's bar: for each tab, the Game Detail or conversation on top of its stack. Each change is one `ACTIVITY-HIDDEN #<n>` line that lists `<tab>=<place>` for every tab it hides, or `none`. Stream them with `xcrun simctl spawn <UDID> log stream --predicate 'subsystem == "com.honganhkhoa.Surround" AND category == "ActivityHidden"'`, or read them in Console on a device.
+
 Keep the result bundle and exported screenshot attachments with each visual review. Device geometry, native safe areas, and move-tree styling can differ intentionally from a drawing; document those separately from fixture data.
 
 ## iOS 18 and iOS 26 screenshot comparison

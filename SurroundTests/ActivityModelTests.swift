@@ -417,6 +417,32 @@ final class ActivityModelTests: XCTestCase {
         XCTAssertNil(Model.LiveGame(game: game, userID: blackID))
     }
 
+    func testGameDetailsPlaceFollowsTheGameAndTheAccount() throws {
+        let game = try game(.Fischer(initialTime: 300, timeIncrement: 10, maxTime: 600))
+        let blackID = try XCTUnwrap(game.gameData?.players.black.id)
+        let service = makeService(user: OGSUser(username: "black", id: blackID, rank: 25))
+        game.ogs = service
+        let id = try XCTUnwrap(game.ogsID)
+
+        let place = Model.Place(showing: game)
+        XCTAssertEqual(place, .game(id: id, isOwnGame: true, isLive: true, isOver: false))
+        XCTAssertTrue(place.hidesBar)
+
+        service.user = OGSUser(username: "watcher", id: 999_999_001, rank: 25)
+        XCTAssertEqual(Model.Place(showing: game), .game(id: id, isOwnGame: false, isLive: true, isOver: false),
+                       "Whether the user plays it follows the signed-in account.")
+
+        game.gamePhase = .finished
+        XCTAssertEqual(Model.Place(showing: game), .game(id: id, isOwnGame: false, isLive: true, isOver: true))
+
+        let correspondence = try self.game(.Fischer(initialTime: 259_200, timeIncrement: 86_400, maxTime: 604_800))
+        correspondence.ogs = service
+        XCTAssertEqual(Model.Place(showing: correspondence),
+                       .game(id: id, isOwnGame: false, isLive: false, isOver: false))
+
+        XCTAssertFalse(Model.Place.root(isMessagesTab: true).hidesBar)
+    }
+
     func testAChallengeWithoutASpeedTagIsClassifiedFromItsClock() throws {
         func timeControl(_ json: String) throws -> TimeControl {
             let decoder = JSONDecoder()

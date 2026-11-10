@@ -939,7 +939,8 @@ struct GameDetailView: View {
 
 /// Registers what a visible Game Detail shows with its window. It observes the
 /// game itself, so a result reaches the app's notices and display sleep at
-/// once, even when nothing else redraws the screen.
+/// once, even when nothing else redraws the screen. It also tells the
+/// window's Activity hosts that a Game Detail is on top of its tab.
 private struct GameDetailNotificationRegistration: ViewModifier {
     @ObservedObject var game: Game
     let allowsActiveGamesCarousel: Bool
@@ -971,6 +972,10 @@ private struct GameDetailNotificationRegistration: ViewModifier {
             .onDisappear {
                 nav.gameDetailNotificationContexts.removeValue(forKey: contextID)
             }
+            // Activity's bar never shows over Game Detail. Unlike the notice
+            // context above, this follows the stack's path, not appearance:
+            // see ActivityPlaceRegistration.
+            .activityPlace(ActivityModel.Place(showing: game))
     }
 }
 

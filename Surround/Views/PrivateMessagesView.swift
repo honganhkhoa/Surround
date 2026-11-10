@@ -507,6 +507,9 @@ struct MessagesConversationView: View {
             }
         }
         .appTabBarHidden(!isPane)
+        // Pushed or in the side pane, a conversation hides Activity's bar.
+        // The pane keeps the tab bar.
+        .activityPlace(.conversation)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("messages.conversation")
     }

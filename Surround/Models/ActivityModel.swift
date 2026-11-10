@@ -358,6 +358,12 @@ extension ActivityModel.Place {
         }
         return nil
     }
+
+    /// Game Detail and conversations hide the bar; root screens don't.
+    var hidesBar: Bool {
+        if case .root = self { return false }
+        return true
+    }
 }
 
 // MARK: - Reading the app's state
@@ -390,8 +396,7 @@ extension Game {
 extension ActivityModel.LiveGame {
     /// Nil for a finished game, or one the user doesn't play.
     init?(game: Game, userID: Int) {
-        let ended = game.gamePhase == .finished
-            || !(game.gameData?.outcome?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        let ended = ActivityModel.hasEnded(game)
         guard let id = game.ogsID, !ended, let color = game.userStoneColor else { return nil }
         // Connection state stays out: offline the order, low time and the
         // lead stay as last known, as Home's chips do.
@@ -410,6 +415,30 @@ extension ActivityModel.LiveGame {
             usesByoyomi: usesByoyomi,
             isInLastByoyomiPeriod: clock.suddenDeath
         )
+    }
+}
+
+extension ActivityModel {
+    /// A game is over once its phase is finished or OGS has sent an
+    /// outcome; either can arrive first, as
+    /// NavigationService.liveGamesNeedingNotice(among:) notes.
+    static func hasEnded(_ game: Game) -> Bool {
+        game.gamePhase == .finished
+            || !(game.gameData?.outcome?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    }
+}
+
+extension ActivityModel.Place {
+    /// What a Game Detail showing `game` registers, and what its in-game
+    /// control will use. Whether the user plays it follows the signed-in
+    /// account through `game.ogs`. A game without an OGS id gets 0, which
+    /// matches no listed game.
+    init(showing game: Game) {
+        let isLive = game.gameData.map {
+            ActivityModel.isRealtime($0.timeControl, width: game.width, height: game.height)
+        } ?? false
+        self = .game(id: game.ogsID ?? 0, isOwnGame: game.isUserPlaying,
+                     isLive: isLive, isOver: ActivityModel.hasEnded(game))
     }
 }
 
