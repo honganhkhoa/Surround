@@ -2362,6 +2362,9 @@ extension OGSService {
                 // installed its own rows above keeps them.
                 state.finishedGamesSnapshot = []
             }
+            if let service = ActivityFixtures.selectedService(from: state, make: { makeService(from: $0) }) {
+                return service
+            }
             return makeService(from: state)
         }
 

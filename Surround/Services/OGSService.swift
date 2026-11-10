@@ -900,6 +900,9 @@ class OGSService: ObservableObject {
         var openChallengeSentById = [Int: OGSSeekgraphChallenge]()
         var challengesReceived = [OGSDirectChallenge]()
         var autoMatchEntryById = [String: OGSAutomatchEntry]()
+        var challengesSent = [OGSDirectChallenge]()
+        var hostingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
+        var participatingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
         var automatchAvailableEntryByID =
             [String: OGSAutomatchAvailableEntry]()
 
@@ -1347,6 +1350,9 @@ class OGSService: ObservableObject {
         openChallengeSentById = state.openChallengeSentById
         challengesReceived = state.challengesReceived
         autoMatchEntryById = state.autoMatchEntryById
+        challengesSent = state.challengesSent
+        hostingRengoChallengeById = state.hostingRengoChallengeById
+        participatingRengoChallengeById = state.participatingRengoChallengeById
         automatchAvailableEntryByID = state.automatchAvailableEntryByID
         isReconcilingAutomatches = state.isReconcilingAutomatches
         quickMatchPopularityStats = state.quickMatchPopularityStats

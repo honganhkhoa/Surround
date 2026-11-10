@@ -115,6 +115,12 @@ enum SurroundUITestContract {
     static let homeStatesLaunchArgument = "--surround-home-states"
     /// No active games, one finished game: Home's empty message with history.
     static let homeFinishedOnlyLaunchArgument = "--surround-home-finished-only"
+    /// Replaces a plain offline journey's Activity data with one fixed state,
+    /// game 26268404 kept: `--surround-activity-state several`. ActivityFixtures.swift.
+    static let activityStateLaunchArgument = "--surround-activity-state"
+    /// `frozen` (default): no fixture time moves. `running`: time passes from the
+    /// launch second; add `--surround-fixture-clock-ticks` to move clocks too.
+    static let activityClockLaunchArgument = "--surround-activity-clock"
     static let widgetDeepLinkRoutingLaunchArgument =
         "--surround-widget-deep-link-routing"
     static let liveGameBannerNavigationLaunchArgument =
@@ -289,6 +295,32 @@ enum SurroundUITestContract {
                 false
             }
         }
+    }
+
+    enum ActivityFixtureState: String, CaseIterable {
+        case nothingWaiting = "nothing-waiting", liveYourMove = "live-your-move"
+        case liveTheirMove = "live-their-move", lowTime = "low-time", stoneRemoval = "stone-removal"
+        case gameStarted = "game-started", challengeReceived = "challenge-received"
+        case unusualChallenge = "unusual-challenge", searching, waiting
+        case correspondenceYourMove = "correspondence-your-move", nothingLeads = "nothing-leads"
+        case several, superchat, rematchOffered = "rematch-offered", rematchBothAsked = "rematch-both-asked"
+    }
+
+    enum ActivityFixtureClock: String {
+        case frozen, running
+    }
+
+    /// Ids in the Activity fixture states (ActivityFixtures.swift).
+    enum ActivityFixtureID {
+        static let harborMistGameID = 91_004_001, startedGameID = 91_004_002, stoneRemovalGameID = 91_004_003
+        static let correspondenceGameIDs = [91_004_004, 91_004_005, 91_004_006]
+        static let usualChallengeID = 95_001, unusualChallengeID = 95_002
+        static let correspondenceChallengeID = 95_003, rematchChallengeID = 95_004
+        static let openChallengeID = 95_101, sentChallengeID = 95_201, rematchSentChallengeID = 95_202
+        static let rengoChallengeID = 95_301
+        static let liveQuickMatchUUID = "a1c7f100-0000-4000-8000-000000000001"
+        static let correspondenceQuickMatchUUID = "a1c7f100-0000-4000-8000-000000000002"
+        static let moderatorID = 916_002
     }
 
     #if DEBUG && MAIN_APP

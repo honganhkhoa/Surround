@@ -34,6 +34,9 @@
 		ACA1D0012026110900000001 /* ActivityPlaceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */; };
 		ACA1D0032026110900000003 /* ActivityPlaceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */; };
 		ACA1D0042026110900000004 /* ActivityPlaceRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACA1D0052026110900000005 /* ActivityPlaceRegistryTests.swift */; };
+		A7F100012026110900000001 /* ActivityFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F100022026110900000002 /* ActivityFixtures.swift */; };
+		A7F100032026110900000003 /* ActivityFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F100022026110900000002 /* ActivityFixtures.swift */; };
+		A7F100042026110900000004 /* ActivityFixturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F100052026110900000005 /* ActivityFixturesTests.swift */; };
 		517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00052026102700000005 /* StonePlacementSoundTests.swift */; };
@@ -552,6 +555,8 @@
 		AC7100052026110900000005 /* ActivityModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityModelTests.swift; sourceTree = "<group>"; };
 		ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPlaceRegistry.swift; sourceTree = "<group>"; };
 		ACA1D0052026110900000005 /* ActivityPlaceRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPlaceRegistryTests.swift; sourceTree = "<group>"; };
+		A7F100022026110900000002 /* ActivityFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityFixtures.swift; sourceTree = "<group>"; };
+		A7F100052026110900000005 /* ActivityFixturesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityFixturesTests.swift; sourceTree = "<group>"; };
 		517D00022026102700000002 /* StonePlacementSoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundPlayer.swift; sourceTree = "<group>"; };
 		517D00052026102700000005 /* StonePlacementSoundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundTests.swift; sourceTree = "<group>"; };
 		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
@@ -876,6 +881,7 @@
 				7E1A2B3C4D5E6F7081920B1C /* BoardMarkerAuditHarness.swift */,
 				AD0800022026090800000002 /* SurroundAnimationDiagnostics.swift */,
 				AE3100083A00000000000008 /* OGSService+Fixtures.swift */,
+				A7F100022026110900000002 /* ActivityFixtures.swift */,
 				AE3100043A00000000000004 /* SurroundUITestContract.swift */,
 				AE3100053A00000000000005 /* SurroundUITestOfflineServices.swift */,
 			);
@@ -968,6 +974,7 @@
 				517D00052026102700000005 /* StonePlacementSoundTests.swift */,
 				AC7100052026110900000005 /* ActivityModelTests.swift */,
 				ACA1D0052026110900000005 /* ActivityPlaceRegistryTests.swift */,
+				A7F100052026110900000005 /* ActivityFixturesTests.swift */,
 				BCFA1151000000000000000C /* HomeRulesTests.swift */,
 				0189D12871764C28AF2D6CE0 /* GameDetailDesignFixtureTests.swift */,
 				87DB1CF4B22A44B2AA1EBCCE /* GameControlRowMetricsTests.swift */,
@@ -1671,6 +1678,7 @@
 				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
 				AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */,
 				AE3100073A00000000000007 /* OGSService+Fixtures.swift in Sources */,
+				A7F100012026110900000001 /* ActivityFixtures.swift in Sources */,
 				D90700012026090700000001 /* AppReviewPolicy.swift in Sources */,
 				D90700082026090700000008 /* AppReviewGameActivity.swift in Sources */,
 				D90700042026090700000004 /* AppReviewPresentation.swift in Sources */,
@@ -1799,6 +1807,8 @@
 				AC7100042026110900000004 /* ActivityModelTests.swift in Sources */,
 				ACA1D0032026110900000003 /* ActivityPlaceRegistry.swift in Sources */,
 				ACA1D0042026110900000004 /* ActivityPlaceRegistryTests.swift in Sources */,
+				A7F100032026110900000003 /* ActivityFixtures.swift in Sources */,
+				A7F100042026110900000004 /* ActivityFixturesTests.swift in Sources */,
 				BCFA1151000000000000000B /* HomeRules.swift in Sources */,
 				BCFA1151000000000000000D /* HomeRulesTests.swift in Sources */,
 				C1ACC76C51B9DBE9AC72CBCA /* Stone.swift in Sources */,
