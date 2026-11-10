@@ -364,6 +364,9 @@ struct MainView: View {
         .onDisappear {
             setKeepsDisplayAwake(false)
         }
+        // This window's place in the app-wide announcer, which speaks and
+        // plays haptics once per app, for the window the user is in.
+        .modifier(AppAnnouncerWindowRegistration(window: nav.announcerWindow))
         .onOpenURL { url in
             nav.handle(appURL: url)
         }

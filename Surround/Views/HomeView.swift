@@ -1008,9 +1008,11 @@ struct HomeView: View {
                   ) else {
                 return
             }
-            AccessibilityNotification.Announcement(
-                String(localized: "Game found")
-            ).post()
+            nav.announce(.init(
+                .gameStarted(gameID),
+                audience: .anyWindow,
+                speech: String(localized: "Game found")
+            ))
             nav.handle(route: route)
         }
         .modifier(ThemeSceneNavigationTitle(

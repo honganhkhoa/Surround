@@ -356,4 +356,10 @@ final class AppAnnouncerTests: XCTestCase {
         XCTAssertEqual(Key.gameStarted(901), .gameStarted(901),
                        "Game found now and Activity's Game started later are one event.")
     }
+
+    func testEachNavigationServiceIsItsOwnWindow() {
+        let first = NavigationService(), second = NavigationService()
+        XCTAssertNotEqual(first.announcerWindow, second.announcerWindow)
+        XCTAssertEqual(first.announcerWindow, first.announcerWindow)
+    }
 }

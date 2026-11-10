@@ -243,6 +243,9 @@ struct GameHistoryViewParameters {
 class NavigationService: ObservableObject {
     static var shared = NavigationService()
     static var instances = [String: NavigationService]()
+    /// This window in the app-wide announcer (AppAnnouncer.swift), which
+    /// speaks and plays haptics once per app, not once per window.
+    let announcerWindow = UUID()
 
     /// iPad account-sheet prototype; phone and Catalyst keep their existing navigation.
     static var usesIPadAccountSheets: Bool {

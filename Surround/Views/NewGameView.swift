@@ -586,7 +586,11 @@ struct NewGameView: View {
         } else {
             announcement = String(localized: "Searching for a game")
         }
-        AccessibilityNotification.Announcement(announcement).post()
+        nav.announce(.init(
+            .quickMatchStarted(submittedEntries.map(\.uuid)),
+            audience: .anyWindow,
+            speech: announcement
+        ))
     }
 
     private func retryQuickMatchStart(_ entry: OGSAutomatchEntry) {
@@ -683,12 +687,14 @@ struct NewGameView: View {
         case .cancelled(let uuid, let removedCount):
             if let uuid {
                 finishCancellation(uuid: uuid)
-                AccessibilityNotification.Announcement(
-                    String(
+                nav.announce(.init(
+                    .quickMatchCancelled(uuid),
+                    audience: .anyWindow,
+                    speech: String(
                         localized: "Search cancelled",
                         comment: "Accessibility announcement after cancelling a Quick Match search"
                     )
-                ).post()
+                ))
             } else {
                 optimisticLiveEntry = nil
                 optimisticCorrespondenceEntries.removeAll()
@@ -699,7 +705,7 @@ struct NewGameView: View {
                     ? String(localized: "Your search ended before a game was found. Your settings are unchanged, so you can search again.")
                     : String(localized: "Your active searches ended before games were found. Your settings are unchanged, so you can search again.")
                 quickMatchServerNotice = notice
-                AccessibilityNotification.Announcement(notice).post()
+                nav.announce(.init(.quickMatchSearchesEnded, audience: .anyWindow, speech: notice))
             }
         case .notFoundAfterReconciliation(let uuid):
             finishCancellation(uuid: uuid)
@@ -715,7 +721,11 @@ struct NewGameView: View {
                     ? String(localized: "OGS did not confirm this search. Your settings are unchanged, so you can search again.")
                     : String(localized: "OGS did not confirm \(count) searches. Your settings are unchanged, so you can search again.")
                 quickMatchServerNotice = notice
-                AccessibilityNotification.Announcement(notice).post()
+                nav.announce(.init(
+                    .quickMatchNotConfirmed(unconfirmedSearchIDs),
+                    audience: .anyWindow,
+                    speech: notice
+                ))
             }
         }
     }

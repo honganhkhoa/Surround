@@ -59,6 +59,7 @@
 		AB0A00012026110900000001 /* AppAnnouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0A00022026110900000002 /* AppAnnouncer.swift */; };
 		AB0A00032026110900000003 /* AppAnnouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0A00022026110900000002 /* AppAnnouncer.swift */; };
 		AB0A00042026110900000004 /* AppAnnouncerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0A00052026110900000005 /* AppAnnouncerTests.swift */; };
+		AB0A00062026110900000006 /* AppAnnouncer+System.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0A00072026110900000007 /* AppAnnouncer+System.swift */; };
 		517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00052026102700000005 /* StonePlacementSoundTests.swift */; };
@@ -599,6 +600,7 @@
 		C5A7000B202611090000000B /* ConnectionStatusProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusProbe.swift; sourceTree = "<group>"; };
 		AB0A00022026110900000002 /* AppAnnouncer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAnnouncer.swift; sourceTree = "<group>"; };
 		AB0A00052026110900000005 /* AppAnnouncerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAnnouncerTests.swift; sourceTree = "<group>"; };
+		AB0A00072026110900000007 /* AppAnnouncer+System.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppAnnouncer+System.swift"; sourceTree = "<group>"; };
 		517D00022026102700000002 /* StonePlacementSoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundPlayer.swift; sourceTree = "<group>"; };
 		517D00052026102700000005 /* StonePlacementSoundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundTests.swift; sourceTree = "<group>"; };
 		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
@@ -1250,6 +1252,7 @@
 				D90700092026090700000009 /* AppReviewGameActivity.swift */,
 				AE3000023A00000000000002 /* PlatformServices.swift */,
 				AB0A00022026110900000002 /* AppAnnouncer.swift */,
+				AB0A00072026110900000007 /* AppAnnouncer+System.swift */,
 				517D00022026102700000002 /* StonePlacementSoundPlayer.swift */,
 				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
 				BCFA1151000000000000000E /* SeekGraphSendHold.swift */,
@@ -1752,6 +1755,7 @@
 				C5A700082026110900000008 /* SystemNetworkPathMonitor.swift in Sources */,
 				C5A7000C202611090000000C /* ConnectionStatusProbe.swift in Sources */,
 				AB0A00012026110900000001 /* AppAnnouncer.swift in Sources */,
+				AB0A00062026110900000006 /* AppAnnouncer+System.swift in Sources */,
 				B10A00012026102900000001 /* BetaSimulatorLoginBridge.swift in Sources */,
 				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
 				AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */,

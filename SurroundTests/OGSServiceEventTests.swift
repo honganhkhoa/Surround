@@ -6477,6 +6477,106 @@ final class OGSServiceEventTests: XCTestCase {
         ]
     }
 
+    // MARK: - Announcements once per app
+
+    private final class SpokenText: AppAnnouncerOutput {
+        private(set) var texts = [String]()
+        func speak(_ text: String, priority: AppAnnouncement.Priority) { texts.append(text) }
+        func play(_ haptic: AppAnnouncement.Haptic) {}
+    }
+
+    /// Two windows, each with its own service and socket. makeService keeps
+    /// one preferences suite for tearDown, so the first one is removed here.
+    private func twoWindowServices() throws -> (OGSService, FakeWebsocket, OGSService, FakeWebsocket) {
+        let socketA = FakeWebsocket()
+        let serviceA = makeService(socket: socketA)
+        let suiteA = try XCTUnwrap(preferenceSuite)
+        addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: suiteA) }
+        let socketB = FakeWebsocket()
+        return (serviceA, socketA, makeService(socket: socketB), socketB)
+    }
+
+    /// Every window's socket delivers a search's cancellation. With New game
+    /// open in both windows, Search cancelled is spoken once.
+    func testTwoWindowsSpeakOneSearchCancellationOnce() throws {
+        let (serviceA, socketA, serviceB, socketB) = try twoWindowServices()
+        let windows = AppAnnouncerWindowRegistry()
+        let windowA = UUID(), windowB = UUID()
+        windows.update(windowA, owner: UUID(), activation: .active)
+        windows.update(windowB, owner: UUID(), activation: .active)
+        let output = SpokenText()
+        var time: TimeInterval = 100
+        let announcer = AppAnnouncer(now: { time }, scenes: windows, output: output)
+
+        // What NewGameView does with the event, in each window.
+        func announceCancellations(_ service: OGSService, from window: UUID) -> AnyCancellable {
+            service.automatchLifecycleEvents.sink { event in
+                guard case .cancelled(let uuid?, _) = event.kind else { return }
+                announcer.post(.init(
+                    .quickMatchCancelled(uuid), audience: .anyWindow, speech: "Search cancelled"
+                ), from: window)
+            }
+        }
+        let subscriptions = [
+            announceCancellations(serviceA, from: windowA),
+            announceCancellations(serviceB, from: windowB),
+        ]
+        defer { subscriptions.forEach { $0.cancel() } }
+
+        socketA.deliver(name: "automatch/cancel", data: ["uuid": "search-1"])
+        time += 0.3
+        socketB.deliver(name: "automatch/cancel", data: ["uuid": "search-1"])
+        XCTAssertEqual(output.texts, ["Search cancelled"])
+
+        socketB.deliver(name: "automatch/cancel", data: ["uuid": "search-2"])
+        socketA.deliver(name: "automatch/cancel", data: ["uuid": "search-2"])
+        XCTAssertEqual(output.texts, ["Search cancelled", "Search cancelled"],
+                       "Another search is another event.")
+    }
+
+    /// Only the window that searched learns it found a game, even when the
+    /// user is in the other window; Activity's later Game started is the
+    /// same event.
+    func testOnlyTheWindowThatSearchedSaysGameFoundAndOnlyOnce() throws {
+        let (serviceA, socketA, serviceB, socketB) = try twoWindowServices()
+        let windows = AppAnnouncerWindowRegistry()
+        let windowA = UUID(), windowB = UUID()
+        windows.update(windowA, owner: UUID(), activation: .active)
+        windows.update(windowB, owner: UUID(), activation: .active)
+        XCTAssertEqual(windows.frontmostWindow, windowB)
+        let output = SpokenText()
+        let announcer = AppAnnouncer(now: { 100 }, scenes: windows, output: output)
+
+        // What HomeView does with the event, in each window.
+        func announceGameFound(_ service: OGSService, from window: UUID) -> AnyCancellable {
+            service.automatchLifecycleEvents.sink { event in
+                guard case .started(_, let gameID?, requestedLocally: true) = event.kind else { return }
+                announcer.post(.init(
+                    .gameStarted(gameID), audience: .anyWindow, speech: "Game found"
+                ), from: window)
+            }
+        }
+        let subscriptions = [
+            announceGameFound(serviceA, from: windowA),
+            announceGameFound(serviceB, from: windowB),
+        ]
+        defer { subscriptions.forEach { $0.cancel() } }
+
+        let entry = OGSQuickMatchDraft(
+            mode: .exact, boardSize: 9, speed: .rapid, system: .fischer
+        ).makeAutomatchEntry(uuid: "found-search")
+        XCTAssertTrue(serviceA.findAutomatch(entry: entry))
+        for socket in [socketA, socketB] {
+            socket.deliver(name: "automatch/start", data: ["uuid": entry.uuid, "game_id": 901])
+        }
+        XCTAssertEqual(output.texts, ["Game found"])
+        XCTAssertEqual(
+            announcer.post(.init(.gameStarted(901), audience: .frontmostWindow, speech: "Game started"),
+                           from: windowB),
+            .duplicate
+        )
+    }
+
     private func makeService(
         socket: OGSWebsocketProtocol,
         cachedUsers: [OGSUser] = [],
