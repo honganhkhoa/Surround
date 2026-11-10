@@ -96,30 +96,36 @@ struct GameDetailView: View {
             SurroundUITestContract.AccessibilityID.gameActiveGamesButton
         )
         .popover(isPresented: $showsActiveGames) {
-            VStack(alignment: .leading, spacing: 12) {
-                Group {
-                    if currentGame?.gameData?.timeControl.speed?.isRealtime == true {
-                        Text("Live games")
-                    } else {
-                        Text("Correspondence games")
-                    }
-                }
-                .font(.headline)
-                .padding(.horizontal)
-                ActiveGamesCarousel(
-                    currentGame: $currentGame,
-                    activeGames: activeGames,
-                    onSelectGame: { showsActiveGames = false }
-                )
-            }
-            .padding(.vertical)
-            .frame(idealWidth: 420)
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier(
-                SurroundUITestContract.AccessibilityID.gameActiveGamesPopover
-            )
-            .presentationCompactAdaptation(.popover)
+            activeGamesPopoverContent
+                .presentationCompactAdaptation(.popover)
         }
+    }
+
+    /// Today's picker: the user's other games at this game's speed. Phase 4's
+    /// in-game popover puts Activity's sections under it.
+    private var activeGamesPopoverContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Group {
+                if currentGame?.gameData?.timeControl.speed?.isRealtime == true {
+                    Text("Live games")
+                } else {
+                    Text("Correspondence games")
+                }
+            }
+            .font(.headline)
+            .padding(.horizontal)
+            ActiveGamesCarousel(
+                currentGame: $currentGame,
+                activeGames: activeGames,
+                onSelectGame: { showsActiveGames = false }
+            )
+        }
+        .padding(.vertical)
+        .frame(idealWidth: 420)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(
+            SurroundUITestContract.AccessibilityID.gameActiveGamesPopover
+        )
     }
 
     private var effectiveAttachedKeyboardVisible: Bool {
@@ -358,6 +364,23 @@ struct GameDetailView: View {
         }
     }
 
+    #if DEBUG && MAIN_APP
+    /// The probe's rail-tile: drawn in the content at the bottom of Duo's
+    /// vertical bar, centred on the line where Back sits (duoBackButton).
+    @ViewBuilder private func gameControlProbeRailTile(in geometry: GeometryProxy) -> some View {
+        if let probe = GameControlProbeConfiguration.current, probe.variants.contains(.railTile),
+           isVerticalToolbar, !zenMode, canShowActiveGames || probe.variants.contains(.everyGame),
+           let barWidth = trailingVerticalBarWidth(in: geometry) {
+            let width = probe.size(for: .rail).width
+            GameControlProbeItem(placement: .rail, configuration: probe, isPresented: $showsActiveGames,
+                                 onTurnCount: onTurnActiveGameCount,
+                                 popoverContent: AnyView(activeGamesPopoverContent))
+                .padding(.bottom, 16)
+                .offset(x: (barWidth - 48 + width / 2) * (layoutDirection == .rightToLeft ? -1 : 1))
+        }
+    }
+    #endif
+
     private var extendsContentToBottomEdge: Bool {
         #if os(iOS) && !targetEnvironment(macCatalyst)
         return GameDetailBottomEdgePolicy.extendsContent(
@@ -468,6 +491,18 @@ struct GameDetailView: View {
                                  isShown: Bool) -> GameActiveGamesSlot {
         let placement = arrangement.activeGamesPlacement(
             compact: compactLayout, navigationBarHidden: hidesNavigationBarInDuoWide)
+        #if DEBUG && MAIN_APP
+        if let probe = GameControlProbeConfiguration.current {
+            let shown = isShown || probe.variants.contains(.everyGame)
+            // The rail tile replaces the rail's item; the slot keeps its spacer.
+            let tileInContent = probe.variants.contains(.railTile) && placement.form == .rail
+            return GameActiveGamesSlot(
+                placement: placement, isShown: shown && !tileInContent,
+                view: AnyView(GameControlProbeItem(
+                    placement: placement, configuration: probe, isPresented: $showsActiveGames,
+                    onTurnCount: onTurnActiveGameCount, popoverContent: AnyView(activeGamesPopoverContent))))
+        }
+        #endif
         return GameActiveGamesSlot(placement: placement, isShown: isShown,
                                    view: AnyView(activeGamesButton))
     }
@@ -783,6 +818,9 @@ struct GameDetailView: View {
         .overlay(alignment: .topTrailing) { zenExitOverlay }
         .overlay(alignment: .topLeading) { duoSidebarButton }
         .overlay(alignment: .topTrailing) { duoBackButton(in: geometry) }
+        #if DEBUG && MAIN_APP
+        .overlay(alignment: .bottomTrailing) { gameControlProbeRailTile(in: geometry) }
+        #endif
         .sheet(isPresented: self.$showSettings) {
             AppNavigationStack {
                 ScrollView {
@@ -1364,6 +1402,7 @@ private struct GameToolbarLayout: ViewModifier {
             // Set on the item itself: toolbar content is
             // hosted apart from the game's content.
             .environment(\.gameDetailNotificationContextID, notificationContextID)
+            .gameControlProbeFrame("headerClocks")
     }
 
     private var headerIdentity: some View {

@@ -24,6 +24,11 @@ enum SurroundUITestContract {
     /// the service's timer can while disconnected.
     static let gameDetailSocketDownLaunchArgument = "--surround-game-detail-socket-down"
     static let gameDetailDesignArtboardLaunchArgument = "--surround-game-detail-design-artboard"
+    /// DEBUG toolbar-item probe: Game Detail's Active games slot shows
+    /// GameControlProbeItem.
+    static let gameControlProbeLaunchArgument = "--surround-notices-placeholder-game-control"
+    static let gameControlProbeVariantLaunchArgument = "--surround-notices-placeholder-game-control-variant"
+    static let gameControlProbeSizeLaunchArgument = "--surround-notices-placeholder-game-control-size"
     static let gameDetailDesignAnalysisBaseMoveNumber = 38
     static let gameDetailDesignAnalysisSelectedMoveNumber = 41
     static let gameDetailDesignAnalysisSelectedRow = 10
@@ -1098,6 +1103,8 @@ enum SurroundUITestContract {
         static let gameActiveGamesCarousel = "game.activeGamesCarousel"
         static let gameActiveGamesButton = "game.activeGames.button"
         static let gameActiveGamesPopover = "game.activeGames.popover"
+        static let gameControlProbeEvents = "game.controlProbe.events"
+        static let gameControlProbeComposer = "game.controlProbe.composer"
         static func gameActiveGamesEntry(_ id: Int) -> String {
             "game.activeGames.entry.\(id)"
         }
