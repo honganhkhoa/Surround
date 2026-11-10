@@ -10,6 +10,9 @@ import Foundation
 enum SurroundUITestContract {
     static let launchArgument = "--surround-ui-testing"
     static let sceneActivationLaunchArgument = "--surround-scene-activation"
+    /// DEBUG: shows and logs each window's connection status from the real
+    /// socket and network path (in-app notices). Production root only.
+    static let connectionStatusProbeLaunchArgument = "--surround-connection-status-probe"
     static let animationDiagnosticsLaunchArgument =
         "--surround-animation-diagnostics"
     static let screenshotLaunchArgument = "--surround-app-store-screenshots"

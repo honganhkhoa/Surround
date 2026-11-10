@@ -3713,6 +3713,17 @@ class OGSService: ObservableObject {
         ogsWebsocket.reconnectIfNeeded()
     }
 
+    /// Starts a fresh connection attempt now, with the reconnect backoff
+    /// reset (`OGSWebsocket.connect()`), for Retry and for a network that
+    /// came back. It acts only while the socket waits in its reconnect loop:
+    /// on an open socket `connect()` would swap the transport without
+    /// `surround/socketClosed`, leaving game subscriptions stale, and during
+    /// an attempt `connect()` started it would throw that attempt away.
+    func retryConnection() {
+        guard ogsWebsocket.status == .reconnecting else { return }
+        ogsWebsocket.connect()
+    }
+
     /// Invalidates all model and chat subscriptions owned by the previous
     /// authentication context. This must run before closing the socket.
     private func invalidateAllGameConnections() {

@@ -179,8 +179,18 @@ final class OGSServiceEventTests: XCTestCase {
         var gamelistResults: [[String: Any]]?
         private(set) var closeThenReconnectCount = 0
         var onCloseThenReconnect: (() -> Void)?
+        private(set) var connectCount = 0
+        /// Off for a Retry whose attempt fails: the socket reports
+        /// `.connecting` and the test drops it again.
+        var connectOpensSocket = true
 
         func connect() {
+            connectCount += 1
+            guard connectOpensSocket else {
+                status = .connecting
+                onStatusChanged?()
+                return
+            }
             openSocket()
         }
 
@@ -6724,5 +6734,320 @@ final class OGSServiceEventTests: XCTestCase {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(OGSUIConfig.self, from: data)
+    }
+}
+
+// MARK: - Connection status (in-app notices)
+
+extension OGSServiceEventTests {
+    private final class TestClock {
+        var now: TimeInterval = 1_000
+    }
+
+    private final class FakeNetworkPath: NetworkPathMonitoring {
+        let subject: CurrentValueSubject<NetworkPathStatus, Never>
+
+        init(_ status: NetworkPathStatus = .satisfied) {
+            subject = CurrentValueSubject(status)
+        }
+
+        var pathStatus: AnyPublisher<NetworkPathStatus, Never> { subject.eraseToAnyPublisher() }
+    }
+
+    /// An on-screen source for a service whose socket has already opened.
+    private func onScreenSource(
+        for service: OGSService,
+        path: NetworkPathMonitoring = FakeNetworkPath(),
+        scheduler: ManualScheduler,
+        clock: TestClock
+    ) -> ConnectionStatusSource {
+        let source = ConnectionStatusSource(ogs: service, path: path, scheduler: scheduler, now: { clock.now })
+        source.setVisible(true)
+        return source
+    }
+
+    /// Every `--surround-activity-state`, built on the offline journey's game
+    /// 26268404 with the user as White, the offline no-op socket and the
+    /// journey's `.connected` bootstrap.
+    private func activityFixtureServices() throws -> [OGSService] {
+        let bundle = Bundle(for: OGSServiceEventTests.self)
+        let url = try XCTUnwrap(bundle.url(forResource: "game-26268404", withExtension: "json"))
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let game = Game(ogsGame: try decoder.decode(OGSGame.self, from: Data(contentsOf: url)))
+        game.ogsRawData = [:]
+        var journey = OGSService.BootstrapState()
+        journey.user = try XCTUnwrap(game.whitePlayer)
+        journey.isLoggedIn = true
+        journey.socketStatus = .connected
+        journey.isLoadingOverview = false
+        journey.activeGames[SurroundUITestContract.fixtureGameID] = game
+        let suite = "com.honganhkhoa.Surround.EventTests.\(UUID().uuidString)"
+        addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: suite) }
+        let clock = ActivityFixtures.Clock(reference: 1_794_220_920)
+        return SurroundUITestContract.ActivityFixtureState.allCases.map { fixture -> OGSService in
+            var state = journey
+            ActivityFixtures.apply(fixture, to: &state, clock: clock)
+            let service = OGSService(
+                environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+                httpClient: OGSOfflineRejectingHTTPClient(),
+                preferences: UserDefaults(suiteName: suite)!,
+                ogsWebsocket: OGSOfflineNoOpWebsocket(),
+                connectsAutomatically: false,
+                usesSurroundOverviewService: false,
+                enablesAppSideEffects: false,
+                startsTimers: false,
+                installsObservers: false,
+                initialState: state
+            )
+            ActivityFixtures.finish(fixture, service: service)
+            return service
+        }
+    }
+
+    func testConnectionStatusFollowsTheWindowsSocket() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.openSocket()
+        drainMainQueue()
+        let scheduler = ManualScheduler()
+        let clock = TestClock()
+        let source = onScreenSource(for: service, scheduler: scheduler, clock: clock)
+        var announcements = [ConnectionStatusModel.Announcement]()
+        let observation = source.announcements.sink { announcements.append($0) }
+        defer { observation.cancel() }
+        XCTAssertEqual(source.status, .hidden)
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "Nothing runs while connected.")
+
+        socket.dropSocket()
+        drainMainQueue()
+        XCTAssertEqual(scheduler.pendingDelays, [2])
+        clock.now += 1
+        socket.openSocket()
+        drainMainQueue()
+        XCTAssertEqual(source.status, .hidden, "A blip shows nothing.")
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty)
+
+        socket.dropSocket()
+        drainMainQueue()
+        clock.now += 2
+        scheduler.advance()
+        XCTAssertEqual(source.status, .reconnecting)
+        clock.now += 28
+        scheduler.advance()
+        XCTAssertEqual(source.status, .unreachable(.timedOut))
+        socket.openSocket()
+        drainMainQueue()
+        XCTAssertEqual(source.status, .connected)
+        clock.now += 2
+        scheduler.advance()
+        XCTAssertEqual(source.status, .hidden)
+        XCTAssertEqual(announcements, [.reconnecting, .connected])
+    }
+
+    func testRetryAfterCantReachOGSGoesThroughConnect() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.openSocket()
+        drainMainQueue()
+        let scheduler = ManualScheduler()
+        let clock = TestClock()
+        let source = onScreenSource(for: service, scheduler: scheduler, clock: clock)
+        socket.dropSocket()
+        drainMainQueue()
+        clock.now += 2
+        scheduler.advance()
+        clock.now += 28
+        scheduler.advance()
+        XCTAssertEqual(source.status, .unreachable(.timedOut))
+
+        socket.connectOpensSocket = false
+        source.retry()
+        XCTAssertEqual(socket.connectCount, 1, "Retry starts a fresh attempt through connect().")
+        XCTAssertEqual(source.status, .reconnecting)
+        XCTAssertEqual(scheduler.pendingDelays, [30], "Retry restarts the 30 s.")
+        drainMainQueue()
+        XCTAssertEqual(service.socketStatus, .connecting)
+        XCTAssertEqual(source.status, .reconnecting, "An attempt in progress is not a connection.")
+        socket.dropSocket()
+        drainMainQueue()
+        XCTAssertEqual(source.status, .reconnecting,
+                       "The failed attempt's connecting and reconnecting both read as not connected.")
+
+        socket.connectOpensSocket = true
+        clock.now += 30
+        scheduler.advance()
+        XCTAssertEqual(source.status, .unreachable(.timedOut))
+        source.retry()
+        XCTAssertEqual(socket.connectCount, 2)
+        drainMainQueue()
+        XCTAssertEqual(source.status, .connected)
+    }
+
+    func testRetryConnectionActsOnlyWhileTheSocketIsReconnecting() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        for status: OGSWebsocketStatus in [.connected, .connecting, .disconnected] {
+            socket.status = status
+            service.retryConnection()
+        }
+        XCTAssertEqual(socket.connectCount, 0,
+                       "connect() would swap an open transport or throw away an attempt in flight.")
+
+        socket.dropSocket()
+        service.retryConnection()
+        XCTAssertEqual(socket.connectCount, 1, "A socket in its reconnect loop starts again at once.")
+        drainMainQueue()
+    }
+
+    func testTheNetworkComingBackReconnectsTheWindowsSocket() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.openSocket()
+        drainMainQueue()
+        let path = FakeNetworkPath()
+        let scheduler = ManualScheduler()
+        let clock = TestClock()
+        let source = onScreenSource(for: service, path: path, scheduler: scheduler, clock: clock)
+        path.subject.send(.unsatisfied)
+        socket.dropSocket()
+        drainMainQueue()
+        clock.now += 2
+        scheduler.advance()
+        XCTAssertEqual(source.status, .unreachable(.noNetwork))
+        XCTAssertEqual(socket.connectCount, 0)
+
+        path.subject.send(.satisfied)
+        XCTAssertEqual(socket.connectCount, 1, "The socket doesn't sit out its backoff once the network is back.")
+        XCTAssertEqual(source.status, .reconnecting)
+        drainMainQueue()
+        XCTAssertEqual(source.status, .connected)
+    }
+
+    func testEachWindowShowsItsOwnSocketsStatus() {
+        let socketA = FakeWebsocket()
+        let socketB = FakeWebsocket()
+        let serviceA = makeService(socket: socketA)
+        let suiteA = preferenceSuite!
+        addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: suiteA) }
+        let serviceB = makeService(socket: socketB)
+        socketA.openSocket()
+        socketB.openSocket()
+        drainMainQueue()
+        let path = FakeNetworkPath()
+        let clock = TestClock()
+        let schedulerA = ManualScheduler()
+        let schedulerB = ManualScheduler()
+        let sourceA = onScreenSource(for: serviceA, path: path, scheduler: schedulerA, clock: clock)
+        let sourceB = onScreenSource(for: serviceB, path: path, scheduler: schedulerB, clock: clock)
+
+        socketA.dropSocket()
+        drainMainQueue()
+        clock.now += 2
+        schedulerA.advance()
+        schedulerB.advance()
+        XCTAssertEqual(sourceA.status, .reconnecting)
+        XCTAssertEqual(sourceB.status, .hidden, "Each window follows its own socket.")
+
+        path.subject.send(.unsatisfied)
+        XCTAssertEqual(sourceA.status, .unreachable(.noNetwork))
+        XCTAssertEqual(sourceB.status, .hidden, "B's socket still works, so B says nothing.")
+
+        path.subject.send(.satisfied)
+        XCTAssertEqual(socketA.connectCount, 1)
+        XCTAssertEqual(socketB.connectCount, 0, "An open socket is never reconnected.")
+        drainMainQueue()
+        XCTAssertEqual(sourceA.status, .connected)
+        XCTAssertEqual(sourceB.status, .hidden)
+    }
+
+    func testSignedOutWindowsShowConnectionStatus() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.openSocket()
+        drainMainQueue()
+        let scheduler = ManualScheduler()
+        let clock = TestClock()
+        let source = onScreenSource(for: service, scheduler: scheduler, clock: clock)
+        XCTAssertFalse(service.isLoggedIn)
+        XCTAssertNil(service.user)
+
+        socket.dropSocket()
+        drainMainQueue()
+        clock.now += 2
+        scheduler.advance()
+        XCTAssertEqual(source.status, .reconnecting, "Public games use the socket too.")
+    }
+
+    func testAWindowInTheBackgroundShowsNothingAndNoConnectedOnReturn() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.openSocket()
+        drainMainQueue()
+        let scheduler = ManualScheduler()
+        let clock = TestClock()
+        let source = onScreenSource(for: service, scheduler: scheduler, clock: clock)
+        var announcements = [ConnectionStatusModel.Announcement]()
+        let observation = source.announcements.sink { announcements.append($0) }
+        defer { observation.cancel() }
+        socket.dropSocket()
+        drainMainQueue()
+        clock.now += 2
+        scheduler.advance()
+        XCTAssertEqual(source.status, .reconnecting)
+
+        source.setVisible(false)
+        XCTAssertEqual(source.status, .hidden)
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "Nothing runs for a window nobody sees.")
+        socket.openSocket()
+        drainMainQueue()
+        source.setVisible(true)
+        XCTAssertEqual(source.status, .hidden, "Nobody saw the outage end, so no Connected.")
+        XCTAssertEqual(announcements, [.reconnecting])
+    }
+
+    func testOfflineFixturesNeverShowAnOutage() throws {
+        let services = try [OGSService.previewInstance()] + activityFixtureServices()
+        for service in services {
+            XCTAssertEqual(service.socketStatus, .connected)
+            let scheduler = ManualScheduler()
+            let clock = TestClock()
+            let source = ConnectionStatusSource(
+                ogs: service,
+                path: ConstantNetworkPath.satisfied,
+                scheduler: scheduler,
+                now: { clock.now }
+            )
+            var announcements = [ConnectionStatusModel.Announcement]()
+            let observation = source.announcements.sink { announcements.append($0) }
+            source.setVisible(true)
+            source.retry()
+            source.setVisible(false)
+            source.setVisible(true)
+            clock.now += 3_600
+            scheduler.advance()
+            XCTAssertEqual(source.status, .hidden)
+            XCTAssertTrue(scheduler.pendingDelays.isEmpty, "The offline fixtures never run a timer.")
+            XCTAssertTrue(announcements.isEmpty)
+            observation.cancel()
+        }
+    }
+
+    func testTheSocketDownDesignFixtureShowsTheOutage() {
+        let service = OGSService.previewInstance(socketStatus: .reconnecting)
+        let scheduler = ManualScheduler()
+        let clock = TestClock()
+        let source = ConnectionStatusSource(
+            ogs: service,
+            path: ConstantNetworkPath.satisfied,
+            scheduler: scheduler,
+            now: { clock.now }
+        )
+        source.setVisible(true)
+        XCTAssertEqual(source.status, .hidden)
+        clock.now += 2
+        scheduler.advance()
+        XCTAssertEqual(source.status, .reconnecting,
+                       "A design fixture that drops the socket shows the outage, for review.")
     }
 }
