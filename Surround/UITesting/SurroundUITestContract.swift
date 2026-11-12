@@ -853,6 +853,8 @@ enum SurroundUITestContract {
         /// The moderator superchat cover (SuperchatCover.swift).
         static let superchatCover = "superchat.cover"
         static let superchatCoverStatus = "superchat.cover.status"
+        static let superchatCoverTitle = "superchat.cover.title"
+        static let superchatCoverSubtitle = "superchat.cover.subtitle"
         static let superchatCoverReply = "superchat.cover.reply"
         static let superchatCoverSend = "superchat.cover.send"
         static let superchatCoverEnded = "superchat.cover.ended"

@@ -2456,6 +2456,30 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                           "Opening Active games must respond within ten seconds.")
         }
 
+        // SURROUND_UI_SUPERCHAT_MIDWAY=1 (TEST_RUNNER_SURROUND_UI_SUPERCHAT_MIDWAY
+        // through xcodebuild): after half the cycles, the moderator cover rises
+        // over the open game and lowers again; the remaining navigation must
+        // stay responsive. Without it the journey is unchanged.
+        let raisesCoverMidway = ProcessInfo.processInfo.environment["SURROUND_UI_SUPERCHAT_MIDWAY"] == "1"
+
+        func raiseAndLowerTheCover() {
+            #if DEBUG
+            let cover = app.descendants(matching: .any).matching(identifier: id.superchatCover).firstMatch
+            guard requireWithEvidence(waitUntilHittable(board, timeout: 10),
+                                      "The board must be usable before the cover rises.") else { return }
+            post(.start)
+            guard requireWithEvidence(cover.waitForExistence(timeout: 10),
+                                      "The moderator cover must rise over the game within ten seconds.") else { return }
+            requireWithEvidence(pollUntil(timeout: 10) { board.exists && !board.isHittable },
+                                "The board must not be hittable under the cover.")
+            post(.end)
+            tapReady(app.buttons.matching(identifier: id.superchatCoverDone).firstMatch,
+                     description: "the cover's Done")
+            requireWithEvidence(pollUntil(timeout: 10) { !cover.exists },
+                                "Done must lower the cover within ten seconds.")
+            #endif
+        }
+
         func returnHome() {
             let identifiedBacks = app.buttons.matching(identifier: "BackButton")
             let navigationBacks = app.navigationBars.buttons.matching(NSPredicate(
@@ -2504,6 +2528,11 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 checkpoint("open-own-game", cycle: cycle)
                 openOwnGameFromHome(gameIDs[0])
                 waitForGame(gameIDs[0])
+
+                if raisesCoverMidway && cycle == cycles / 2 + 1 {
+                    checkpoint("superchat-midway", cycle: cycle)
+                    raiseAndLowerTheCover()
+                }
 
                 checkpoint("switch-own-game", cycle: cycle)
                 openActiveGames()

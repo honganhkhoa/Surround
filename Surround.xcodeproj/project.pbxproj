@@ -178,6 +178,7 @@
 		BC042AFA24AB2CFA0050B2D1 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BC042AF924AB2CFA0050B2D1 /* Preview Assets.xcassets */; };
 		BC042B0524AB2CFA0050B2D1 /* SurroundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B0424AB2CFA0050B2D1 /* SurroundTests.swift */; };
 		BC042B1024AB2CFA0050B2D1 /* SurroundUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B0F24AB2CFA0050B2D1 /* SurroundUITests.swift */; };
+		5C2E00142026111100000014 /* SuperchatCoverUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00132026111100000013 /* SuperchatCoverUITests.swift */; };
 		BC042B4624AB2DD10050B2D1 /* GameCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B2A24AB2DD00050B2D1 /* GameCell.swift */; };
 		BC042B4824AB2DD10050B2D1 /* TimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B2C24AB2DD00050B2D1 /* TimerView.swift */; };
 		BC042B4924AB2DD10050B2D1 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B2D24AB2DD00050B2D1 /* MainView.swift */; };
@@ -704,6 +705,7 @@
 		BC042B0624AB2CFA0050B2D1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BC042B0B24AB2CFA0050B2D1 /* SurroundUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC042B0F24AB2CFA0050B2D1 /* SurroundUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundUITests.swift; sourceTree = "<group>"; };
+		5C2E00132026111100000013 /* SuperchatCoverUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperchatCoverUITests.swift; sourceTree = "<group>"; };
 		BC042B1124AB2CFA0050B2D1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BC042B2A24AB2DD00050B2D1 /* GameCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameCell.swift; sourceTree = "<group>"; };
 		BC042B2C24AB2DD00050B2D1 /* TimerView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimerView.swift; sourceTree = "<group>"; };
@@ -1113,6 +1115,7 @@
 				AE4500023C00000000000002 /* SurroundJourneyUITestCase.swift */,
 				AE4400023C00000000000002 /* SurroundUITestCase.swift */,
 				BC042B0F24AB2CFA0050B2D1 /* SurroundUITests.swift */,
+				5C2E00132026111100000013 /* SuperchatCoverUITests.swift */,
 				BC042B1124AB2CFA0050B2D1 /* Info.plist */,
 			);
 			path = SurroundUITests;
@@ -2044,6 +2047,7 @@
 				D10100032026100100000003 /* SidebarKeyboardUITests.swift in Sources */,
 				D10100012026100100000001 /* AppReviewPresentationUITests.swift in Sources */,
 				BC042B1024AB2CFA0050B2D1 /* SurroundUITests.swift in Sources */,
+				5C2E00142026111100000014 /* SuperchatCoverUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

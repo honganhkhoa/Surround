@@ -137,6 +137,7 @@ struct SuperchatCoverView: View {
     @State private var handledRise: Int?
     @AccessibilityFocusState private var endCardFocused: Bool
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// The two settings Home reads, so the live games' clocks match Home's.
@@ -300,27 +301,12 @@ struct SuperchatCoverView: View {
                     .background(MessagesStyle.accent.opacity(0.12), in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("Moderator chat")
-                            .font(.headline)
-                            .accessibilityAddTraits(.isHeader)
-                        if isOffline {
-                            HStack(spacing: 4) {
-                                ProgressView()
-                                    .controlSize(.mini)
-                                    .accessibilityHidden(true)
-                                Text("Reconnecting…")
-                            }
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityIdentifier(ID.superchatCoverStatus)
-                        }
-                    }
+                    titleRow
                     Text("Surround is locked until the moderator ends this chat. You can read and reply.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier(ID.superchatCoverSubtitle)
                 }
             }
             if presentation.showsChips {
@@ -334,6 +320,39 @@ struct SuperchatCoverView: View {
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .modifier(SuperchatCoverWindowControls())
+    }
+
+    /// The title, and offline Reconnecting… beside it, or under it where the
+    /// two don't fit on one line: squeezed side by side, both break inside a word.
+    @ViewBuilder private var titleRow: some View {
+        let title = Text("Moderator chat")
+            .font(.headline)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier(ID.superchatCoverTitle)
+        if isOffline {
+            let status = HStack(spacing: 4) {
+                ProgressView()
+                    .controlSize(.mini)
+                    .accessibilityHidden(true)
+                Text("Reconnecting…")
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier(ID.superchatCoverStatus)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    title
+                    status
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    title
+                    status
+                }
+            }
+        } else {
+            title
+        }
     }
 
     /// One chip per moderator, newest first. The selected one is filled.
@@ -435,7 +454,12 @@ struct SuperchatCoverView: View {
     }
 
     private var doneCard: some View {
-        HStack(spacing: 12) {
+        // At accessibility sizes Done goes under the line: side by side, the
+        // line squeezes Done until its label breaks inside the word.
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .trailing, spacing: 12))
+            : AnyLayout(HStackLayout(spacing: 12))
+        return layout {
             Text("The moderator ended this chat.")
                 .font(.subheadline.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)

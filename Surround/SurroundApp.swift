@@ -265,6 +265,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         {
             return false
         }
+        MainViewWrapper.prepareOfflineUITestRoot()
         #endif
 
         guard !SurroundUITestContract.isEnabled else {

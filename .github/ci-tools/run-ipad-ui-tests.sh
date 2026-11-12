@@ -96,6 +96,11 @@ readonly composer_test_names=(
   testAnalyzeTrunkMarkersShareWithoutLeakingToLiveBoard
   testPrivateMessageProfileEntriesPreserveConversationDraft
 )
+# Whole classes that belong with them: the moderator cover focuses its reply
+# field on every rise in regular height, so each of its journeys does.
+readonly composer_test_classes=(
+  SuperchatCoverUITests
+)
 
 # xcodebuild accepts an unknown -only-testing or -skip-testing selector and
 # exits successfully after running zero tests. Keep the isolation manifest tied
@@ -110,6 +115,9 @@ classes_and_sources=(
 )
 for class_and_part in "${main_part_classes[@]}"; do
   classes_and_sources+=("${class_and_part%%:*}:SurroundUITests/${class_and_part%%:*}.swift")
+done
+for composer_test_class in "${composer_test_classes[@]}"; do
+  classes_and_sources+=("${composer_test_class}:SurroundUITests/${composer_test_class}.swift")
 done
 for class_and_source in "${classes_and_sources[@]}"; do
   class_name="${class_and_source%%:*}"
@@ -192,9 +200,12 @@ select_main_tests() {
     "-skip-testing:${messages_test_case}"
     "-skip-testing:${continuity_test_case}"
   )
-  local composer_test_name
+  local composer_test_name composer_test_class
   for composer_test_name in "${composer_test_names[@]}"; do
     selection_arguments+=("-skip-testing:${test_case}/${composer_test_name}")
+  done
+  for composer_test_class in "${composer_test_classes[@]}"; do
+    selection_arguments+=("-skip-testing:${test_target}/${composer_test_class}")
   done
 }
 
@@ -362,6 +373,9 @@ case "$phase" in
     selection_arguments=()
     for test_name in "${composer_test_names[@]}"; do
       selection_arguments+=("-only-testing:${test_case}/${test_name}")
+    done
+    for test_class_name in "${composer_test_classes[@]}"; do
+      selection_arguments+=("-only-testing:${test_target}/${test_class_name}")
     done
 
     echo "Running the isolated iPad composer and keyboard UI tests."

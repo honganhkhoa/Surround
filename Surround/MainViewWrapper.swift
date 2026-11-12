@@ -116,6 +116,22 @@ private struct OfflineUITestRootView: View {
             && !SurroundUITestContract.isCapturingCompatibilityScreenshots
     }
 
+    /// The first window's service, made at launch by `prepareFirstService()`.
+    private static var preparedService: OGSService?
+
+    /// In the superchat state, making the first service starts the moderator's
+    /// superchat (`ActivityFixtures.finish`), which changes the app-wide store
+    /// that the Debug menu observes. SwiftUI warns when an observed object
+    /// changes during a view update, and the root makes its service in one,
+    /// so this makes that service at launch instead. The first window still
+    /// opens covered.
+    static func prepareFirstService() {
+        guard SurroundUITestContract.isEnabled, !SurroundUITestContract.testsAppReviewPresentation,
+              mountsSuperchatCover, ActivityFixtures.selected?.state == .superchat,
+              ActivityFixtures.selectedSeed == nil else { return }
+        preparedService = OGSService.offlineUITestInstance()
+    }
+
     init() {
         let ogs: OGSService
         if SurroundUITestContract.testsAppReviewPresentation {
@@ -149,6 +165,9 @@ private struct OfflineUITestRootView: View {
             state.sortedPublicGames = [game]
             state.finishedGamesSnapshot = []
             ogs = OGSService(previewState: state)
+        } else if let prepared = Self.preparedService {
+            Self.preparedService = nil
+            ogs = prepared
         } else {
             ogs = OGSService.offlineUITestInstance()
         }
@@ -222,6 +241,13 @@ private struct OfflineSuperchatCoverMount: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+extension MainViewWrapper {
+    /// Called once at launch, before any window's first update (AppDelegate).
+    static func prepareOfflineUITestRoot() {
+        OfflineUITestRootView.prepareFirstService()
     }
 }
 
