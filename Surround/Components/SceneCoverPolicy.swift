@@ -70,4 +70,19 @@ enum SceneCoverPolicy {
     ) -> Bool {
         attaching && isFirstRequest && options.raisesWhileAttaching && wantsRaised && !isRaised
     }
+
+    /// Less than this added to the leading safe area is only an iPad's
+    /// rounded display corner: 9 pt for a window that fills the screen, whose
+    /// controls stay hidden. Window controls add 66 pt (iPadOS 26.5).
+    static let minimumWindowControlsInset: CGFloat = 32
+
+    /// How far the cover's content moves off its leading edge to clear a
+    /// windowed iPad's window controls: what the content window's
+    /// corner-adapted safe area adds to its plain one. Nothing in full
+    /// screen, and nothing for a display corner alone, which the header's own
+    /// margin already clears.
+    static func windowControlsLeading(isFullScreen: Bool, cornerAdapted: CGFloat, plain: CGFloat) -> CGFloat {
+        let added = cornerAdapted - plain
+        return isFullScreen || added < minimumWindowControlsInset ? 0 : added
+    }
 }

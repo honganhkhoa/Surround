@@ -83,4 +83,24 @@ final class SceneCoverPolicyTests: XCTestCase {
             attaching: true, isFirstRequest: true, options: SceneCoverOptions(),
             wantsRaised: true, isRaised: false))
     }
+
+    // MARK: - Window controls
+
+    func testTheHeaderMovesOnlyByWhatTheWindowControlsAdd() {
+        // A windowed iPad: the controls add 66 pt to the plain safe area (iPadOS 26.5).
+        XCTAssertEqual(SceneCoverPolicy.windowControlsLeading(isFullScreen: false, cornerAdapted: 66, plain: 0), 66)
+        XCTAssertEqual(SceneCoverPolicy.windowControlsLeading(isFullScreen: false, cornerAdapted: 86, plain: 20), 66)
+        // A window that fills the screen hides its controls; the 9 pt its
+        // rounded display corner adds is cleared by the header's own margin.
+        XCTAssertEqual(SceneCoverPolicy.windowControlsLeading(isFullScreen: false, cornerAdapted: 9, plain: 0), 0)
+        XCTAssertEqual(
+            SceneCoverPolicy.windowControlsLeading(
+                isFullScreen: false, cornerAdapted: SceneCoverPolicy.minimumWindowControlsInset - 0.5, plain: 0),
+            0)
+        // Full screen, as the system reports it: nothing, whatever the insets.
+        XCTAssertEqual(SceneCoverPolicy.windowControlsLeading(isFullScreen: true, cornerAdapted: 66, plain: 0), 0)
+        // Nothing added, or less than the plain safe area: no padding.
+        XCTAssertEqual(SceneCoverPolicy.windowControlsLeading(isFullScreen: false, cornerAdapted: 59, plain: 59), 0)
+        XCTAssertEqual(SceneCoverPolicy.windowControlsLeading(isFullScreen: false, cornerAdapted: 10, plain: 20), 0)
+    }
 }

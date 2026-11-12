@@ -22,6 +22,12 @@ final class SceneCoverContext: ObservableObject {
     /// first rise can land before its content first renders, so observe it
     /// with `onChange(of:initial: true)` and check `isRaised`.
     @Published fileprivate(set) var raiseCount = 0
+    /// How far content keeps off its leading edge to clear a windowed iPad's
+    /// window controls (iPadOS 26 and later); 0 elsewhere. It comes from the
+    /// content window, which has had its corner insets since its scene's
+    /// first layout. A cover window made later gets none until its window
+    /// moves, and a corner offset doesn't reach into a scroll view.
+    @Published fileprivate(set) var windowControlsLeading: CGFloat = 0
     #if DEBUG
     /// What the cover last rose over, for probes and logs.
     @Published fileprivate(set) var report: [String] = []
@@ -121,6 +127,17 @@ final class SceneCoverWindow: UIWindow {
     override var canBecomeKey: Bool { allowsKey }
 }
 
+/// The cover window's root: reports each layout pass, so the window
+/// controls' inset follows resizes and the scene's first layout.
+private final class SceneCoverHostingController: UIHostingController<AnyView> {
+    var didLayout: () -> Void = {}
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        didLayout()
+    }
+}
+
 /// One per window scene. Owns the scene's cover window and applies the
 /// latest request one run-loop turn after it arrives, so a window change
 /// never runs inside a SwiftUI update or a UIKit layout pass such as
@@ -149,7 +166,7 @@ final class SceneCover: NSObject {
     private weak var contentWindow: UIWindow?
     private weak var keyWindowBeforeRaise: UIWindow?
     private var window: SceneCoverWindow?
-    private var host: UIHostingController<AnyView>?
+    private var host: SceneCoverHostingController?
     private var request: SceneCoverRequest?
     private var contentChanged = false
     private var applyScheduled = false
@@ -225,8 +242,13 @@ final class SceneCover: NSObject {
     private func makeWindow(in scene: UIWindowScene) {
         let window = SceneCoverWindow(windowScene: scene)
         window.windowLevel = Self.level
-        let host = UIHostingController(rootView: AnyView(EmptyView()))
+        let host = SceneCoverHostingController(rootView: AnyView(EmptyView()))
         host.view.backgroundColor = .systemBackground
+        // A layout pass follows each resize and the scene's first layout; the
+        // inset is read a main turn later, outside the pass.
+        host.didLayout = { [weak self] in
+            DispatchQueue.main.async { self?.updateWindowControlsLeading() }
+        }
         window.rootViewController = host
         self.window = window
         self.host = host
@@ -265,6 +287,8 @@ final class SceneCover: NSObject {
         // The content sets its own appearance; the window underneath may wear
         // a screen's own style, such as a dark game.
         matchContentFrame()
+        // Before the window shows, so its first frame already clears the controls.
+        updateWindowControlsLeading(atRise: true)
         isRaised = true
         window.allowsKey = true
         window.isHidden = false
@@ -343,6 +367,38 @@ final class SceneCover: NSObject {
         SceneCoverLog.record("NOTICES-COVER frame cover=\(window.frame) content=\(contentWindow.frame)")
         #endif
         window.frame = contentWindow.frame
+    }
+
+    /// Reads the window controls' inset from the content window's
+    /// corner-adapted safe area, and publishes it when it changes.
+    private func updateWindowControlsLeading(atRise: Bool = false) {
+        let insets = contentLeadingInsets()
+        let leading = insets.map {
+            SceneCoverPolicy.windowControlsLeading(
+                isFullScreen: $0.isFullScreen, cornerAdapted: $0.cornerAdapted, plain: $0.plain)
+        } ?? 0
+        #if DEBUG
+        if atRise || context.windowControlsLeading != leading {
+            let raw = insets.map { "corner \($0.cornerAdapted) plain \($0.plain) fullScreen \($0.isFullScreen)" } ?? "none"
+            SceneCoverLog.record("NOTICES-COVER window controls leading=\(leading) (\(raw)) scene=\(Self.shortID(scene))")
+        }
+        #endif
+        guard context.windowControlsLeading != leading else { return }
+        context.windowControlsLeading = leading
+    }
+
+    /// The content window's leading safe area, plain and corner-adapted. The
+    /// Mac draws its window controls in the title bar, outside the content.
+    private func contentLeadingInsets() -> (isFullScreen: Bool, cornerAdapted: CGFloat, plain: CGFloat)? {
+        #if !targetEnvironment(macCatalyst)
+        if #available(iOS 26.0, *), let contentWindow, let windowScene = contentWindow.windowScene,
+           let view = contentWindow.rootViewController?.view {
+            return (windowScene.isFullScreen,
+                    view.directionalEdgeInsets(for: .safeArea(cornerAdaptation: .horizontal)).leading,
+                    view.directionalEdgeInsets(for: .safeArea()).leading)
+        }
+        #endif
+        return nil
     }
 
     @objc private func sceneDidDisconnect(_ notification: Notification) {

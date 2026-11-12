@@ -318,8 +318,12 @@ struct SuperchatCoverView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
+        // Clears a windowed iPad's window controls. A plain padding works in
+        // both layouts, where a corner offset reached neither into the
+        // two-column scroll view nor into a cover window made after its
+        // scene's first layout.
+        .padding(.leading, context.windowControlsLeading)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .modifier(SuperchatCoverWindowControls())
     }
 
     /// The title, and offline Reconnecting… beside it, or under it where the
@@ -529,18 +533,6 @@ private struct SuperchatCoverLiveGameRow: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.superchatCoverLiveGame(game.ogsID ?? 0))
-    }
-}
-
-/// Keeps the header's leading edge clear of iPadOS 26 and later's window
-/// controls in a windowed iPad.
-private struct SuperchatCoverWindowControls: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, macCatalyst 26.0, *) {
-            content.containerCornerOffset(.leading, sizeToFit: true)
-        } else {
-            content
-        }
     }
 }
 
