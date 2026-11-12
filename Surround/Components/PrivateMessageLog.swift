@@ -88,6 +88,25 @@ struct PrivateMessageLine: View {
     }
 }
 
+/// What a conversation's composer says and does beyond Messages' defaults.
+struct PrivateMessageComposerOptions {
+    /// Nil keeps today's "Message <name>" field (the existing initializer).
+    var prompt: Text?
+    var label: Text?
+    var fieldIdentifier = SurroundUITestContract.AccessibilityID.privateMessageComposer
+    var sendIdentifier: String?
+    /// The field and Send are off and read "Reconnecting…".
+    var isOffline = false
+    /// Hides the field row; `header` still shows (a stale window's end card).
+    var hidesField = false
+    /// Each new non-nil value focuses the field when it is enabled, then
+    /// calls `didRequestFocus` on the next main turn, focused or not.
+    var focusRequest: Int?
+    var didRequestFocus: (() -> Void)?
+    /// Shown above the field: the cover's end card, Messages' ended line.
+    var header: AnyView?
+}
+
 private struct PrivateMessageComposer: View {
     #if os(iOS) && !targetEnvironment(macCatalyst)
     @Environment(\.scenePhase) private var scenePhase
@@ -97,70 +116,101 @@ private struct PrivateMessageComposer: View {
     let ogs: OGSService
     let allowsRemoteActivity: Bool
     let focusIsSuspended: Bool
+    let options: PrivateMessageComposerOptions
     @Binding var draft: String
     @ObservedObject var sendSession: PrivateMessageSendSession
     @FocusState private var isFocused: Bool
 
+    private var state: PrivateMessageComposerState {
+        PrivateMessageComposerState(
+            draftIsEmpty: draft.isEmpty,
+            allowsRemoteActivity: allowsRemoteActivity,
+            isOffline: options.isOffline
+        )
+    }
+
     private func sendMessage() {
-        guard allowsRemoteActivity else { return }
+        guard state.sendIsEnabled else { return }
         sendSession.send(to: peer, draft: $draft, using: ogs)
+    }
+
+    /// Today's "Message <name>" field, unless the options set a prompt or label.
+    @ViewBuilder private var messageField: some View {
+        if options.prompt != nil || options.label != nil {
+            TextField(text: $draft, prompt: options.prompt) {
+                options.label
+            }
+            .onSubmit(sendMessage)
+        } else {
+            TextField("Message \(peer.username)", text: $draft, onCommit: sendMessage)
+        }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if let failure = sendSession.failure {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                            .accessibilityHidden(true)
-                        Group {
-                            if failure == .notSent {
-                                Text("Message wasn’t sent. Try again.")
-                            } else {
-                                Text("Couldn’t confirm delivery. Check the conversation before retrying.")
-                            }
-                        }
-                        .font(.footnote)
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Button("Retry", action: sendMessage)
-                        .font(.footnote.weight(.semibold))
-                        .disabled(draft.isEmpty || !allowsRemoteActivity)
-                }
+            if let header = options.header {
+                header
             }
-            HStack(spacing: 10) {
-                TextField("Message \(peer.username)", text: $draft, onCommit: sendMessage)
-                    .focused($isFocused)
-                    .font(.body)
-                    .submitLabel(.send)
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 44)
-                    .background(Color(.secondarySystemBackground), in: Capsule())
-                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.privateMessageComposer)
-                    .onChange(of: draft) { _, _ in
-                        sendSession.dismissFailure()
+            if !options.hidesField {
+                if let failure = sendSession.failure {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                                .accessibilityHidden(true)
+                            Group {
+                                if failure == .notSent {
+                                    Text("Message wasn’t sent. Try again.")
+                                } else {
+                                    Text("Couldn’t confirm delivery. Check the conversation before retrying.")
+                                }
+                            }
+                            .font(.footnote)
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Button("Retry", action: sendMessage)
+                            .font(.footnote.weight(.semibold))
+                            .disabled(!state.sendIsEnabled)
                     }
-                if sendSession.isSending {
-                    ProgressView()
-                        .frame(width: 44, height: 44)
-                } else {
-                    Button(action: sendMessage) {
-                        Image(systemName: "arrow.up")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(
-                                draft.isEmpty || !allowsRemoteActivity
-                                    ? Color(.secondaryLabel) : .white
-                            )
+                }
+                HStack(spacing: 10) {
+                    messageField
+                        .focused($isFocused)
+                        .font(.body)
+                        .submitLabel(.send)
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 44)
+                        .background(Color(.secondarySystemBackground), in: Capsule())
+                        .disabled(!state.fieldIsEnabled)
+                        .accessibilityIdentifier(options.fieldIdentifier)
+                        .accessibilityValue(Text("Reconnecting…"), isEnabled: state.readsReconnecting)
+                        .onChange(of: draft) { _, _ in
+                            sendSession.dismissFailure()
+                        }
+                    if sendSession.isSending {
+                        ProgressView()
                             .frame(width: 44, height: 44)
-                            .background(
-                                draft.isEmpty || !allowsRemoteActivity
-                                    ? Color(.systemGray3) : Color.accentColor,
-                                in: Circle()
-                            )
+                    } else {
+                        Button(action: sendMessage) {
+                            Image(systemName: "arrow.up")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(
+                                    !state.sendIsEnabled
+                                        ? Color(.secondaryLabel) : .white
+                                )
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    !state.sendIsEnabled
+                                        ? Color(.systemGray3) : Color.accentColor,
+                                    in: Circle()
+                                )
+                        }
+                        .disabled(!state.sendIsEnabled)
+                        .accessibilityLabel("Send message")
+                        .accessibilityValue(Text("Reconnecting…"), isEnabled: state.readsReconnecting)
+                        .accessibilityIdentifier(options.sendIdentifier ?? "",
+                                                 isEnabled: options.sendIdentifier != nil)
                     }
-                    .disabled(draft.isEmpty || !allowsRemoteActivity)
-                    .accessibilityLabel("Send message")
                 }
             }
         }
@@ -173,6 +223,18 @@ private struct PrivateMessageComposer: View {
             if suspended {
                 isFocused = false
             }
+        }
+        // A focused field that goes offline ends editing: disabling it alone
+        // might leave it first responder, still taking typing. The draft stays.
+        .onChange(of: state.fieldIsEnabled) { _, enabled in
+            if !enabled {
+                isFocused = false
+            }
+        }
+        .onChange(of: options.focusRequest, initial: true) { _, request in
+            guard request != nil, !focusIsSuspended else { return }
+            if state.fieldIsEnabled { isFocused = true }
+            if let next = options.didRequestFocus { DispatchQueue.main.async(execute: next) }
         }
         #if os(iOS) && !targetEnvironment(macCatalyst)
         .onChange(of: scenePhase) { _, phase in
@@ -464,6 +526,7 @@ struct PrivateMessageLog: View {
     private let showsProfileToolbar: Bool
     private let focusIsSuspended: Bool
     private let composerFocusIsSuspended: Bool
+    private let composer: PrivateMessageComposerOptions
 
     init(
         peer: OGSUser,
@@ -473,7 +536,8 @@ struct PrivateMessageLog: View {
         scrollBookmark: PrivateMessageScrollBookmark? = nil,
         showsProfileToolbar: Bool = true,
         focusIsSuspended: Bool = false,
-        composerFocusIsSuspended: Bool = false
+        composerFocusIsSuspended: Bool = false,
+        composer: PrivateMessageComposerOptions = .init()
     ) {
         self.peer = peer
         messagesOverride = messages
@@ -483,6 +547,7 @@ struct PrivateMessageLog: View {
         self.showsProfileToolbar = showsProfileToolbar
         self.focusIsSuspended = focusIsSuspended
         self.composerFocusIsSuspended = composerFocusIsSuspended
+        self.composer = composer
     }
 
     var messages: [OGSPrivateMessage] {
@@ -530,6 +595,7 @@ struct PrivateMessageLog: View {
                 ogs: ogs,
                 allowsRemoteActivity: allowsRemoteActivity,
                 focusIsSuspended: focusIsSuspended || composerFocusIsSuspended,
+                options: composer,
                 draft: draft,
                 sendSession: PrivateMessageSendSessions.session(for: ogs, peerID: peer.id)
             )
