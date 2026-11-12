@@ -12021,88 +12021,6 @@
         }
       }
     },
-    "⚠️ OGS Moderator's official message. Please respond." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚠️ Offizielle Nachricht des OGS-Moderationsteams. Bitte antworte."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚠️ Mensaje oficial de un moderador de OGS. Responde, por favor."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚠️ Message d'un modérateur OGS. Veuillez répondre."
-          }
-        },
-        "id" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚠️ Pesan resmi Moderator OGS. Harap tanggapi."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚠️ OGS モデレーター公式メッセージ: ご返信下さい。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚠️ OGS 운영자의 공식 메시지입니다. 답변해 주세요."
-          }
-        },
-        "ms" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚠️ Mesej rasmi moderator OGS. Sila balas."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚠️ Mensagem oficial da moderação do OGS. Responda."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚠️ Mensagem oficial de um moderador do OGS. Responda, por favor."
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚠️ ข้อความทางการจากผู้ดูแล OGS โปรดตอบกลับ"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚠️ Tin nhắn từ quản trị viên OGS. Vui lòng trả lời."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚠️ OGS 管理员的官方消息，请回复。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⚠️ OGS 管理員的官方訊息。請回覆。"
-          }
-        }
-      }
-    },
     "A **rengo** game is played between two teams, one taking the Black stones and the other taking the White stones. Each player in a team must play in turn." : {
       "localizations" : {
         "de" : {
@@ -37659,16 +37577,82 @@
     },
     "Moderator chat" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat mit der Moderation"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat con un moderador"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discussion avec un modérateur"
+          }
+        },
         "id" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Obrolan moderator"
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデレータとのチャット"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "운영자 채팅"
+          }
+        },
         "ms" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Perbualan moderator"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat com um moderador"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat com um moderador"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "แชทกับผู้ดูแล"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trò chuyện với quản trị viên"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与管理员聊天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "與管理員聊天"
           }
         }
       }
@@ -49885,32 +49869,164 @@
     },
     "Reply" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antworten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Responder"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Répondre"
+          }
+        },
         "id" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Balas"
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "답장"
+          }
+        },
         "ms" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Balas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Responder"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Responder"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ตอบกลับ"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trả lời"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回复"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回覆"
           }
         }
       }
     },
     "Reply to the moderator" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antwort an die Moderation"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Responder al moderador"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Répondre au modérateur"
+          }
+        },
         "id" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Balas moderator"
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデレータに返信"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "운영자에게 답장"
+          }
+        },
         "ms" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Balas kepada moderator"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Responder ao moderador"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Responder ao moderador"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ตอบกลับผู้ดูแล"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trả lời quản trị viên"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回复管理员"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回覆管理員"
           }
         }
       }
@@ -58340,16 +58456,82 @@
     },
     "Surround is locked until the moderator ends this chat. You can read and reply." : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround ist gesperrt, bis die Moderation diesen Chat beendet. Du kannst lesen und antworten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround está bloqueado hasta que el moderador termine este chat. Puedes leer y responder."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround est verrouillé jusqu’à ce que le modérateur mette fin à cette discussion. Vous pouvez lire et répondre."
+          }
+        },
         "id" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Surround terkunci sampai moderator mengakhiri obrolan ini. Anda tetap bisa membaca dan membalas."
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデレータがこのチャットを終了するまで、Surroundはロックされています。メッセージを読んで返信できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "운영자가 이 채팅을 종료할 때까지 Surround가 잠겨 있습니다. 메시지를 읽고 답장할 수 있습니다."
+          }
+        },
         "ms" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Surround dikunci sehingga moderator menamatkan perbualan ini. Anda boleh membaca dan membalas."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Surround fica bloqueado até o moderador encerrar este chat. Você pode ler e responder."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Surround fica bloqueado até o moderador terminar este chat. Pode ler e responder."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround จะถูกล็อกจนกว่าผู้ดูแลจะจบแชทนี้ คุณยังอ่านและตอบกลับได้"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround bị khóa cho đến khi quản trị viên kết thúc cuộc trò chuyện này. Bạn vẫn có thể đọc và trả lời."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在管理员结束此会话之前，Surround 将保持锁定。您可以阅读和回复。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在管理員結束這段對話之前，Surround 會保持鎖定。你可以閱讀和回覆。"
           }
         }
       }
@@ -59592,16 +59774,82 @@
     },
     "The moderator ended this chat." : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Moderation hat diesen Chat beendet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El moderador ha terminado este chat."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le modérateur a mis fin à cette discussion."
+          }
+        },
         "id" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Moderator telah mengakhiri obrolan ini."
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデレータがこのチャットを終了しました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "운영자가 이 채팅을 종료했습니다."
+          }
+        },
         "ms" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Moderator telah menamatkan perbualan ini."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O moderador encerrou este chat."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O moderador terminou este chat."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ผู้ดูแลจบแชทนี้แล้ว"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quản trị viên đã kết thúc cuộc trò chuyện này."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理员已结束此会话。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理員已結束這段對話。"
           }
         }
       }
@@ -70788,16 +71036,82 @@
     },
     "Your live game with %@ keeps running" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Live-Partie gegen %@ läuft weiter"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu partida en vivo con %@ sigue en curso"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre partie en temps réel contre %@ continue"
+          }
+        },
         "id" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Permainan langsung Anda melawan %@ terus berjalan"
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@とのライブ対局は続いています"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@님과의 실시간 대국은 계속 진행됩니다"
+          }
+        },
         "ms" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Permainan langsung anda dengan %@ terus berjalan"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua partida ao vivo contra %@ continua"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A sua partida em direto com %@ continua"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เกมสดของคุณกับ %@ ยังดำเนินต่อไป"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ván trực tiếp của bạn với %@ vẫn tiếp tục"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您与 %@ 的即时对局仍在进行"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你與 %@ 的即時對局仍在進行"
           }
         }
       }
