@@ -268,7 +268,6 @@ final class ActivityFixturesTests: XCTestCase {
         let store = SuperchatStore(preferences: nil)
         let (ogs, _) = try service(.superchat, store: store)
         let user = try XCTUnwrap(ogs.user)
-        XCTAssertEqual(ogs.superchatPeerIds, [ID.moderatorID])
         let cover = try XCTUnwrap(store.covers[user.id], "The state covers its user.")
         XCTAssertEqual(cover.moderators.map(\.id), [ID.moderatorID])
         XCTAssertEqual(cover.moderators.first?.username, Fixtures.Cast.moderator.username)
@@ -279,7 +278,6 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertEqual(payload["player_id"] as? Int, user.id)
         XCTAssertEqual(payload["moderator_id"] as? Int, ID.moderatorID)
         ogs.handleSuperchat(config: payload)
-        XCTAssertTrue(ogs.superchatPeerIds.isEmpty)
         XCTAssertEqual(store.covers[user.id]?.awaitsDone, true, "The end waits for Done.")
         store.done(accountID: user.id)
         XCTAssertNil(store.covers[user.id])
@@ -294,7 +292,6 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertEqual(echo["enable"] as? Bool, true)
         ogs.handleSuperchat(config: echo)
         XCTAssertNil(store.covers[user.id])
-        XCTAssertTrue(ogs.superchatPeerIds.isEmpty)
         let second = Fixtures.Cast.secondModerator
         XCTAssertFalse(Fixtures.Cast.all.contains(second))
         ogs.handleSuperchat(config: Fixtures.superchatPayload(for: user, enable: true, moderator: second))
@@ -309,7 +306,6 @@ final class ActivityFixturesTests: XCTestCase {
         let (ogs, _) = try service(.superchat, store: store, startsSuperchat: false)
         XCTAssertTrue(store.covers.isEmpty)
         XCTAssertNil(ogs.superchatCover)
-        XCTAssertTrue(ogs.superchatPeerIds.isEmpty)
         XCTAssertEqual(ogs.privateMessagesUnreadPeerIds, [ID.moderatorID], "The moderator's message is still there.")
     }
 

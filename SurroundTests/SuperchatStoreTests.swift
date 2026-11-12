@@ -694,4 +694,83 @@ final class SuperchatStoreTests: XCTestCase {
         XCTAssertEqual(store.covers[player]?.isOn, true, "The echo of an end changes nothing either.")
         XCTAssertTrue(store.endings.isEmpty)
     }
+
+    // MARK: What a window's cover shows
+
+    func testPresentationShowsDoneInAStaleWindow() throws {
+        let store = makeStore()
+        start(store, moderator)
+        let live = try XCTUnwrap(store.covers[player])
+        // The window kept another account, while the stored sign-in is `player`.
+        let staleWhileOn = try XCTUnwrap(SuperchatCoverPresentation(
+            cover: live, selectedModeratorID: nil, windowUserID: otherPlayer, accountID: player))
+        XCTAssertTrue(staleWhileOn.isStale)
+        XCTAssertEqual(staleWhileOn.endCard, .none)
+        XCTAssertFalse(staleWhileOn.showsReplyField, "A stale window has no field.")
+        XCTAssertFalse(staleWhileOn.showsLiveGames, "Its games belong to the other account.")
+
+        end(store, moderator)
+        let ended = try XCTUnwrap(store.covers[player])
+        let stale = try XCTUnwrap(SuperchatCoverPresentation(
+            cover: ended, selectedModeratorID: nil, windowUserID: otherPlayer, accountID: player))
+        XCTAssertEqual(stale.endCard, .done, "A live end heard by any window gives the stale one Done.")
+        XCTAssertFalse(stale.showsReplyField)
+        XCTAssertFalse(stale.showsLiveGames)
+        XCTAssertEqual(stale.moderator.id, moderator)
+
+        let unknown = try XCTUnwrap(SuperchatCoverPresentation(
+            cover: ended, selectedModeratorID: nil, windowUserID: nil, accountID: player))
+        XCTAssertTrue(unknown.isStale, "A window with no user of its own is stale too.")
+
+        let fresh = try XCTUnwrap(SuperchatCoverPresentation(
+            cover: ended, selectedModeratorID: nil, windowUserID: player, accountID: player))
+        XCTAssertFalse(fresh.isStale)
+        XCTAssertEqual(fresh.endCard, .done)
+        XCTAssertTrue(fresh.showsReplyField, "The last reply can still be sent.")
+        XCTAssertTrue(fresh.showsLiveGames)
+    }
+
+    func testPresentationEndCardStates() throws {
+        let store = makeStore()
+        func shown(selecting id: Int? = nil) throws -> SuperchatCoverPresentation {
+            try XCTUnwrap(SuperchatCoverPresentation(
+                cover: XCTUnwrap(store.covers[player]), selectedModeratorID: id,
+                windowUserID: player, accountID: player))
+        }
+        start(store, moderator)
+        XCTAssertEqual(try shown().endCard, .none)
+        XCTAssertFalse(try shown().showsChips, "One moderator needs no chips.")
+        XCTAssertEqual(try shown().moderator.id, moderator)
+
+        clock.now = 1_010
+        start(store, secondModerator, username: "second")
+        XCTAssertTrue(try shown().showsChips)
+        XCTAssertEqual(try shown().moderator.id, secondModerator, "The newest is selected.")
+        XCTAssertEqual(try shown(selecting: moderator).moderator.id, moderator)
+        XCTAssertEqual(try shown(selecting: 999).moderator.id, secondModerator,
+                       "A choice that isn't on the cover falls back to the newest.")
+
+        end(store, moderator)
+        XCTAssertEqual(try shown(selecting: moderator).endCard, .endedLine,
+                       "Its line alone while another is still on: no Done.")
+        XCTAssertEqual(try shown().endCard, .none, "The one still on shows no card.")
+
+        end(store, secondModerator)
+        XCTAssertEqual(try shown().endCard, .done)
+        XCTAssertEqual(try shown(selecting: moderator).endCard, .done, "Done once nothing is on, whichever is selected.")
+        XCTAssertTrue(try shown().showsChips)
+
+        XCTAssertNil(SuperchatCoverPresentation(
+            cover: SuperchatCover(moderators: []), selectedModeratorID: nil, windowUserID: player, accountID: player),
+            "The store never keeps an empty cover, and nothing shows one.")
+    }
+
+    func testOnlyRegularHeightFreshWindowsFocusTheReply() {
+        XCTAssertTrue(SuperchatCoverPresentation.focusesReply(isCompactHeight: false, isStale: false))
+        XCTAssertFalse(SuperchatCoverPresentation.focusesReply(isCompactHeight: true, isStale: false),
+                       "In compact height the keyboard would leave no room.")
+        XCTAssertFalse(SuperchatCoverPresentation.focusesReply(isCompactHeight: false, isStale: true),
+                       "A stale window has no field.")
+        XCTAssertFalse(SuperchatCoverPresentation.focusesReply(isCompactHeight: true, isStale: true))
+    }
 }

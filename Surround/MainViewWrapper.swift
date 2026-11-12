@@ -56,6 +56,10 @@ struct MainViewWrapper: View {
         let ogs = OGSService.instance(forSceneWithID: sceneID)
         let sgs = SurroundService.shared
         let nav = NavigationService.instance(forSceneWithID: sceneID)
+        // Links and the app's own opens wait while this window's account is
+        // covered; set before the first body returns, so a cold launch from a
+        // link is held too.
+        nav.holdNavigationWhileCovered(by: ogs, store: .shared)
         return Group {
             #if OGS_BETA
             MainView()
@@ -65,6 +69,7 @@ struct MainViewWrapper: View {
             }
             #endif
         }
+            .modifier(SuperchatCoverMount(ogs: ogs, nav: nav, store: .shared))
             .environmentObject(ogs)
             .environmentObject(sgs)
             .environmentObject(nav)
@@ -104,6 +109,12 @@ private struct OfflineUITestRootView: View {
     @State private var reviewCoordinator: AppReviewCoordinator?
     private let compatibilityScene:
         SurroundUITestContract.CompatibilityScene?
+    /// Captures keep their own contract: no superchat cover, held navigation
+    /// or store, as the fixture factory skips them (OGSService+Fixtures.swift).
+    private static var mountsSuperchatCover: Bool {
+        !SurroundUITestContract.isCapturingAppStoreScreenshots
+            && !SurroundUITestContract.isCapturingCompatibilityScreenshots
+    }
 
     init() {
         let ogs: OGSService
@@ -153,6 +164,10 @@ private struct OfflineUITestRootView: View {
         _ogs = StateObject(wrappedValue: ogs)
         _sgs = StateObject(wrappedValue: sgs)
         _nav = StateObject(wrappedValue: nav)
+        if Self.mountsSuperchatCover {
+            // The App Review root's preview service has no store, so it never covers.
+            nav.holdNavigationWhileCovered(by: ogs, store: .shared)
+        }
         _reviewCoordinator = State(initialValue: SurroundUITestContract.testsAppReviewPresentation
             ? AppReviewCoordinator(history: AppReviewHistoryStore(
                 preferences: AppReviewUITestPreferences(),
@@ -175,6 +190,7 @@ private struct OfflineUITestRootView: View {
                 MainView(allowsRemoteActivity: false)
             }
         }
+            .modifier(OfflineSuperchatCoverMount(isMounted: Self.mountsSuperchatCover, ogs: ogs, nav: nav))
             .friendshipResponseUITestHarness()
             .environmentObject(ogs)
             .environmentObject(sgs)
@@ -190,6 +206,22 @@ private struct OfflineUITestRootView: View {
             #if targetEnvironment(macCatalyst)
             .background(CatalystUITestWindowPositioner())
             #endif
+    }
+}
+
+/// The superchat cover in offline runs, except captures. The store is
+/// touched only when mounted, so captures never create it.
+private struct OfflineSuperchatCoverMount: ViewModifier {
+    let isMounted: Bool
+    let ogs: OGSService
+    let nav: NavigationService
+
+    func body(content: Content) -> some View {
+        if isMounted {
+            content.modifier(SuperchatCoverMount(ogs: ogs, nav: nav, store: .shared))
+        } else {
+            content
+        }
     }
 }
 

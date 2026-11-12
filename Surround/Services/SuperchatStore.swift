@@ -284,6 +284,42 @@ final class NavigationHold {
     func isLatest(_ ticket: Int) -> Bool { store.isLatestHold(ticket) }
 }
 
+/// What one window's cover shows (SuperchatCoverView). Pure, so
+/// SurroundTests can check every state, stale windows included.
+struct SuperchatCoverPresentation: Equatable {
+    enum EndCard: Equatable {
+        case none
+        /// The selected moderator ended while another is still on.
+        case endedLine
+        /// Nothing is on: the end card with Done, in every window.
+        case done
+    }
+
+    let moderator: SuperchatModerator
+    let showsChips: Bool
+    /// The window kept another account: no conversation, games or field.
+    let isStale: Bool
+    let endCard: EndCard
+
+    var showsLiveGames: Bool { !isStale }
+    var showsReplyField: Bool { !isStale }
+
+    /// Nil only for an empty cover, which the store never keeps.
+    init?(cover: SuperchatCover, selectedModeratorID: Int?, windowUserID: Int?, accountID: Int) {
+        guard let first = cover.moderators.first else { return nil }
+        moderator = cover.moderators.first { $0.id == selectedModeratorID } ?? first
+        showsChips = cover.moderators.count > 1
+        isStale = windowUserID != accountID
+        endCard = cover.awaitsDone ? .done : (moderator.isOn ? .none : .endedLine)
+    }
+
+    /// Whether a rise focuses the reply field, and so moves VoiceOver to it.
+    /// The mount and the content both ask.
+    static func focusesReply(isCompactHeight: Bool, isStale: Bool) -> Bool {
+        !isCompactHeight && !isStale
+    }
+}
+
 extension SettingKey {
     /// Superchats still on, per OGS account. Kept on sign-out: the next
     /// sign-in as that account covers again until OGS re-sends or not.

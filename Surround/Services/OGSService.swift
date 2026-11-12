@@ -1270,8 +1270,7 @@ class OGSService: ObservableObject {
     @Published private(set) public var privateMessagesUnreadCount: Int = 0
     @Published private(set) public var privateMessagesUnreadPeerIds = Set<Int>()
     @Published private(set) public var privateMessagesActivePeerIds = Set<Int>()
-    @Published private(set) public var superchatPeerIds = Set<Int>()
-    
+
     #if MAIN_APP || TESTING
     /// The app-wide superchat record this window reports to and is covered
     /// from: SuperchatStore.shared in production and offline UI-test windows,
@@ -6076,7 +6075,6 @@ class OGSService: ObservableObject {
         privateMessagesActivePeerIds.removeAll()
         privateMessagesUnreadPeerIds.removeAll()
         privateMessagesUnreadCount = 0
-        superchatPeerIds.removeAll()
     }
 
     private func rememberRecentPrivateMessagePeer(_ peerID: Int, timestamp: Double) {
@@ -6203,13 +6201,10 @@ class OGSService: ObservableObject {
         superchatStore?.receive(
             enable: enable, moderatorID: moderatorID,
             username: config["moderator_username"] as? String, accountID: accountID)
+        #else
+        // The widget and the notification extensions keep no superchat state.
+        _ = enable
         #endif
-        // Today's locked Messages panel reads this until the cover replaces it.
-        if enable {
-            superchatPeerIds.insert(moderatorID)
-        } else {
-            superchatPeerIds.remove(moderatorID)
-        }
     }
 
     #if DEBUG && MAIN_APP

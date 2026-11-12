@@ -2138,7 +2138,6 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertEqual(first.superchatCover, cover)
         XCTAssertEqual(second.superchatCover, cover, "A window whose socket heard nothing is covered too.")
         XCTAssertEqual(firstSocket.loadedConversations, [moderator], "The conversation loads into Messages.")
-        XCTAssertEqual(first.superchatPeerIds, [moderator], "Today's locked panel still hears it.")
 
         // A window opened later is covered as soon as it joins the store.
         let (third, _) = try makeSuperchatWindow(userID: superchatPlayer, store: store, sharing: first)
@@ -2174,7 +2173,6 @@ final class OGSServiceIsolationTests: XCTestCase {
         }
         XCTAssertTrue(store.covers.isEmpty)
         XCTAssertNil(service.superchatCover)
-        XCTAssertTrue(service.superchatPeerIds.isEmpty, "Today's panel doesn't lock the moderator either.")
         XCTAssertEqual(socket.loadedConversations, [], "No conversation with itself.")
         XCTAssertNil(service.privateMessagesByPeerId[moderator])
     }
@@ -2194,21 +2192,18 @@ final class OGSServiceIsolationTests: XCTestCase {
         }
         XCTAssertTrue(store.covers.isEmpty)
         XCTAssertNil(service.superchatCover)
-        XCTAssertTrue(service.superchatPeerIds.isEmpty)
         XCTAssertEqual(socket.loadedConversations, [])
 
         // Without a player_id, the socket's identity decides, as on the web.
         socket.serverEventCallback?("private-superchat", superchat(moderator, player: nil))
         XCTAssertEqual(store.covers[superchatPlayer]?.moderators.map(\.id), [moderator])
         XCTAssertEqual(service.superchatCover?.isOn, true)
-        XCTAssertEqual(service.superchatPeerIds, [moderator])
 
         // Another player's end doesn't end this account's superchat.
         socket.serverEventCallback?(
             "private-superchat", superchat(moderator, enable: false, player: otherPlayer)
         )
         XCTAssertEqual(service.superchatCover?.isOn, true)
-        XCTAssertEqual(service.superchatPeerIds, [moderator])
     }
 
     func testSuperusersAreExemptButAdminsAndModeratorsAreNot() throws {
@@ -2231,7 +2226,6 @@ final class OGSServiceIsolationTests: XCTestCase {
             socket.serverEventCallback?("private-superchat", superchat(moderator, player: superchatPlayer))
             XCTAssertEqual(store.covers[superchatPlayer] != nil, role.isCovered, role.name)
             XCTAssertEqual(service.superchatCover?.isOn == true, role.isCovered, role.name)
-            XCTAssertEqual(service.superchatPeerIds == [moderator], role.isCovered, "\(role.name): today's panel")
             XCTAssertEqual(
                 socket.loadedConversations, [moderator], "\(role.name): the conversation still loads into Messages."
             )
@@ -2253,7 +2247,6 @@ final class OGSServiceIsolationTests: XCTestCase {
         }
         XCTAssertTrue(store.covers.isEmpty)
         XCTAssertNil(service.superchatCover)
-        XCTAssertTrue(service.superchatPeerIds.isEmpty)
         XCTAssertEqual(socket.loadedConversations, [])
 
         socket.authenticatedUserID = superchatPlayer
@@ -2346,7 +2339,6 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertEqual(scheduler.pendingDelays, [], "Its authentications opened no wait.")
         scheduler.advance()
         XCTAssertEqual(stale.superchatCover, cover, "So nothing lifts.")
-        XCTAssertTrue(stale.superchatPeerIds.isEmpty)
 
         // A live end heard by window 1 gives windows 2 and 3 Done.
         firstSocket.serverEventCallback?(

@@ -849,6 +849,18 @@ enum SurroundUITestContract {
         static let profileChallengeWithSettings = "profile.challenge-with-settings"
         static let profileBannerAvatarPrefix = "profile.entry.banner.avatar."
         static let privateMessageComposer = "messages.composer"
+
+        /// The moderator superchat cover (SuperchatCover.swift).
+        static let superchatCover = "superchat.cover"
+        static let superchatCoverStatus = "superchat.cover.status"
+        static let superchatCoverReply = "superchat.cover.reply"
+        static let superchatCoverSend = "superchat.cover.send"
+        static let superchatCoverEnded = "superchat.cover.ended"
+        static let superchatCoverDone = "superchat.cover.done"
+        static let messagesSuperchatEnded = "messages.superchatEnded"
+        static func superchatCoverModerator(_ id: Int) -> String { "superchat.cover.moderator.\(id)" }
+        static func superchatCoverLiveGame(_ id: Int) -> String { "superchat.cover.liveGame.\(id)" }
+
         static let profileRengoMenuPrefix = "profile.menu.rengo."
         static let profileActiveGames = "profile.active-games"
         static let profileActiveGamesRetry = "profile.active-games.retry"

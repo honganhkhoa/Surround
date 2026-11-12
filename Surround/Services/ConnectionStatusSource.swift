@@ -2,11 +2,12 @@
 //  ConnectionStatusSource.swift
 //  Surround
 //
-//  One window's connection status, for the screens that will show it (in-app
-//  notices, phases 4 and 5). It feeds `ConnectionStatusModel` from the
+//  One window's connection status, for the screens that show it: the
+//  moderator superchat cover (SuperchatCover.swift), and later the in-app
+//  notices of phases 4 and 5. It feeds `ConnectionStatusModel` from the
 //  window's `OGSService` socket status, the device's network path and
 //  whether the window is on screen, and wakes itself at the model's next
-//  deadline. Nothing creates one in Release builds yet.
+//  deadline.
 //
 
 import Combine

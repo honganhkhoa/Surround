@@ -37657,6 +37657,22 @@
         }
       }
     },
+    "Moderator chat" : {
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obrolan moderator"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perbualan moderator"
+          }
+        }
+      }
+    },
     "moderator decision" : {
       "localizations" : {
         "de" : {
@@ -49867,6 +49883,38 @@
         }
       }
     },
+    "Reply" : {
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balas"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balas"
+          }
+        }
+      }
+    },
+    "Reply to the moderator" : {
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balas moderator"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balas kepada moderator"
+          }
+        }
+      }
+    },
     "Request sent" : {
       "comment" : "Disabled profile action after sending a friend request, while it awaits a response.",
       "localizations" : {
@@ -58290,6 +58338,22 @@
         }
       }
     },
+    "Surround is locked until the moderator ends this chat. You can read and reply." : {
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround terkunci sampai moderator mengakhiri obrolan ini. Anda tetap bisa membaca dan membalas."
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround dikunci sehingga moderator menamatkan perbualan ini. Anda boleh membaca dan membalas."
+          }
+        }
+      }
+    },
     "System" : {
       "comment" : "pause reason",
       "localizations" : {
@@ -59522,6 +59586,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "對局可能已結束或無法載入。請再試一次。"
+          }
+        }
+      }
+    },
+    "The moderator ended this chat." : {
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moderator telah mengakhiri obrolan ini."
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moderator telah menamatkan perbualan ini."
           }
         }
       }
@@ -70702,6 +70782,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你與 %@ 的對局已開始。"
+          }
+        }
+      }
+    },
+    "Your live game with %@ keeps running" : {
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permainan langsung Anda melawan %@ terus berjalan"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permainan langsung anda dengan %@ terus berjalan"
           }
         }
       }

@@ -46,6 +46,7 @@
 		5C0E00032026110900000003 /* SceneCoverPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00042026110900000004 /* SceneCoverPolicy.swift */; };
 		5C0E00052026110900000005 /* SceneCoverPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00042026110900000004 /* SceneCoverPolicy.swift */; };
 		5C2E00102026111100000010 /* SuperchatDebugCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E000F202611110000000F /* SuperchatDebugCommands.swift */; };
+		5C2E00122026111100000012 /* SuperchatCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00112026111100000011 /* SuperchatCover.swift */; };
 		5C2E00012026111100000001 /* SceneCoverPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00022026111100000002 /* SceneCoverPolicyTests.swift */; };
 		5C2E00092026111100000009 /* SuperchatStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00082026111100000008 /* SuperchatStoreTests.swift */; };
 		5C2E000E202611110000000E /* PrivateMessageComposerStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E000D202611110000000D /* PrivateMessageComposerStateTests.swift */; };
@@ -596,6 +597,7 @@
 		5C0E00022026110900000002 /* SceneCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCover.swift; sourceTree = "<group>"; };
 		5C0E00042026110900000004 /* SceneCoverPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCoverPolicy.swift; sourceTree = "<group>"; };
 		5C2E000F202611110000000F /* SuperchatDebugCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperchatDebugCommands.swift; sourceTree = "<group>"; };
+		5C2E00112026111100000011 /* SuperchatCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperchatCover.swift; sourceTree = "<group>"; };
 		5C2E00022026111100000002 /* SceneCoverPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCoverPolicyTests.swift; sourceTree = "<group>"; };
 		5C2E00082026111100000008 /* SuperchatStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperchatStoreTests.swift; sourceTree = "<group>"; };
 		5C2E000D202611110000000D /* PrivateMessageComposerStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageComposerStateTests.swift; sourceTree = "<group>"; };
@@ -1248,6 +1250,7 @@
 				BC6B05F525FA0DF8004E1D66 /* BoardDemoView.swift */,
 				5C0E00022026110900000002 /* SceneCover.swift */,
 				5C0E00042026110900000004 /* SceneCoverPolicy.swift */,
+				5C2E00112026111100000011 /* SuperchatCover.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -1762,6 +1765,7 @@
 				5C0E00012026110900000001 /* SceneCover.swift in Sources */,
 				5C0E00032026110900000003 /* SceneCoverPolicy.swift in Sources */,
 				5C2E00102026111100000010 /* SuperchatDebugCommands.swift in Sources */,
+				5C2E00122026111100000012 /* SuperchatCover.swift in Sources */,
 				C5A700022026110900000002 /* ConnectionStatusModel.swift in Sources */,
 				5C2E000B202611110000000B /* PrivateMessageComposerState.swift in Sources */,
 				C5A700052026110900000005 /* ConnectionStatusSource.swift in Sources */,

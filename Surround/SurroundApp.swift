@@ -41,7 +41,7 @@ struct SurroundApp: App {
                 ThemePreviewExportView()
             } else if let cellSize = BoardMarkerAuditContract.cellSize {
                 BoardMarkerAuditView(cellSize: cellSize)
-                    .modifier(FixtureColorScheme(colorScheme: fixtureColorScheme))
+                    .modifier(FixtureColorScheme(colorScheme: Self.fixtureColorScheme))
             } else {
                 appContent
             }
@@ -76,10 +76,12 @@ struct SurroundApp: App {
             .background(CatalystWindowResizeConfigurator())
             #endif
             .modifier(WholeAppThemeAppearance())
-            .modifier(FixtureColorScheme(colorScheme: fixtureColorScheme))
+            .modifier(FixtureColorScheme(colorScheme: Self.fixtureColorScheme))
     }
 
-    private var fixtureColorScheme: ColorScheme? {
+    /// A UI-test or capture run's fixed appearance; nil otherwise. The
+    /// moderator cover's own window applies it too (SuperchatCover.swift).
+    static var fixtureColorScheme: ColorScheme? {
         #if DEBUG && MAIN_APP
         if let appearance = SurroundUITestContract.appearanceOverride {
             return appearance == .dark ? .dark : .light
@@ -99,8 +101,9 @@ struct SurroundApp: App {
 
 /// A dark-only theme on the whole app turns every screen dark, including
 /// those that do not wear themes yet, and the system's sheets and bars.
-/// With Games only, games alone turn dark, as they always have.
-private struct WholeAppThemeAppearance: ViewModifier {
+/// With Games only, games alone turn dark, as they always have. The
+/// moderator cover's own window wears it too (SuperchatCover.swift).
+struct WholeAppThemeAppearance: ViewModifier {
     @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
     private var themeID = SurroundTheme.standard.rawValue
     @AppStorage(SettingKey<Bool>.themeAppliesToWholeApp.name, store: userDefaults)
@@ -115,7 +118,7 @@ private struct WholeAppThemeAppearance: ViewModifier {
 
 /// Applies a fixture's appearance only when it has one. An unconditional
 /// `preferredColorScheme(nil)` at the root would replace a screen's own choice.
-private struct FixtureColorScheme: ViewModifier {
+struct FixtureColorScheme: ViewModifier {
     let colorScheme: ColorScheme?
 
     func body(content: Content) -> some View {

@@ -13,7 +13,8 @@ extension SuperchatStore {
     /// Every window's store. It saves to the shared preferences: the app
     /// group's suite, or the UI-test suite wiped at each launch. Its first
     /// use is on the main thread, from OGSService.instance(forSceneWithID:),
-    /// the offline fixture factory or the Superchat (Debug) menu.
+    /// the offline fixture factory, a window root's navigation hold (the App
+    /// Review run, whose service has no store) or the Superchat (Debug) menu.
     static let shared = SuperchatStoreAppLifecycle.shared.store
 }
 

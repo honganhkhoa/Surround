@@ -99,8 +99,10 @@ struct PrivateMessageComposerOptions {
     var isOffline = false
     /// Hides the field row; `header` still shows (a stale window's end card).
     var hidesField = false
-    /// Each new non-nil value focuses the field when it is enabled, then
-    /// calls `didRequestFocus` on the next main turn, focused or not.
+    /// Each new non-nil value focuses the field when it is enabled. Then
+    /// `didRequestFocus` runs once: on the main turn after the field takes
+    /// focus, or after `focusReportDeadline` if it never does; on the next
+    /// main turn when nothing can take focus (offline, or a hidden field).
     var focusRequest: Int?
     var didRequestFocus: (() -> Void)?
     /// Shown above the field: the cover's end card, Messages' ended line.
@@ -120,6 +122,13 @@ private struct PrivateMessageComposer: View {
     @Binding var draft: String
     @ObservedObject var sendSession: PrivateMessageSendSession
     @FocusState private var isFocused: Bool
+    /// The focus request whose `didRequestFocus` waits for the field to take focus.
+    @State private var pendingFocusReport: Int?
+
+    /// SwiftUI gives a new field focus once it is in a key window, which at a
+    /// cover's first rise comes after the next main turn (seen on iOS 18.6,
+    /// 26.5 and 27.2). A field that never takes focus reports after this.
+    static let focusReportDeadline: TimeInterval = 0.5
 
     private var state: PrivateMessageComposerState {
         PrivateMessageComposerState(
@@ -233,7 +242,27 @@ private struct PrivateMessageComposer: View {
         }
         .onChange(of: options.focusRequest, initial: true) { _, request in
             guard request != nil, !focusIsSuspended else { return }
-            if state.fieldIsEnabled { isFocused = true }
+            guard state.fieldIsEnabled, !options.hidesField, !isFocused else {
+                // Nothing takes focus now, or the field already has it.
+                pendingFocusReport = nil
+                if let next = options.didRequestFocus { DispatchQueue.main.async(execute: next) }
+                return
+            }
+            isFocused = true
+            guard let next = options.didRequestFocus else { return }
+            pendingFocusReport = request
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.focusReportDeadline) {
+                // Still waiting on this request: the field never took focus.
+                guard pendingFocusReport == request else { return }
+                pendingFocusReport = nil
+                next()
+            }
+        }
+        // The focus a request asked for landed: now the cover can point
+        // VoiceOver at the field, its first responder.
+        .onChange(of: isFocused) { _, focused in
+            guard focused, pendingFocusReport != nil else { return }
+            pendingFocusReport = nil
             if let next = options.didRequestFocus { DispatchQueue.main.async(execute: next) }
         }
         #if os(iOS) && !targetEnvironment(macCatalyst)
