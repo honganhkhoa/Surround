@@ -8,12 +8,10 @@
 //  windows. A SwiftUI view mounts it with `SceneCoverAnchor`; the caller
 //  decides when it is raised and what it shows.
 //
-//  Debug-only until the moderator superchat cover adopts it. Lifting the
-//  outer #if then ships it; the inner DEBUG blocks stay probe-only.
+//  Ships with the moderator superchat cover; the inner DEBUG blocks stay
+//  probe-only.
 //
 
-#if DEBUG
-import OSLog
 import SwiftUI
 import UIKit
 
@@ -28,12 +26,37 @@ final class SceneCoverContext: ObservableObject {
     /// What the cover last rose over, for probes and logs.
     @Published fileprivate(set) var report: [String] = []
     #endif
+    /// Set by the cover that owns this context, in its `init`.
+    fileprivate var moveVoiceOver: @MainActor () -> Void = {}
+
+    /// Points VoiceOver at the cover's focused element, such as the reply
+    /// field the content just focused, or at its root view when nothing has
+    /// focus. Content calls it after a rise its request answered `.content` for.
+    @MainActor func moveVoiceOverToFocusedElement() {
+        moveVoiceOver()
+    }
+}
+
+/// Who moves VoiceOver when the cover rises.
+enum SceneCoverVoiceOver {
+    /// Another window is the one the user is in: post nothing.
+    case none
+    /// Post `.screenChanged` with the cover's root view: VoiceOver starts at the header.
+    case coverRoot
+    /// Post nothing at the rise: the content focuses a field and calls
+    /// `SceneCoverContext.moveVoiceOverToFocusedElement()`.
+    case content
 }
 
 /// The anchor's latest wish for its scene's cover.
 struct SceneCoverRequest {
     var isRaised: Bool
     var options: SceneCoverOptions
+    /// Read at each rise and lower, with the cover window's traits.
+    var voiceOver: (UITraitCollection) -> SceneCoverVoiceOver
+    /// Called last when the cover lowers: its window is hidden and the next
+    /// key window is chosen.
+    var didLower: () -> Void
     var content: AnyView
 }
 
@@ -42,6 +65,10 @@ struct SceneCoverRequest {
 struct SceneCoverAnchor<Content: View>: UIViewRepresentable {
     var isRaised: Bool
     var options = SceneCoverOptions()
+    /// By default VoiceOver starts at the cover's root view, and nothing
+    /// runs after a lower.
+    var voiceOver: (UITraitCollection) -> SceneCoverVoiceOver = { _ in .coverRoot }
+    var didLower: () -> Void = {}
     @ViewBuilder var content: () -> Content
 
     func makeUIView(context: Context) -> SceneCoverAnchorView {
@@ -50,7 +77,8 @@ struct SceneCoverAnchor<Content: View>: UIViewRepresentable {
 
     func updateUIView(_ view: SceneCoverAnchorView, context: Context) {
         view.update(SceneCoverRequest(
-            isRaised: isRaised, options: options, content: AnyView(content())
+            isRaised: isRaised, options: options, voiceOver: voiceOver, didLower: didLower,
+            content: AnyView(content())
         ))
     }
 }
@@ -137,6 +165,7 @@ final class SceneCover: NSObject {
     private init(scene: UIWindowScene) {
         self.scene = scene
         super.init()
+        context.moveVoiceOver = { [weak self] in self?.moveVoiceOverToFocusedElement() }
         NotificationCenter.default.addObserver(
             self, selector: #selector(sceneDidDisconnect(_:)),
             name: UIScene.didDisconnectNotification, object: scene
@@ -148,6 +177,9 @@ final class SceneCover: NSObject {
     }
 
     func receive(_ request: SceneCoverRequest, from contentWindow: UIWindow, attaching: Bool) {
+        // The anchor delivers nothing before it has a window, so a scene's
+        // first request is its attach.
+        let isFirstRequest = self.request == nil
         self.request = request
         self.contentWindow = contentWindow
         contentChanged = true
@@ -156,7 +188,10 @@ final class SceneCover: NSObject {
             SceneCoverLog.record("NOTICES-COVER attach scene=\(Self.shortID(contentWindow.windowScene)) raised=\(request.isRaised)")
         }
         #endif
-        if attaching, request.options.raisesWhileAttaching, request.isRaised, !isRaised {
+        if SceneCoverPolicy.raisesWhileAttaching(
+            attaching: attaching, isFirstRequest: isFirstRequest, options: request.options,
+            wantsRaised: request.isRaised, isRaised: isRaised
+        ) {
             apply()
         } else {
             scheduleApply()
@@ -181,9 +216,9 @@ final class SceneCover: NSObject {
             contentChanged = false
         }
         if request.isRaised, !isRaised {
-            raise(in: scene, options: request.options)
+            raise(in: scene, request: request)
         } else if !request.isRaised, isRaised {
-            lower(in: scene)
+            lower(in: scene, request: request)
         }
     }
 
@@ -198,8 +233,9 @@ final class SceneCover: NSObject {
         contentChanged = true
     }
 
-    private func raise(in scene: UIWindowScene, options: SceneCoverOptions) {
+    private func raise(in scene: UIWindowScene, request: SceneCoverRequest) {
         guard let window, let host else { return }
+        let options = request.options
         let below = Set(SceneCoverPolicy.windowsBelow(
             ObjectIdentifier(window), in: scene.windows.map { Self.policyWindow($0) },
             coverLevel: Self.level.rawValue
@@ -226,9 +262,8 @@ final class SceneCover: NSObject {
         }
         window.accessibilityViewIsModal = options.modalTarget == .window
         host.view.accessibilityViewIsModal = options.modalTarget == .rootView
-        if let contentWindow {
-            window.overrideUserInterfaceStyle = contentWindow.overrideUserInterfaceStyle
-        }
+        // The content sets its own appearance; the window underneath may wear
+        // a screen's own style, such as a dark game.
         matchContentFrame()
         isRaised = true
         window.allowsKey = true
@@ -243,12 +278,16 @@ final class SceneCover: NSObject {
         context.report = report
         SceneCoverLog.record("NOTICES-COVER raise " + report.joined(separator: " | "))
         #endif
-        UIAccessibility.post(notification: .screenChanged, argument: host.view)
+        // `.content` moves VoiceOver itself once it has focused a field, and
+        // `.none` leaves it in the window the user is in.
+        if request.voiceOver(window.traitCollection) == .coverRoot {
+            UIAccessibility.post(notification: .screenChanged, argument: host.view)
+        }
         host.setNeedsFocusUpdate()
         host.updateFocusIfNeeded()
     }
 
-    private func lower(in scene: UIWindowScene) {
+    private func lower(in scene: UIWindowScene, request: SceneCoverRequest) {
         guard let window else { return }
         let next = SceneCoverPolicy.keyWindowAfterLowering(
             scene.windows.map { Self.policyWindow($0) },
@@ -259,6 +298,8 @@ final class SceneCover: NSObject {
         )
         isRaised = false
         window.allowsKey = false
+        // A hidden cover never keeps its own first responder, such as the reply field.
+        window.endEditing(true)
         window.isHidden = true
         for entry in locked {
             entry.window?.accessibilityElementsHidden = entry.accessibilityHidden
@@ -275,7 +316,23 @@ final class SceneCover: NSObject {
         let key = scene.keyWindow.map { String(describing: type(of: $0)) } ?? "none"
         SceneCoverLog.record("NOTICES-COVER lower scene=\(Self.shortID(scene)) key=\(key)")
         #endif
-        UIAccessibility.post(notification: .screenChanged, argument: nil)
+        if request.voiceOver(window.traitCollection) != .none {
+            UIAccessibility.post(notification: .screenChanged, argument: nil)
+        }
+        // Last, so what it starts, such as held navigation, runs uncovered.
+        request.didLower()
+    }
+
+    /// Points VoiceOver at the cover's first responder, such as the reply
+    /// field it just focused (probe 5, device run 5); at the cover's root
+    /// view when nothing in it has focus.
+    func moveVoiceOverToFocusedElement() {
+        guard isRaised, let window, let host else { return }
+        let target: UIView = Self.firstResponder(in: window) ?? host.view
+        UIAccessibility.post(notification: .screenChanged, argument: target)
+        #if DEBUG
+        SceneCoverLog.record("NOTICES-COVER voiceover target=\(type(of: target))")
+        #endif
     }
 
     private func matchContentFrame() {
@@ -310,6 +367,16 @@ final class SceneCover: NSObject {
         SceneCoverPolicy.Window(
             id: ObjectIdentifier(window), level: window.windowLevel.rawValue, isHidden: window.isHidden
         )
+    }
+
+    /// The view that is first responder in `view`'s subtree. View-only on
+    /// purpose: text inputs are views, and this never asks another scene.
+    private static func firstResponder(in view: UIView) -> UIView? {
+        if view.isFirstResponder { return view }
+        for subview in view.subviews {
+            if let responder = firstResponder(in: subview) { return responder }
+        }
+        return nil
     }
 
     #if DEBUG
@@ -350,25 +417,16 @@ final class SceneCover: NSObject {
         }
         return result
     }
-
-    /// The view that is first responder in `view`'s subtree. View-only on
-    /// purpose: text inputs are views, and this never asks another scene.
-    private static func firstResponder(in view: UIView) -> UIView? {
-        if view.isFirstResponder { return view }
-        for subview in view.subviews {
-            if let responder = firstResponder(in: subview) { return responder }
-        }
-        return nil
-    }
     #endif
 }
 
 #if DEBUG
+import OSLog
+
 /// The cover's Debug lines, each starting with NOTICES-COVER, under
 /// subsystem com.honganhkhoa.Surround, category NoticesCover.
 enum SceneCoverLog {
     private static let log = Logger(subsystem: "com.honganhkhoa.Surround", category: "NoticesCover")
     static func record(_ message: String) { log.notice("\(message, privacy: .public)") }
 }
-#endif
 #endif

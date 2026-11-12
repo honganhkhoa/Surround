@@ -2,8 +2,9 @@
 //  NoticesPlaceholderCoverTests.swift
 //  SurroundTests
 //
-//  The Debug-only placeholder cover's launch flags, its app-wide raise and
-//  lower state, and the scene cover's window choices.
+//  The Debug-only placeholder cover's launch flags and its app-wide raise
+//  and lower state. The scene cover's window choices are in
+//  SceneCoverPolicyTests.
 //
 
 #if DEBUG
@@ -13,7 +14,15 @@ import XCTest
 final class NoticesPlaceholderCoverTests: XCTestCase {
     private typealias Configuration = NoticesPlaceholderCoverConfiguration
     private typealias Contract = NoticesPlaceholderCoverContract
-    private typealias PolicyWindow = SceneCoverPolicy.Window<Int>
+
+    /// The placeholder's options without variants: the scene cover's
+    /// defaults, except that it raises one turn after attaching unless the
+    /// `raise-while-attaching` variant asks.
+    private var placeholderDefaults: SceneCoverOptions {
+        var options = SceneCoverOptions()
+        options.raisesWhileAttaching = false
+        return options
+    }
 
     // MARK: - Launch arguments
 
@@ -29,7 +38,7 @@ final class NoticesPlaceholderCoverTests: XCTestCase {
         XCTAssertEqual(configuration, Configuration())
         XCTAssertNil(configuration.raiseAfterLaunch)
         XCTAssertEqual(configuration.reraiseDelay, 5)
-        XCTAssertEqual(configuration.coverOptions, SceneCoverOptions())
+        XCTAssertEqual(configuration.coverOptions, placeholderDefaults)
     }
 
     func testDelaysAndVariantsAreRead() throws {
@@ -48,20 +57,20 @@ final class NoticesPlaceholderCoverTests: XCTestCase {
         func options(_ variant: Configuration.Variant) -> SceneCoverOptions {
             Configuration(variants: [variant]).coverOptions
         }
-        var expected = SceneCoverOptions()
+        var expected = placeholderDefaults
         expected.endsEditingUnderneath = false
         XCTAssertEqual(options(.keepResponder), expected)
-        expected = SceneCoverOptions()
+        expected = placeholderDefaults
         expected.modalTarget = .rootView
         XCTAssertEqual(options(.modalRoot), expected)
-        expected = SceneCoverOptions()
+        expected = placeholderDefaults
         expected.locksWindowsBelow = true
         XCTAssertEqual(options(.lockUnderneath), expected)
-        expected = SceneCoverOptions()
+        expected = placeholderDefaults
         expected.raisesWhileAttaching = true
         XCTAssertEqual(options(.raiseWhileAttaching), expected)
-        XCTAssertEqual(options(.focusReply), SceneCoverOptions())
-        XCTAssertEqual(options(.keepContentEnabled), SceneCoverOptions())
+        XCTAssertEqual(options(.focusReply), placeholderDefaults)
+        XCTAssertEqual(options(.keepContentEnabled), placeholderDefaults)
     }
 
     func testMalformedValuesStopTheLaunch() {
@@ -151,48 +160,6 @@ final class NoticesPlaceholderCoverTests: XCTestCase {
         state.perform(.toggle); XCTAssertFalse(state.isRaised)
         state.perform(.toggle); XCTAssertTrue(state.isRaised)
         state.perform(.lower); XCTAssertFalse(state.isRaised)
-    }
-
-    // MARK: - Window choices
-
-    /// The app, a text effects window, a hidden window, the cover and the keyboard.
-    private let scene = [
-        PolicyWindow(id: 1, level: 0, isHidden: false),
-        PolicyWindow(id: 2, level: 1, isHidden: false),
-        PolicyWindow(id: 3, level: 0, isHidden: true),
-        PolicyWindow(id: 9, level: 2_001, isHidden: false),
-        PolicyWindow(id: 4, level: 10_000_000, isHidden: false),
-    ]
-
-    func testEditingEndsOnlyInVisibleWindowsBelowTheCover() {
-        XCTAssertEqual(SceneCoverPolicy.windowsBelow(9, in: scene, coverLevel: 2_001), [1, 2])
-    }
-
-    func testKeyReturnsToTheWindowThatHadIt() {
-        XCTAssertEqual(SceneCoverPolicy.keyWindowAfterLowering(
-            scene, cover: 9, coverLevel: 2_001, previousKey: 2, content: 1), 2)
-    }
-
-    func testKeyFallsBackToTheContentWindow() {
-        // The previous key window is hidden now, or sits above the cover.
-        for previous in [3, 4] {
-            XCTAssertEqual(SceneCoverPolicy.keyWindowAfterLowering(
-                scene, cover: 9, coverLevel: 2_001, previousKey: previous, content: 1), 1)
-        }
-    }
-
-    func testKeyFallsBackToTheLowestVisibleWindow() {
-        XCTAssertEqual(SceneCoverPolicy.keyWindowAfterLowering(
-            scene, cover: 9, coverLevel: 2_001, previousKey: nil, content: nil), 1)
-        XCTAssertEqual(SceneCoverPolicy.keyWindowAfterLowering(
-            scene, cover: 9, coverLevel: 2_001, previousKey: nil, content: 3), 1)
-    }
-
-    func testNoWindowTakesKeyWhenNoneQualifies() {
-        let alone = [PolicyWindow(id: 9, level: 2_001, isHidden: false),
-                     PolicyWindow(id: 4, level: 10_000_000, isHidden: false)]
-        XCTAssertNil(SceneCoverPolicy.keyWindowAfterLowering(
-            alone, cover: 9, coverLevel: 2_001, previousKey: 4, content: nil))
     }
 }
 
