@@ -1313,7 +1313,15 @@ class OGSService: ObservableObject {
     deinit {
         // Production services never go away. Fixture, preview and test
         // services can, and a wait they left could otherwise still lift a cover.
-        superchatStore?.connectionEnded(superchatConnection)
+        guard let store = superchatStore else { return }
+        let connection = superchatConnection
+        if Thread.isMainThread {
+            store.connectionEnded(connection)
+        } else {
+            // The store is main thread only, and the last release can come
+            // from a closure on another queue. Capture the store, never self.
+            DispatchQueue.main.async { store.connectionEnded(connection) }
+        }
     }
     #endif
 
@@ -1598,9 +1606,14 @@ class OGSService: ObservableObject {
         }
 
         ogsWebsocket.authenticationConfigProvider = { [weak self] in self?.ogsUIConfig }
-        ogsWebsocket.serverEventCallback = self.onWebsocketServerEvent(name:data:)
-        ogsWebsocket.onStatusChanged = {
+        // The service holds its socket, so the socket's callbacks hold the
+        // service weakly: a service nothing else keeps can go away.
+        ogsWebsocket.serverEventCallback = { [weak self] name, data in
+            self?.onWebsocketServerEvent(name: name, data: data)
+        }
+        ogsWebsocket.onStatusChanged = { [weak self] in
             DispatchQueue.main.async {
+                guard let self else { return }
                 self.socketStatus = self.ogsWebsocket.status
             }
         }

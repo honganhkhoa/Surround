@@ -2484,13 +2484,6 @@ final class OGSServiceIsolationTests: XCTestCase {
                 OGSWebsocketAuthenticationAnswer(userID: superchatPlayer, outcome: .confirmed)
             )
             XCTAssertEqual(scheduler.pendingDelays, [SuperchatStore.resendWindow], "A confirmed wait.")
-            // The service and its socket hold each other through the two
-            // callbacks the service installs. Nothing in the app clears them,
-            // so a fixture, preview or test service with a socket never goes
-            // away on its own. This test clears them by hand to release its
-            // service.
-            socket.serverEventCallback = nil
-            socket.onStatusChanged = nil
         }
         XCTAssertNil(released, "The window's service went away.")
         XCTAssertEqual(scheduler.pendingDelays, [], "Its deinit ended the wait.")

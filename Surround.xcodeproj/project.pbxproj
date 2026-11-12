@@ -45,10 +45,7 @@
 		5C0E00012026110900000001 /* SceneCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00022026110900000002 /* SceneCover.swift */; };
 		5C0E00032026110900000003 /* SceneCoverPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00042026110900000004 /* SceneCoverPolicy.swift */; };
 		5C0E00052026110900000005 /* SceneCoverPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00042026110900000004 /* SceneCoverPolicy.swift */; };
-		5C0E00062026110900000006 /* NoticesPlaceholderCoverContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00072026110900000007 /* NoticesPlaceholderCoverContract.swift */; };
-		5C0E00082026110900000008 /* NoticesPlaceholderCoverContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00072026110900000007 /* NoticesPlaceholderCoverContract.swift */; };
-		5C0E00092026110900000009 /* NoticesPlaceholderCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E000A2026110900000010 /* NoticesPlaceholderCover.swift */; };
-		5C0E000B2026110900000011 /* NoticesPlaceholderCoverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E000C2026110900000012 /* NoticesPlaceholderCoverTests.swift */; };
+		5C2E00102026111100000010 /* SuperchatDebugCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E000F202611110000000F /* SuperchatDebugCommands.swift */; };
 		5C2E00012026111100000001 /* SceneCoverPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00022026111100000002 /* SceneCoverPolicyTests.swift */; };
 		5C2E00092026111100000009 /* SuperchatStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00082026111100000008 /* SuperchatStoreTests.swift */; };
 		5C2E000E202611110000000E /* PrivateMessageComposerStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E000D202611110000000D /* PrivateMessageComposerStateTests.swift */; };
@@ -598,9 +595,7 @@
 		6A7E00092026110900000009 /* NoticesHostProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesHostProbe.swift; sourceTree = "<group>"; };
 		5C0E00022026110900000002 /* SceneCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCover.swift; sourceTree = "<group>"; };
 		5C0E00042026110900000004 /* SceneCoverPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCoverPolicy.swift; sourceTree = "<group>"; };
-		5C0E00072026110900000007 /* NoticesPlaceholderCoverContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesPlaceholderCoverContract.swift; sourceTree = "<group>"; };
-		5C0E000A2026110900000010 /* NoticesPlaceholderCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesPlaceholderCover.swift; sourceTree = "<group>"; };
-		5C0E000C2026110900000012 /* NoticesPlaceholderCoverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesPlaceholderCoverTests.swift; sourceTree = "<group>"; };
+		5C2E000F202611110000000F /* SuperchatDebugCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperchatDebugCommands.swift; sourceTree = "<group>"; };
 		5C2E00022026111100000002 /* SceneCoverPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCoverPolicyTests.swift; sourceTree = "<group>"; };
 		5C2E00082026111100000008 /* SuperchatStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperchatStoreTests.swift; sourceTree = "<group>"; };
 		5C2E000D202611110000000D /* PrivateMessageComposerStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageComposerStateTests.swift; sourceTree = "<group>"; };
@@ -948,8 +943,7 @@
 				7B5A00072026110900000007 /* GameControlProbeConfiguration.swift */,
 				C5A7000B202611090000000B /* ConnectionStatusProbe.swift */,
 				AE3100053A00000000000005 /* SurroundUITestOfflineServices.swift */,
-				5C0E00072026110900000007 /* NoticesPlaceholderCoverContract.swift */,
-				5C0E000A2026110900000010 /* NoticesPlaceholderCover.swift */,
+				5C2E000F202611110000000F /* SuperchatDebugCommands.swift */,
 			);
 			path = UITesting;
 			sourceTree = "<group>";
@@ -1042,7 +1036,6 @@
 				ACA1D0052026110900000005 /* ActivityPlaceRegistryTests.swift */,
 				A7F100052026110900000005 /* ActivityFixturesTests.swift */,
 				6A7E00052026110900000005 /* ActivityHostPolicyTests.swift */,
-				5C0E000C2026110900000012 /* NoticesPlaceholderCoverTests.swift */,
 				5C2E00022026111100000002 /* SceneCoverPolicyTests.swift */,
 				5C2E00082026111100000008 /* SuperchatStoreTests.swift */,
 				5C2E000D202611110000000D /* PrivateMessageComposerStateTests.swift */,
@@ -1768,8 +1761,7 @@
 				6A7E00082026110900000008 /* NoticesHostProbe.swift in Sources */,
 				5C0E00012026110900000001 /* SceneCover.swift in Sources */,
 				5C0E00032026110900000003 /* SceneCoverPolicy.swift in Sources */,
-				5C0E00062026110900000006 /* NoticesPlaceholderCoverContract.swift in Sources */,
-				5C0E00092026110900000009 /* NoticesPlaceholderCover.swift in Sources */,
+				5C2E00102026111100000010 /* SuperchatDebugCommands.swift in Sources */,
 				C5A700022026110900000002 /* ConnectionStatusModel.swift in Sources */,
 				5C2E000B202611110000000B /* PrivateMessageComposerState.swift in Sources */,
 				C5A700052026110900000005 /* ConnectionStatusSource.swift in Sources */,
@@ -1917,8 +1909,6 @@
 				6A7E00032026110900000003 /* ActivityHostPolicy.swift in Sources */,
 				6A7E00042026110900000004 /* ActivityHostPolicyTests.swift in Sources */,
 				5C0E00052026110900000005 /* SceneCoverPolicy.swift in Sources */,
-				5C0E00082026110900000008 /* NoticesPlaceholderCoverContract.swift in Sources */,
-				5C0E000B2026110900000011 /* NoticesPlaceholderCoverTests.swift in Sources */,
 				5C2E00012026111100000001 /* SceneCoverPolicyTests.swift in Sources */,
 				5C2E00052026111100000005 /* SuperchatStore.swift in Sources */,
 				5C2E00092026111100000009 /* SuperchatStoreTests.swift in Sources */,
