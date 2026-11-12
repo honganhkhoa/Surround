@@ -18,11 +18,24 @@ final class OGSServiceIsolationTests: XCTestCase {
         var status = OGSWebsocketStatus.disconnected
         var drift = 0.0
         var latency = 0.0
+        /// The account the socket authenticated as; tests set it.
+        var authenticatedUserID: Int?
         private(set) var reconnectCount = 0
         private(set) var emittedCommands = [String]()
+        /// Each emitted command's `player_id`, beside `emittedCommands`.
+        private(set) var emittedPlayerIDs = [Int?]()
+        /// Runs as each command leaves, with its `player_id`.
+        var onEmit: ((String, Int?) -> Void)?
         var nextCallbackError: [String: String]?
         var defersPrivateMessageAcknowledgements = false
         private(set) var privateMessageCallbacks = [OGSWebsocketResultCallback]()
+
+        /// The peers whose conversations OGS was asked to replay, in order.
+        var loadedConversations: [Int] {
+            zip(emittedCommands, emittedPlayerIDs).compactMap { command, playerID in
+                command == "chat/pm/load" ? playerID : nil
+            }
+        }
 
         func connect() {}
         func close() {}
@@ -30,7 +43,10 @@ final class OGSServiceIsolationTests: XCTestCase {
         func closeThenReconnect() { reconnectCount += 1 }
 
         func emit(command: String, data: Any?, resultCallback: OGSWebsocketResultCallback?) {
+            let playerID = (data as? [String: Any])?["player_id"] as? Int
             emittedCommands.append(command)
+            emittedPlayerIDs.append(playerID)
+            onEmit?(command, playerID)
             if command == "chat/pm", defersPrivateMessageAcknowledgements, let resultCallback {
                 privateMessageCallbacks.append(resultCallback)
                 return
@@ -41,11 +57,52 @@ final class OGSServiceIsolationTests: XCTestCase {
 
         func resetEmittedCommands() {
             emittedCommands.removeAll()
+            emittedPlayerIDs.removeAll()
         }
 
         func acknowledgeNextPrivateMessage(with data: [String: Any]) {
             let callback = privateMessageCallbacks.removeFirst()
             callback(data, nil)
+        }
+    }
+
+    /// Runs a superchat store's re-send deadlines only when the test advances it.
+    private final class ManualScheduler: OGSWebsocketScheduling {
+        private final class Cancellation: Cancellable {
+            private var handler: (() -> Void)?
+            init(_ handler: @escaping () -> Void) { self.handler = handler }
+            func cancel() {
+                handler?()
+                handler = nil
+            }
+        }
+
+        private var nextID = 0
+        private var work = [Int: (delay: TimeInterval, block: () -> Void)]()
+
+        /// The delays of the deadlines still to come.
+        var pendingDelays: [TimeInterval] { work.values.map { $0.delay } }
+
+        func async(_ block: @escaping () -> Void) { block() }
+
+        func schedule(after delay: TimeInterval, _ block: @escaping () -> Void) -> Cancellable {
+            nextID += 1
+            let id = nextID
+            work[id] = (delay, block)
+            return Cancellation { [weak self] in self?.work.removeValue(forKey: id) }
+        }
+
+        func scheduleRepeating(every interval: TimeInterval, _ block: @escaping () -> Void) -> Cancellable {
+            preconditionFailure("The store schedules one deadline at a time.")
+        }
+
+        /// Runs every pending deadline, as if the re-send window passed.
+        /// Work that an earlier one cancels doesn't run.
+        func advance() {
+            for id in work.keys.sorted() {
+                guard let due = work.removeValue(forKey: id) else { continue }
+                due.block()
+            }
         }
     }
 
@@ -2063,6 +2120,431 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertFalse(secondSocket.emittedCommands.contains("chat/pm"))
     }
 
+    // MARK: - Superchats: who an event is for, and the store's waits
+
+    func testASuperchatCoversTheSignedInAccount() throws {
+        let (store, _) = makeSuperchatStore()
+        let (first, firstSocket) = try makeSuperchatWindow(
+            userID: superchatPlayer, store: store, label: "superchat-covers"
+        )
+        let (second, secondSocket) = try makeSuperchatWindow(userID: superchatPlayer, store: store, sharing: first)
+        XCTAssertNil(first.superchatCover)
+        XCTAssertNil(second.superchatCover)
+
+        firstSocket.serverEventCallback?("private-superchat", superchat(moderator, player: superchatPlayer))
+        let cover = try XCTUnwrap(store.covers[superchatPlayer], "The event reached the app's store.")
+        XCTAssertEqual(cover.moderators.map(\.id), [moderator])
+        XCTAssertTrue(cover.isOn)
+        XCTAssertEqual(first.superchatCover, cover)
+        XCTAssertEqual(second.superchatCover, cover, "A window whose socket heard nothing is covered too.")
+        XCTAssertEqual(firstSocket.loadedConversations, [moderator], "The conversation loads into Messages.")
+        XCTAssertEqual(first.superchatPeerIds, [moderator], "Today's locked panel still hears it.")
+
+        // A window opened later is covered as soon as it joins the store.
+        let (third, _) = try makeSuperchatWindow(userID: superchatPlayer, store: store, sharing: first)
+        XCTAssertEqual(third.superchatCover, cover)
+
+        // The end, heard by another window, reaches every window.
+        secondSocket.serverEventCallback?(
+            "private-superchat", superchat(moderator, enable: false, player: superchatPlayer)
+        )
+        for window in [first, second, third] {
+            XCTAssertEqual(window.superchatCover?.awaitsDone, true)
+            XCTAssertEqual(window.superchatEndings, [moderator: SuperchatEnding(at: 1_000, wasMissed: false)])
+        }
+        store.done(accountID: superchatPlayer)
+        for window in [first, second, third] {
+            XCTAssertNil(window.superchatCover, "Done in any window clears every window.")
+        }
+    }
+
+    func testTheModeratorsOwnEchoNeverCovers() throws {
+        let (store, _) = makeSuperchatStore()
+        // The moderator's own account: OGS sends its connections a copy.
+        let (service, socket) = try makeSuperchatWindow(
+            userID: moderator, store: store, isModerator: true, label: "superchat-echo"
+        )
+        // The copy names the player. Without a player_id, only the echo check decides.
+        for payload in [
+            superchat(moderator, player: superchatPlayer),
+            superchat(moderator, player: nil),
+            superchat(moderator, enable: false, player: nil),
+        ] {
+            socket.serverEventCallback?("private-superchat", payload)
+        }
+        XCTAssertTrue(store.covers.isEmpty)
+        XCTAssertNil(service.superchatCover)
+        XCTAssertTrue(service.superchatPeerIds.isEmpty, "Today's panel doesn't lock the moderator either.")
+        XCTAssertEqual(socket.loadedConversations, [], "No conversation with itself.")
+        XCTAssertNil(service.privateMessagesByPeerId[moderator])
+    }
+
+    func testAnEventForAnotherPlayerIsIgnored() throws {
+        let (store, _) = makeSuperchatStore()
+        let (service, socket) = try makeSuperchatWindow(
+            userID: superchatPlayer, store: store, label: "superchat-other-player"
+        )
+        // A player_id that is present and isn't this account's: a copy from
+        // a socket still speaking for another account.
+        let otherPlayerIDs: [Any] = [otherPlayer, "\(otherPlayer)", 0, NSNull()]
+        for playerID in otherPlayerIDs {
+            var payload = superchat(moderator, player: nil)
+            payload["player_id"] = playerID
+            socket.serverEventCallback?("private-superchat", payload)
+        }
+        XCTAssertTrue(store.covers.isEmpty)
+        XCTAssertNil(service.superchatCover)
+        XCTAssertTrue(service.superchatPeerIds.isEmpty)
+        XCTAssertEqual(socket.loadedConversations, [])
+
+        // Without a player_id, the socket's identity decides, as on the web.
+        socket.serverEventCallback?("private-superchat", superchat(moderator, player: nil))
+        XCTAssertEqual(store.covers[superchatPlayer]?.moderators.map(\.id), [moderator])
+        XCTAssertEqual(service.superchatCover?.isOn, true)
+        XCTAssertEqual(service.superchatPeerIds, [moderator])
+
+        // Another player's end doesn't end this account's superchat.
+        socket.serverEventCallback?(
+            "private-superchat", superchat(moderator, enable: false, player: otherPlayer)
+        )
+        XCTAssertEqual(service.superchatCover?.isOn, true)
+        XCTAssertEqual(service.superchatPeerIds, [moderator])
+    }
+
+    func testSuperusersAreExemptButAdminsAndModeratorsAreNot() throws {
+        let roles: [(name: String, isSuperuser: Bool?, uiClass: String?, isModerator: Bool?, isCovered: Bool)] = [
+            ("is_superuser", true, nil, nil, false),
+            ("ui_class admin", nil, "admin", nil, true),
+            ("is_moderator", nil, nil, true, true),
+            ("is_superuser false", false, nil, nil, true),
+        ]
+        for role in roles {
+            let (store, _) = makeSuperchatStore()
+            let (service, socket) = try makeSuperchatWindow(
+                userID: superchatPlayer, store: store, isSuperuser: role.isSuperuser,
+                uiClass: role.uiClass, isModerator: role.isModerator, label: "superchat-role"
+            )
+            XCTAssertEqual(service.user?.isSuperuser, role.isSuperuser, role.name)
+            if role.uiClass != nil { XCTAssertEqual(service.user?.isOGSAdmin, true, role.name) }
+            if role.isModerator == true { XCTAssertEqual(service.user?.isOGSModerator, true, role.name) }
+
+            socket.serverEventCallback?("private-superchat", superchat(moderator, player: superchatPlayer))
+            XCTAssertEqual(store.covers[superchatPlayer] != nil, role.isCovered, role.name)
+            XCTAssertEqual(service.superchatCover?.isOn == true, role.isCovered, role.name)
+            XCTAssertEqual(service.superchatPeerIds == [moderator], role.isCovered, "\(role.name): today's panel")
+            XCTAssertEqual(
+                socket.loadedConversations, [moderator], "\(role.name): the conversation still loads into Messages."
+            )
+        }
+    }
+
+    func testAnEventFromASocketOfAnotherAccountIsIgnored() throws {
+        let (store, scheduler) = makeSuperchatStore()
+        let (service, socket) = try makeSuperchatWindow(
+            userID: superchatPlayer, store: store, label: "superchat-socket-account"
+        )
+        // The socket still speaks for another account, or for none while it's down.
+        let identities: [Int?] = [otherPlayer, nil]
+        for identity in identities {
+            socket.authenticatedUserID = identity
+            XCTAssertNil(service.superchatAccountID, "\(String(describing: identity))")
+            socket.serverEventCallback?("private-superchat", superchat(moderator, player: superchatPlayer))
+            socket.serverEventCallback?("private-superchat", superchat(moderator, player: nil))
+        }
+        XCTAssertTrue(store.covers.isEmpty)
+        XCTAssertNil(service.superchatCover)
+        XCTAssertTrue(service.superchatPeerIds.isEmpty)
+        XCTAssertEqual(socket.loadedConversations, [])
+
+        socket.authenticatedUserID = superchatPlayer
+        XCTAssertEqual(service.superchatAccountID, superchatPlayer)
+        socket.serverEventCallback?("private-superchat", superchat(moderator, player: superchatPlayer))
+        XCTAssertEqual(service.superchatCover?.isOn, true)
+
+        // Nor can such a socket's authentication lift the cover.
+        socket.authenticatedUserID = otherPlayer
+        socket.serverEventCallback?("surround/socketAuthenticated", nil)
+        socket.serverEventCallback?(
+            "surround/socketAuthenticationAnswered",
+            OGSWebsocketAuthenticationAnswer(userID: otherPlayer, outcome: .confirmed)
+        )
+        XCTAssertEqual(scheduler.pendingDelays, [], "No wait opened.")
+        scheduler.advance()
+        XCTAssertEqual(service.superchatCover?.isOn, true)
+    }
+
+    func testAStaleWindowNeitherCoversNorLiftsButIsCovered() throws {
+        let saved = makeSuperchatPreferences(label: "superchat-stale-saved")
+        let (store, scheduler) = makeSuperchatStore(preferences: saved)
+        let (first, firstSocket) = try makeSuperchatWindow(
+            userID: superchatPlayer, store: store, label: "superchat-stale"
+        )
+        let (stale, staleSocket) = try makeSuperchatWindow(userID: superchatPlayer, store: store, sharing: first)
+        let (third, thirdSocket) = try makeSuperchatWindow(userID: superchatPlayer, store: store, sharing: first)
+
+        // Before the switch, windows 2 and 3 wait for the first account's
+        // re-send. OGS answered window 2, so its deadline runs; it didn't
+        // answer window 3, whose deadline starts at its next pong.
+        firstSocket.serverEventCallback?("private-superchat", superchat(moderator, player: superchatPlayer))
+        let firstCover = try XCTUnwrap(store.covers[superchatPlayer])
+        func authenticate(_ socket: StubWebsocket, answered outcome: OGSWebsocketAuthenticationAnswer.Outcome) {
+            socket.serverEventCallback?("surround/socketAuthenticated", nil)
+            socket.serverEventCallback?(
+                "surround/socketAuthenticationAnswered",
+                OGSWebsocketAuthenticationAnswer(userID: superchatPlayer, outcome: outcome)
+            )
+        }
+        authenticate(staleSocket, answered: .confirmed)
+        authenticate(thirdSocket, answered: .unanswered)
+        XCTAssertEqual(scheduler.pendingDelays, [SuperchatStore.resendWindow])
+
+        // Window 1 signs in as another account; windows 2 and 3 keep the first one.
+        try signInForPrivateMessageTest(first, userID: otherPlayer)
+        firstSocket.authenticatedUserID = otherPlayer
+        drainMainQueue()
+        XCTAssertEqual(stale.user?.id, superchatPlayer)
+        XCTAssertEqual(stale.superchatCoverAccountID, otherPlayer, "Its cover follows the stored sign-in.")
+        XCTAssertNil(stale.superchatAccountID, "It hears for no account.")
+
+        // So they drop the first account's re-send, and the change ended both
+        // waits: no deadline runs or starts, and that account keeps its cover.
+        XCTAssertEqual(scheduler.pendingDelays, [], "The change ended window 2's wait.")
+        for socket in [staleSocket, thirdSocket] {
+            socket.serverEventCallback?("private-superchat", superchat(moderator, player: superchatPlayer))
+            socket.serverEventCallback?("net/pong", pong)
+        }
+        XCTAssertEqual(scheduler.pendingDelays, [], "Window 3's pong started nothing.")
+        scheduler.advance()
+        XCTAssertEqual(store.covers, [superchatPlayer: firstCover], "Nothing lifted the first account's cover.")
+        XCTAssertEqual(saved[.superchatModeratorsByOGSAccountID], [superchatPlayer: firstCover.moderators])
+
+        firstSocket.serverEventCallback?("private-superchat", superchat(moderator, player: otherPlayer))
+        let cover = try XCTUnwrap(store.covers[otherPlayer])
+        XCTAssertEqual(first.superchatCover, cover)
+        XCTAssertEqual(stale.superchatCover, cover, "The stale window is covered.")
+
+        // Window 2's socket hears superchats as its own account, or as the
+        // stored one after reconnecting with the shared sign-in. None of
+        // them counts, and its authentications open no wait.
+        for identity in [superchatPlayer, otherPlayer] {
+            staleSocket.authenticatedUserID = identity
+            staleSocket.serverEventCallback?("private-superchat", superchat(secondModerator, player: identity))
+            staleSocket.serverEventCallback?(
+                "private-superchat", superchat(moderator, enable: false, player: identity)
+            )
+            staleSocket.serverEventCallback?("surround/socketAuthenticated", nil)
+            staleSocket.serverEventCallback?(
+                "surround/socketAuthenticationAnswered",
+                OGSWebsocketAuthenticationAnswer(userID: identity, outcome: .confirmed)
+            )
+            staleSocket.serverEventCallback?("net/pong", pong)
+        }
+        XCTAssertEqual(
+            store.covers, [superchatPlayer: firstCover, otherPlayer: cover], "Window 2's events changed nothing."
+        )
+        XCTAssertTrue(store.endings.isEmpty)
+        XCTAssertEqual(scheduler.pendingDelays, [], "Its authentications opened no wait.")
+        scheduler.advance()
+        XCTAssertEqual(stale.superchatCover, cover, "So nothing lifts.")
+        XCTAssertTrue(stale.superchatPeerIds.isEmpty)
+
+        // A live end heard by window 1 gives windows 2 and 3 Done.
+        firstSocket.serverEventCallback?(
+            "private-superchat", superchat(moderator, enable: false, player: otherPlayer)
+        )
+        for window in [stale, third] {
+            XCTAssertEqual(window.superchatCover?.awaitsDone, true)
+            XCTAssertEqual(window.superchatEndings, [moderator: SuperchatEnding(at: 1_000, wasMissed: false)])
+        }
+    }
+
+    func testSocketLifecycleOpensAnswersAndCancelsWaits() throws {
+        let (store, scheduler) = makeSuperchatStore()
+        let (service, socket) = try makeSuperchatWindow(
+            userID: superchatPlayer, store: store, label: "superchat-lifecycle"
+        )
+        let window = SuperchatStore.resendWindow
+        func event(_ name: String, _ data: Any? = nil) { socket.serverEventCallback?(name, data) }
+        func answer(_ outcome: OGSWebsocketAuthenticationAnswer.Outcome, for userID: Int? = nil) {
+            event(
+                "surround/socketAuthenticationAnswered",
+                OGSWebsocketAuthenticationAnswer(userID: userID ?? superchatPlayer, outcome: outcome)
+            )
+        }
+        event("private-superchat", superchat(moderator, player: superchatPlayer))
+
+        // Authenticated: a wait opens, and OGS's answer starts its deadline.
+        event("surround/socketAuthenticated")
+        XCTAssertEqual(scheduler.pendingDelays, [], "No deadline before OGS answers.")
+        answer(.confirmed, for: otherPlayer)
+        XCTAssertEqual(scheduler.pendingDelays, [], "An answer for another identity starts nothing.")
+        answer(.confirmed)
+        XCTAssertEqual(scheduler.pendingDelays, [window])
+        // Closed: the wait is cancelled, so its deadline lifts nothing.
+        event("surround/socketClosed")
+        XCTAssertEqual(scheduler.pendingDelays, [])
+        scheduler.advance()
+        XCTAssertEqual(service.superchatCover?.isOn, true)
+
+        // Rejected: the wait closes, and no ping starts a deadline.
+        event("surround/socketAuthenticated")
+        answer(.rejected)
+        event("net/pong", pong)
+        XCTAssertEqual(scheduler.pendingDelays, [])
+
+        // Unanswered after a ping: the deadline starts at the timeout.
+        event("surround/socketAuthenticated")
+        event("net/pong", pong)
+        XCTAssertEqual(scheduler.pendingDelays, [], "A ping alone starts nothing.")
+        answer(.unanswered)
+        XCTAssertEqual(scheduler.pendingDelays, [window])
+        event("surround/socketClosed")
+        XCTAssertEqual(scheduler.pendingDelays, [])
+
+        // Unanswered before any ping: the deadline starts at the next pong.
+        event("surround/socketAuthenticated")
+        answer(.unanswered)
+        XCTAssertEqual(scheduler.pendingDelays, [])
+        event("net/pong", pong)
+        XCTAssertEqual(scheduler.pendingDelays, [window])
+        scheduler.advance()
+        XCTAssertNil(service.superchatCover, "No re-send: the cover lifted by itself.")
+        XCTAssertEqual(service.superchatEndings, [moderator: SuperchatEnding(at: 1_000, wasMissed: true)])
+    }
+
+    func testTheModeratorsNameComesFromTheEvent() throws {
+        let (store, _) = makeSuperchatStore()
+        let (service, socket) = try makeSuperchatWindow(
+            userID: superchatPlayer, store: store, label: "superchat-name"
+        )
+        XCTAssertNil(service.cachedUsersById[moderator], "No profile of the moderator is cached.")
+
+        socket.serverEventCallback?(
+            "private-superchat", superchat(moderator, player: superchatPlayer, username: "moderator-name")
+        )
+        XCTAssertEqual(store.covers[superchatPlayer]?.moderators.map(\.username), ["moderator-name"])
+        XCTAssertEqual(service.superchatCover?.moderators.map(\.username), ["moderator-name"])
+        XCTAssertNil(service.cachedUsersById[moderator], "The name came from the event alone.")
+    }
+
+    func testAccountChangesKeepEachAccountsCover() throws {
+        let (store, scheduler) = makeSuperchatStore()
+        let (first, firstSocket) = try makeSuperchatWindow(
+            userID: superchatPlayer, store: store, label: "superchat-accounts"
+        )
+        let (second, _) = try makeSuperchatWindow(userID: superchatPlayer, store: store, sharing: first)
+        firstSocket.serverEventCallback?("private-superchat", superchat(moderator, player: superchatPlayer))
+        let firstCover = try XCTUnwrap(store.covers[superchatPlayer])
+        // Window 1's connection waits for the first account's re-send.
+        firstSocket.serverEventCallback?("surround/socketAuthenticated", nil)
+        firstSocket.serverEventCallback?(
+            "surround/socketAuthenticationAnswered",
+            OGSWebsocketAuthenticationAnswer(userID: superchatPlayer, outcome: .confirmed)
+        )
+        XCTAssertEqual(scheduler.pendingDelays, [SuperchatStore.resendWindow])
+
+        // Window 1 signs in as another account. Its reset leaves the first
+        // account's cover in the store, and each window follows the new sign-in.
+        try signInForPrivateMessageTest(first, userID: otherPlayer)
+        firstSocket.authenticatedUserID = otherPlayer
+        XCTAssertEqual(scheduler.pendingDelays, [], "The switch ended the first account's wait before reconnecting.")
+        scheduler.advance()
+        XCTAssertEqual(store.covers, [superchatPlayer: firstCover])
+        XCTAssertNil(first.superchatCover, "The new account has no cover.")
+        drainMainQueue()
+        XCTAssertNil(second.superchatCover, "The change reached window 2 too.")
+
+        firstSocket.serverEventCallback?("private-superchat", superchat(secondModerator, player: otherPlayer))
+        let secondCover = try XCTUnwrap(store.covers[otherPlayer])
+        XCTAssertEqual(store.covers, [superchatPlayer: firstCover, otherPlayer: secondCover])
+        XCTAssertEqual(first.superchatCover, secondCover)
+        XCTAssertEqual(second.superchatCover, secondCover)
+
+        // Back to the first account: its cover is still there, in both windows.
+        try signInForPrivateMessageTest(first, userID: superchatPlayer)
+        firstSocket.authenticatedUserID = superchatPlayer
+        drainMainQueue()
+        XCTAssertEqual(first.superchatCover, firstCover)
+        XCTAssertEqual(second.superchatCover, firstCover)
+        XCTAssertEqual(store.covers, [superchatPlayer: firstCover, otherPlayer: secondCover])
+    }
+
+    func testAServiceThatGoesAwayEndsItsWait() throws {
+        let (store, scheduler) = makeSuperchatStore()
+        weak var released: OGSService?
+        do {
+            let (service, socket) = try makeSuperchatWindow(
+                userID: superchatPlayer, store: store, label: "superchat-released"
+            )
+            released = service
+            socket.serverEventCallback?("private-superchat", superchat(moderator, player: superchatPlayer))
+            socket.serverEventCallback?("surround/socketAuthenticated", nil)
+            socket.serverEventCallback?(
+                "surround/socketAuthenticationAnswered",
+                OGSWebsocketAuthenticationAnswer(userID: superchatPlayer, outcome: .confirmed)
+            )
+            XCTAssertEqual(scheduler.pendingDelays, [SuperchatStore.resendWindow], "A confirmed wait.")
+            // The service and its socket hold each other through the two
+            // callbacks the service installs. Nothing in the app clears them,
+            // so a fixture, preview or test service with a socket never goes
+            // away on its own. This test clears them by hand to release its
+            // service.
+            socket.serverEventCallback = nil
+            socket.onStatusChanged = nil
+        }
+        XCTAssertNil(released, "The window's service went away.")
+        XCTAssertEqual(scheduler.pendingDelays, [], "Its deinit ended the wait.")
+        scheduler.advance()
+        XCTAssertEqual(store.covers[superchatPlayer]?.isOn, true, "The deadline lifts nothing.")
+    }
+
+    func testEachAuthenticationAsksForEveryModeratorStillOn() throws {
+        // What a relaunch restores: a superchat still on, saved by an earlier
+        // launch, from a moderator this window never loaded (no messages and
+        // no recent-peer entry). Another moderator's superchat started and
+        // ended live since.
+        let saved = makeSuperchatPreferences(label: "superchat-saved")
+        let (earlier, _) = makeSuperchatStore(preferences: saved)
+        earlier.receive(enable: true, moderatorID: moderator, username: "moderator", accountID: superchatPlayer)
+        let (store, scheduler) = makeSuperchatStore(preferences: saved)
+        store.receive(enable: true, moderatorID: secondModerator, username: "second", accountID: superchatPlayer)
+        store.receive(enable: false, moderatorID: secondModerator, username: nil, accountID: superchatPlayer)
+        XCTAssertEqual(store.covers[superchatPlayer]?.moderators.map(\.id), [secondModerator, moderator])
+        XCTAssertEqual(store.covers[superchatPlayer]?.moderators.map(\.isOn), [false, true])
+
+        let (service, socket) = try makeSuperchatWindow(
+            userID: superchatPlayer, store: store, label: "superchat-asks"
+        )
+        XCTAssertTrue(service.privateMessagesActivePeerIds.isEmpty)
+        XCTAssertNil(service.preferences[.recentPrivateMessagePeerIDsByOGSAccountID]?[superchatPlayer])
+        socket.resetEmittedCommands()
+
+        socket.serverEventCallback?("surround/socketAuthenticated", nil)
+        XCTAssertEqual(socket.loadedConversations, [moderator], "Only the moderator still on is asked for.")
+        XCTAssertEqual(service.privateMessagesActivePeerIds, [moderator], "Its thread waits for the replay.")
+
+        // The request leaves before the wait opens. A connection that
+        // authenticates again without closing first (connect() on an open
+        // socket) shows it: its request still finds the earlier wait's
+        // deadline, which opening the new wait cancels.
+        socket.serverEventCallback?(
+            "surround/socketAuthenticationAnswered",
+            OGSWebsocketAuthenticationAnswer(userID: superchatPlayer, outcome: .confirmed)
+        )
+        XCTAssertEqual(scheduler.pendingDelays, [SuperchatStore.resendWindow])
+        let moderatorID = moderator
+        var deadlinesAtRequest: [TimeInterval]?
+        socket.onEmit = { command, playerID in
+            if command == "chat/pm/load", playerID == moderatorID { deadlinesAtRequest = scheduler.pendingDelays }
+        }
+        socket.resetEmittedCommands()
+        socket.serverEventCallback?("surround/socketAuthenticated", nil)
+        socket.onEmit = nil
+        XCTAssertEqual(socket.loadedConversations, [moderator])
+        XCTAssertEqual(deadlinesAtRequest, [SuperchatStore.resendWindow], "The request left first,")
+        XCTAssertEqual(scheduler.pendingDelays, [], "then the new wait opened.")
+    }
+
     func testSubmitMoveWithoutGameDataFailsInsteadOfHanging() {
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
         let service = makeService(
@@ -2287,24 +2769,38 @@ final class OGSServiceIsolationTests: XCTestCase {
         return try JSONDecoder().decode(OGSUser.self, from: data)
     }
 
-    private func makeUIConfig(jwt: String, userID: Int) throws -> OGSUIConfig {
+    /// `ui/config` for `userID`. The role options add OGS's role fields to its
+    /// user: `is_superuser`, `ui_class` and `is_moderator`.
+    private func makeUIConfig(
+        jwt: String, userID: Int, isSuperuser: Bool? = nil, uiClass: String? = nil, isModerator: Bool? = nil
+    ) throws -> OGSUIConfig {
+        var user: [String: Any] = [
+            "username": "player-\(userID)",
+            "id": userID,
+            "anonymous": false,
+        ]
+        if let isSuperuser { user["is_superuser"] = isSuperuser }
+        if let uiClass { user["ui_class"] = uiClass }
+        if let isModerator { user["is_moderator"] = isModerator }
         let data = try JSONSerialization.data(withJSONObject: [
             "csrf_token": "test-csrf",
             "user_jwt": jwt,
-            "user": [
-                "username": "player-\(userID)",
-                "id": userID,
-                "anonymous": false,
-            ],
+            "user": user,
         ])
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(OGSUIConfig.self, from: data)
     }
 
-    private func signInForPrivateMessageTest(_ service: OGSService, userID: Int) throws {
+    private func signInForPrivateMessageTest(
+        _ service: OGSService, userID: Int,
+        isSuperuser: Bool? = nil, uiClass: String? = nil, isModerator: Bool? = nil
+    ) throws {
         service.preferences[.ogsSessionId] = "test-session-\(userID)"
-        service.ogsUIConfig = try makeUIConfig(jwt: "test-jwt-\(userID)", userID: userID)
+        service.ogsUIConfig = try makeUIConfig(
+            jwt: "test-jwt-\(userID)", userID: userID,
+            isSuperuser: isSuperuser, uiClass: uiClass, isModerator: isModerator
+        )
         XCTAssertEqual(service.user?.id, userID)
     }
 
@@ -2324,6 +2820,87 @@ final class OGSServiceIsolationTests: XCTestCase {
             "to": ["id": recipientID, "username": "player-\(recipientID)"],
             "message": ["i": id, "m": id, "t": 100.0],
         ]
+    }
+
+    // MARK: Superchat helpers
+
+    private let superchatPlayer = 101
+    private let otherPlayer = 202
+    private let moderator = 301
+    private let secondModerator = 302
+    /// A `net/pong` the service accepts as a clock sample.
+    private let pong: [String: Any] = ["client": 1_000 as NSNumber, "server": 2_000 as NSNumber]
+
+    /// A superchat store of the test's own, on a manual scheduler and a fixed clock.
+    private func makeSuperchatStore(preferences: UserDefaults? = nil) -> (SuperchatStore, ManualScheduler) {
+        let scheduler = ManualScheduler()
+        return (SuperchatStore(preferences: preferences, scheduler: scheduler, now: { 1_000 }), scheduler)
+    }
+
+    /// A throwaway suite for what a superchat store saves.
+    private func makeSuperchatPreferences(label: String) -> UserDefaults {
+        let suite = "com.honganhkhoa.Surround.IsolationTests.\(label).\(UUID().uuidString)"
+        preferenceSuites.append(suite)
+        return UserDefaults(suiteName: suite)!
+    }
+
+    /// One window of the app, signed in as `userID` on a socket that
+    /// authenticated as it, and reporting to `store`. A window made
+    /// `sharing` another uses its preferences, so the two share the stored
+    /// sign-in, as the app's windows do.
+    private func makeSuperchatWindow(
+        userID: Int, store: SuperchatStore, sharing other: OGSService? = nil,
+        isSuperuser: Bool? = nil, uiClass: String? = nil, isModerator: Bool? = nil,
+        label: String = "superchat-window"
+    ) throws -> (OGSService, StubWebsocket) {
+        let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
+        let httpClient = makeHTTPClient(responseUsername: label)
+        let socket = StubWebsocket()
+        let service: OGSService
+        if let other {
+            service = OGSService(
+                environment: environment,
+                httpClient: httpClient,
+                preferences: other.preferences,
+                ogsWebsocket: socket,
+                connectsAutomatically: false,
+                usesSurroundOverviewService: false,
+                enablesAppSideEffects: false,
+                startsTimers: false,
+                installsObservers: false
+            )
+        } else {
+            service = makeService(environment: environment, httpClient: httpClient, socket: socket, label: label)
+        }
+        try signInForPrivateMessageTest(
+            service, userID: userID, isSuperuser: isSuperuser, uiClass: uiClass, isModerator: isModerator
+        )
+        socket.authenticatedUserID = userID
+        service.superchatStore = store
+        return (service, socket)
+    }
+
+    /// OGS's `private-superchat` (Goban ServerToClient.ts:348-365). A nil
+    /// `player` leaves out `player_id`.
+    private func superchat(
+        _ moderatorID: Int, enable: Bool = true, player: Int?, username: String = "moderator"
+    ) -> [String: Any] {
+        var payload: [String: Any] = [
+            "moderator_id": moderatorID, "moderator_username": username, "enable": enable,
+        ]
+        if let player {
+            payload["player_id"] = player
+            payload["player_username"] = "player-\(player)"
+        }
+        return payload
+    }
+
+    /// Lets the main queue run what is already on it, such as another
+    /// window's account-change broadcast.
+    private func drainMainQueue() {
+        let drained = expectation(description: "the main queue ran its earlier work")
+        DispatchQueue.main.async { drained.fulfill() }
+        wait(for: [drained], timeout: 1)
     }
 
     private func makeService(

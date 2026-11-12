@@ -831,6 +831,51 @@ final class OGSWebsocketTests: XCTestCase {
         XCTAssertNil(offline.authenticatedUserID, "A fake that doesn't model identity has none.")
     }
 
+    // MARK: - A superchat through the real socket
+
+    func testAResendOnARealSocketKeepsTheCover() throws {
+        let run = try makeSuperchatRun()
+        let (second, authenticateID) = try reconnectAfterASuperchat(run)
+
+        // The replay the request asked for ends with the re-send, here before
+        // OGS answers authenticate. Then the re-send window passes.
+        second.receive(superchatFrame(enable: true))
+        second.receive("[\(authenticateID),{\"id\":1,\"username\":\"player\"}]")
+        XCTAssertEqual(run.storeScheduler.scheduledDelays, [], "The re-send closed the wait.")
+        run.clock.now = 1_010
+        XCTAssertFalse(run.storeScheduler.runNext(after: SuperchatStore.resendWindow), "No deadline to pass.")
+
+        XCTAssertEqual(run.service.superchatCover?.moderators.map(\.id), [superchatModerator])
+        XCTAssertEqual(run.service.superchatCover?.isOn, true, "The cover stays.")
+        XCTAssertEqual(run.service.superchatEndings, [:])
+        XCTAssertEqual(saved(run)?.map(\.id), [superchatModerator], "It is still saved for a relaunch.")
+        run.socket.close()
+    }
+
+    func testNoResendOnARealSocketLiftsTheCover() throws {
+        let run = try makeSuperchatRun()
+        var lifted = [Int]()
+        let liftedSubscription = run.store.coverLiftedWithoutDone.sink { lifted.append($0) }
+        let (second, authenticateID) = try reconnectAfterASuperchat(run)
+
+        // OGS answers, and nothing is re-sent: the superchat ended while the
+        // connection was down. The deadline runs from the answer.
+        second.receive("[\(authenticateID),{\"id\":1,\"username\":\"player\"}]")
+        XCTAssertEqual(run.storeScheduler.scheduledDelays, [SuperchatStore.resendWindow])
+        run.clock.now = 1_010
+        XCTAssertTrue(run.storeScheduler.runNext(after: SuperchatStore.resendWindow))
+
+        XCTAssertNil(run.service.superchatCover, "The cover lifted by itself.")
+        XCTAssertNil(run.store.covers[superchatPlayer])
+        XCTAssertEqual(run.service.superchatEndings, [
+            superchatModerator: SuperchatEnding(at: 1_010, wasMissed: true),
+        ], "Messages can say the chat ended.")
+        XCTAssertEqual(lifted, [superchatPlayer])
+        XCTAssertNil(saved(run), "Nothing is left to restore.")
+        liftedSubscription.cancel()
+        run.socket.close()
+    }
+
     private func makeConfig(jwt: String, anonymous: Bool) throws -> OGSUIConfig {
         try makeConfig(jwt: jwt, userID: anonymous ? 0 : 1, anonymous: anonymous)
     }
@@ -887,5 +932,115 @@ final class OGSWebsocketTests: XCTestCase {
         let frame = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(message.utf8)) as? [Any])
         XCTAssertEqual(frame.first as? String, "authenticate")
         return frame
+    }
+
+    // MARK: Superchat runs
+
+    /// The signed-in player of `makeConfig(jwt:anonymous:)`, and a moderator.
+    private let superchatPlayer = 1
+    private let superchatModerator = 101
+
+    private final class Clock {
+        var now: TimeInterval = 1_000
+    }
+
+    /// A signed-in OGSService on a fresh suite, on a real socket with this
+    /// file's fake transports, reporting to a store on its own manual scheduler.
+    private struct SuperchatRun {
+        let service: OGSService
+        let socket: OGSWebsocket
+        let socketScheduler: Scheduler
+        let factory: TransportFactory
+        let preferences: UserDefaults
+        let store: SuperchatStore
+        let storeScheduler: Scheduler
+        let clock: Clock
+    }
+
+    private func makeSuperchatRun() throws -> SuperchatRun {
+        let suite = "com.honganhkhoa.Surround.OGSWebsocketTests.\(UUID().uuidString)"
+        addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: suite) }
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let socketScheduler = Scheduler()
+        let factory = TransportFactory()
+        let socket = OGSWebsocket(
+            rootURL: URL(string: "https://ogs.test")!,
+            authenticationConfigProvider: { nil },
+            transportFactory: factory.make,
+            scheduler: socketScheduler,
+            anonymousConfigLoader: { _, _ in XCTFail("The service gives the socket its signed-in identity.") },
+            logger: { _ in }
+        )
+        let service = OGSService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: OGSOfflineRejectingHTTPClient(),
+            preferences: preferences,
+            ogsWebsocket: socket,
+            connectsAutomatically: false,
+            installsObservers: false
+        )
+        preferences[.ogsSessionId] = "test-session"
+        service.ogsUIConfig = try makeConfig(jwt: "player-jwt", anonymous: false)
+        XCTAssertEqual(service.user?.id, superchatPlayer)
+
+        let storeScheduler = Scheduler()
+        let clock = Clock()
+        let store = SuperchatStore(preferences: preferences, scheduler: storeScheduler, now: { clock.now })
+        service.superchatStore = store
+        return SuperchatRun(
+            service: service, socket: socket, socketScheduler: socketScheduler, factory: factory,
+            preferences: preferences, store: store, storeScheduler: storeScheduler, clock: clock
+        )
+    }
+
+    /// Opens the run's socket and hears a superchat, then fails the
+    /// transport and lets the socket reconnect. Returns the new transport and
+    /// its `authenticate`'s callback id, before OGS answers it.
+    private func reconnectAfterASuperchat(_ run: SuperchatRun) throws -> (Transport, Int) {
+        run.socket.connect()
+        let first = try XCTUnwrap(run.factory.transports.last)
+        first.open()
+        first.receive(superchatFrame(enable: true))
+        XCTAssertEqual(run.service.superchatCover?.moderators.map(\.id), [superchatModerator])
+        XCTAssertEqual(run.service.superchatCover?.isOn, true)
+
+        first.fail()
+        XCTAssertNil(run.service.superchatAccountID, "A dropped socket hears for no account.")
+        XCTAssertEqual(run.service.superchatCover?.isOn, true, "A drop lifts nothing.")
+        XCTAssertTrue(run.socketScheduler.runNext(after: 1))
+        let second = try XCTUnwrap(run.factory.transports.last)
+        XCTAssertFalse(second === first)
+        second.open()
+
+        // The new connection authenticates as the account and asks for OGS's
+        // answer. With it goes the request for the moderator's conversation,
+        // whose replay brings any re-send.
+        let frame = try authenticateFrame(on: second)
+        XCTAssertEqual(frame.count, 3, "A signed-in connection asks for OGS's answer.")
+        XCTAssertEqual((frame[1] as? [String: String])?["jwt"], "player-jwt")
+        let authenticateID = try XCTUnwrap(frame[2] as? Int)
+        XCTAssertEqual(try conversationRequests(on: second), [superchatModerator])
+        XCTAssertEqual(run.service.superchatAccountID, superchatPlayer)
+        XCTAssertEqual(run.storeScheduler.scheduledDelays, [], "The wait's deadline waits for OGS's answer.")
+        return (second, authenticateID)
+    }
+
+    /// OGS's `private-superchat` for the signed-in player (Goban ServerToClient.ts:348-365).
+    private func superchatFrame(enable: Bool) -> String {
+        #"["private-superchat",{"moderator_id":101,"moderator_username":"moderator","player_id":1,"player_username":"player","enable":\#(enable)}]"#
+    }
+
+    /// The peers a transport asked OGS to replay with `chat/pm/load`, in order.
+    private func conversationRequests(on transport: Transport) throws -> [Int] {
+        try transport.sentMessages.compactMap { message in
+            let frame = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(message.utf8)) as? [Any])
+            guard frame.first as? String == "chat/pm/load" else { return nil }
+            return (frame[1] as? [String: Any])?["player_id"] as? Int
+        }
+    }
+
+    /// The run's superchats still on, as a relaunch would find them.
+    private func saved(_ run: SuperchatRun) -> [SuperchatModerator]? {
+        run.preferences[.superchatModeratorsByOGSAccountID]?[superchatPlayer]
     }
 }
