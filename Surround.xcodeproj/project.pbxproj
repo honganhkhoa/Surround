@@ -50,11 +50,15 @@
 		5C0E00092026110900000009 /* NoticesPlaceholderCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E000A2026110900000010 /* NoticesPlaceholderCover.swift */; };
 		5C0E000B2026110900000011 /* NoticesPlaceholderCoverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E000C2026110900000012 /* NoticesPlaceholderCoverTests.swift */; };
 		5C2E00012026111100000001 /* SceneCoverPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00022026111100000002 /* SceneCoverPolicyTests.swift */; };
+		5C2E00092026111100000009 /* SuperchatStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00082026111100000008 /* SuperchatStoreTests.swift */; };
 		C5A700022026110900000002 /* ConnectionStatusModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700012026110900000001 /* ConnectionStatusModel.swift */; };
 		C5A700032026110900000003 /* ConnectionStatusModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700012026110900000001 /* ConnectionStatusModel.swift */; };
 		C5A700052026110900000005 /* ConnectionStatusSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700042026110900000004 /* ConnectionStatusSource.swift */; };
 		C5A700062026110900000006 /* ConnectionStatusSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700042026110900000004 /* ConnectionStatusSource.swift */; };
 		C5A700082026110900000008 /* SystemNetworkPathMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700072026110900000007 /* SystemNetworkPathMonitor.swift */; };
+		5C2E00042026111100000004 /* SuperchatStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00032026111100000003 /* SuperchatStore.swift */; };
+		5C2E00052026111100000005 /* SuperchatStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00032026111100000003 /* SuperchatStore.swift */; };
+		5C2E00072026111100000007 /* SuperchatStore+System.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00062026111100000006 /* SuperchatStore+System.swift */; };
 		C5A7000A202611090000000A /* ConnectionStatusModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700092026110900000009 /* ConnectionStatusModelTests.swift */; };
 		C5A7000C202611090000000C /* ConnectionStatusProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A7000B202611090000000B /* ConnectionStatusProbe.swift */; };
 		AB0A00012026110900000001 /* AppAnnouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0A00022026110900000002 /* AppAnnouncer.swift */; };
@@ -595,9 +599,12 @@
 		5C0E000A2026110900000010 /* NoticesPlaceholderCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesPlaceholderCover.swift; sourceTree = "<group>"; };
 		5C0E000C2026110900000012 /* NoticesPlaceholderCoverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesPlaceholderCoverTests.swift; sourceTree = "<group>"; };
 		5C2E00022026111100000002 /* SceneCoverPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCoverPolicyTests.swift; sourceTree = "<group>"; };
+		5C2E00082026111100000008 /* SuperchatStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperchatStoreTests.swift; sourceTree = "<group>"; };
 		C5A700012026110900000001 /* ConnectionStatusModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusModel.swift; sourceTree = "<group>"; };
 		C5A700042026110900000004 /* ConnectionStatusSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusSource.swift; sourceTree = "<group>"; };
 		C5A700072026110900000007 /* SystemNetworkPathMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemNetworkPathMonitor.swift; sourceTree = "<group>"; };
+		5C2E00032026111100000003 /* SuperchatStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperchatStore.swift; sourceTree = "<group>"; };
+		5C2E00062026111100000006 /* SuperchatStore+System.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SuperchatStore+System.swift"; sourceTree = "<group>"; };
 		C5A700092026110900000009 /* ConnectionStatusModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusModelTests.swift; sourceTree = "<group>"; };
 		C5A7000B202611090000000B /* ConnectionStatusProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusProbe.swift; sourceTree = "<group>"; };
 		AB0A00022026110900000002 /* AppAnnouncer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAnnouncer.swift; sourceTree = "<group>"; };
@@ -1032,6 +1039,7 @@
 				6A7E00052026110900000005 /* ActivityHostPolicyTests.swift */,
 				5C0E000C2026110900000012 /* NoticesPlaceholderCoverTests.swift */,
 				5C2E00022026111100000002 /* SceneCoverPolicyTests.swift */,
+				5C2E00082026111100000008 /* SuperchatStoreTests.swift */,
 				C5A700092026110900000009 /* ConnectionStatusModelTests.swift */,
 				AB0A00052026110900000005 /* AppAnnouncerTests.swift */,
 				BCFA1151000000000000000C /* HomeRulesTests.swift */,
@@ -1266,6 +1274,8 @@
 				BC649426253FF940002B2200 /* NavigationService.swift */,
 				C5A700042026110900000004 /* ConnectionStatusSource.swift */,
 				C5A700072026110900000007 /* SystemNetworkPathMonitor.swift */,
+				5C2E00032026111100000003 /* SuperchatStore.swift */,
+				5C2E00062026111100000006 /* SuperchatStore+System.swift */,
 				BC7407DA25493B71001D5581 /* SurroundService.swift */,
 				BC39EE3725DBC23C00562C68 /* TextUtilities.swift */,
 			);
@@ -1756,6 +1766,8 @@
 				C5A700022026110900000002 /* ConnectionStatusModel.swift in Sources */,
 				C5A700052026110900000005 /* ConnectionStatusSource.swift in Sources */,
 				C5A700082026110900000008 /* SystemNetworkPathMonitor.swift in Sources */,
+				5C2E00042026111100000004 /* SuperchatStore.swift in Sources */,
+				5C2E00072026111100000007 /* SuperchatStore+System.swift in Sources */,
 				C5A7000C202611090000000C /* ConnectionStatusProbe.swift in Sources */,
 				AB0A00012026110900000001 /* AppAnnouncer.swift in Sources */,
 				AB0A00062026110900000006 /* AppAnnouncer+System.swift in Sources */,
@@ -1900,6 +1912,8 @@
 				5C0E00082026110900000008 /* NoticesPlaceholderCoverContract.swift in Sources */,
 				5C0E000B2026110900000011 /* NoticesPlaceholderCoverTests.swift in Sources */,
 				5C2E00012026111100000001 /* SceneCoverPolicyTests.swift in Sources */,
+				5C2E00052026111100000005 /* SuperchatStore.swift in Sources */,
+				5C2E00092026111100000009 /* SuperchatStoreTests.swift in Sources */,
 				C5A700032026110900000003 /* ConnectionStatusModel.swift in Sources */,
 				C5A700062026110900000006 /* ConnectionStatusSource.swift in Sources */,
 				C5A7000A202611090000000A /* ConnectionStatusModelTests.swift in Sources */,

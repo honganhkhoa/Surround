@@ -139,7 +139,8 @@ struct OGSWebsocketAuthenticationAnswer: Equatable {
         case confirmed
         /// No answer within `callbackTimeout`, on the same open transport.
         case unanswered
-        /// An answer naming no account (`undefined`) or another one.
+        /// An answer naming no account (`undefined`) or another one, or
+        /// OGS's error answer `{code, message}`.
         case rejected
     }
     /// The identity the connection sent.
