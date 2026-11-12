@@ -520,4 +520,305 @@ final class AppRouteTests: XCTestCase {
         XCTAssertTrue(didRequireREST)
         XCTAssertEqual(resolution.game, "rest")
     }
+
+    // MARK: - Held navigation under a moderator superchat cover
+
+    /// One window's cover, which the test raises and lowers.
+    private final class Cover {
+        var isRaised: Bool
+        init(isRaised: Bool = true) { self.isRaised = isRaised }
+    }
+
+    /// Counts what a publisher sends from now on.
+    private final class Count {
+        private(set) var value = 0
+        private var observation: AnyCancellable?
+
+        init<Sent: Publisher>(_ publisher: Sent) where Sent.Failure == Never {
+            observation = publisher.sink { [unowned self] _ in self.value += 1 }
+        }
+    }
+
+    /// A window whose navigation waits while its cover is raised, as the
+    /// window's root sets it up. Windows of one store share its tap tickets.
+    private func window(store: SuperchatStore, cover: Cover) -> NavigationService {
+        let navigation = NavigationService()
+        navigation.navigationHold = NavigationHold(store: store, isCovered: { cover.isRaised })
+        return navigation
+    }
+
+    /// Each `handle(route:)` or `goToActiveGame` that runs resets tracked
+    /// navigation once; `requestGameOpen` on its own resets nothing.
+    private func countResets(of navigation: NavigationService) -> Count {
+        Count(navigation.$navigationResetID.dropFirst())
+    }
+
+    private func route(_ rootView: RootView, game: Int? = nil) throws -> AppRoute {
+        try XCTUnwrap(AppRoute(rootView: rootView, ogsGameID: game))
+    }
+
+    private func link(_ rootView: RootView, game: Int? = nil) throws -> URL {
+        try XCTUnwrap(route(rootView, game: game).url())
+    }
+
+    private func makeGame(_ id: Int) -> Game {
+        Game(width: 9, height: 9, blackName: "Black", whiteName: "White", gameId: .OGS(id))
+    }
+
+    @MainActor
+    func testRoutesWaitWhileCovered() throws {
+        let cover = Cover(isRaised: false)
+        let navigation = window(store: SuperchatStore(preferences: nil), cover: cover)
+        // What the window shows when the cover rises: an open in flight,
+        // a Home game and tracked sheets.
+        navigation.requestGameOpen(try route(.publicGames, game: 40))
+        let pending = try XCTUnwrap(navigation.pendingGameOpen)
+        let homeGame = makeGame(41)
+        navigation.home.activeGame = homeGame
+        navigation.home.showingNewGameView = true
+        navigation.home.showingSettings = true
+        navigation.main.showWaitingGames = true
+        navigation.main.accountSheet = .profile
+        let resetID = navigation.navigationResetID
+        cover.isRaised = true
+        let publishes = Count(navigation.objectWillChange)
+
+        XCTAssertTrue(navigation.handle(appURL: try link(.home, game: 42)), "A held link is still handled.")
+        XCTAssertTrue(navigation.handle(appURL: try link(.settings)))
+        XCTAssertFalse(navigation.handle(appURL: URL(string: "surround://home/0")!))
+        navigation.handle(route: try route(.home, game: 43))
+        navigation.requestGameOpen(try route(.home, game: 44), closesNewGame: true)
+        navigation.goToActiveGame(game: makeGame(45))
+
+        XCTAssertEqual(navigation.main.rootView, .publicGames)
+        XCTAssertEqual(navigation.pendingGameOpen, pending)
+        XCTAssertTrue(navigation.home.activeGame === homeGame)
+        XCTAssertTrue(navigation.home.showingNewGameView)
+        XCTAssertTrue(navigation.home.showingSettings)
+        XCTAssertTrue(navigation.main.showWaitingGames)
+        XCTAssertEqual(navigation.main.accountSheet, .profile)
+        XCTAssertEqual(navigation.navigationResetID, resetID)
+        XCTAssertEqual(publishes.value, 0, "Holding publishes nothing, so nothing redraws.")
+        XCTAssertEqual(navigation.heldTap?.route, try route(.settings), "The window keeps its latest valid tap.")
+        guard case .activeGame(let held)? = navigation.heldInternalNavigation else {
+            return XCTFail("The window keeps its latest internal open.")
+        }
+        XCTAssertEqual(held.ogsID, 45)
+    }
+
+    @MainActor
+    func testOnlyTheAppsLatestHeldTapRuns() throws {
+        let store = SuperchatStore(preferences: nil)
+        let coverA = Cover(), coverB = Cover()
+        let windowA = window(store: store, cover: coverA)
+        let windowB = window(store: store, cover: coverB)
+        windowA.main.rootView = .about
+        let resetsA = countResets(of: windowA), resetsB = countResets(of: windowB)
+
+        XCTAssertTrue(windowA.handle(appURL: try link(.home, game: 51)))
+        XCTAssertTrue(windowB.handle(appURL: try link(.publicGames, game: 52)))
+        XCTAssertEqual(resetsA.value + resetsB.value, 0)
+
+        // Done lowers the cover in every window of the account.
+        coverA.isRaised = false
+        coverB.isRaised = false
+        windowA.replayHeldNavigation()
+        windowB.replayHeldNavigation()
+
+        XCTAssertEqual(resetsA.value, 0, "Another window's later tap replaced this one.")
+        XCTAssertEqual(windowA.main.rootView, .about)
+        XCTAssertNil(windowA.pendingGameOpen)
+        XCTAssertEqual(resetsB.value, 1)
+        XCTAssertEqual(windowB.main.rootView, .publicGames)
+        XCTAssertEqual(windowB.pendingGameOpen?.ogsGameID, 52)
+
+        windowA.replayHeldNavigation()
+        windowB.replayHeldNavigation()
+        XCTAssertEqual(resetsA.value, 0, "A dropped tap never comes back.")
+        XCTAssertEqual(resetsB.value, 1, "A replayed tap runs once.")
+
+        // Each window replays from its own cover's lowering, in either order:
+        // the earlier window replaying last still drops its tap.
+        coverA.isRaised = true
+        coverB.isRaised = true
+        XCTAssertTrue(windowA.handle(appURL: try link(.home, game: 53)))
+        XCTAssertTrue(windowB.handle(appURL: try link(.publicGames, game: 54)))
+        coverA.isRaised = false
+        coverB.isRaised = false
+        windowB.replayHeldNavigation()
+        windowA.replayHeldNavigation()
+        XCTAssertEqual(resetsA.value, 0, "The latest tap's replay leaves the earlier one dropped.")
+        XCTAssertEqual(windowA.main.rootView, .about)
+        XCTAssertNil(windowA.pendingGameOpen)
+        XCTAssertEqual(resetsB.value, 2)
+        XCTAssertEqual(windowB.pendingGameOpen?.ogsGameID, 54)
+    }
+
+    @MainActor
+    func testATapBeatsALaterInternalOpen() throws {
+        let cover = Cover()
+        let navigation = window(store: SuperchatStore(preferences: nil), cover: cover)
+        let resets = countResets(of: navigation)
+        XCTAssertTrue(navigation.handle(appURL: try link(.publicGames, game: 61)))
+        // Home's automatch start, after the tap.
+        navigation.handle(route: try route(.home, game: 62))
+
+        cover.isRaised = false
+        navigation.replayHeldNavigation()
+
+        XCTAssertEqual(resets.value, 1, "Only the tap ran.")
+        XCTAssertEqual(navigation.main.rootView, .publicGames)
+        XCTAssertEqual(navigation.pendingGameOpen?.ogsGameID, 61)
+        navigation.replayHeldNavigation()
+        XCTAssertEqual(resets.value, 1, "The internal open was dropped, not kept for later.")
+
+        // A tap that another window's later tap replaced gives way to its
+        // own window's internal open.
+        let store = SuperchatStore(preferences: nil)
+        let coverA = Cover(), coverB = Cover()
+        let windowA = window(store: store, cover: coverA)
+        let windowB = window(store: store, cover: coverB)
+        windowA.main.rootView = .about
+        XCTAssertTrue(windowA.handle(appURL: try link(.publicGames, game: 63)))
+        windowA.handle(route: try route(.home, game: 64))
+        XCTAssertTrue(windowB.handle(appURL: try link(.publicGames, game: 65)))
+        coverA.isRaised = false
+        coverB.isRaised = false
+        windowA.replayHeldNavigation()
+        XCTAssertEqual(windowA.main.rootView, .home)
+        XCTAssertEqual(windowA.pendingGameOpen?.ogsGameID, 64)
+    }
+
+    @MainActor
+    func testInternalOpensReplayWithoutATap() throws {
+        let cover = Cover()
+        let navigation = window(store: SuperchatStore(preferences: nil), cover: cover)
+        let resets = countResets(of: navigation)
+        navigation.main.rootView = .publicGames
+        navigation.home.showingNewGameView = true
+
+        // An open challenge's accept, still in flight when the cover rose.
+        navigation.requestGameOpen(try route(.home, game: 71), closesNewGame: true)
+        XCTAssertTrue(navigation.home.showingNewGameView, "New game stays open under the cover.")
+        XCTAssertEqual(navigation.main.rootView, .publicGames)
+        XCTAssertNil(navigation.pendingGameOpen)
+
+        cover.isRaised = false
+        navigation.replayHeldNavigation()
+        XCTAssertFalse(navigation.home.showingNewGameView)
+        XCTAssertEqual(navigation.main.rootView, .home)
+        XCTAssertEqual(navigation.pendingGameOpen?.ogsGameID, 71)
+        XCTAssertEqual(resets.value, 0, "As when unheld, the accept resets nothing else.")
+
+        // The live-game pill, after another internal open: only the
+        // window's latest one runs.
+        let game = makeGame(72)
+        navigation.main.rootView = .settings
+        cover.isRaised = true
+        navigation.handle(route: try route(.publicGames, game: 73))
+        navigation.goToActiveGame(game: game)
+        XCTAssertNil(navigation.home.activeGame)
+        XCTAssertEqual(navigation.main.rootView, .settings)
+
+        cover.isRaised = false
+        navigation.replayHeldNavigation()
+        XCTAssertTrue(navigation.home.activeGame === game)
+        XCTAssertEqual(navigation.main.rootView, .home)
+        XCTAssertNil(navigation.pendingGameOpen)
+        XCTAssertEqual(resets.value, 1, "Only the window's latest internal open ran.")
+    }
+
+    @MainActor
+    func testAReplayWhileCoveredAgainKeepsTheHolds() throws {
+        let cover = Cover()
+        let navigation = window(store: SuperchatStore(preferences: nil), cover: cover)
+        let resets = countResets(of: navigation)
+        let tap = try route(.publicGames, game: 81)
+        XCTAssertTrue(navigation.handle(appURL: try XCTUnwrap(tap.url())))
+        navigation.handle(route: try route(.home, game: 82))
+
+        // The cover rose again before the lowering's next main turn.
+        navigation.replayHeldNavigation()
+        XCTAssertEqual(resets.value, 0)
+        XCTAssertNil(navigation.pendingGameOpen)
+        XCTAssertEqual(navigation.heldTap?.route, tap)
+        guard case .route(let internalOpen)? = navigation.heldInternalNavigation else {
+            return XCTFail("The internal open stays held.")
+        }
+        XCTAssertEqual(internalOpen.ogsGameID, 82)
+
+        cover.isRaised = false
+        navigation.replayHeldNavigation()
+        XCTAssertEqual(resets.value, 1)
+        XCTAssertEqual(navigation.pendingGameOpen?.ogsGameID, 81, "The kept tap still wins.")
+        XCTAssertNil(navigation.heldTap)
+        XCTAssertNil(navigation.heldInternalNavigation)
+    }
+
+    @MainActor
+    func testAClosedWindowDropsItsHolds() throws {
+        let store = SuperchatStore(preferences: nil)
+        let coverA = Cover(), coverB = Cover()
+        let windowA = window(store: store, cover: coverA)
+        let windowB = window(store: store, cover: coverB)
+        windowA.main.rootView = .about
+        windowB.main.rootView = .settings
+        let resetsA = countResets(of: windowA), resetsB = countResets(of: windowB)
+        XCTAssertTrue(windowA.handle(appURL: try link(.home, game: 101)))
+        // Window B holds the app's latest tap and an automatch-style open.
+        XCTAssertTrue(windowB.handle(appURL: try link(.publicGames, game: 102)))
+        windowB.handle(route: try route(.home, game: 103))
+
+        // B's views go while it is covered: the window closed, or the system
+        // disconnected its scene.
+        let publishes = Count(windowB.objectWillChange)
+        windowB.dropHeldNavigation()
+        XCTAssertNil(windowB.heldTap)
+        XCTAssertNil(windowB.heldInternalNavigation)
+        XCTAssertEqual(publishes.value, 0)
+
+        // Done in A. B held the app's latest tap, so nothing replays it, and
+        // A's earlier tap stays dropped.
+        coverA.isRaised = false
+        windowA.replayHeldNavigation()
+        XCTAssertEqual(resetsA.value, 0)
+        XCTAssertEqual(windowA.main.rootView, .about)
+        XCTAssertNil(windowA.pendingGameOpen)
+
+        // B comes back, and its cover's next lowering replays nothing.
+        coverB.isRaised = false
+        windowB.replayHeldNavigation()
+        XCTAssertEqual(resetsB.value, 0)
+        XCTAssertEqual(windowB.main.rootView, .settings)
+        XCTAssertNil(windowB.pendingGameOpen)
+    }
+
+    @MainActor
+    func testReplayWithoutAHoldDoesNothing() throws {
+        // Without a hold every route runs at once, and a replay finds nothing.
+        let unheld = NavigationService()
+        let unheldResets = countResets(of: unheld)
+        XCTAssertTrue(unheld.handle(appURL: try link(.home, game: 91)))
+        XCTAssertEqual(unheldResets.value, 1)
+        let pending = try XCTUnwrap(unheld.pendingGameOpen)
+        XCTAssertEqual(pending.ogsGameID, 91)
+        let unheldPublishes = Count(unheld.objectWillChange)
+        unheld.replayHeldNavigation()
+        XCTAssertEqual(unheldPublishes.value, 0)
+        XCTAssertEqual(unheld.pendingGameOpen, pending)
+        XCTAssertEqual(unheldResets.value, 1)
+
+        // Nor does a hold whose cover is down hold anything.
+        let navigation = window(store: SuperchatStore(preferences: nil), cover: Cover(isRaised: false))
+        let resets = countResets(of: navigation)
+        XCTAssertTrue(navigation.handle(appURL: try link(.publicGames, game: 92)))
+        navigation.goToActiveGame(game: makeGame(93))
+        XCTAssertEqual(resets.value, 2)
+        XCTAssertNil(navigation.heldTap)
+        XCTAssertNil(navigation.heldInternalNavigation)
+        let publishes = Count(navigation.objectWillChange)
+        navigation.replayHeldNavigation()
+        XCTAssertEqual(publishes.value, 0)
+        XCTAssertEqual(resets.value, 2)
+    }
 }
