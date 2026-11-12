@@ -62,6 +62,11 @@ protocol OGSWebsocketProtocol: AnyObject {
     /// This is local readiness state, not a server acknowledgement.
     var authenticated: Bool { get }
 
+    /// The account the open transport authenticated as: the identity sent
+    /// with `authenticate`. Nil before that, after a close, and for fakes
+    /// that don't model identity.
+    var authenticatedUserID: Int? { get }
+
     /// Whether the underlying transport has reported that it is open.
     var opened: Bool { get }
 
@@ -97,6 +102,8 @@ protocol OGSWebsocketProtocol: AnyObject {
 extension OGSWebsocketProtocol {
     var callbackTimeout: TimeInterval { OGSWebsocket.defaultCallbackTimeout }
 
+    var authenticatedUserID: Int? { nil }
+
     func emit(command: String) {
         emit(command: command, data: nil, resultCallback: nil)
     }
@@ -122,6 +129,22 @@ enum OGSWebsocketFrame {
 struct OGSWebsocketJWTUpdate {
     let userJwt: String
     let authenticatedUserID: Int?
+}
+
+/// How OGS answered a signed-in connection's `authenticate`
+/// (ClientToServer.ts:30-56), sent as `surround/socketAuthenticationAnswered`.
+struct OGSWebsocketAuthenticationAnswer: Equatable {
+    enum Outcome: Equatable {
+        /// `{id, username}` naming the identity sent.
+        case confirmed
+        /// No answer within `callbackTimeout`, on the same open transport.
+        case unanswered
+        /// An answer naming no account (`undefined`) or another one.
+        case rejected
+    }
+    /// The identity the connection sent.
+    let userID: Int
+    let outcome: Outcome
 }
 
 /// Failures encountered while validating the JSON-compatible frame shape.
@@ -516,7 +539,7 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
     private var anonymousConfigRequestInFlight = false
     private var pingCancellable: Cancellable?
     private var isClosed = false
-    private var authenticatedUserID: Int?
+    private(set) var authenticatedUserID: Int?
 
     var drift = 0.0
     var latency = 0.0
@@ -635,8 +658,17 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
         guard !isClosed else { return }
         let config = authenticationConfigProvider() ?? anonymousUIConfig
         if let config {
-            authenticatedUserID = config.user.id
-            emit(command: "authenticate", data: ["jwt": config.userJwt])
+            let userID = config.user.id
+            authenticatedUserID = userID
+            // A guest keeps today's frame, so anonymous sockets' callback ids
+            // and scheduled work don't change.
+            let asksForAnswer = config.user.anonymous != true && userID > 0
+            emit(command: "authenticate", data: ["jwt": config.userJwt],
+                 resultCallback: asksForAnswer
+                    ? { [weak self] response, error in
+                        self?.reportAuthenticationAnswer(userID: userID, response: response, error: error)
+                    }
+                    : nil)
             scheduler.async {
                 self.authenticated = true
                 self.serverEventCallback?("surround/socketAuthenticated", nil)
@@ -660,6 +692,47 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
                 }
             }
         }
+    }
+
+    private func reportAuthenticationAnswer(userID: Int, response: Any?, error: [String: String]?) {
+        // A close or a reconnect clears the identity before failing pending
+        // callbacks (close(), enterReconnecting()), and frames from a replaced
+        // transport are dropped (processServerMessage), so only this
+        // transport's answer gets here.
+        guard authenticatedUserID == userID else { return }
+        let outcome: OGSWebsocketAuthenticationAnswer.Outcome
+        if let error {
+            if error["timeout"] != nil {
+                outcome = .unanswered
+            } else if error["connection"] != nil || error["encoding"] != nil {
+                // Made on this side. A connection error ends the connection's
+                // wait through socketClosed, and this frame always encodes.
+                return
+            } else {
+                // OGS's own error answer, {code, message} (GobanSocket.ts:39-42),
+                // names no account.
+                outcome = .rejected
+            }
+        } else if let identity = response as? [String: Any],
+                  Self.accountID(identity["id"]) == userID {
+            outcome = .confirmed
+        } else {
+            outcome = .rejected
+        }
+        log("Authentication answer: \(outcome)")
+        serverEventCallback?("surround/socketAuthenticationAnswered",
+                             OGSWebsocketAuthenticationAnswer(userID: userID, outcome: outcome))
+    }
+
+    /// An account id as OGS sends it: a JSON number, or its digits in a string.
+    private static func accountID(_ value: Any?) -> Int? {
+        if let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() {
+            let double = number.doubleValue
+            guard double.isFinite, double.rounded(.towardZero) == double, double > 0 else { return nil }
+            return number.intValue
+        }
+        if let text = value as? String, let id = Int(text), id > 0 { return id }
+        return nil
     }
 
     func emit(
