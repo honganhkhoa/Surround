@@ -603,7 +603,7 @@ The notices host probes (Debug; any run, with or without `--surround-ui-testing`
 
 `--surround-connection-status-probe` (Debug; the normal app root only, so not with `--surround-ui-testing`) shows each window's connection status from its real socket and the device's network path in a yellow caption at the top of the window, retries when the caption is tapped while it offers Retry, and logs each status and announcement under subsystem `com.honganhkhoa.Surround`, category `ConnectionStatusProbe`.
 
-`--surround-announcer-diagnostics` (Debug; any run, including on a device) logs each VoiceOver announcement or haptic request with its key, its outcome (`posted`, `duplicate`, `notFrontmost`, `noWindowInFront` or `windowClosed`) and short window IDs, and each window's activation report, under subsystem `com.honganhkhoa.Surround`, category `AppAnnouncer`, never the spoken text.
+`--surround-announcer-diagnostics` (Debug; any run, including on a device) logs each VoiceOver announcement or haptic request with its key, its outcome (`posted`, `duplicate`, `notFrontmost`, `noWindowInFront` or `windowClosed`) and short window IDs, each window's activation report, and each change of a window's active appearance (the focused window on Mac, and on iPad in Stage Manager and Windowed Apps), under subsystem `com.honganhkhoa.Surround`, category `AppAnnouncer`, never the spoken text.
 
 Keep the result bundle and exported screenshot attachments with each visual review. Device geometry, native safe areas, and move-tree styling can differ intentionally from a drawing; document those separately from fixture data.
 

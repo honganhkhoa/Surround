@@ -18,8 +18,9 @@ extension AppAnnouncer {
     static let shared = AppAnnouncer(scenes: windows, output: SystemAnnouncerOutput())
 
     #if DEBUG && MAIN_APP
-    /// `--surround-announcer-diagnostics` logs each post and each window
-    /// report: keys, outcomes and short window IDs, never the spoken text.
+    /// `--surround-announcer-diagnostics` logs each post, each window report
+    /// and each change of a window's active appearance: keys, outcomes and
+    /// short window IDs, never the spoken text.
     static let logsDiagnostics = ProcessInfo.processInfo.arguments
         .contains("--surround-announcer-diagnostics")
     private static let diagnostics = Logger(
@@ -148,12 +149,11 @@ struct AppAnnouncerWindowAnchor: UIViewRepresentable {
                     self, selector: #selector(sceneChanged(_:)), name: name, object: nil
                 )
             }
-            #if targetEnvironment(macCatalyst)
-            // On Mac only, the window that becomes key appears active.
+            // The focused window appears active: on Mac, and on iPad in Stage
+            // Manager and windowed apps.
             registerForTraitChanges(
                 [UITraitActiveAppearance.self], action: #selector(activeAppearanceChanged)
             )
-            #endif
         }
 
         @available(*, unavailable)
@@ -189,10 +189,26 @@ struct AppAnnouncerWindowAnchor: UIViewRepresentable {
             }
         }
 
-        #if targetEnvironment(macCatalyst)
         @objc private func activeAppearanceChanged() {
+            #if DEBUG && MAIN_APP
+            AppAnnouncer.logDiagnostic(
+                "appearance window=\(AppAnnouncer.shortID(announcerWindow)) "
+                    + "activeAppearance=\(Self.describe(traitCollection.activeAppearance)) "
+                    + "scene=\(window?.windowScene.map { "\(Self.activation(of: $0))" } ?? "none") "
+                    + "frontmost=\(AppAnnouncer.shortID(AppAnnouncer.windows.frontmostWindow))"
+            )
+            #endif
             guard traitCollection.activeAppearance == .active else { return }
             report(focused: true)
+        }
+
+        #if DEBUG && MAIN_APP
+        private static func describe(_ appearance: UIUserInterfaceActiveAppearance) -> String {
+            switch appearance {
+            case .active: "active"
+            case .inactive: "inactive"
+            default: "unspecified"
+            }
         }
         #endif
 
@@ -213,6 +229,7 @@ struct AppAnnouncerWindowAnchor: UIViewRepresentable {
             #if DEBUG && MAIN_APP
             AppAnnouncer.logDiagnostic(
                 "window=\(AppAnnouncer.shortID(announcerWindow)) activation=\(state) "
+                    + "appearance=\(Self.describe(traitCollection.activeAppearance)) "
                     + "focused=\(focused) frontmost=\(AppAnnouncer.shortID(AppAnnouncer.windows.frontmostWindow))"
             )
             #endif

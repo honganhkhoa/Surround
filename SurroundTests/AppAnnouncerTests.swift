@@ -143,12 +143,57 @@ final class AppAnnouncerTests: XCTestCase {
         XCTAssertEqual(windows.frontmost, windowB)
     }
 
-    func testFocusOnAWindowThatIsNotActiveIsIgnored() {
+    func testAWindowFocusedWhileInactiveComesToTheFrontWhenItActivates() {
         var windows = AppAnnouncerWindows()
+        let owners = [windowA: ownerA, windowB: ownerB]
         windows.update(windowA, owner: ownerA, activation: .active)
         windows.update(windowB, owner: ownerB, activation: .active)
+        // Another app's window covers A. Tapping A makes it appear active
+        // before its scene activates.
+        windows.update(windowA, owner: ownerA, activation: .inactive)
         windows.update(windowA, owner: ownerA, activation: .inactive, focused: true)
-        XCTAssertEqual(windows.frontmost, windowB)
+        XCTAssertEqual(windows.frontmost, windowB, "An inactive window waits for its scene.")
+        windows.update(windowA, owner: ownerA, activation: .active)
+        XCTAssertEqual(windows.frontmost, windowA)
+        for reactivation in [[windowB, windowA], [windowA, windowB]] {
+            windows.update(windowA, owner: ownerA, activation: .inactive)
+            windows.update(windowB, owner: ownerB, activation: .inactive)
+            for window in reactivation {
+                windows.update(window, owner: owners[window]!, activation: .active)
+            }
+            XCTAssertEqual(windows.frontmost, windowA, "Control Center afterwards keeps the order.")
+        }
+    }
+
+    func testTheWindowFocusedOnReturnStaysInFrontWhicheverActivatesLast() {
+        typealias Report = (window: UUID, activation: AppAnnouncerWindows.Activation, focused: Bool)
+        let focusFirst: [Report] = [(windowA, .inactive, true), (windowA, .active, false), (windowB, .active, false)]
+        let focusLast: [Report] = [(windowA, .inactive, true), (windowB, .active, false), (windowA, .active, false)]
+        let focusAfterActivating: [Report] = [
+            (windowA, .active, false), (windowA, .active, true), (windowB, .active, false),
+        ]
+        for (order, returning) in [
+            ("focus, then A, then B", focusFirst), ("focus, then B, then A", focusLast),
+            ("A, then focus, then B", focusAfterActivating),
+        ] {
+            var windows = AppAnnouncerWindows()
+            let owners = [windowA: ownerA, windowB: ownerB]
+            windows.update(windowA, owner: ownerA, activation: .active)
+            windows.update(windowB, owner: ownerB, activation: .active)
+            // The user leaves for another app and comes back to A, which was
+            // behind B. Both scenes return through inactive; A appears active
+            // before or after its scene activates, and either scene can
+            // activate first.
+            for activation in [AppAnnouncerWindows.Activation.background, .inactive] {
+                windows.update(windowA, owner: ownerA, activation: activation)
+                windows.update(windowB, owner: ownerB, activation: activation)
+            }
+            for report in returning {
+                windows.update(report.window, owner: owners[report.window]!,
+                               activation: report.activation, focused: report.focused)
+            }
+            XCTAssertEqual(windows.frontmost, windowA, order)
+        }
     }
 
     func testAWindowRegisteredInTheBackgroundComesForwardWhenItActivates() {

@@ -109,7 +109,8 @@ struct AppAnnouncerWindows {
         /// UIScene's foregroundActive: on screen and taking input.
         case active
         /// foregroundInactive: on screen behind Control Center, the app
-        /// switcher or a system alert, or still launching.
+        /// switcher, a system alert or another app's window, or still
+        /// launching.
         case inactive
         /// background, or unattached.
         case background
@@ -123,6 +124,9 @@ struct AppAnnouncerWindows {
         var focus = 0
         /// It went to the background after the user last came to it.
         var wasInBackground = false
+        /// It became the focused window before its scene was active, such as
+        /// a window coming back from another app.
+        var focusedWhileInactive = false
     }
 
     private var entries = [UUID: Entry]()
@@ -130,9 +134,13 @@ struct AppAnnouncerWindows {
 
     /// Records what a window's anchor, `owner`, sees. The window counts as
     /// the one the user came to when it first becomes active, when it is
-    /// active again after the background, or when `focused` says so (a Mac
-    /// window becoming key). Activating again after Control Center or an
-    /// alert keeps the order the windows had.
+    /// active again after the background, or when `focused` says so (it
+    /// became the focused window, on Mac or on an iPad in Stage Manager or
+    /// windowed apps). A focus that arrives while the window is inactive
+    /// counts when it activates. A focused window comes before the windows
+    /// that return from the background with it, whichever activates last.
+    /// Activating again after Control Center or an alert keeps the order the
+    /// windows had.
     mutating func update(
         _ window: UUID,
         owner: UUID,
@@ -141,14 +149,30 @@ struct AppAnnouncerWindows {
     ) {
         var entry = entries[window] ?? Entry(owner: owner, activation: activation)
         entry.owner = owner
+        entry.activation = activation
         if activation == .background {
             entry.wasInBackground = true
+            entry.focusedWhileInactive = false
+        } else if focused {
+            // Only the window focused last can be the one the user is in.
+            for other in entries.keys where other != window {
+                entries[other]?.focusedWhileInactive = false
+            }
+            entry.focusedWhileInactive = activation == .inactive
         }
-        entry.activation = activation
-        if activation == .active, focused || entry.focus == 0 || entry.wasInBackground {
+        if activation == .active,
+           focused || entry.focusedWhileInactive || entry.focus == 0 || entry.wasInBackground {
+            if focused || entry.focusedWhileInactive {
+                // The windows still returning with it didn't get the focus.
+                for (other, otherEntry) in entries
+                where other != window && otherEntry.activation == .inactive {
+                    entries[other]?.wasInBackground = false
+                }
+            }
             focusCount += 1
             entry.focus = focusCount
             entry.wasInBackground = false
+            entry.focusedWhileInactive = false
         }
         entries[window] = entry
     }
