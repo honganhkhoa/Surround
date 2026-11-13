@@ -15,8 +15,9 @@ permissions:
 # Every "part N of M" step below keeps a 50-minute limit: run-ipad-ui-tests.sh
 # interrupts xcodebuild at 46 minutes and needs the rest to save the result
 # bundle and failure evidence. The composer and continuity steps keep 45
-# minutes, interrupted at 41. Change part_deadline_seconds and
-# isolated_phase_deadline_seconds with these limits.
+# minutes, interrupted at 41, and the Activity steps 30, interrupted at 26.
+# Change part_deadline_seconds, isolated_phase_deadline_seconds and
+# activity_phase_deadline_seconds with these limits.
 jobs:
   test:
     runs-on: macos-26
@@ -213,7 +214,7 @@ jobs:
 
   ipad-messages-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 135
+    timeout-minutes: 165
 
     steps:
       - uses: actions/checkout@v4
@@ -254,6 +255,14 @@ jobs:
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh messages-2 \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run iPad Activity UI tests
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 30
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh activity \
             "${{ steps.simulator.outputs.id }}" iPad
 
       - name: Upload iPad Messages UI test results
@@ -492,7 +501,7 @@ jobs:
 
   minimum-ios-18-messages-ui-tests:
     runs-on: macos-15
-    timeout-minutes: 135
+    timeout-minutes: 165
 
     steps:
       - uses: actions/checkout@v4
@@ -539,6 +548,14 @@ jobs:
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh messages-2 \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run iPad Activity UI tests on iPadOS 18
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 30
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh activity \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
       - name: Upload iPadOS 18 Messages UI test results

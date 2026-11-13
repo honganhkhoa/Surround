@@ -343,6 +343,8 @@ enum SurroundUITestContract {
         static let correspondenceChallengeID = 95_003, rematchChallengeID = 95_004
         static let openChallengeID = 95_101, sentChallengeID = 95_201, rematchSentChallengeID = 95_202
         static let rengoChallengeID = 95_301
+        /// The game an accepted challenge starts under `--surround-activity-actions`.
+        static func acceptedGameID(_ challengeID: Int) -> Int { challengeID + 900_000 }
         static let liveQuickMatchUUID = "a1c7f100-0000-4000-8000-000000000001"
         static let correspondenceQuickMatchUUID = "a1c7f100-0000-4000-8000-000000000002"
         static let moderatorID = 916_002
@@ -743,6 +745,20 @@ enum SurroundUITestContract {
             preconditionFailure("\(activityOpenLaunchArgument) needs \(launchArgument) with \(activityStateLaunchArgument).")
         }
         return open
+    }()
+
+    /// The launch's answers to Accept, Reject and Withdraw, read once. A
+    /// malformed flag, or one without a UI-testing Activity state, stops the
+    /// launch.
+    static let activityActions: ActivityActions? = {
+        let actions: ActivityActions?
+        do { actions = try parseActivityActions(ProcessInfo.processInfo.arguments) }
+        catch { preconditionFailure("\(error)") }
+        guard let actions else { return nil }
+        guard ActivityFixtures.selected != nil else {
+            preconditionFailure("\(activityActionsLaunchArgument) needs \(launchArgument) with \(activityStateLaunchArgument).")
+        }
+        return actions
     }()
     #else
     static let isEnabled = false
@@ -1416,6 +1432,48 @@ extension SurroundUITestContract {
         guard let open = ActivityOpen(rawValue: raw) else { throw ActivityOpenError.unknownValue(raw) }
         guard arguments.contains(activityStateLaunchArgument) else { throw ActivityOpenError.needsActivityState }
         return open
+    }
+
+    /// The offline service answers Accept, Reject and Withdraw itself, 0.35 s
+    /// after each is sent, where it would fail at once: `--surround-activity-actions
+    /// succeed`, or `fail-once`, where each challenge's first action fails and
+    /// later ones succeed. An accepted challenge starts an active game
+    /// (`ActivityFixtureID.acceptedGameID`); a rejected or withdrawn one leaves
+    /// its list. A Quick Match withdraw still goes to the socket, which never
+    /// confirms it. It needs an Activity state (`--surround-activity-state`).
+    static let activityActionsLaunchArgument = "--surround-activity-actions"
+
+    enum ActivityActions: String, CaseIterable {
+        case succeed
+        case failOnce = "fail-once"
+    }
+
+    enum ActivityActionsError: Error, Equatable, CustomStringConvertible {
+        case missingValue, unknownValue(String), needsActivityState
+
+        var description: String {
+            switch self {
+            case .missingValue:
+                "\(activityActionsLaunchArgument) needs a value: "
+                    + ActivityActions.allCases.map(\.rawValue).joined(separator: ", ")
+            case .unknownValue(let raw):
+                "Unknown \(activityActionsLaunchArgument) value '\(raw)'. Use one of: "
+                    + ActivityActions.allCases.map(\.rawValue).joined(separator: ", ")
+            case .needsActivityState:
+                "\(activityActionsLaunchArgument) needs \(activityStateLaunchArgument)."
+            }
+        }
+    }
+
+    /// Nil without `--surround-activity-actions`. A missing or unknown value,
+    /// or no Activity state, throws.
+    static func parseActivityActions(_ arguments: [String]) throws -> ActivityActions? {
+        guard let index = arguments.firstIndex(of: activityActionsLaunchArgument) else { return nil }
+        guard arguments.indices.contains(index + 1) else { throw ActivityActionsError.missingValue }
+        let raw = arguments[index + 1]
+        guard let actions = ActivityActions(rawValue: raw) else { throw ActivityActionsError.unknownValue(raw) }
+        guard arguments.contains(activityStateLaunchArgument) else { throw ActivityActionsError.needsActivityState }
+        return actions
     }
 }
 #endif

@@ -1087,7 +1087,9 @@ struct ActivityDebugOpener: ViewModifier {
                 window = value
             }
             .onAppear {
-                // Read first, so a malformed flag stops the launch.
+                // Read first, so a malformed flag stops the launch, also in
+                // a run whose service isn't an Activity state's.
+                _ = SurroundUITestContract.activityActions
                 guard let open = SurroundUITestContract.activityOpen, !Self.hasOpened else { return }
                 Self.hasOpened = true
                 switch open {
