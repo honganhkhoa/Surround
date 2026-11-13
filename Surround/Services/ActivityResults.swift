@@ -303,7 +303,9 @@ final class ActivityResults: ObservableObject {
     }
 
     /// The row moved VoiceOver focus to its result, so the store doesn't
-    /// announce the result that is about to be spoken.
+    /// announce it too. It counts from the moment the result publishes in
+    /// `entries` until the store decides, a main-queue turn later; a row
+    /// claims from its `entries` subscription, in the publish itself.
     func claim(itemID: String) {
         guard awaitingAnnouncement[itemID] != nil else { return }
         claimedIDs.insert(itemID)
@@ -487,22 +489,24 @@ final class ActivityResults: ObservableObject {
             navigator?.closeActivity()
             navigator?.openGame(gameID, closesNewGame: true)
         case .succeeded(let outcome):
-            record(.succeeded(outcome), for: attempt)
-            if attempt.request.hidesOnSuccess, !hiddenIDs.contains(itemID) {
-                hiddenIDs.insert(itemID)
-            }
+            // The announcement waits before the result publishes, so a row
+            // that takes VoiceOver focus as it publishes can claim it.
             announceNextTurn(
                 AppAnnouncement(.activityResult(itemID: itemID, action: action), audience: .anyWindow,
                                 speech: outcome.text),
                 about: itemID
             )
+            record(.succeeded(outcome), for: attempt)
+            if attempt.request.hidesOnSuccess, !hiddenIDs.contains(itemID) {
+                hiddenIDs.insert(itemID)
+            }
         case .failed:
-            record(.failed, for: attempt)
             announceNextTurn(
                 AppAnnouncement(.activityFailure(itemID: itemID, action: action), audience: .anyWindow,
                                 speech: action.failureText),
                 about: itemID
             )
+            record(.failed, for: attempt)
         case .removed:
             guard records[attempt.session]?[itemID]?.attemptID == attempt.id else { return }
             records[attempt.session]?[itemID] = nil
@@ -518,7 +522,9 @@ final class ActivityResults: ObservableObject {
         publish(attempt.session)
     }
 
-    /// Speaks one turn later, unless the row claimed the result by then.
+    /// Speaks one turn later, unless the row claimed the result by then. A
+    /// SwiftUI state change can apply after a block queued now runs, so the
+    /// row's claim never waits for its own redraw.
     private func announceNextTurn(_ announcement: AppAnnouncement, about itemID: String) {
         awaitingAnnouncement[itemID, default: 0] += 1
         let generation = generation

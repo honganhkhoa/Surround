@@ -15,7 +15,19 @@ struct PrivateMessagesView: View {
     @State private var usesColumns: Bool?
     @State private var friendsExpanded = false
     @State private var inboxPosition = ScrollPosition(idType: String.self, edge: .top)
+    /// Friend requests accepted or rejected here, by player id. Each keeps
+    /// its row, showing the result, until the inbox goes off screen.
+    @State private var requestResults: [Int: MessagesRequestResult] = [:]
+    /// Requests acted on here whose confirmation hasn't come yet.
+    @State private var actingRequests: [Int: RequestPlace] = [:]
+    @AccessibilityFocusState private var requestFocus: MessagesRequestFocus?
     private var selectedPeerID: Int? { selectedPeer?.id }
+
+    /// Where a request was when the user acted on it.
+    private struct RequestPlace {
+        /// The request shown before it, if any.
+        let after: Int?
+    }
 
     private var privateMessagesByPeerId: [Int: [OGSPrivateMessage]] { ogs.privateMessagesByPeerId }
     private var unreadPeerIds: Set<Int> { ogs.privateMessagesUnreadPeerIds }
@@ -133,6 +145,10 @@ struct PrivateMessagesView: View {
                         }
                     }
                 }
+                // Request results go once the inbox is off screen, covered by
+                // what it pushed or left for another tab. Going as a push
+                // starts would collapse the rows while the inbox slides away.
+                .onDisappear { clearRequestResults() }
             }
             .onChange(of: mode, initial: true) { _, wide in
                 guard let wide else { return }
@@ -160,6 +176,50 @@ struct PrivateMessagesView: View {
             playerSearchQuery = ""
             friendsExpanded = false
             inboxPosition = ScrollPosition(idType: String.self, edge: .top)
+            clearRequestResults()
+        }
+        .onReceive(ogs.$friendshipNotice.compactMap { $0 }) { keepRequestResult($0) }
+    }
+
+    /// A request accepted or rejected here keeps its row, showing what came
+    /// of it. When VoiceOver was on the row's controls, the result takes
+    /// focus and the row claims the notice as it arrives, so the window,
+    /// which decides a turn later, doesn't speak it too.
+    private func keepRequestResult(_ notice: OGSFriendshipNotice) {
+        switch notice.action {
+        case .accept, .reject: break
+        case .send, .remove: return
+        }
+        let id = notice.user.id
+        guard let place = actingRequests.removeValue(forKey: id) else { return }
+        let order = (requestResults.values.map(\.order).max() ?? 0) + 1
+        requestResults[id] = MessagesRequestResult(user: notice.user, action: notice.action,
+                                                   after: place.after, order: order)
+        if MessagesRequestFocus.resultTakesFocus(from: requestFocus, row: id) {
+            requestFocus = .result(id)
+            nav.friendshipConfirmations.claim(notice.id)
+        }
+    }
+
+    private func clearRequestResults() {
+        if !requestResults.isEmpty { requestResults = [:] }
+        if !actingRequests.isEmpty { actingRequests = [:] }
+    }
+
+    /// The live requests in the service's order, with each resolved one back
+    /// in its place.
+    private var requestRowIDs: [Int] {
+        ResolvedRowOrder.merge(
+            live: ogs.friendInvitations.map(\.id),
+            resolved: requestResults.values.sorted { $0.order < $1.order }.map { (id: $0.user.id, after: $0.after) }
+        )
+    }
+
+    /// What a request row tells the inbox: where it was when the user acted.
+    private func requestHooks(for id: Int, in ids: [Int]) -> MessagesRequestHooks {
+        MessagesRequestHooks(focus: $requestFocus) { _ in
+            let index = ids.firstIndex(of: id) ?? 0
+            actingRequests[id] = RequestPlace(after: index > 0 ? ids[index - 1] : nil)
         }
     }
 
@@ -258,7 +318,7 @@ struct PrivateMessagesView: View {
     private func inboxSections(expanded: Bool, availableHeight: CGFloat) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                if !ogs.friendInvitations.isEmpty || ogs.friendInvitationsError != nil {
+                if !ogs.friendInvitations.isEmpty || ogs.friendInvitationsError != nil || !requestResults.isEmpty {
                     requestsSection.id("messages.requests")
                 }
 
@@ -270,7 +330,7 @@ struct PrivateMessagesView: View {
                         .id("messages.friends")
                 }
 
-                if data.isEmpty && ogs.friends.isEmpty && ogs.friendInvitations.isEmpty {
+                if data.isEmpty && ogs.friends.isEmpty && ogs.friendInvitations.isEmpty && requestResults.isEmpty {
                     discoveryEmptyState(expanded: expanded)
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: max(300, availableHeight - 170))
@@ -306,11 +366,18 @@ struct PrivateMessagesView: View {
                 MessagesRetryCard(title: "Couldn’t load friend requests",
                                   message: error, retry: ogs.fetchFriends)
             }
-            if !ogs.friendInvitations.isEmpty {
+            let ids = requestRowIDs
+            if !ids.isEmpty {
+                let invitations = Dictionary(ogs.friendInvitations.map { ($0.id, $0) },
+                                             uniquingKeysWith: { first, _ in first })
                 VStack(spacing: 0) {
-                    ForEach(ogs.friendInvitations) { invitation in
-                        MessagesRequestRow(invitation: invitation)
-                        if invitation.id != ogs.friendInvitations.last?.id {
+                    ForEach(ids, id: \.self) { id in
+                        if let result = requestResults[id] {
+                            MessagesResolvedRequestRow(result: result, focus: $requestFocus)
+                        } else if let invitation = invitations[id] {
+                            MessagesRequestRow(invitation: invitation, hooks: requestHooks(for: id, in: ids))
+                        }
+                        if id != ids.last {
                             Divider().padding(.leading, 56)
                         }
                     }

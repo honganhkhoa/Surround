@@ -215,33 +215,13 @@ enum ActivityListSections {
     }
 
     /// One section's items in order, each followed by the gone rows that came
-    /// after it. Gone rows with nothing to follow lead the section, in the
-    /// order given; so do rows whose predecessors point back at them.
+    /// after it, by `ResolvedRowOrder`.
     private static func merged(_ items: [ActivityModel.Item], _ gone: [ActivityResolvedRow]) -> [Row] {
+        let itemsByID = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let goneByID = Dictionary(gone.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let anchors = Set(items.map(\.id)).union(goneByID.keys)
-        var followers = [String: [ActivityResolvedRow]]()
-        var leading = [ActivityResolvedRow]()
-        for row in gone {
-            if let after = row.after, anchors.contains(after), !leadsBackToItself(row, in: goneByID) {
-                followers[after, default: []].append(row)
-            } else {
-                leading.append(row)
-            }
-        }
-
-        var rows = [Row]()
-        var placed = Set<String>()
-        func place(_ row: Row) {
-            guard placed.insert(row.id).inserted else { return }
-            rows.append(row)
-            for follower in followers[row.id] ?? [] {
-                place(.resolved(follower))
-            }
-        }
-        leading.forEach { place(.resolved($0)) }
-        items.forEach { place(.item($0)) }
-        return rows
+        let order = ResolvedRowOrder.merge(
+            live: items.map(\.id), resolved: gone.map { (id: $0.id, after: $0.after) })
+        return order.compactMap { id in itemsByID[id].map(Row.item) ?? goneByID[id].map(Row.resolved) }
     }
 
     /// Where a row sits: its section and the id before it there, nil when it
@@ -253,20 +233,56 @@ enum ActivityListSections {
         }
         return nil
     }
+}
 
-    /// Following `after` through the gone rows comes back to `row`.
-    private static func leadsBackToItself(
-        _ row: ActivityResolvedRow,
-        in goneByID: [String: ActivityResolvedRow]
-    ) -> Bool {
-        var visited = Set<String>()
-        var next = row.after
-        while let id = next, let predecessor = goneByID[id] {
-            if id == row.id {
+/// Where rows that act in place go once their live row has gone: after the
+/// id that preceded them when the user acted, or first when that id has gone
+/// too. Activity's sections and Messages' friend requests both use it.
+enum ResolvedRowOrder {
+    /// The live ids in order, each followed by the resolved ids that came
+    /// after it. Resolved ids with nothing to follow lead, in the order
+    /// given; so do ids whose predecessors point back at them. No id shows
+    /// twice: a live id keeps its own place.
+    static func merge<ID: Hashable>(live: [ID], resolved: [(id: ID, after: ID?)]) -> [ID] {
+        var seen = Set<ID>()
+        let liveIDs = live.filter { seen.insert($0).inserted }
+        let gone = resolved.filter { seen.insert($0.id).inserted }
+        let afterByID = Dictionary(gone.map { ($0.id, $0.after) }, uniquingKeysWith: { first, _ in first })
+        let anchors = Set(liveIDs).union(afterByID.keys)
+        var followers = [ID: [ID]]()
+        var leading = [ID]()
+        for row in gone {
+            if let after = row.after, anchors.contains(after), !leadsBackToItself(row.id, in: afterByID) {
+                followers[after, default: []].append(row.id)
+            } else {
+                leading.append(row.id)
+            }
+        }
+
+        var order = [ID]()
+        var placed = Set<ID>()
+        func place(_ id: ID) {
+            guard placed.insert(id).inserted else { return }
+            order.append(id)
+            for follower in followers[id] ?? [] {
+                place(follower)
+            }
+        }
+        leading.forEach(place)
+        liveIDs.forEach(place)
+        return order
+    }
+
+    /// Following `after` through the resolved ids comes back to `id`.
+    private static func leadsBackToItself<ID: Hashable>(_ id: ID, in afterByID: [ID: ID?]) -> Bool {
+        var visited = Set<ID>()
+        var next = afterByID[id] ?? nil
+        while let current = next, let predecessorAfter = afterByID[current] {
+            if current == id {
                 return true
             }
-            guard visited.insert(id).inserted else { return false }
-            next = predecessor.after
+            guard visited.insert(current).inserted else { return false }
+            next = predecessorAfter
         }
         return false
     }
@@ -497,6 +513,48 @@ struct ActivityRowActionState: Equatable {
         }
     }
 }
+
+// MARK: - VoiceOver focus on results
+
+/// Where VoiceOver is among the places of rows that act in place, as a
+/// view's `@AccessibilityFocusState` reads it: Activity's rows and pushed
+/// cards, and Messages' friend request rows. A result that arrives while
+/// VoiceOver is on one of its row's controls, or on the spinner standing in
+/// for one, takes focus there and isn't announced as well; anywhere else,
+/// the window announces it.
+enum ResultFocus<Row: Hashable, Control: Hashable>: Hashable {
+    /// A control that acts on the row.
+    case control(Row, Control)
+    /// The spinner that stands in for a control while its request is sent.
+    case pending(Row)
+    /// The row's result, or its failure.
+    case result(Row)
+
+    /// Where VoiceOver goes as `control` sends its request: to the spinner
+    /// standing in for it, when VoiceOver was on that control. Nil leaves
+    /// focus where it is.
+    static func sending(_ control: Control, of row: Row, from focus: Self?) -> Self? {
+        focus == .control(row, control) ? .pending(row) : nil
+    }
+
+    /// Whether `row`'s result, arriving now, takes VoiceOver focus: focus is
+    /// on one of the row's controls, or on its spinner. Not from the row's
+    /// earlier result, whose changed text VoiceOver wouldn't read again.
+    static func resultTakesFocus(from focus: Self?, row: Row) -> Bool {
+        switch focus {
+        case .control(let focused, _), .pending(let focused): focused == row
+        case .result, nil: false
+        }
+    }
+}
+
+/// The controls that act on an Activity item, in a row or its pushed card.
+enum ActivityFocusControl: Hashable {
+    case action(ActivityAction)
+    case retry
+}
+
+typealias ActivityFocus = ResultFocus<String, ActivityFocusControl>
 
 /// What an accepted challenge, or a started Rengo game, does next.
 enum ActivityAcceptRule: Equatable {

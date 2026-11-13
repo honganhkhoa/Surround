@@ -356,6 +356,17 @@ struct MainView: View {
             // exists to discard its old drafts or cancel pending callbacks.
             gameChatSessions.discardOtherAccounts(keeping: accountID)
         }
+        // A friendship action's result shows where the user acted, and is
+        // spoken once from here unless a Messages request row took
+        // VoiceOver focus for it.
+        .onReceive(ogs.$friendshipNotice.compactMap { $0 }) { notice in
+            let ogs = ogs, nav = nav
+            nav.friendshipConfirmations.receive(
+                notice,
+                announce: { [weak nav] in nav?.announce($0) },
+                dismiss: { [weak ogs] in ogs?.dismissFriendshipNotice(id: notice.id) }
+            )
+        }
         .onChange(of: scenePhase, initial: true) { _, phase in
             guard allowsRemoteActivity else { return }
             if phase == .active {

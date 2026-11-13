@@ -40,11 +40,40 @@ struct MessageAvatar: View {
     }
 }
 
+/// The controls of a friend request row in Messages' inbox.
+enum MessagesRequestControl: Hashable {
+    case accept, reject
+}
+
+/// Where VoiceOver is among the inbox's friend requests, by the other
+/// player's id.
+typealias MessagesRequestFocus = ResultFocus<Int, MessagesRequestControl>
+
+/// What an inbox request row's controls tell the inbox, which keeps the
+/// request's result in its place and moves VoiceOver focus to it.
+struct MessagesRequestHooks {
+    var focus: AccessibilityFocusState<MessagesRequestFocus?>.Binding
+    /// The user accepted or rejected the request in this row.
+    var didAct: (OGSFriendshipAction) -> Void
+}
+
+/// A friend request the user accepted or rejected in the inbox. Its row
+/// shows the result until the inbox goes off screen.
+struct MessagesRequestResult {
+    let user: OGSUser
+    let action: OGSFriendshipAction
+    /// The request shown before it when the user acted, so it keeps its place.
+    let after: Int?
+    /// When it resolved, among the inbox's results.
+    let order: Int
+}
+
 struct MessagesRequestRow: View {
     @Environment(\.openPlayerProfile) private var openPlayerProfile
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let invitation: OGSFriendInvitation
+    var hooks: MessagesRequestHooks? = nil
 
     private var profileAccessibilityValue: Text {
         let rank = Text(verbatim: invitation.fromUser.formattedRank)
@@ -90,10 +119,66 @@ struct MessagesRequestRow: View {
             .accessibilityIdentifier(
                 SurroundUITestContract.AccessibilityID.friendRequestProfile(invitation.fromUser.id)
             )
-            FriendshipControls(user: invitation.fromUser, presentation: .inboxRow)
+            FriendshipControls(user: invitation.fromUser, presentation: .inboxRow, requestHooks: hooks)
                 .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : 140)
         }
         .padding(.horizontal, 10)
+        .frame(minHeight: 60)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// A request the user accepted or rejected here, in its place: the result,
+/// and View profile for a new friend. VoiceOver moves to the result from
+/// the row's controls.
+struct MessagesResolvedRequestRow: View {
+    @Environment(\.openPlayerProfile) private var openPlayerProfile
+
+    let result: MessagesRequestResult
+    let focus: AccessibilityFocusState<MessagesRequestFocus?>.Binding
+
+    private var user: OGSUser { result.user }
+    private var isAccepted: Bool { result.action == .accept }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 9) {
+                MessageAvatar(user: user, size: 38)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: isAccepted ? "checkmark.circle" : "xmark.circle")
+                        .foregroundStyle(isAccepted ? Color(uiColor: .systemGreen) : Color.secondary)
+                        .accessibilityHidden(true)
+                    Text(verbatim: result.action.confirmation(with: user))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier(
+                            SurroundUITestContract.AccessibilityID.friendRequestResult(user.id)
+                        )
+                        .resultFocus(focus, .result(user.id))
+                }
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(minHeight: 44)
+            if isAccepted, let openPlayerProfile {
+                Button { openPlayerProfile(user) } label: {
+                    Text("View profile", comment: "Messages: opens the profile of the player whose friend request you just accepted")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(MessagesStyle.accent)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 30)
+                        .background(MessagesStyle.paleAccent, in: Capsule())
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                // Under the result, past the avatar.
+                .padding(.leading, 47)
+                .accessibilityLabel(Text("View \(user.username)’s profile"))
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.friendRequestViewProfile(user.id))
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, isAccepted ? 4 : 0)
         .frame(minHeight: 60)
         .accessibilityElement(children: .contain)
     }

@@ -5306,7 +5306,6 @@ class OGSService: ObservableObject {
                         }
                         self.applyFriendship(relationship, user: player)
                         self.friendshipFailuresByPlayerID.removeValue(forKey: player.id)
-                        self.friendshipNotice = OGSFriendshipNotice(action: action)
                     } else if case .failure(let error) = result {
                         self.friendshipFailuresByPlayerID[player.id] = OGSFriendshipFailure(
                             action: action, user: player,
@@ -5315,6 +5314,12 @@ class OGSService: ObservableObject {
                         )
                     }
                     promise(result)
+                    if case .success = result {
+                        // After the action's own subscribers have its result,
+                        // so the row that shows it is there when the notice
+                        // arrives.
+                        self.friendshipNotice = OGSFriendshipNotice(action: action, user: player)
+                    }
                     if !isFixture, case .success = result {
                         self.fetchFriends()
                         self.friendshipRefreshRevision &+= 1

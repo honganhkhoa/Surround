@@ -4,9 +4,11 @@
 //
 //  VoiceOver announcements and haptics post once per app: on behalf of the
 //  window the user is in, and once for copies of one event that several
-//  windows report.
+//  windows report. A window speaks a friendship result unless the request
+//  row that shows it took VoiceOver focus.
 //
 
+import Combine
 import XCTest
 
 final class AppAnnouncerTests: XCTestCase {
@@ -243,7 +245,7 @@ final class AppAnnouncerTests: XCTestCase {
                 said(.quickMatchCancelled("s1"), "Search cancelled", .anyWindow),
                 said(.quickMatchCancelled("s2"), "Search cancelled", .anyWindow),
                 said(.friendshipResult(UUID()), "Sent friend request", .anyWindow),
-                said(.friendshipResult(UUID()), "Friend request accepted", .anyWindow),
+                said(.friendshipResult(UUID()), "You and RiverWillow are friends", .anyWindow),
                 said(.quickMatchNotConfirmed(["s3"]), "OGS did not confirm this search.", .anyWindow),
                 said(.quickMatchNotConfirmed(["s3", "s4"]), "OGS did not confirm 2 searches.", .anyWindow),
                 said(.quickMatchSearchesEnded, "Your search ended.", .anyWindow),
@@ -431,5 +433,102 @@ final class AppAnnouncerTests: XCTestCase {
         let first = NavigationService(), second = NavigationService()
         XCTAssertNotEqual(first.announcerWindow, second.announcerWindow)
         XCTAssertEqual(first.announcerWindow, first.announcerWindow)
+    }
+
+    // MARK: Friendship confirmations
+
+    /// Runs what `async` queued only on `turn()`, as the main queue's next
+    /// turn would.
+    private final class Turns: OGSWebsocketScheduling {
+        private var queued = [() -> Void]()
+
+        func async(_ block: @escaping () -> Void) { queued.append(block) }
+
+        func schedule(after delay: TimeInterval, _ block: @escaping () -> Void) -> Cancellable {
+            preconditionFailure("Confirmations wait one turn only.")
+        }
+
+        func scheduleRepeating(every interval: TimeInterval, _ block: @escaping () -> Void) -> Cancellable {
+            preconditionFailure("Confirmations wait one turn only.")
+        }
+
+        func turn() {
+            let due = queued
+            queued = []
+            due.forEach { $0() }
+        }
+    }
+
+    /// What one window's observer did with the notices it received.
+    private final class Window {
+        let turns = Turns()
+        lazy var confirmations = FriendshipConfirmations(scheduler: turns)
+        private(set) var announced = [AppAnnouncement]()
+        private(set) var dismissed = [UUID]()
+
+        var spoken: [String] { announced.compactMap(\.speech) }
+
+        func receive(_ notice: OGSFriendshipNotice) {
+            confirmations.receive(notice, announce: { self.announced.append($0) },
+                                  dismiss: { self.dismissed.append(notice.id) })
+        }
+    }
+
+    private func notice(_ action: OGSFriendshipAction) -> OGSFriendshipNotice {
+        OGSFriendshipNotice(action: action, user: OGSUser(username: "RiverWillow", id: 912_001))
+    }
+
+    func testAFriendshipResultIsSpokenATurnLaterThenDismissed() {
+        let window = Window()
+        let accepted = notice(.accept)
+        window.receive(accepted)
+        XCTAssertTrue(window.announced.isEmpty, "A request row may still claim it in this turn.")
+        XCTAssertTrue(window.dismissed.isEmpty)
+        window.turns.turn()
+        XCTAssertEqual(window.announced, [
+            AppAnnouncement(.friendshipResult(accepted.id), audience: .anyWindow,
+                            speech: "You and RiverWillow are friends"),
+        ], "It is the result of the user's own action in this window.")
+        XCTAssertEqual(window.dismissed, [accepted.id])
+    }
+
+    func testARowsClaimInTheSameTurnSilencesTheWindowWhicheverCameFirst() {
+        let window = Window()
+        let accepted = notice(.accept), rejected = notice(.reject(notifyRequestor: true))
+        window.receive(accepted)
+        window.confirmations.claim(accepted.id)
+        window.confirmations.claim(rejected.id)
+        window.receive(rejected)
+        window.turns.turn()
+        XCTAssertTrue(window.announced.isEmpty, "The rows moved VoiceOver focus to their results.")
+        XCTAssertEqual(window.dismissed, [accepted.id, rejected.id], "Claimed notices are dismissed too.")
+    }
+
+    func testOnlyAClaimBeforeTheTurnCountsAndEachNoticeIsDecidedOnce() {
+        let window = Window()
+        let quiet = notice(.reject(notifyRequestor: false))
+        window.receive(quiet)
+        window.receive(quiet)
+        window.turns.turn()
+        window.confirmations.claim(quiet.id)
+        XCTAssertEqual(window.spoken, ["Rejected quietly."], "Delivered twice, decided once; no row had claimed it.")
+        XCTAssertEqual(window.dismissed, [quiet.id])
+
+        let removed = notice(.remove)
+        window.receive(removed)
+        window.turns.turn()
+        XCTAssertEqual(window.spoken, ["Rejected quietly.", "Removed friend"],
+                       "A claim made after its turn silences nothing later.")
+    }
+
+    func testEachFriendshipActionSaysWhatCameOfIt() {
+        let player = OGSUser(username: "RiverWillow", id: 912_001)
+        XCTAssertEqual(OGSFriendshipAction.send.confirmation(with: player), "Sent friend request")
+        XCTAssertEqual(OGSFriendshipAction.accept.confirmation(with: player), "You and RiverWillow are friends")
+        XCTAssertEqual(OGSFriendshipAction.reject(notifyRequestor: true).confirmation(with: player),
+                       "Rejected. RiverWillow was told.")
+        XCTAssertEqual(OGSFriendshipAction.reject(notifyRequestor: false).confirmation(with: player),
+                       "Rejected quietly.")
+        XCTAssertEqual(OGSFriendshipAction.remove.confirmation(with: player), "Removed friend")
     }
 }

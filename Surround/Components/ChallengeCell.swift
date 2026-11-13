@@ -321,19 +321,20 @@ struct RengoActions: View {
                 HStack {
                     if isRequesting {
                         ProgressView()
+                            .activityCardPending(activityCellActions)
                     } else {
                         if userId == host.id {
                             HStack {
                                 Button(role: .destructive, action: { cancel() }) {
                                     Text("Cancel").bold()
                                 }
-                                .activityCardAction(activityCellActions)
+                                .activityCardAction(activityCellActions, .withdraw)
                                 Spacer()
                                 Button(action: { start() }) {
                                     Text("Start").bold()
                                 }
                                 .disabled(!challenge.game.rengoReadyToStart)
-                                .activityCardAction(activityCellActions)
+                                .activityCardAction(activityCellActions, .start)
                             }
                         } else {
                             if participants.firstIndex(of: userId) == nil {
@@ -347,7 +348,7 @@ struct RengoActions: View {
                                 Button(role: .destructive, action: { leave() }) {
                                     Text("Leave", comment: "leaveRengoChallenge").bold()
                                 }
-                                .activityCardAction(activityCellActions)
+                                .activityCardAction(activityCellActions, .leave)
                             }
                         }
                     }
@@ -590,23 +591,25 @@ struct ChallengeCell: View {
                             if challenger.id == ogs.user?.id {
                                 if isRequesting {
                                     ProgressView()
+                                        .activityCardPending(activityCellActions)
                                 } else {
                                     Button(action: { withdraw(challenge) }) {
                                         Text("Withdraw")
                                             .bold()
                                             .foregroundColor(.red)
                                     }
-                                    .activityCardAction(activityCellActions)
+                                    .activityCardAction(activityCellActions, .withdraw)
                                 }
                             } else if challenge.challenged == nil {
                                 if isRequesting {
                                     ProgressView()
+                                        .activityCardPending(activityCellActions)
                                 } else {
                                     Button(action: { accept(challenge) }) {
                                         Text("Accept")
                                             .bold()
                                     }
-                                    .activityCardAction(activityCellActions)
+                                    .activityCardAction(activityCellActions, .accept)
                                 }
                             }
                         }
@@ -629,7 +632,7 @@ struct ChallengeCell: View {
                                     .padding(.vertical, 5)
                                     .contentShape(RoundedRectangle(cornerRadius: 10))
                                     .hoverEffect(.highlight)
-                                    .activityCardAction(activityCellActions)
+                                    .activityCardAction(activityCellActions, .reject)
                                     Button(action: { accept(challenge) }) {
                                         Text("Accept")
                                             .bold()
@@ -638,7 +641,7 @@ struct ChallengeCell: View {
                                     .padding(.vertical, 5)
                                     .contentShape(RoundedRectangle(cornerRadius: 10))
                                     .hoverEffect(.highlight)
-                                    .activityCardAction(activityCellActions)
+                                    .activityCardAction(activityCellActions, .accept)
                                 }
                                 .offset(x: 10)
                                 // Only Activity's request waits here; the cell's own sends at once.

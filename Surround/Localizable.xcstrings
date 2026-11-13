@@ -49393,6 +49393,40 @@
         }
       }
     },
+    "Rejected quietly." : {
+      "comment" : "Messages: the result of rejecting a friend request without letting its sender know, in place of the request and spoken.",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ditolak tanpa memberi tahu."
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ditolak tanpa memaklumkan."
+          }
+        }
+      }
+    },
+    "Rejected. %@ was told." : {
+      "comment" : "Messages: the result of rejecting a friend request and letting its sender know, in place of the request and spoken. The placeholder is the sender’s username.",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ditolak. %@ telah diberi tahu."
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ditolak. %@ telah dimaklumkan."
+          }
+        }
+      }
+    },
     "Rejecting…" : {
       "comment" : "Activity: VoiceOver, a challenge's Reject is being sent",
       "localizations" : {
@@ -66434,7 +66468,7 @@
       }
     },
     "View profile" : {
-      "extractionState" : "stale",
+      "comment" : "Messages: opens the profile of the player whose friend request you just accepted",
       "localizations" : {
         "id" : {
           "stringUnit" : {
@@ -70539,6 +70573,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你 · 下一位"
+          }
+        }
+      }
+    },
+    "You and %@ are friends" : {
+      "comment" : "Messages: the result of accepting a friend request, in place of the request and spoken. The placeholder is the other player’s username.",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anda dan %@ kini berteman"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anda dan %@ kini berkawan"
           }
         }
       }

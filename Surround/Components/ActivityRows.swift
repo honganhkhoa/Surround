@@ -6,7 +6,8 @@
 //  received, the user's own searches and challenges, the correspondence
 //  row, conversations, All messages, and a row whose item went after the
 //  user acted on it. Each row is one VoiceOver element whose label reads it
-//  as a sentence; its buttons stay separate elements with full labels. At
+//  as a sentence; its buttons stay separate elements with full labels, and
+//  a result takes VoiceOver focus from the button that acted. At
 //  accessibility sizes a row drops its second line before any action label
 //  shortens. Also the hook through which the challenge and Quick Match cards
 //  act inside Activity.
@@ -28,6 +29,12 @@ struct ActivityCellActions {
     /// The list that pushed the card is offline: the card's actions are off
     /// and read Reconnecting…, as the list's rows do.
     var isOffline = false
+    /// The card's VoiceOver focus, and the item it acts on, so a failure
+    /// can take focus from the control that acted.
+    var focus: ActivityFocusBinding?
+    var itemID = ""
+    /// The action whose request is in flight.
+    var pendingAction: ActivityAction?
     var accept: (any OGSSubmittedChallenge) -> Void
     var reject: (any OGSSubmittedChallenge) -> Void
     /// The user's own open or sent challenge, or a Rengo challenge the user
@@ -65,9 +72,52 @@ private struct ActivityCardActionAvailability: ViewModifier {
     }
 }
 
+extension ActivityCellActions {
+    /// A control that sends `action`. While its own request is in flight, a
+    /// control the card keeps on screen stands in as its spinner.
+    func focusTarget(for action: ActivityAction) -> ActivityFocus {
+        pendingAction == action ? .pending(itemID) : .control(itemID, .action(action))
+    }
+}
+
 extension View {
-    func activityCardAction(_ actions: ActivityCellActions?) -> some View {
+    /// A card's control that sends `action` through Activity: off while the
+    /// list is offline, and part of the card's VoiceOver focus.
+    func activityCardAction(_ actions: ActivityCellActions?, _ action: ActivityAction) -> some View {
         modifier(ActivityCardActionAvailability(isOffline: actions?.isOffline == true))
+            .resultFocus(actions?.focus, actions?.focusTarget(for: action))
+    }
+
+    /// The spinner a card shows while its request is in flight: VoiceOver
+    /// says what is being sent, and focus moves here from the control.
+    @ViewBuilder
+    func activityCardPending(_ actions: ActivityCellActions?) -> some View {
+        if let actions, let action = actions.pendingAction {
+            accessibilityLabel(Text(verbatim: action.pendingText))
+                .resultFocus(actions.focus, .pending(actions.itemID))
+        } else {
+            resultFocus(actions?.focus, actions.map { ActivityFocus.pending($0.itemID) })
+        }
+    }
+}
+
+// MARK: - VoiceOver focus
+
+typealias ActivityFocusBinding = AccessibilityFocusState<ActivityFocus?>.Binding
+
+extension View {
+    /// Binds this element to `value` in a list's, card's or inbox's VoiceOver
+    /// focus, when it has one.
+    @ViewBuilder
+    func resultFocus<Row: Hashable, Control: Hashable>(
+        _ focus: AccessibilityFocusState<ResultFocus<Row, Control>?>.Binding?,
+        _ value: ResultFocus<Row, Control>?
+    ) -> some View {
+        if let focus, let value {
+            accessibilityFocused(focus, equals: value)
+        } else {
+            self
+        }
     }
 }
 
@@ -366,10 +416,12 @@ private struct ActivityTrailingButtonStyle: ViewModifier {
 }
 
 /// The spinner that stands in for an action's button while it is sent, with
-/// the button's identifier.
+/// the button's identifier. VoiceOver moves here from the button.
 private struct ActivityPendingControl: View {
     let action: ActivityAction
     let identifier: String
+    let itemID: String
+    let focus: ActivityFocusBinding?
 
     var body: some View {
         ProgressView()
@@ -377,16 +429,19 @@ private struct ActivityPendingControl: View {
             .accessibilityElement()
             .accessibilityLabel(Text(verbatim: action.pendingText))
             .accessibilityIdentifier(identifier)
+            .resultFocus(focus, .pending(itemID))
     }
 }
 
 /// What replaces a row's actions once it acted: its result (with Open game
 /// for a correspondence game that started), its failure with Retry, or, for
-/// a row whose item went while it was sent, a spinner.
+/// a row whose item went while it was sent, a spinner. The result takes
+/// VoiceOver focus from the control that acted, in `focus`.
 struct ActivityEntryLine: View {
     let itemID: String
     let entry: ActivityResults.Entry
     let actionState: ActivityRowActionState
+    let focus: ActivityFocusBinding?
     let retry: () -> Void
     let openGame: (Int) -> Void
 
@@ -400,6 +455,7 @@ struct ActivityEntryLine: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier(ID.activityRowResult(itemID))
+                    .resultFocus(focus, .pending(itemID))
                 Spacer(minLength: 0)
             case .succeeded(let outcome):
                 Text(verbatim: outcome.text)
@@ -407,6 +463,7 @@ struct ActivityEntryLine: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier(ID.activityRowResult(itemID))
+                    .resultFocus(focus, .result(itemID))
                 if case .gameStarted(let gameID) = outcome {
                     Button {
                         openGame(gameID)
@@ -422,11 +479,13 @@ struct ActivityEntryLine: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier(ID.activityRowResult(itemID))
+                    .resultFocus(focus, .result(itemID))
                 Button("Retry", action: retry)
                     .modifier(ActivityTrailingButtonStyle(density: .regular))
                     .disabled(!actionState.isEnabled(.retry))
                     .accessibilityValue(Text(verbatim: actionState.accessibilityValue(.retry) ?? ""))
                     .accessibilityIdentifier(ID.activityRow(itemID, .retry))
+                    .resultFocus(focus, .control(itemID, .retry))
             }
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -505,6 +564,7 @@ struct ActivityChallengeRow: View {
     let density: ActivityRowDensity
     let actionState: ActivityRowActionState
     let entry: ActivityResults.Entry?
+    let focus: ActivityFocusBinding?
     let accept: () -> Void
     let reject: () -> Void
     let view: () -> Void
@@ -535,7 +595,7 @@ struct ActivityChallengeRow: View {
                 }
             }
             if let entry, entry.replacesActions || !actionState.showsInlineAcceptAndReject {
-                ActivityEntryLine(itemID: itemID, entry: entry, actionState: actionState,
+                ActivityEntryLine(itemID: itemID, entry: entry, actionState: actionState, focus: focus,
                                   retry: retry, openGame: openGame)
             } else if actionState.showsInlineAcceptAndReject {
                 inlineActions
@@ -579,7 +639,8 @@ struct ActivityChallengeRow: View {
             ? AnyLayout(VStackLayout(spacing: 10)) : AnyLayout(HStackLayout(spacing: 10))
         return layout {
             if entry?.action == .reject {
-                ActivityPendingControl(action: .reject, identifier: ID.activityRow(itemID, .reject))
+                ActivityPendingControl(action: .reject, identifier: ID.activityRow(itemID, .reject),
+                                       itemID: itemID, focus: focus)
                     .frame(maxWidth: .infinity)
             } else {
                 Button(action: reject) {
@@ -594,9 +655,11 @@ struct ActivityChallengeRow: View {
                 ))
                 .accessibilityValue(Text(verbatim: actionState.accessibilityValue(.reject) ?? ""))
                 .accessibilityIdentifier(ID.activityRow(itemID, .reject))
+                .resultFocus(focus, .control(itemID, .action(.reject)))
             }
             if entry?.action == .accept {
-                ActivityPendingControl(action: .accept, identifier: ID.activityRow(itemID, .accept))
+                ActivityPendingControl(action: .accept, identifier: ID.activityRow(itemID, .accept),
+                                       itemID: itemID, focus: focus)
                     .frame(maxWidth: .infinity)
             } else {
                 Button(action: accept) {
@@ -611,6 +674,7 @@ struct ActivityChallengeRow: View {
                 ))
                 .accessibilityValue(Text(verbatim: actionState.accessibilityValue(.accept) ?? ""))
                 .accessibilityIdentifier(ID.activityRow(itemID, .accept))
+                .resultFocus(focus, .control(itemID, .action(.accept)))
             }
         }
     }
@@ -645,6 +709,7 @@ struct ActivityWaitingRow: View {
     let open: (() -> Void)?
     let actionState: ActivityRowActionState
     let entry: ActivityResults.Entry?
+    let focus: ActivityFocusBinding?
     let withdraw: () -> Void
     let retry: () -> Void
     /// A Rengo game the user started from the card, when it is correspondence.
@@ -659,7 +724,7 @@ struct ActivityWaitingRow: View {
                 trailing
             }
             if let entry, entry.replacesActions || !withdrawsInPlace {
-                ActivityEntryLine(itemID: itemID, entry: entry, actionState: actionState,
+                ActivityEntryLine(itemID: itemID, entry: entry, actionState: actionState, focus: focus,
                                   retry: retry, openGame: openGame)
             }
         }
@@ -701,7 +766,8 @@ struct ActivityWaitingRow: View {
     private var trailing: some View {
         if withdrawsInPlace, entry?.replacesActions != true {
             if entry?.state.isPending == true {
-                ActivityPendingControl(action: .withdraw, identifier: ID.activityRow(itemID, .withdraw))
+                ActivityPendingControl(action: .withdraw, identifier: ID.activityRow(itemID, .withdraw),
+                                       itemID: itemID, focus: focus)
             } else {
                 Button(action: withdraw) {
                     // In the sheet the row leaves 4 pt, so the label sits 12 pt in.
@@ -715,6 +781,7 @@ struct ActivityWaitingRow: View {
                 .accessibilityLabel(Text(verbatim: withdrawLabel))
                 .accessibilityValue(Text(verbatim: actionState.accessibilityValue(.withdraw) ?? ""))
                 .accessibilityIdentifier(ID.activityRow(itemID, .withdraw))
+                .resultFocus(focus, .control(itemID, .action(.withdraw)))
             }
         }
     }
@@ -805,6 +872,7 @@ struct ActivityResolvedRowView: View {
     let entry: ActivityResults.Entry?
     let density: ActivityRowDensity
     let actionState: ActivityRowActionState
+    let focus: ActivityFocusBinding?
     let retry: () -> Void
     let openGame: (Int) -> Void
 
@@ -823,7 +891,7 @@ struct ActivityResolvedRowView: View {
             .accessibilityLabel(Text(verbatim: content.spoken))
             .accessibilityIdentifier(ID.activityRow(row.id))
             if let entry {
-                ActivityEntryLine(itemID: row.id, entry: entry, actionState: actionState,
+                ActivityEntryLine(itemID: row.id, entry: entry, actionState: actionState, focus: focus,
                                   retry: retry, openGame: openGame)
             }
         }
