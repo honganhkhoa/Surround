@@ -64,7 +64,9 @@ final class GameControlStateTests: XCTestCase {
 
         queue.resume()
         suspended = false
-        wait(for: [finished], timeout: 5)
+        // The real estimator runs here, and a busy CI runner can take tens of
+        // seconds; the test is about the result, not its speed.
+        wait(for: [finished], timeout: 60)
         XCTAssertFalse(state.isBusy)
         XCTAssertNil(position.estimatedScores, "Undo must not revive an estimate requested before the move")
     }
