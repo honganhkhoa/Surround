@@ -145,6 +145,25 @@ enum ImageStoneShadowStyle: Equatable {
     case ice
     /// A firmer contact edge gives polished glass depth on dark enamel.
     case raisedGlass
+    /// Cream glass needs a stronger white contact without a broader cast.
+    case raisedIvoryGlass
+
+    var usesRaisedGlassProfile: Bool { self == .raisedGlass || self == .raisedIvoryGlass }
+
+    func contactOpacity(for color: StoneColor, cellSize: CGFloat) -> Double {
+        guard cellSize.isFinite, usesDetailedStoneRendering(at: cellSize) else { return 0 }
+        switch self {
+        case .contact: return 0.5
+        case .raised: return 0.32
+        case .ice: return 0.26
+        case .raisedGlass, .raisedIvoryGlass:
+            let ivory = self == .raisedIvoryGlass && color == .white
+            let large: CGFloat = ivory ? 0.6 : 0.5
+            let phone: CGFloat = ivory ? 0.48 : 0.34
+            let phoneWeight = min(1, max(0, (32 - cellSize) / 10))
+            return Double(large + (phone - large) * phoneWeight)
+        }
+    }
 }
 
 /// A surface accent for artwork whose shallow shoulder is hard to separate

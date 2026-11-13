@@ -216,8 +216,7 @@ struct HomeClockChip<Leading: View>: View {
             if theme == .feltMeadow {
                 FeltControlSurface(color: color, shape: shape)
             } else if theme == .christmasKeepsakes {
-                ChristmasOrnamentSurface(color: color, role: .clock, attachment: .none,
-                                         showsDecoration: false, compact: true)
+                ChristmasOrnamentSurface(color: color, role: .clock, compact: true)
             } else {
                 shape.fill(LinearGradient(colors: theme.identityChipColors(color),
                                           startPoint: .top, endPoint: .bottom))

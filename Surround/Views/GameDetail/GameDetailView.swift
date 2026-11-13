@@ -473,6 +473,14 @@ struct GameDetailView: View {
         return false
     }
 
+    private func usesPhoneLandscapeRoomFraming(in geometry: GeometryProxy) -> Bool {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        return UIDevice.current.userInterfaceIdiom == .phone && !hasDisplayDivision(in: geometry)
+        #else
+        return false
+        #endif
+    }
+
     /// Which of Game Detail's four toolbar arrangements this layout uses.
     private var toolbarArrangement: GameToolbarArrangement {
         #if os(iOS) && !targetEnvironment(macCatalyst)
@@ -798,7 +806,7 @@ struct GameDetailView: View {
             SurroundUITestContract.AccessibilityID.gameDetail(currentGame)
         )
         .background {
-            GameDetailBackdrop()
+            GameDetailBackdrop(usesPhoneLandscapeFraming: usesPhoneLandscapeRoomFraming(in: geometry))
                 .overlay {
                     GameDetailSceneFoliage(hasTopEdgeClocks: hasActiveVerticalDisplayDivision(in: geometry))
                 }

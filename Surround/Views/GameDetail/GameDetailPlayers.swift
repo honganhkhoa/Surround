@@ -626,8 +626,6 @@ private struct GameDetailClockCard: View {
             FeltControlSurface(color: color, shape: shape)
         } else if theme == .christmasKeepsakes {
             ChristmasOrnamentSurface(color: color, role: .clock,
-                                     attachment: color == .black ? .leading : .trailing,
-                                     showsDecoration: style != .inline && !columnCard && !narrowFullCard && !narrowCompactCard,
                                      compact: style == .inline || columnCard || narrowFullCard || narrowCompactCard)
         } else if showsThemeGlass {
             Color.clear
@@ -1290,8 +1288,6 @@ struct GameDetailPlayerIdentity: View {
                     }
             } else if theme == .christmasKeepsakes {
                 ChristmasOrnamentSurface(color: color, role: .player,
-                                        attachment: avatarLeads ? .leading : .trailing,
-                                        showsDecoration: !navigationHeader && !compactHeader && !avatarOnly && !vertical,
                                         compact: navigationHeader || compactHeader || avatarOnly || vertical)
             } else if !showsThemeGlass {
                 let translucentScene = theme.usesLightSceneSurfaces && !navigationHeader

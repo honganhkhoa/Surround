@@ -21,21 +21,16 @@ enum ChristmasOrnamentRole: Hashable, CaseIterable {
     }
 }
 
-enum ChristmasOrnamentAttachment: Hashable, CaseIterable { case leading, trailing, none }
-
 struct ChristmasOrnamentSurface: View {
     let color: StoneColor
     let role: ChristmasOrnamentRole
-    let attachment: ChristmasOrnamentAttachment
-    let showsDecoration: Bool
     var compact: Bool = false
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        ChristmasOrnamentMaterial(color: color, role: role, attachment: attachment,
-                                  showsDecoration: showsDecoration, colorScheme: colorScheme,
+        ChristmasOrnamentMaterial(color: color, role: role, colorScheme: colorScheme,
                                   showsDetail: contrast != .increased && !reduceTransparency,
                                   compact: compact)
     }
@@ -46,18 +41,11 @@ struct ChristmasOrnamentSurface: View {
 struct ChristmasOrnamentMaterial: View {
     let color: StoneColor
     let role: ChristmasOrnamentRole
-    let attachment: ChristmasOrnamentAttachment
-    let showsDecoration: Bool
     let colorScheme: ColorScheme
     let showsDetail: Bool
     var compact: Bool = false
 
-    static let decorationOutset: CGFloat = 7
-
-    private var decorationAlignment: Alignment {
-        if role == .clock { return attachment == .trailing ? .topTrailing : .topLeading }
-        return attachment == .trailing ? .trailing : .leading
-    }
+    static let depthOutset: CGFloat = 7
 
     var body: some View {
         let paint = showsDetail ? ChristmasOrnamentTexture.image(kind: .paintedWood, color: color,
@@ -70,7 +58,7 @@ struct ChristmasOrnamentMaterial: View {
             .overlay {
                 GeometryReader { geometry in
                     let size = geometry.size
-                    let allowance: CGFloat = compact ? 0 : Self.decorationOutset
+                    let allowance: CGFloat = compact ? 0 : Self.depthOutset
                     Canvas { context, _ in
                         guard detailed, let paint, let wood, size.width > 8, size.height > 8 else { return }
                         context.translateBy(x: allowance, y: allowance)
@@ -106,24 +94,6 @@ struct ChristmasOrnamentMaterial: View {
                     .offset(x: -allowance, y: -allowance)
                 }
             }
-            .overlay(alignment: decorationAlignment) {
-                if detailed && showsDecoration && !compact && attachment != .none, let wood {
-                    if role == .clock {
-                        ChristmasOrnamentClockCord(dark: colorScheme == .dark)
-                            .frame(width: Self.decorationOutset * 2 + 1, height: Self.decorationOutset * 2 + 1)
-                            .clipped()
-                            .scaleEffect(x: attachment == .trailing ? -1 : 1, y: 1)
-                            .offset(x: attachment == .trailing ? Self.decorationOutset : -Self.decorationOutset,
-                                    y: -Self.decorationOutset)
-                    } else {
-                        ChristmasOrnamentCord(wood: wood, dark: colorScheme == .dark)
-                            .frame(width: Self.decorationOutset + 1, height: 34)
-                            .clipped()
-                            .scaleEffect(x: attachment == .trailing ? -1 : 1, y: 1)
-                            .offset(x: attachment == .trailing ? Self.decorationOutset : -Self.decorationOutset)
-                    }
-                }
-            }
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
@@ -155,84 +125,6 @@ struct ChristmasOrnamentOutline: InsettableShape {
             path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - cut))
             path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + cut))
             path.closeSubpath()
-        }
-    }
-}
-
-/// Local (11.5,11.5) is the original clock's unused (4.5,4.5) corner.
-/// Even the outer drill rim and cord stay before the 8 pt text reservation.
-private struct ChristmasOrnamentClockCord: View {
-    let dark: Bool
-
-    var body: some View {
-        Canvas { context, _ in
-            let hole = Path(ellipseIn: CGRect(x: 9.6, y: 9.6, width: 3.8, height: 3.8))
-            context.fill(hole, with: .color(OrnamentPigment.color(0x30291D)))
-            context.stroke(hole, with: .linearGradient(
-                Gradient(colors: [OrnamentPigment.color(0x936A3F), OrnamentPigment.color(0xF4E0BD)]),
-                startPoint: CGPoint(x: 9.6, y: 9.6), endPoint: CGPoint(x: 13.4, y: 13.4)), lineWidth: 0.65)
-
-            var cord = Path()
-            cord.move(to: CGPoint(x: 11.5, y: 11.5))
-            cord.addCurve(to: CGPoint(x: 6.2, y: 5.2),
-                          control1: CGPoint(x: 8.8, y: 10.8), control2: CGPoint(x: 10, y: 4.8))
-            cord.addCurve(to: CGPoint(x: 3.8, y: 4.4),
-                          control1: CGPoint(x: 4.1, y: 2.6), control2: CGPoint(x: 2.4, y: 2.8))
-            cord.addCurve(to: CGPoint(x: 11.5, y: 11.5),
-                          control1: CGPoint(x: 4, y: 6.5), control2: CGPoint(x: 7.3, y: 10.8))
-            context.stroke(cord, with: .color(.black.opacity(0.4)),
-                           style: StrokeStyle(lineWidth: 2.7, lineCap: .round))
-            context.stroke(cord, with: .color(OrnamentPigment.color(dark ? 0x31563C : 0x174B2D)),
-                           style: StrokeStyle(lineWidth: 2.1, lineCap: .round))
-            context.stroke(cord, with: .color(OrnamentPigment.color(0x86A277).opacity(0.5)),
-                           style: StrokeStyle(lineWidth: 0.5, lineCap: .round))
-        }
-    }
-}
-
-private struct ChristmasOrnamentCord: View {
-    let wood: UIImage
-    let dark: Bool
-
-    var body: some View {
-        Canvas { context, size in
-            let green = OrnamentPigment.color(dark ? 0x31563C : 0x174B2D)
-            let centerY = size.height / 2
-            var cord = Path()
-            cord.move(to: CGPoint(x: 0.3, y: centerY - 5))
-            cord.addCurve(to: CGPoint(x: 4.3, y: centerY),
-                          control1: CGPoint(x: 5.5, y: centerY - 7),
-                          control2: CGPoint(x: 6, y: centerY - 3))
-            cord.addQuadCurve(to: CGPoint(x: 0.3, y: centerY + 4),
-                              control: CGPoint(x: 3.5, y: centerY + 3))
-            context.stroke(cord, with: .color(.black.opacity(0.35)),
-                           style: StrokeStyle(lineWidth: 2.9, lineCap: .round))
-            context.stroke(cord, with: .color(green),
-                           style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
-
-            var end = Path()
-            end.move(to: CGPoint(x: 8, y: 0.5))
-            end.addLine(to: CGPoint(x: 2.3, y: 5))
-            end.addLine(to: CGPoint(x: 0.8, y: 9))
-            end.addLine(to: CGPoint(x: 0.8, y: size.height - 9))
-            end.addLine(to: CGPoint(x: 2.3, y: size.height - 5))
-            end.addLine(to: CGPoint(x: 8, y: size.height - 0.5))
-            end.closeSubpath()
-            let edge = end
-            let hole = Path(ellipseIn: CGRect(x: 2, y: centerY - 1.8, width: 3.6, height: 3.6))
-            end.addPath(hole)
-            context.fill(end, with: .tiledImage(Image(uiImage: wood)), style: FillStyle(eoFill: true))
-            context.stroke(edge, with: .linearGradient(
-                Gradient(colors: [.white.opacity(0.45), .clear, .black.opacity(0.28)]),
-                startPoint: .zero, endPoint: CGPoint(x: 5, y: size.height)), lineWidth: 0.6)
-            context.stroke(hole, with: .color(OrnamentPigment.color(0x765132).opacity(0.8)), lineWidth: 0.65)
-
-            var strand = Path()
-            strand.move(to: CGPoint(x: 0, y: centerY - 2))
-            strand.addQuadCurve(to: CGPoint(x: 4, y: centerY), control: CGPoint(x: 2, y: centerY + 1))
-            context.stroke(strand, with: .color(green), style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
-            context.stroke(strand, with: .color(OrnamentPigment.color(0x76966B).opacity(0.5)),
-                           style: StrokeStyle(lineWidth: 0.45, lineCap: .round))
         }
     }
 }

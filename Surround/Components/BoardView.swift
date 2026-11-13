@@ -792,7 +792,7 @@ private struct ImageStoneCanvas: View, Equatable {
             // Long casts shift the apparent center of a tiny stone. Keep
             // phone-size shadows close to its footprint; larger boards
             // retain the theme's full raised profile and light direction.
-            let glass = shadowStyle == .raisedGlass
+            let glass = shadowStyle.usesRaisedGlassProfile
             let shadowScale = min(1, max(glass ? 0.5 : 0.35, (cellSize - 10) / 30))
             // Broad dark halos join dense cranberry groups at phone size.
             // Keep a tight contact there, returning to the original raised
@@ -805,7 +805,7 @@ private struct ImageStoneCanvas: View, Equatable {
             if shadowStyle == .ice {
                 drawShadow(in: context, radius: min(1.8, max(0.65, cellSize * 0.04)),
                            x: min(0.8, cellSize * 0.018), y: min(1.2, cellSize * 0.03),
-                           inset: 0.25, opacity: 0.26)
+                           inset: 0.25, opacity: shadowStyle.contactOpacity(for: .black, cellSize: cellSize))
             } else if shadowStyle != .contact {
                 // A full-footprint cast stays visible against wood grain at
                 // phone size. Cap its spread so larger boards do not float.
@@ -821,11 +821,14 @@ private struct ImageStoneCanvas: View, Equatable {
                            radius: glassValue(min(1, max(glass ? 0.5 : 0.45, cellSize * (glass ? 0.025 : 0.02))), phone: 0.35),
                            x: glassValue(min(glass ? 0.9 : 0.5, cellSize * (glass ? 0.025 : 0.01)), phone: 0.2),
                            y: glassValue(min(glass ? 1.5 : 0.8, cellSize * (glass ? 0.045 : 0.02)), phone: 0.4),
-                           inset: glass ? 0.1 : 0.2, opacity: Double(glassValue(glass ? 0.5 : 0.32, phone: 0.34)))
+                           inset: glass ? 0.1 : 0.2,
+                           opacity: shadowStyle.contactOpacity(for: .black, cellSize: cellSize),
+                           whiteOpacity: shadowStyle == .raisedIvoryGlass
+                               ? shadowStyle.contactOpacity(for: .white, cellSize: cellSize) : nil)
             } else {
                 drawShadow(in: context, radius: max(0.6, cellSize * 0.06 * shadowScale),
                            x: cellSize * 0.03 * shadowScale, y: cellSize * 0.06 * shadowScale,
-                           inset: 0.5, opacity: 0.5)
+                           inset: 0.5, opacity: shadowStyle.contactOpacity(for: .black, cellSize: cellSize))
             }
 
             // Batch the loose fibers by player and captured state. Their
@@ -898,16 +901,28 @@ private struct ImageStoneCanvas: View, Equatable {
     }
 
     private func drawShadow(in context: GraphicsContext, radius: CGFloat,
-                            x: CGFloat, y: CGFloat, inset: CGFloat, opacity: Double) {
+                            x: CGFloat, y: CGFloat, inset: CGFloat, opacity: Double,
+                            whiteOpacity: Double? = nil) {
         context.drawLayer { shadows in
             shadows.addFilter(.blur(radius: radius))
             var path = Path()
+            var whitePath = Path()
             for stone in stones where !stone.isRemoved {
-                path.addEllipse(in: stone.rect
+                let rect = stone.rect
                     .offsetBy(dx: lightDirection.shadowXSign * x, dy: y)
-                    .insetBy(dx: inset, dy: inset))
+                    .insetBy(dx: inset, dy: inset)
+                if stone.color == .white, whiteOpacity != nil {
+                    whitePath.addEllipse(in: rect)
+                } else {
+                    path.addEllipse(in: rect)
+                }
             }
             shadows.fill(path, with: .color(.black.opacity(opacity)))
+            // Only an opted-in material separates the white contact pass.
+            // All other profiles retain their original shared path and blur.
+            if let whiteOpacity {
+                shadows.fill(whitePath, with: .color(.black.opacity(whiteOpacity)))
+            }
         }
     }
 }

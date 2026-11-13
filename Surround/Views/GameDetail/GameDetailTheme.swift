@@ -682,7 +682,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 gridLineScale: 0.85,
                 stoneImages: ChristmasKeepsakesAssets.stones,
                 stoneLightDirection: .upperLeft,
-                imageStoneShadow: .raisedGlass,
+                imageStoneShadow: .raisedIvoryGlass,
                 // The cabochon artwork contains its broad window reflection
                 // and transmitted red light; an extra contour would double it.
                 imageStoneShading: .artwork,
@@ -863,6 +863,14 @@ private final class ChristmasKeepsakesAssets {
     static func room(for composition: ChristmasKeepsakesRoomLayout.Composition) -> UIImage? {
         UIImage(named: composition.assetName, in: bundle, compatibleWith: nil)
     }
+}
+
+/// The upright tree is separate from the table photograph so only its outer
+/// boughs peek through the right edge across the room's different crops.
+final class ChristmasKeepsakesTreeAssets {
+    private init() {}
+    static let image = UIImage(named: "ChristmasKeepsakesTree",
+                               in: Bundle(for: ChristmasKeepsakesTreeAssets.self), compatibleWith: nil)
 }
 
 /// Warm walnut, ivory and ruby retain their material identities as the room
@@ -3421,6 +3429,7 @@ private struct StatusBarContrastSurface: UIViewRepresentable {
 struct GameDetailBackdrop: View {
     @Environment(\.surroundTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    var usesPhoneLandscapeFraming = false
 
     var body: some View {
         switch theme {
@@ -3439,7 +3448,7 @@ struct GameDetailBackdrop: View {
         case .nightGarden:
             NightGardenScene(scheme: colorScheme)
         case .christmasKeepsakes:
-            ChristmasKeepsakesScene(scheme: colorScheme)
+            ChristmasKeepsakesScene(scheme: colorScheme, usesPhoneLandscapeFraming: usesPhoneLandscapeFraming)
         case .paperBlossoms:
             PaperBlossomsScene(scheme: colorScheme)
         case .frostPine:
@@ -3480,7 +3489,7 @@ struct ChristmasKeepsakesRoomLayout: Equatable {
     let lightingReference: CGRect
     let lightCenter: CGPoint
 
-    init(size: CGSize) {
+    init(size: CGSize, usesPhoneLandscapeFraming: Bool = false) {
         let width = size.width.isFinite ? max(0, size.width) : 0
         let height = size.height.isFinite ? max(0, size.height) : 0
         let shortSide = min(width, height)
@@ -3498,7 +3507,15 @@ struct ChristmasKeepsakesRoomLayout: Equatable {
         // crop through its window frame. Scale the entire room down together.
         let preferredSide = min(baseSide, height / composition.visibleHeightFraction)
         let side = max(preferredSide, max(width, height))
-        backdrop = CGRect(x: 0, y: height - side, width: side, height: side)
+        // Wide ordinary phone landscape needs more of the frosted pane above
+        // the sill. Move the whole photograph without enlarging its gifts;
+        // their bases may crop slightly below the viewport. Other contexts
+        // keep their original bottom anchor. A closed divided phone can have
+        // no visible division; its narrower landscape shape needs no reveal.
+        let wideLandscapeWeight = height > 0 ? min(1, max(0, (width / height - 1.5) / 0.25)) : 0
+        let bottomCrop = usesPhoneLandscapeFraming && composition == .compactLandscape
+            ? min(height * 0.12 * wideLandscapeWeight, max(0, side - height)) : 0
+        backdrop = CGRect(x: 0, y: height - side + bottomCrop, width: side, height: side)
 
         let compactFraming = min(1, max(0, (600 - shortSide) / 160))
         let backdropBaseSide: CGFloat = 1440 - 480 * compactFraming
@@ -3512,14 +3529,46 @@ struct ChristmasKeepsakesRoomLayout: Equatable {
     }
 }
 
+/// A standing tree continues beyond the right and bottom edges. Its scale
+/// depends only on the shorter viewport edge, so panels and Zen cannot move it
+/// and rotation reveals different boughs without enlarging the decorations.
+struct ChristmasKeepsakesTreeLayout: Equatable {
+    let frame: CGRect
+
+    init(size: CGSize, artworkSize: CGSize) {
+        let width = size.width.isFinite ? max(0, size.width) : 0
+        let height = size.height.isFinite ? max(0, size.height) : 0
+        guard width > 0, height > 0,
+              artworkSize.width.isFinite, artworkSize.height.isFinite,
+              artworkSize.width > 0, artworkSize.height > 0 else {
+            frame = .zero
+            return
+        }
+        let scale = min(1, min(width, height) / 440)
+        let treeHeight = 560 * scale
+        let treeWidth = treeHeight * artworkSize.width / artworkSize.height
+        guard treeWidth.isFinite, treeWidth > 0 else {
+            frame = .zero
+            return
+        }
+        // The portrait source includes clear space before its outer needles;
+        // this frame reach leaves only a smaller strip of actual foliage.
+        let visibleWidth = min(80 * scale, treeWidth * 0.32)
+        frame = CGRect(x: width - visibleWidth, y: height - treeHeight * 0.9,
+                       width: treeWidth, height: treeHeight)
+    }
+}
+
 private struct ChristmasKeepsakesScene: View {
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let scheme: ColorScheme
+    let usesPhoneLandscapeFraming: Bool
 
     var body: some View {
         GeometryReader { geometry in
             ChristmasKeepsakesSceneContent(size: geometry.size, scheme: scheme,
+                                           usesPhoneLandscapeFraming: usesPhoneLandscapeFraming,
                                            showsLight: ChristmasKeepsakesWindowLight.isVisible(
                                                contrast: contrast, reduceTransparency: reduceTransparency)).equatable()
         }
@@ -3531,6 +3580,7 @@ private struct ChristmasKeepsakesScene: View {
 private struct ChristmasKeepsakesSceneContent: View, Equatable {
     let size: CGSize
     let scheme: ColorScheme
+    let usesPhoneLandscapeFraming: Bool
     let showsLight: Bool
 
     private var chrome: Color {
@@ -3551,7 +3601,7 @@ private struct ChristmasKeepsakesSceneContent: View, Equatable {
     }
 
     var body: some View {
-        let layout = ChristmasKeepsakesRoomLayout(size: size)
+        let layout = ChristmasKeepsakesRoomLayout(size: size, usesPhoneLandscapeFraming: usesPhoneLandscapeFraming)
         ZStack {
             chrome
             if let backdrop = ChristmasKeepsakesAssets.room(for: layout.composition) {
@@ -3561,6 +3611,15 @@ private struct ChristmasKeepsakesSceneContent: View, Equatable {
                     .colorMultiply(scheme == .dark ? Color(themeHex: 0x8A7767) : .white)
                     .frame(width: layout.backdrop.width, height: layout.backdrop.height)
                     .position(x: layout.backdrop.midX, y: layout.backdrop.midY)
+            }
+            if let tree = ChristmasKeepsakesTreeAssets.image {
+                let frame = ChristmasKeepsakesTreeLayout(size: size, artworkSize: tree.size).frame
+                Image(uiImage: tree)
+                    .resizable()
+                    .saturation(scheme == .dark ? 0.78 : 1)
+                    .colorMultiply(scheme == .dark ? Color(themeHex: 0x8A7767) : .white)
+                    .frame(width: frame.width, height: frame.height)
+                    .position(x: frame.midX, y: frame.midY)
             }
             RadialGradient(colors: [Color(themeHex: 0xF4DFC2).opacity(scheme == .dark ? 0.16 : 0.13), .clear],
                            center: .center, startRadius: 0, endRadius: 210)
