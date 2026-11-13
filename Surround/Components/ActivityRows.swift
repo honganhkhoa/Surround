@@ -338,31 +338,25 @@ struct ActivityRowTile: View {
 }
 
 /// Line one, then line two (and a challenge's line three), which drop at
-/// accessibility sizes so no action label shortens.
+/// accessibility sizes so no action label shortens. At those sizes nothing
+/// shares line one with a name it would break inside a word: a rank that
+/// doesn't fit beside the name goes under it, and so does the trailing view.
 struct ActivityRowLines<Trailing: View>: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let content: ActivityRowContent
     let density: ActivityRowDensity
     var showsMoreDetails = false
-    /// Beside line one, such as a live game's clock.
+    /// Beside line one, such as a live game's clock; under it at
+    /// accessibility sizes.
     @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
-            HStack(spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(verbatim: content.title)
-                        .font(density.titleFont)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
-                    if let rank = content.rank {
-                        Text(verbatim: rank)
-                            .font(density.rankFont)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .fixedSize()
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            let lineOne = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 8))
+            lineOne {
+                nameAndRank
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 trailing()
             }
             if !dynamicTypeSize.isAccessibilitySize {
@@ -379,6 +373,36 @@ struct ActivityRowLines<Trailing: View>: View {
                         .lineLimit(1)
                 }
             }
+        }
+    }
+
+    @ViewBuilder private var nameAndRank: some View {
+        let name = Text(verbatim: content.title)
+            .font(density.titleFont)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+        if let rank = content.rank {
+            let rankText = Text(verbatim: rank)
+                .font(density.rankFont)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize()
+            let beside = HStack(alignment: .firstTextBaseline, spacing: 4) {
+                name
+                rankText
+            }
+            if dynamicTypeSize.isAccessibilitySize {
+                ViewThatFits(in: .horizontal) {
+                    beside
+                    VStack(alignment: .leading, spacing: 0) {
+                        name
+                        rankText
+                    }
+                }
+            } else {
+                beside
+            }
+        } else {
+            name
         }
     }
 }
@@ -436,8 +460,10 @@ private struct ActivityPendingControl: View {
 /// What replaces a row's actions once it acted: its result (with Open game
 /// for a correspondence game that started), its failure with Retry, or, for
 /// a row whose item went while it was sent, a spinner. The result takes
-/// VoiceOver focus from the control that acted, in `focus`.
+/// VoiceOver focus from the control that acted, in `focus`. At accessibility
+/// sizes the button goes under the words, so neither breaks inside a word.
 struct ActivityEntryLine: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let itemID: String
     let entry: ActivityResults.Entry
     let actionState: ActivityRowActionState
@@ -450,7 +476,9 @@ struct ActivityEntryLine: View {
     var labelInset: CGFloat = 0
 
     var body: some View {
-        HStack(spacing: 12) {
+        let layout = dynamicTypeSize.isAccessibilitySize && !entry.state.isPending
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 12))
+        layout {
             switch entry.state {
             case .pending:
                 ProgressView()
@@ -458,9 +486,9 @@ struct ActivityEntryLine: View {
                 Text(verbatim: entry.action.pendingText)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier(ID.activityRowResult(itemID))
                     .resultFocus(focus, .pending(itemID))
-                Spacer(minLength: 0)
             case .succeeded(let outcome):
                 Text(verbatim: outcome.text)
                     .font(.subheadline.weight(.semibold))

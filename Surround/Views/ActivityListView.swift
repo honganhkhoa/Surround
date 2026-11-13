@@ -845,13 +845,18 @@ private struct ActivityItemCardContent: View {
 /// The list's offline line: "Reconnecting…", or "Can’t reach OGS" with
 /// Retry. It shows under the list's title, and above the composer of a
 /// conversation the list pushed, where the list's own line is out of sight.
+/// At accessibility sizes Retry goes under the words, so neither breaks
+/// inside a word.
 struct ActivityStatusLine: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var connection: ConnectionStatusSource
     var statusIdentifier = ID.activityStatus
     var retryIdentifier = ID.activityStatusRetry
 
     var body: some View {
-        HStack(spacing: 6) {
+        let layout = dynamicTypeSize.isAccessibilitySize && connection.status.offersRetry
+            ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 6))
+        layout {
             if connection.status.offersRetry {
                 Text("Can’t reach OGS", comment: "Activity: under the title while the app can't connect to OGS; shown with Retry")
                     .accessibilityIdentifier(statusIdentifier)
@@ -870,6 +875,7 @@ struct ActivityStatusLine: View {
         }
         .font(.subheadline)
         .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity, minHeight: 32)
     }
 }
