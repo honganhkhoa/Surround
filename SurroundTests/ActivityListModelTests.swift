@@ -198,6 +198,18 @@ final class ActivityListModelTests: XCTestCase {
                           ActivityRequest(source: .debug, style: .sheet).id)
     }
 
+    func testOpenedAtMessagesTheOnlyUnreadConversationOpensAtOnce() {
+        let read = Item.conversation(ActivityModel.Conversation(peerID: 32, isUnread: false, lastMessageTime: 200))
+        let one = [game(1), challenge(7), conversation(31), read]
+        XCTAssertEqual(ActivityRequest.Focus.messages.conversationToOpen(in: one), 31,
+                       "Read conversations don't count.")
+        XCTAssertNil(ActivityRequest.Focus.top.conversationToOpen(in: one), "Only the Messages button's focus opens one.")
+        XCTAssertNil(ActivityRequest.Focus.messages.conversationToOpen(in: [conversation(31), conversation(30), read]),
+                     "With two unread, the list stays at Messages.")
+        XCTAssertNil(ActivityRequest.Focus.messages.conversationToOpen(in: [game(1), read]))
+        XCTAssertNil(ActivityRequest.Focus.messages.conversationToOpen(in: []))
+    }
+
     // MARK: Row controls
 
     func testInlineAcceptOnlyForAUsualChallengeOutsideAGame() {

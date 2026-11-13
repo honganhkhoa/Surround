@@ -479,6 +479,9 @@ struct MessagesConversationView: View {
     @EnvironmentObject private var navigation: StackRouter
     @Environment(\.owningStackRoute) private var owningStackRoute
     @Environment(\.isVerticalToolbar) private var isVerticalToolbar
+    /// Set only in a stack with an Activity list, whose status turns the
+    /// composer off while offline.
+    @Environment(\.activityConnection) private var activityConnection
     let peer: OGSUser
     var isPane = false
 
@@ -535,7 +538,8 @@ struct MessagesConversationView: View {
                 .accessibilityIdentifier("messages.conversation.heading")
                 Divider()
             }
-            MessagesConversationLog(drafts: nav.conversationDrafts, peer: peer,
+            MessagesConversationLog(drafts: nav.conversationDrafts,
+                connection: activityConnection ?? .neverOffline, peer: peer,
                 accountID: ogs.user?.id,
                 marksThreadAsRead: navigation.path.last == owningStackRoute
                     && navigation.isActive,
@@ -603,9 +607,13 @@ struct MessagesConversationView: View {
 /// The transcript and composer, with the draft and reading position from
 /// the window's store. Only this view observes the store, so a keystroke
 /// redraws the window's conversations, including a second composer for the
-/// same peer, and never the stacks or games around them.
+/// same peer, and never the stacks or games around them. Inside Activity's
+/// stack the composer is off while the list is offline, as the moderator
+/// cover's is, and the list's offline line above it says why; elsewhere
+/// `connection` is never offline.
 private struct MessagesConversationLog: View {
     @ObservedObject var drafts: ConversationDraftStore
+    @ObservedObject var connection: ConnectionStatusSource
     let peer: OGSUser
     let accountID: Int?
     let marksThreadAsRead: Bool
@@ -621,7 +629,19 @@ private struct MessagesConversationLog: View {
             showsProfileToolbar: false,
             focusIsSuspended: focusIsSuspended,
             composerFocusIsSuspended: composerFocusIsSuspended,
-            composer: .init(header: header))
+            composer: .init(isOffline: connection.dimsActivityActions, header: composerHeader))
+    }
+
+    /// Offline, the list's line, then Messages' ended line if any.
+    private var composerHeader: AnyView? {
+        guard connection.dimsActivityActions else { return header }
+        return AnyView(VStack(spacing: 6) {
+            ActivityStatusLine(
+                connection: connection,
+                statusIdentifier: SurroundUITestContract.AccessibilityID.activityConversationStatus,
+                retryIdentifier: SurroundUITestContract.AccessibilityID.activityConversationStatusRetry)
+            if let header { header }
+        })
     }
 }
 
