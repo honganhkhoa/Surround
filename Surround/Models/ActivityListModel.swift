@@ -62,8 +62,20 @@ struct ActivityRequest: Identifiable, Equatable {
     /// Where the list starts.
     enum Focus: Equatable {
         case top
-        /// Scrolled to Messages, as the Messages button opens it.
+        /// Scrolled to Messages, as the Messages button opens it. With
+        /// exactly one unread conversation, that one opens at once.
         case messages
+
+        /// The peer whose conversation the list opens at once: with
+        /// Messages in focus and exactly one unread conversation listed.
+        func conversationToOpen(in list: [ActivityModel.Item]) -> Int? {
+            guard self == .messages else { return nil }
+            let unread = list.compactMap { item -> Int? in
+                guard case .conversation(let conversation) = item, conversation.isUnread else { return nil }
+                return conversation.peerID
+            }
+            return unread.count == 1 ? unread[0] : nil
+        }
     }
 
     /// The list's session, which its rows' results belong to (ActivityResults).

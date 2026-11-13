@@ -886,6 +886,9 @@ enum SurroundUITestContract {
         /// "Reconnecting…", or "Can’t reach OGS" with its Retry.
         static let activityStatus = "activity.status"
         static let activityStatusRetry = "activity.status.retry"
+        /// The same line above the composer of a conversation the list pushed.
+        static let activityConversationStatus = "activity.conversation.status"
+        static let activityConversationStatusRetry = "activity.conversation.status.retry"
         enum ActivityRowControl: String {
             case accept, reject, view, withdraw, openGame, retry
         }
@@ -1075,6 +1078,9 @@ enum SurroundUITestContract {
         /// The waiting and challenge pills, which open Activity.
         static let waitingBanner = "notification.waiting"
         static let challengeBanner = "notification.challenge"
+        /// The Messages button beside the pills, with the unread count as its
+        /// value. It opens Activity at Messages.
+        static let messagesButton = "global.privateMessages"
         static let connectionBanner = "notification.connection"
         static let homePreferredSettings = "home.preferredSettings"
         static let homePreferredSettingsEdit = "home.preferredSettings.edit"

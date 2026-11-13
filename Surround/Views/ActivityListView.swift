@@ -335,7 +335,7 @@ private struct ActivityListContent: View {
                         .padding(.horizontal, density == .regular ? 16 : 0)
                         .padding(.bottom, 20)
                     }
-                    .onAppear { scrollToFocus(proxy) }
+                    .onAppear { applyFocus(proxy, snapshot) }
                 }
             }
         }
@@ -348,39 +348,31 @@ private struct ActivityListContent: View {
         }
     }
 
-    private func scrollToFocus(_ proxy: ScrollViewProxy) {
+    /// Opened at Messages, the list scrolls there on its first appearance.
+    /// With exactly one unread conversation it also opens that one at once,
+    /// so Back shows the list at Messages.
+    private func applyFocus(_ proxy: ScrollViewProxy, _ snapshot: ActivityListSource.Snapshot) {
         guard focus == .messages, !hasFocused else { return }
         hasFocused = true
-        // After the first layout, so the section has its place.
+        let conversation = focus.conversationToOpen(in: snapshot.model.list).flatMap { peer($0) }
+        // After the first layout, so the section has its place and the
+        // stack has appeared.
         DispatchQueue.main.async {
             proxy.scrollTo(ActivitySection.messages, anchor: .top)
+            guard let conversation else { return }
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                navigation.openConversation(conversation)
+            }
         }
     }
 
     /// Under the title: "Reconnecting…", or "Can’t reach OGS" with Retry.
     @ViewBuilder private var statusLine: some View {
         if isOffline {
-            HStack(spacing: 6) {
-                if connection.status.offersRetry {
-                    Text("Can’t reach OGS", comment: "Activity: under the title while the app can't connect to OGS; shown with Retry")
-                        .accessibilityIdentifier(ID.activityStatus)
-                    Button("Retry") { connection.retry() }
-                        .font(.subheadline.weight(.semibold))
-                        .tint(MessagesStyle.accent)
-                        .frame(minHeight: 44)
-                        .accessibilityIdentifier(ID.activityStatusRetry)
-                } else {
-                    ProgressView()
-                        .controlSize(.mini)
-                        .accessibilityHidden(true)
-                    Text("Reconnecting…")
-                        .accessibilityIdentifier(ID.activityStatus)
-                }
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, minHeight: 32)
-            .padding(.top, 4)
+            ActivityStatusLine(connection: connection)
+                .padding(.top, 4)
         }
     }
 
@@ -776,6 +768,38 @@ private struct ActivityItemCardContent: View {
     }
 }
 
+/// The list's offline line: "Reconnecting…", or "Can’t reach OGS" with
+/// Retry. It shows under the list's title, and above the composer of a
+/// conversation the list pushed, where the list's own line is out of sight.
+struct ActivityStatusLine: View {
+    @ObservedObject var connection: ConnectionStatusSource
+    var statusIdentifier = ID.activityStatus
+    var retryIdentifier = ID.activityStatusRetry
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if connection.status.offersRetry {
+                Text("Can’t reach OGS", comment: "Activity: under the title while the app can't connect to OGS; shown with Retry")
+                    .accessibilityIdentifier(statusIdentifier)
+                Button("Retry") { connection.retry() }
+                    .font(.subheadline.weight(.semibold))
+                    .tint(MessagesStyle.accent)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier(retryIdentifier)
+            } else {
+                ProgressView()
+                    .controlSize(.mini)
+                    .accessibilityHidden(true)
+                Text("Reconnecting…")
+                    .accessibilityIdentifier(statusIdentifier)
+            }
+        }
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, minHeight: 32)
+    }
+}
+
 extension ConnectionStatusSource {
     /// Reconnecting… and Can’t reach OGS both dim the actions that need OGS.
     var dimsActivityActions: Bool {
@@ -785,8 +809,9 @@ extension ConnectionStatusSource {
         }
     }
 
-    /// For a card without its list: never offline, since it is never shown.
-    fileprivate static let neverOffline = ConnectionStatusSource(
+    /// For a card without its list, and a conversation outside Activity's
+    /// stack: never offline, since it is never shown.
+    static let neverOffline = ConnectionStatusSource(
         socketIsConnected: Just(true).eraseToAnyPublisher(),
         path: ConstantNetworkPath.satisfied,
         reconnect: {}
@@ -929,19 +954,40 @@ struct ActivityOpenerButton<Label: View>: View {
         } label: {
             label()
         }
-        .onGeometryChange(for: CGRect.self) { proxy in
-            proxy.frame(in: .global)
-        } action: { value in
-            frame.value = value
-            nav.moveActivityAnchor(to: value, from: source)
-        }
+        .activityOpenerFrame(frame, source: source)
     }
 }
 
-/// An opener's latest frame, held by reference so a new frame redraws
-/// nothing.
-private final class ActivityOpenerFrame {
-    var value = CGRect.zero
+/// An opener's latest frame in the window's global space, held by
+/// reference so a new frame redraws nothing. A control that opens the list
+/// only sometimes, as the live pill does, keeps one in `@State` and records
+/// it with `activityOpenerFrame(_:source:)`.
+final class ActivityOpenerFrame {
+    fileprivate(set) var value = CGRect.zero
+}
+
+extension View {
+    /// Keeps `frame` at this control's frame in the window's global space,
+    /// and moves the popover `source` opened, while it is shown, with it.
+    func activityOpenerFrame(_ frame: ActivityOpenerFrame, source: ActivityRequest.Source) -> some View {
+        modifier(ActivityOpenerFrameRecorder(frame: frame, source: source))
+    }
+}
+
+private struct ActivityOpenerFrameRecorder: ViewModifier {
+    let frame: ActivityOpenerFrame
+    let source: ActivityRequest.Source
+    @EnvironmentObject private var nav: NavigationService
+
+    func body(content: Content) -> some View {
+        content
+            .onGeometryChange(for: CGRect.self) { proxy in
+                proxy.frame(in: .global)
+            } action: { value in
+                frame.value = value
+                nav.moveActivityAnchor(to: value, from: source)
+            }
+    }
 }
 
 // MARK: - Debug opener

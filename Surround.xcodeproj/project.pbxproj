@@ -371,7 +371,6 @@
 		BC9EE84725B6D25E0044EA2C /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE84625B6D25E0044EA2C /* DictionaryCoding */; };
 		BC9EE86725B7ECEB0044EA2C /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86625B7ECEB0044EA2C /* Alamofire */; };
 		BC9EE86925B7ECF00044EA2C /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86825B7ECF00044EA2C /* DictionaryCoding */; };
-		BCA0C72225F0DF5C0077DD28 /* PrivateMessageNotificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA0C72125F0DF5C0077DD28 /* PrivateMessageNotificationView.swift */; };
 		BCA4904224E3FCC1002F4336 /* ThirdPartyLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */; };
 		BCACD3E229DEC06D00655D8B /* OGSWebsocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */; };
 		BCACD3E329DEC06D00655D8B /* OGSWebsocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */; };
@@ -810,7 +809,6 @@
 		BC8CE87E2657B1B100E4BE1A /* GameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameTests.swift; sourceTree = "<group>"; };
 		BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSystemPickerView.swift; sourceTree = "<group>"; };
 		BC92008125CE5BE400C14433 /* UserSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSelectionView.swift; sourceTree = "<group>"; };
-		BCA0C72125F0DF5C0077DD28 /* PrivateMessageNotificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageNotificationView.swift; sourceTree = "<group>"; };
 		BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThirdPartyLoginView.swift; sourceTree = "<group>"; };
 		BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSWebsocket.swift; sourceTree = "<group>"; };
 		BCAE412D24D1213100B5DB74 /* ThreadPool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ThreadPool.h; sourceTree = "<group>"; };
@@ -1283,7 +1281,6 @@
 				BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */,
 				06D2A58E5E3E4C3695A597A0 /* FriendshipControls.swift */,
 				BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */,
-				BCA0C72125F0DF5C0077DD28 /* PrivateMessageNotificationView.swift */,
 				BC6B05F525FA0DF8004E1D66 /* BoardDemoView.swift */,
 				5C0E00022026110900000002 /* SceneCover.swift */,
 				5C0E00042026110900000004 /* SceneCoverPolicy.swift */,
@@ -1862,7 +1859,6 @@
 				D03000012026093000000001 /* DuoTabContainer.swift in Sources */,
 				D00600012026100600000001 /* IPadTabContainer.swift in Sources */,
 				BC042AF524AB2CF50050B2D1 /* MainViewWrapper.swift in Sources */,
-				BCA0C72225F0DF5C0077DD28 /* PrivateMessageNotificationView.swift in Sources */,
 				BC6B05F625FA0DF8004E1D66 /* BoardDemoView.swift in Sources */,
 				BC042B5024AB2DD10050B2D1 /* OGSUser.swift in Sources */,
 				BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */,

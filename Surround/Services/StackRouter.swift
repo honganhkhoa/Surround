@@ -730,6 +730,20 @@ extension EnvironmentValues {
     }
 }
 
+private struct ActivityConnectionKey: EnvironmentKey {
+    static let defaultValue: ConnectionStatusSource? = nil
+}
+
+extension EnvironmentValues {
+    /// In a stack with an Activity list, the list's connection status, so a
+    /// conversation it pushes goes offline with it. Nil in every other
+    /// stack, Messages' own included.
+    var activityConnection: ConnectionStatusSource? {
+        get { self[ActivityConnectionKey.self] }
+        set { self[ActivityConnectionKey.self] = newValue }
+    }
+}
+
 private struct OwningTabRootKey: EnvironmentKey {
     static let defaultValue: RootView? = nil
 }
@@ -882,6 +896,7 @@ struct AppNavigationStack<Content: View>: View {
         case .messagesConversation(let playerID), .conversation(let playerID):
             if let user = navigation.users[playerID] {
                 MessagesConversationView(peer: user)
+                    .environment(\.activityConnection, navigation.activityConnection)
             }
         case .challenge(let id):
             if let draft = navigation.drafts[id] {

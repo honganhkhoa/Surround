@@ -339,8 +339,6 @@ class NavigationService: ObservableObject {
     /// The app's connection banner is on screen, including its "Connected"
     /// fade-out. On iPhone it sits in the title slot, so the title gives way.
     @Published var connectionBannerVisible = false
-    /// The global message presenter is open in this window.
-    @Published var showingPrivateChatView = false
 
     /// A visible Game Detail shows a live game that has not ended, whoever
     /// plays it, so this window keeps the display awake.
