@@ -58,54 +58,10 @@ final class RootOpponentSelection {
     }
 }
 
-/// Retained by the conversation's account/peer owner, without publishing scroll
-/// updates through the navigation or inbox hierarchy.
-final class PrivateMessageScrollBookmark {
-    var messageKey: String?
-    var isAtEndOfChat = true
-
-    /// Visibility callbacks do not promise transcript order. Retain the middle
-    /// visible message in chronological order, rather than a lazy layout's
-    /// estimated leading target or a content offset tied to one width.
-    func rememberVisibleMessages(_ visibleKeys: [String], orderedKeys: [String]) {
-        guard !isAtEndOfChat else { return }
-        let visible = Set(visibleKeys)
-        let orderedVisible = orderedKeys.filter { visible.contains($0) }
-        guard !orderedVisible.isEmpty else { return }
-        messageKey = orderedVisible[orderedVisible.count / 2]
-    }
-}
-
 /// One instance belongs to one navigation stack, including each presented sheet.
+/// Conversation drafts belong to the window (ConversationDraftStore), so no
+/// route change here can drop one.
 final class StackRouter: ObservableObject {
-    private struct ConversationDraftKey: Hashable {
-        let accountID: Int
-        let peerID: Int
-    }
-    @Published private var conversationDrafts: [ConversationDraftKey: String] = [:]
-    private var conversationScrollBookmarks: [ConversationDraftKey: PrivateMessageScrollBookmark] = [:]
-
-    /// Draft lifetime is independent of the compact or detail navigation path.
-    func conversationDraft(for peerID: Int, accountID: Int?) -> Binding<String> {
-        guard let accountID else { return .constant("") }
-        let key = ConversationDraftKey(accountID: accountID, peerID: peerID)
-        return Binding(
-            get: { self.conversationDrafts[key, default: ""] },
-            set: { self.conversationDrafts[key] = $0 }
-        )
-    }
-
-    /// Scroll bookmarks share the draft's account/peer lifetime, but scrolling
-    /// never publishes a navigation or inbox update.
-    func conversationScrollBookmark(for peerID: Int, accountID: Int?) -> PrivateMessageScrollBookmark {
-        guard let accountID else { return PrivateMessageScrollBookmark() }
-        let key = ConversationDraftKey(accountID: accountID, peerID: peerID)
-        if let bookmark = conversationScrollBookmarks[key] { return bookmark }
-        let bookmark = PrivateMessageScrollBookmark()
-        conversationScrollBookmarks[key] = bookmark
-        return bookmark
-    }
-
     /// Compact presentation of Messages' selected root peer. Generic Profile
     /// conversations keep their own route, including when they share this peer.
     func presentMessagesConversation(_ user: OGSUser) {

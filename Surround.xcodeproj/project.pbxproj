@@ -54,6 +54,7 @@
 		5C2E00092026111100000009 /* SuperchatStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00082026111100000008 /* SuperchatStoreTests.swift */; };
 		5C3E00102026111200000010 /* ActivityResultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E000F202611120000000F /* ActivityResultsTests.swift */; };
 		5C3E00122026111200000012 /* ActivityLastKnownTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E00112026111200000011 /* ActivityLastKnownTests.swift */; };
+		5C3E00172026111200000017 /* ConversationDraftStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E00162026111200000016 /* ConversationDraftStoreTests.swift */; };
 		5C2E000E202611110000000E /* PrivateMessageComposerStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E000D202611110000000D /* PrivateMessageComposerStateTests.swift */; };
 		C5A700022026110900000002 /* ConnectionStatusModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700012026110900000001 /* ConnectionStatusModel.swift */; };
 		C5A700032026110900000003 /* ConnectionStatusModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700012026110900000001 /* ConnectionStatusModel.swift */; };
@@ -70,6 +71,8 @@
 		5C3E00092026111200000009 /* ActivityResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E00072026111200000007 /* ActivityResults.swift */; };
 		5C3E000B202611120000000B /* ActivityLastKnown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E000A202611120000000A /* ActivityLastKnown.swift */; };
 		5C3E000C202611120000000C /* ActivityLastKnown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E000A202611120000000A /* ActivityLastKnown.swift */; };
+		5C3E00142026111200000014 /* ConversationDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E00132026111200000013 /* ConversationDraftStore.swift */; };
+		5C3E00152026111200000015 /* ConversationDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E00132026111200000013 /* ConversationDraftStore.swift */; };
 		5C2E00072026111100000007 /* SuperchatStore+System.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00062026111100000006 /* SuperchatStore+System.swift */; };
 		C5A7000A202611090000000A /* ConnectionStatusModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700092026110900000009 /* ConnectionStatusModelTests.swift */; };
 		C5A7000C202611090000000C /* ConnectionStatusProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A7000B202611090000000B /* ConnectionStatusProbe.swift */; };
@@ -616,6 +619,7 @@
 		5C2E00082026111100000008 /* SuperchatStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperchatStoreTests.swift; sourceTree = "<group>"; };
 		5C3E000F202611120000000F /* ActivityResultsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityResultsTests.swift; sourceTree = "<group>"; };
 		5C3E00112026111200000011 /* ActivityLastKnownTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLastKnownTests.swift; sourceTree = "<group>"; };
+		5C3E00162026111200000016 /* ConversationDraftStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationDraftStoreTests.swift; sourceTree = "<group>"; };
 		5C2E000D202611110000000D /* PrivateMessageComposerStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageComposerStateTests.swift; sourceTree = "<group>"; };
 		C5A700012026110900000001 /* ConnectionStatusModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusModel.swift; sourceTree = "<group>"; };
 		5C2E000A202611110000000A /* PrivateMessageComposerState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageComposerState.swift; sourceTree = "<group>"; };
@@ -625,6 +629,7 @@
 		5C3E00012026111200000001 /* ActivitySession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySession.swift; sourceTree = "<group>"; };
 		5C3E00072026111200000007 /* ActivityResults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityResults.swift; sourceTree = "<group>"; };
 		5C3E000A202611120000000A /* ActivityLastKnown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLastKnown.swift; sourceTree = "<group>"; };
+		5C3E00132026111200000013 /* ConversationDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationDraftStore.swift; sourceTree = "<group>"; };
 		5C2E00062026111100000006 /* SuperchatStore+System.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SuperchatStore+System.swift"; sourceTree = "<group>"; };
 		C5A700092026110900000009 /* ConnectionStatusModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusModelTests.swift; sourceTree = "<group>"; };
 		C5A7000B202611090000000B /* ConnectionStatusProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusProbe.swift; sourceTree = "<group>"; };
@@ -1063,6 +1068,7 @@
 				5C2E00082026111100000008 /* SuperchatStoreTests.swift */,
 				5C3E000F202611120000000F /* ActivityResultsTests.swift */,
 				5C3E00112026111200000011 /* ActivityLastKnownTests.swift */,
+				5C3E00162026111200000016 /* ConversationDraftStoreTests.swift */,
 				5C2E000D202611110000000D /* PrivateMessageComposerStateTests.swift */,
 				C5A700092026110900000009 /* ConnectionStatusModelTests.swift */,
 				AB0A00052026110900000005 /* AppAnnouncerTests.swift */,
@@ -1306,6 +1312,7 @@
 				5C3E00012026111200000001 /* ActivitySession.swift */,
 				5C3E00072026111200000007 /* ActivityResults.swift */,
 				5C3E000A202611120000000A /* ActivityLastKnown.swift */,
+				5C3E00132026111200000013 /* ConversationDraftStore.swift */,
 				5C2E00062026111100000006 /* SuperchatStore+System.swift */,
 				BC7407DA25493B71001D5581 /* SurroundService.swift */,
 				BC39EE3725DBC23C00562C68 /* TextUtilities.swift */,
@@ -1803,6 +1810,7 @@
 				5C3E00022026111200000002 /* ActivitySession.swift in Sources */,
 				5C3E00082026111200000008 /* ActivityResults.swift in Sources */,
 				5C3E000B202611120000000B /* ActivityLastKnown.swift in Sources */,
+				5C3E00142026111200000014 /* ConversationDraftStore.swift in Sources */,
 				5C2E00072026111100000007 /* SuperchatStore+System.swift in Sources */,
 				C5A7000C202611090000000C /* ConnectionStatusProbe.swift in Sources */,
 				AB0A00012026110900000001 /* AppAnnouncer.swift in Sources */,
@@ -1952,9 +1960,11 @@
 				5C3E00032026111200000003 /* ActivitySession.swift in Sources */,
 				5C3E00092026111200000009 /* ActivityResults.swift in Sources */,
 				5C3E000C202611120000000C /* ActivityLastKnown.swift in Sources */,
+				5C3E00152026111200000015 /* ConversationDraftStore.swift in Sources */,
 				5C2E00092026111100000009 /* SuperchatStoreTests.swift in Sources */,
 				5C3E00102026111200000010 /* ActivityResultsTests.swift in Sources */,
 				5C3E00122026111200000012 /* ActivityLastKnownTests.swift in Sources */,
+				5C3E00172026111200000017 /* ConversationDraftStoreTests.swift in Sources */,
 				5C2E000E202611110000000E /* PrivateMessageComposerStateTests.swift in Sources */,
 				C5A700032026110900000003 /* ConnectionStatusModel.swift in Sources */,
 				5C2E000C202611110000000C /* PrivateMessageComposerState.swift in Sources */,
