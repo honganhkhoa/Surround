@@ -5498,7 +5498,9 @@ class OGSService: ObservableObject {
     }
     
     /// Publishes the new challenge's id, which an open challenge also carries
-    /// once it arrives through the seek graph.
+    /// once it arrives through the seek graph. Until then an open send holds
+    /// the seek graph, so the challenge is listed, and a live one kept alive,
+    /// even if the screen that sent it closes first.
     func sendChallenge(opponent: OGSUser?, challenge: OGSChallengeTemplate) -> AnyPublisher<Int, Error> {
         var challenge = challenge
         if !challenge.useCustomKomi {
@@ -5512,6 +5514,13 @@ class OGSService: ObservableObject {
                 url = "\(self.ogsRoot)/api/v1/players/\(opponentId)/challenge"
             }
             if let csrfToken = self.ogsUIConfig?.csrfToken {
+                // Taken before the request, so the hold sees the challenge even
+                // if the seek graph lists it before the response arrives.
+                let settleHold = self.holdSeekGraph(forChallengeTo: opponent)
+                let finish: (Result<Int, Error>) -> Void = { result in
+                    settleHold?(result)
+                    promise(result)
+                }
                 self.httpClient.session.request(
                     url,
                     method: .post,
@@ -5528,16 +5537,17 @@ class OGSService: ObservableObject {
                                 let gameID = (result["game"] as? Int)
                                     ?? ((result["game"] as? [String: Any])?["id"] as? Int)
                                 if let challengeID = result["challenge"] as? Int, gameID != nil {
-                                    // The seek graph listing an open challenge
-                                    // starts its keepalive, whichever arrives first.
-                                    promise(.success(challengeID))
+                                    // An open challenge's keepalive starts once
+                                    // the seek graph lists it; the hold keeps
+                                    // the seek graph until then.
+                                    finish(.success(challengeID))
                                     return
                                 }
                             }
                         }
-                        promise(.failure(OGSServiceError.invalidJSON))
+                        finish(.failure(OGSServiceError.invalidJSON))
                     case .failure(let error):
-                        promise(.failure(error))
+                        finish(.failure(error))
                     }
                     print(response.result)
                 }
@@ -5547,6 +5557,30 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
+    /// An open challenge reaches the waiting list, and a live one its
+    /// keepalive, only through the seek graph, which the screen that sent it
+    /// may release before the challenge is listed. So each open send holds
+    /// the seek graph itself (see `SeekGraphSendHold`), and the returned
+    /// closure tells the hold how the send ended. A direct challenge never
+    /// appears in the seek graph, and extensions never send challenges, so
+    /// neither holds it.
+    private func holdSeekGraph(forChallengeTo opponent: OGSUser?) -> ((Result<Int, Error>) -> Void)? {
+        #if MAIN_APP || TESTING
+        guard opponent == nil else { return nil }
+        let hold = SeekGraphSendHold(service: self)
+        return { result in
+            switch result {
+            case .success(let challengeID):
+                hold.challengeSent(id: challengeID, isOpen: true)
+            case .failure:
+                hold.release()
+            }
+        }
+        #else
+        return nil
+        #endif
+    }
+
     func addPreferredGameSetting(challenge: OGSChallengeTemplate) -> AnyPublisher<Void, Error> {
         var setting = challenge
         if !setting.useCustomKomi {

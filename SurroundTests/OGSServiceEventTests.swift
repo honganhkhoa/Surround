@@ -6281,6 +6281,80 @@ final class OGSServiceEventTests: XCTestCase {
         request.cancel()
     }
 
+    /// A signed-in service whose challenge POST answers with `challengeID`.
+    private func challengePostService(
+        challengeID: Int
+    ) throws -> (OGSService, FakeWebsocket, ManualScheduler) {
+        ChallengePostURLProtocol.body =
+            #"{"status":"ok","challenge":\#(challengeID),"game":\#(challengeID + 1_000)}"#
+        let socket = FakeWebsocket()
+        let scheduler = ManualScheduler()
+        let service = makeService(
+            socket: socket,
+            urlProtocolClass: ChallengePostURLProtocol.self,
+            keepAliveScheduler: scheduler
+        )
+        service.ogsUIConfig = try makeUIConfig(jwt: "jwt", userID: 1)
+        socket.openSocket(authenticate: true)
+        service.user = OGSUser(username: "current", id: 1, rank: 25)
+        return (service, socket, scheduler)
+    }
+
+    /// Sends an open live challenge and returns the id OGS answered with.
+    private func sendOpenChallenge(using service: OGSService) -> Int? {
+        let sent = expectation(description: "challenge sent")
+        var sentID: Int?
+        let request = service.sendChallenge(opponent: nil, challenge: liveChallengeTemplate()).sink(
+            receiveCompletion: { _ in sent.fulfill() },
+            receiveValue: { sentID = $0 }
+        )
+        wait(for: [sent], timeout: 2)
+        request.cancel()
+        return sentID
+    }
+
+    private func seekGraphConnects(_ socket: FakeWebsocket) -> Int {
+        socket.emissions.filter { $0.command == "seek_graph/connect" }.count
+    }
+
+    /// Closing New game's sheet as the response arrived used to release the
+    /// seek graph before it listed the new challenge, which then never got a
+    /// keepalive. The send holds the seek graph itself.
+    func testAnOpenChallengeKeepsTheSeekGraphAfterItsScreenCloses() throws {
+        let (service, socket, scheduler) = try challengePostService(challengeID: 61)
+        service.subscribeToSeekGraph()
+        service.onSeekGraphEvent(data: [])
+
+        XCTAssertEqual(sendOpenChallenge(using: service), 61)
+        service.unsubscribeFromSeekGraphWhenDone()
+        XCTAssertEqual(seekGraphDisconnects(socket), 0, "The send still holds the seek graph.")
+
+        listOwnChallenge(61, on: socket)
+        drainMainQueue()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [61])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+        XCTAssertEqual(seekGraphDisconnects(socket), 0,
+                       "The service keeps the seek graph for the challenge it now tracks.")
+        withExtendedLifetime(service) {}
+    }
+
+    /// A challenge made from a profile or a conversation has no screen that
+    /// holds the seek graph, so the send connects it.
+    func testAnOpenChallengeConnectsTheSeekGraphWithoutAScreen() throws {
+        let (service, socket, scheduler) = try challengePostService(challengeID: 64)
+        XCTAssertEqual(seekGraphConnects(socket), 0)
+
+        XCTAssertEqual(sendOpenChallenge(using: service), 64)
+        XCTAssertEqual(seekGraphConnects(socket), 1)
+
+        listOwnChallenge(64, on: socket)
+        drainMainQueue()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [64])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+        XCTAssertEqual(seekGraphDisconnects(socket), 0)
+        withExtendedLifetime(service) {}
+    }
+
     // MARK: - Challenge send holds
 
     private func seekGraphHoldService() -> (OGSService, FakeWebsocket) {
