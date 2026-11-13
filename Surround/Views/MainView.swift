@@ -109,13 +109,25 @@ struct MainView: View {
         backgroundTask = nil
     }
 
-    /// Connects the window's Activity stores to its service, once.
+    /// Connects the window's Activity stores to its service, and its list
+    /// to this presenter, once.
     private func attachActivity() {
         guard activityFirstSeen == nil else { return }
         nav.activityResults.attach(client: .live(ogs), navigator: nav,
                                    scheduler: OGSMainQueueWebsocketScheduler.shared)
         nav.activityLastKnown.attach(ogs: ogs)
         activityFirstSeen = ActivityFirstSeenObserver(ogs: ogs)
+        let nav = nav
+        nav.onCloseActivity = { [weak nav] in nav?.main.activity = nil }
+    }
+
+    /// Another account's list, results, drafts and last-known rows don't
+    /// carry over.
+    private func resetActivity(keepingAccount accountID: Int?) {
+        nav.main.activity = nil
+        nav.activityResults.reset()
+        nav.conversationDrafts.discardDrafts(exceptAccount: accountID)
+        nav.activityLastKnown.reset()
     }
 
     private func redirectSignedOutAccountDestination() {
@@ -316,24 +328,13 @@ struct MainView: View {
         }
         return ZStack(alignment: .top) {
             tabNavigation
-            .sheet(isPresented: $nav.main.showWaitingGames) {
-                AppNavigationStack {
-                    WaitingGamesView()
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button(action: { nav.main.showWaitingGames = false }) {
-                                    Text("Close")
-                                }
-                            }
-                        }
-                        .environmentObject(ogs)
-                        .environmentObject(nav)
-                }
-            }
+                .modifier(ActivitySheetPresenter())
             if ogs.isLoggedIn {
                 NotificationPopup()
             }
         }
+        // The popover's anchor, above everything it may be opened from.
+        .overlay { ActivityPopoverPresenter() }
         .sheet(item: $nav.main.accountSheet) { destination in
             IPadAccountSheet(destination: destination)
         }
@@ -341,6 +342,9 @@ struct MainView: View {
         .modifier(ActivityDebugOpener())
         #endif
         .onAppear(perform: attachActivity)
+        .onChange(of: ogs.user?.id) { _, accountID in
+            resetActivity(keepingAccount: accountID)
+        }
         .onChange(of: ogs.isLoggedIn, initial: true) { _, _ in
             redirectSignedOutAccountDestination()
         }

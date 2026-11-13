@@ -210,7 +210,7 @@ struct NotificationPopup: View {
     }
     
     var waitingGamesPopup: some View {
-        Button(action: { nav.main.showWaitingGames = true }) {
+        ActivityOpenerButton(source: .waitingPill) {
             HStack(spacing: 0) {
                 VStack {
                     Text("Waiting...").bold().foregroundColor(.white)
@@ -224,10 +224,11 @@ struct NotificationPopup: View {
             .background(Color(.systemIndigo))
             .cornerRadius(10)
         }
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.waitingBanner)
     }
-    
+
     var challengeReceivedPopup: some View {
-        Button(action: { nav.main.showWaitingGames = true }) {
+        ActivityOpenerButton(source: .challengePill) {
             VStack {
                 Text("Challenge received!").bold().foregroundColor(.white)
                 Text("Tap to view").font(.subheadline).foregroundColor(.white)
@@ -237,6 +238,7 @@ struct NotificationPopup: View {
             .background(Color(.systemIndigo))
             .cornerRadius(10)
         }
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.challengeBanner)
     }
     
     func closeChatWindow() {

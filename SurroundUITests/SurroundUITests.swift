@@ -1819,10 +1819,21 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         )
         XCTAssertEqual(findAnother.label, "Find 2 more games")
         // The offline runtime keeps these searches optimistic rather than
-        // inserting server entries, so the destination has no stored requests.
-        tap(banner, description: "Show empty active-search list", in: app)
-        XCTAssertTrue(app.staticTexts["No active searches"].waitForExistence(timeout: 5))
-        keepScreenshot("Waiting games – no active searches", in: app)
+        // inserting server entries, so Activity lists no search of the
+        // user's own. The journey's live game keeps the list from being empty.
+        tap(banner, description: "Show Activity without stored searches", in: app)
+        element(SurroundUITestContract.AccessibilityID.activityList, in: app)
+        element(
+            SurroundUITestContract.AccessibilityID.activityRow("game-\(SurroundUITestContract.fixtureGameID)"),
+            in: app
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "activity.row.waiting-"))
+                .firstMatch.exists,
+            "Optimistic searches have no stored requests to list."
+        )
+        keepScreenshot("Activity – no stored searches", in: app)
     }
 
     func testQuickMatchShowsPendingCorrespondenceSubmission() {
@@ -1918,34 +1929,21 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.CompatibilityScene.waitingGames.rawValue,
         ])
 
-        let exact = element(
-            SurroundUITestContract.AccessibilityID.waitingGamesAutomatchEntry(
-                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d0"
-            ),
-            in: app
-        )
+        let exact = pushedQuickMatchCard("f0050bcf-f5fc-46c8-9ed6-01dfd898e0d0", in: app)
         XCTAssertTrue(exact.staticTexts["Fischer"].exists)
         XCTAssertFalse(exact.staticTexts.matching(
             NSPredicate(format: "label CONTAINS %@", "+")
         ).firstMatch.exists, "Clock values belong in the speed picker, not request cards.")
+        returnToActivityList(in: app)
 
-        let flexible = element(
-            SurroundUITestContract.AccessibilityID.waitingGamesAutomatchEntry(
-                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d1"
-            ),
-            in: app
-        )
+        let flexible = pushedQuickMatchCard("f0050bcf-f5fc-46c8-9ed6-01dfd898e0d1", in: app)
         XCTAssertTrue(flexible.staticTexts["Fischer or Byo-Yomi"].exists)
         XCTAssertFalse(flexible.staticTexts.matching(
             NSPredicate(format: "label CONTAINS %@ OR label CONTAINS %@", "+", "preferred")
         ).firstMatch.exists)
+        returnToActivityList(in: app)
 
-        let mixed = element(
-            SurroundUITestContract.AccessibilityID.waitingGamesAutomatchEntry(
-                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d2"
-            ),
-            in: app
-        )
+        let mixed = pushedQuickMatchCard("f0050bcf-f5fc-46c8-9ed6-01dfd898e0d2", in: app)
         XCTAssertTrue(mixed.staticTexts.matching(
             NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Blitz", "Fischer")
         ).firstMatch.exists)
@@ -1953,7 +1951,30 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Rapid", "Byo-Yomi")
         ).firstMatch.exists)
         XCTAssertTrue(mixed.staticTexts["No handicap"].exists)
-        keepScreenshot("Waiting games – neutral clock summaries", in: app)
+        keepScreenshot("Activity – Quick Match card, neutral clock summaries", in: app)
+    }
+
+    /// Pushes a Quick Match search's card from its row in Activity's list.
+    private func pushedQuickMatchCard(_ uuid: String, in app: XCUIApplication) -> XCUIElement {
+        let row = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.activityRow("waiting-quick-match-\(uuid)"),
+            in: app
+        )
+        scrollIntoTappableArea(row, in: app)
+        tap(row, description: "Open the search's card", in: app)
+        return element(SurroundUITestContract.AccessibilityID.waitingGamesAutomatchEntry(uuid), in: app)
+    }
+
+    /// Back from a card Activity's list pushed, until the list is on top.
+    private func returnToActivityList(in app: XCUIApplication) {
+        let back = app.navigationBars.buttons.matching(NSPredicate(
+            format: "identifier == %@ OR label == %@ OR label == %@", "BackButton", "Activity", "Back"
+        )).firstMatch
+        tap(back, description: "Back to Activity", in: app)
+        let popped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: back)
+        XCTAssertEqual(waitWithFinalCheck(for: [popped], timeout: 10), .completed,
+                       "Back must return to Activity's list.")
+        element(SurroundUITestContract.AccessibilityID.activityList, in: app)
     }
 
     func testQuickMatchActivityIsExposedWithoutRelyingOnColor() {

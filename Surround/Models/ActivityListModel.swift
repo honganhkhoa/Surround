@@ -74,6 +74,9 @@ struct ActivityRequest: Identifiable, Equatable {
     /// The opener's frame in the window's global coordinates, captured when
     /// it was tapped, so a popover never depends on its opener staying.
     var anchor: CGRect
+    /// Where the window was when the list opened. Over a game the list is a
+    /// game's popover, with denser rows and View instead of inline Accept.
+    var place: ActivityModel.Place
 
     var id: UUID { sessionID }
 
@@ -82,13 +85,15 @@ struct ActivityRequest: Identifiable, Equatable {
         source: Source,
         focus: Focus = .top,
         style: ActivityPresentationStyle,
-        anchor: CGRect = .zero
+        anchor: CGRect = .zero,
+        place: ActivityModel.Place = .root(isMessagesTab: false)
     ) {
         self.sessionID = sessionID
         self.source = source
         self.focus = focus
         self.style = style
         self.anchor = anchor
+        self.place = place
     }
 }
 
@@ -318,13 +323,22 @@ enum ActivityItemRef: Equatable {
 }
 
 /// How long a search or open challenge has waited, as the list shows it:
-/// m:ss, then h:mm:ss from an hour.
+/// m:ss under an hour, then hours and minutes, then days and hours, each in
+/// the locale's abbreviated units, so a long wait stays on one line.
 enum ActivityElapsed {
-    static func text(_ seconds: TimeInterval) -> String {
-        let whole = Duration.seconds(Int64(max(0, seconds).rounded(.down)))
-        return whole >= .seconds(3_600)
-            ? whole.formatted(.time(pattern: .hourMinuteSecond))
-            : whole.formatted(.time(pattern: .minuteSecond))
+    static func text(_ seconds: TimeInterval, locale: Locale = .current) -> String {
+        let whole = max(0, seconds).rounded(.down)
+        guard whole >= 3_600 else {
+            return Duration.seconds(Int64(whole)).formatted(.time(pattern: .minuteSecond).locale(locale))
+        }
+        let formatter = DateComponentsFormatter()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = locale
+        formatter.calendar = calendar
+        formatter.unitsStyle = .abbreviated
+        formatter.allowedUnits = whole < 86_400 ? [.hour, .minute] : [.day, .hour]
+        formatter.maximumUnitCount = 2
+        return formatter.string(from: whole) ?? ""
     }
 }
 

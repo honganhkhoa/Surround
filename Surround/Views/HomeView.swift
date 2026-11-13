@@ -344,11 +344,12 @@ struct HomeView: View {
         }
     }
 
-    /// Quick Match searches and pending Rengo games share one card.
+    /// Quick Match searches and pending Rengo games share one card, which
+    /// opens Activity.
     @ViewBuilder
     private var searchingCard: some View {
         if ogs.waitingGames > 0 || ogs.pendingRengoGames > 0 {
-            Button(action: { nav.main.showWaitingGames = true }) {
+            ActivityOpenerButton(source: .homeSearching) {
                 HStack(spacing: 12) {
                     Group {
                         if reduceMotion {
@@ -386,6 +387,7 @@ struct HomeView: View {
                 .modifier(HomeCard())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homeSearching)
             .padding(.top, 12)
         }
     }

@@ -250,7 +250,7 @@ private func appReviewContext(
         || nav.home.showingPreferredSettings
         || nav.home.showingSettings
         || nav.main.accountSheet != nil
-        || nav.main.showWaitingGames
+        || nav.main.activity != nil
         || ogs.isLoadingOverview
         || ogs.socketStatus != .connected
         || ogs.waitingLiveGames > 0

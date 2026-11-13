@@ -340,6 +340,7 @@ struct NewGameView: View {
                 }
                 .background(Color(.systemPurple))
                 .padding(.horizontal, -18)
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.newGameRengoWaiting)
             }
             Spacer().frame(height: 10)
             Picker(selection: $newGameOption.animation(), label: Text("New game option")) {

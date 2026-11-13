@@ -25,6 +25,9 @@ struct ActivityCellActions {
     /// The item's request is in flight: the card shows its spinner and sends
     /// nothing more.
     var isPending = false
+    /// The list that pushed the card is offline: the card's actions are off
+    /// and read Reconnecting…, as the list's rows do.
+    var isOffline = false
     var accept: (any OGSSubmittedChallenge) -> Void
     var reject: (any OGSSubmittedChallenge) -> Void
     /// The user's own open or sent challenge, or a Rengo challenge the user
@@ -43,6 +46,28 @@ extension EnvironmentValues {
     var activityCellActions: ActivityCellActions? {
         get { self[ActivityCellActionsKey.self] }
         set { self[ActivityCellActionsKey.self] = newValue }
+    }
+}
+
+/// A card's action that needs OGS, while the list that pushed it is offline:
+/// off, and VoiceOver reads Reconnecting…, as on the list's rows.
+private struct ActivityCardActionAvailability: ViewModifier {
+    let isOffline: Bool
+
+    func body(content: Content) -> some View {
+        if isOffline {
+            content
+                .disabled(true)
+                .accessibilityValue(Text("Reconnecting…"))
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    func activityCardAction(_ actions: ActivityCellActions?) -> some View {
+        modifier(ActivityCardActionAvailability(isOffline: actions?.isOffline == true))
     }
 }
 

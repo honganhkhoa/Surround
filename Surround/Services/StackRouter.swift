@@ -176,6 +176,9 @@ final class StackRouter: ObservableObject {
     /// does: a game opened from a profile there closes the list and opens
     /// in the window instead of being pushed.
     var gameOpenOverride: ((Int) -> Void)?
+    /// The connection status of the Activity list in this stack. The cards
+    /// the list pushes dim their actions by it, as its rows do.
+    weak var activityConnection: ConnectionStatusSource?
 
     /// Opening a game already below the profile returns to that same screen,
     /// retaining its analysis, chat draft and connection owner.
@@ -856,7 +859,7 @@ struct AppNavigationStack<Content: View>: View {
         case .publicGame:
             GameDetailView(currentGame: $nav.publicGames.activeGame)
         case .waitingGames:
-            WaitingGamesView()
+            ActivityRouteList()
         case .game(let gameID):
             StackGameDestination(gameID: gameID)
         case .playerHistory(let playerID, let opponentID):

@@ -192,6 +192,8 @@ final class ActivityListModelTests: XCTestCase {
                                       anchor: CGRect(x: 10, y: 20, width: 44, height: 44))
         XCTAssertEqual(request.id, session)
         XCTAssertEqual(ActivityRequest(source: .homeSearching, style: .sheet).focus, .top)
+        XCTAssertEqual(ActivityRequest(source: .homeSearching, style: .sheet).place, .root(isMessagesTab: false),
+                       "Without a place, the list opened on a root screen.")
         XCTAssertNotEqual(ActivityRequest(source: .debug, style: .sheet).id,
                           ActivityRequest(source: .debug, style: .sheet).id)
     }
@@ -305,14 +307,22 @@ final class ActivityListModelTests: XCTestCase {
         XCTAssertNil(Sections.position(of: "waiting-open-9", in: sections))
     }
 
-    func testElapsedTimeReadsMinutesThenHours() {
-        XCTAssertEqual(ActivityElapsed.text(0), "0:00")
-        XCTAssertEqual(ActivityElapsed.text(72), "1:12")
-        XCTAssertEqual(ActivityElapsed.text(220.9), "3:40", "Whole seconds, rounded down.")
-        XCTAssertEqual(ActivityElapsed.text(3_599), "59:59")
-        XCTAssertEqual(ActivityElapsed.text(3_600), "1:00:00")
-        XCTAssertEqual(ActivityElapsed.text(36_125), "10:02:05")
-        XCTAssertEqual(ActivityElapsed.text(-3), "0:00", "A clock that went back reads no time.")
+    func testElapsedTimeReadsMinutesThenHoursThenDays() {
+        func text(_ seconds: TimeInterval) -> String {
+            ActivityElapsed.text(seconds, locale: Locale(identifier: "en_US"))
+        }
+        XCTAssertEqual(text(0), "0:00")
+        XCTAssertEqual(text(72), "1:12")
+        XCTAssertEqual(text(220.9), "3:40", "Whole seconds, rounded down.")
+        XCTAssertEqual(text(3_599), "59:59")
+        XCTAssertEqual(text(3_600), "1h", "From an hour, hours and minutes, short enough for one line.")
+        XCTAssertEqual(text(3_659), "1h", "Seconds no longer show.")
+        XCTAssertEqual(text(3_900), "1h 5m")
+        XCTAssertEqual(text(36_125), "10h 2m")
+        XCTAssertEqual(text(86_399), "23h 59m")
+        XCTAssertEqual(text(90_061), "1d 1h", "From a day, days and hours.")
+        XCTAssertEqual(text(172_800 + 300), "2d")
+        XCTAssertEqual(text(-3), "0:00", "A clock that went back reads no time.")
     }
 
     func testAQuickMatchRowWithdrawsInPlaceOnlyForOneSizeAtOneSpeed() {

@@ -299,14 +299,17 @@ struct RengoActions: View {
                 let newGameId = value.0
                 self.ogsRequestCancellable?.cancel()
                 self.ogsRequestCancellable = nil
-                if !nav.main.showWaitingGames {  // Waiting games list view is meant to preserve context, so don't perform navigation when accepting games from there
-                    withAnimation {
-                        if let route = AppRoute(
-                            rootView: .home,
-                            ogsGameID: newGameId
-                        ) {
-                            nav.requestGameOpen(route, closesNewGame: challenge.challenged == nil)
-                        }
+                // A live game opens. A correspondence game leaves the user
+                // where they are; the challenge goes with the next update.
+                guard ActivityModel.isRealtime(
+                    challenge.game.timeControl, width: challenge.game.width, height: challenge.game.height
+                ) else { return }
+                withAnimation {
+                    if let route = AppRoute(
+                        rootView: .home,
+                        ogsGameID: newGameId
+                    ) {
+                        nav.requestGameOpen(route, closesNewGame: challenge.challenged == nil)
                     }
                 }
             })
@@ -324,11 +327,13 @@ struct RengoActions: View {
                                 Button(role: .destructive, action: { cancel() }) {
                                     Text("Cancel").bold()
                                 }
+                                .activityCardAction(activityCellActions)
                                 Spacer()
                                 Button(action: { start() }) {
                                     Text("Start").bold()
                                 }
                                 .disabled(!challenge.game.rengoReadyToStart)
+                                .activityCardAction(activityCellActions)
                             }
                         } else {
                             if participants.firstIndex(of: userId) == nil {
@@ -342,6 +347,7 @@ struct RengoActions: View {
                                 Button(role: .destructive, action: { leave() }) {
                                     Text("Leave", comment: "leaveRengoChallenge").bold()
                                 }
+                                .activityCardAction(activityCellActions)
                             }
                         }
                     }
@@ -475,14 +481,18 @@ struct ChallengeCell: View {
                 let newGameId = value.0
                 self.ogsRequestCancellable?.cancel()
                 self.ogsRequestCancellable = nil
-                if !nav.main.showWaitingGames {  // Waiting games list view is meant to preserve context, so don't perform navigation when accepting games from there
-                    withAnimation {
-                        if let route = AppRoute(
-                            rootView: .home,
-                            ogsGameID: newGameId
-                        ) {
-                            nav.requestGameOpen(route, closesNewGame: challenge.challenged == nil)
-                        }
+                // A live game opens. A correspondence game leaves the user
+                // where they are; its row goes when the overview drops the
+                // challenge.
+                guard ActivityModel.isRealtime(
+                    challenge.game.timeControl, width: challenge.game.width, height: challenge.game.height
+                ) else { return }
+                withAnimation {
+                    if let route = AppRoute(
+                        rootView: .home,
+                        ogsGameID: newGameId
+                    ) {
+                        nav.requestGameOpen(route, closesNewGame: challenge.challenged == nil)
                     }
                 }
             })
@@ -586,6 +596,7 @@ struct ChallengeCell: View {
                                             .bold()
                                             .foregroundColor(.red)
                                     }
+                                    .activityCardAction(activityCellActions)
                                 }
                             } else if challenge.challenged == nil {
                                 if isRequesting {
@@ -595,6 +606,7 @@ struct ChallengeCell: View {
                                         Text("Accept")
                                             .bold()
                                     }
+                                    .activityCardAction(activityCellActions)
                                 }
                             }
                         }
@@ -617,6 +629,7 @@ struct ChallengeCell: View {
                                     .padding(.vertical, 5)
                                     .contentShape(RoundedRectangle(cornerRadius: 10))
                                     .hoverEffect(.highlight)
+                                    .activityCardAction(activityCellActions)
                                     Button(action: { accept(challenge) }) {
                                         Text("Accept")
                                             .bold()
@@ -625,6 +638,7 @@ struct ChallengeCell: View {
                                     .padding(.vertical, 5)
                                     .contentShape(RoundedRectangle(cornerRadius: 10))
                                     .hoverEffect(.highlight)
+                                    .activityCardAction(activityCellActions)
                                 }
                                 .offset(x: 10)
                                 // Only Activity's request waits here; the cell's own sends at once.

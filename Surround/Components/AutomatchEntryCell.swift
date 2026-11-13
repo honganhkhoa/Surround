@@ -4,10 +4,9 @@
 //
 //  Created by Anh Khoa Hong on 23/02/2021.
 //
-//  One Quick Match search as a card: its settings and Withdraw. In a card
-//  that Activity pushed, Withdraw goes through the window's results store
-//  (`activityCellActions`), which settles it; elsewhere the cell sends it and
-//  waits 8 s for OGS to confirm.
+//  One Quick Match search as a card: its settings and Withdraw. Activity
+//  pushes it, and Withdraw goes through the window's results store
+//  (`activityCellActions`), which sends it and settles it.
 //
 
 import SwiftUI
@@ -15,14 +14,12 @@ import SwiftUI
 struct AutomatchEntryCell: View {
     @EnvironmentObject var ogs: OGSService
     @Environment(\.activityCellActions) private var activityCellActions
-    @State private var isCancelling = false
-    @State private var cancellationFailed = false
-    
+
     var entry: OGSAutomatchEntry
 
-    /// Activity's request, or the cell's own.
+    /// While Activity's request is out.
     private var isWithdrawing: Bool {
-        (activityCellActions?.isPending ?? false) || isCancelling
+        activityCellActions?.isPending ?? false
     }
 
     private var presentation: AutomatchEntryPresentation? {
@@ -92,25 +89,6 @@ struct AutomatchEntryCell: View {
             SurroundUITestContract.AccessibilityID
                 .waitingGamesAutomatchEntry(entry.uuid)
         )
-        .task(id: isCancelling) {
-            guard isCancelling else { return }
-            try? await Task.sleep(for: .seconds(8))
-            guard !Task.isCancelled,
-                  ogs.autoMatchEntryById[entry.uuid] != nil else {
-                return
-            }
-            isCancelling = false
-            cancellationFailed = true
-        }
-        .alert(
-            "Couldn’t cancel the search",
-            isPresented: $cancellationFailed
-        ) {
-            Button("Retry", action: requestCancellation)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("OGS did not confirm the cancellation. The search is still shown so you can try again.")
-        }
     }
 
     private func clockSummary(
@@ -168,6 +146,7 @@ struct AutomatchEntryCell: View {
             }
         }
         .disabled(isWithdrawing)
+        .activityCardAction(activityCellActions)
         .frame(minWidth: 44, minHeight: 44)
         .accessibilityLabel(
             isWithdrawing
@@ -181,16 +160,6 @@ struct AutomatchEntryCell: View {
     }
 
     private func requestCancellation() {
-        if let activityCellActions {
-            // The store sends it and settles it: no 8 s alert here.
-            activityCellActions.withdrawSearch(entry)
-            return
-        }
-        guard !isCancelling else { return }
-        guard ogs.cancelAutomatch(entry: entry) else {
-            cancellationFailed = true
-            return
-        }
-        isCancelling = true
+        activityCellActions?.withdrawSearch(entry)
     }
 }

@@ -212,7 +212,10 @@ struct GameOpenResolver<GameValue> {
 
 struct MainViewParameters {
     var rootView: RootView = .home
-    var showWaitingGames = false
+    #if MAIN_APP || TESTING
+    /// The window's Activity list, while it is shown.
+    var activity: ActivityRequest?
+    #endif
     var accountSheet: AccountSheet?
 }
 
@@ -488,7 +491,9 @@ class NavigationService: ObservableObject {
     ) {
         pendingGameOpen = nil
 
-        main.showWaitingGames = false
+        #if MAIN_APP || TESTING
+        main.activity = nil
+        #endif
         main.accountSheet = nil
 
         if rootView != .home {
@@ -745,6 +750,37 @@ struct RootViewSwitchingMenu: ViewModifier {
                 }
             }
         }
+    }
+}
+#endif
+
+#if MAIN_APP || TESTING
+extension NavigationService {
+    /// Opens this window's Activity list for a tapped opener: a sheet or a
+    /// popover by where the window is, decided now and kept until the list
+    /// closes. `anchor` is the opener's frame in the window's global space.
+    func openActivity(
+        source: ActivityRequest.Source,
+        focus: ActivityRequest.Focus = .top,
+        anchor: CGRect = .zero,
+        horizontalSizeClass: UserInterfaceSizeClass?
+    ) {
+        let place = activityPlaces.place(in: main.rootView)
+        let style = ActivityPresentationStyle.style(
+            horizontalSizeClass: horizontalSizeClass == .regular ? .regular : .compact,
+            place: place,
+            crossesDivision: false
+        )
+        main.activity = ActivityRequest(source: source, focus: focus, style: style, anchor: anchor, place: place)
+    }
+
+    /// The opener of this window's Activity popover moved while it stays on
+    /// screen, as on rotation, so the popover follows it.
+    func moveActivityAnchor(to anchor: CGRect, from source: ActivityRequest.Source) {
+        guard var request = main.activity, request.style == .popover, request.source == source,
+              request.anchor != anchor else { return }
+        request.anchor = anchor
+        main.activity = request
     }
 }
 #endif

@@ -1168,9 +1168,10 @@ private enum AppStoreScreenshotProfileData {
     )
 }
 
-/// A fixed cross-section of every Quick Match request shape shown by
-/// WaitingGamesView. Keeping the wire-era entry in the same fixture makes the
-/// compatibility scene exercise both modern and legacy parsing paths.
+/// A fixed cross-section of every Quick Match request shape, which the
+/// Activity list's rows and their pushed cards show. Keeping the wire-era
+/// entry in the same fixture makes the compatibility scene exercise both
+/// modern and legacy parsing paths.
 private enum CompatibilityWaitingAutomatchFixtures {
     static let exact = OGSQuickMatchDraft(
         mode: .exact,
@@ -3487,7 +3488,7 @@ extension OGSService {
             hostedStandardChallenge.game.id = 103_001
             hostedStandardChallenge.game.name = "Weekend 19×19"
 
-            // WaitingGamesView consumes these dictionaries directly. Its own
+            // The Activity list reads these dictionaries directly. Its own
             // compatibility scene covers every request shape; other scenes
             // retain a single request so their established state is stable.
             let showsIdleQuickMatch =
