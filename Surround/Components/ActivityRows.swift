@@ -444,6 +444,10 @@ struct ActivityEntryLine: View {
     let focus: ActivityFocusBinding?
     let retry: () -> Void
     let openGame: (Int) -> Void
+    /// Room on each side of Retry's and Open game's labels. A waiting row in
+    /// the sheet leaves 4 pt at its edge and pads Withdraw's label by 8, so
+    /// it passes 8 to keep them in line with Withdraw.
+    var labelInset: CGFloat = 0
 
     var body: some View {
         HStack(spacing: 12) {
@@ -469,6 +473,8 @@ struct ActivityEntryLine: View {
                         openGame(gameID)
                     } label: {
                         Text("Open game", comment: "Activity: opens the correspondence game an accepted challenge started")
+                            .padding(.horizontal, labelInset)
+                            .contentShape(Rectangle())
                     }
                     .modifier(ActivityTrailingButtonStyle(density: .regular))
                     .disabled(!actionState.isEnabled(.openGame))
@@ -480,12 +486,16 @@ struct ActivityEntryLine: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier(ID.activityRowResult(itemID))
                     .resultFocus(focus, .result(itemID))
-                Button("Retry", action: retry)
-                    .modifier(ActivityTrailingButtonStyle(density: .regular))
-                    .disabled(!actionState.isEnabled(.retry))
-                    .accessibilityValue(Text(verbatim: actionState.accessibilityValue(.retry) ?? ""))
-                    .accessibilityIdentifier(ID.activityRow(itemID, .retry))
-                    .resultFocus(focus, .control(itemID, .retry))
+                Button(action: retry) {
+                    Text("Retry")
+                        .padding(.horizontal, labelInset)
+                        .contentShape(Rectangle())
+                }
+                .modifier(ActivityTrailingButtonStyle(density: .regular))
+                .disabled(!actionState.isEnabled(.retry))
+                .accessibilityValue(Text(verbatim: actionState.accessibilityValue(.retry) ?? ""))
+                .accessibilityIdentifier(ID.activityRow(itemID, .retry))
+                .resultFocus(focus, .control(itemID, .retry))
             }
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -725,7 +735,7 @@ struct ActivityWaitingRow: View {
             }
             if let entry, entry.replacesActions || !withdrawsInPlace {
                 ActivityEntryLine(itemID: itemID, entry: entry, actionState: actionState, focus: focus,
-                                  retry: retry, openGame: openGame)
+                                  retry: retry, openGame: openGame, labelInset: density == .regular ? 8 : 0)
             }
         }
         .padding(.leading, density.horizontalPadding)
