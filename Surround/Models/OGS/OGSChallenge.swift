@@ -438,9 +438,13 @@ struct OGSSeekgraphChallenge: OGSSubmittedChallenge, Identifiable {
     var challenged: OGSUser?
     var challengerColor: StoneColor?
     var game: OGSSeekgraphChallenge.GameDetail
-    
+    /// When OGS created the challenge, from the seek graph's `created`;
+    /// nil when it sends none.
+    var createdAt: Date?
+
     enum CodingKeys: String, CodingKey {
         case challengeId
+        case created
         case userId
         case username
         case rank
@@ -505,7 +509,38 @@ struct OGSSeekgraphChallenge: OGSSubmittedChallenge, Identifiable {
             rengoNominees: try container.decodeIfPresent([Int].self, forKey: .rengoNominees),
             rengoParticipants: try container.decodeIfPresent([Int].self, forKey: .rengoParticipants)
         )
+        if let created = try? container.decodeIfPresent(String.self, forKey: .created) {
+            createdAt = Self.createdDate(from: created)
+        }
     }
+
+    /// OGS sends `created` as an ISO 8601 date without a zone, such as
+    /// "2024-03-21T02:58:09", in UTC. A zone or fractional seconds are read
+    /// too; anything else gives nil, and the challenge still decodes.
+    static func createdDate(from string: String) -> Date? {
+        for formatter in createdFormatters {
+            if let date = formatter.date(from: string) { return date }
+        }
+        return nil
+    }
+
+    private static let createdFormatters: [ISO8601DateFormatter] = {
+        let withoutZone: ISO8601DateFormatter.Options = [
+            .withFullDate, .withTime, .withDashSeparatorInDate, .withColonSeparatorInTime
+        ]
+        let options: [ISO8601DateFormatter.Options] = [
+            [.withInternetDateTime, .withFractionalSeconds],
+            [.withInternetDateTime],
+            withoutZone.union(.withFractionalSeconds),
+            withoutZone,
+        ]
+        return options.map { options in
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = options
+            formatter.timeZone = TimeZone(identifier: "UTC")
+            return formatter
+        }
+    }()
 }
 
 struct OGSChallengeTemplate: OGSChallenge, Encodable {
