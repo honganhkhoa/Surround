@@ -1067,7 +1067,14 @@ enum SurroundUITestContract {
             "home.section.\(id)"
         }
         static let newGameClose = "newGame.close"
+        /// New game's pending Rengo link, which opens Activity in its stack.
+        static let newGameRengoWaiting = "newGame.rengoWaiting"
+        /// Home's Searching card, which opens Activity.
+        static let homeSearching = "home.searching"
         static let liveGameBanner = "notification.liveGame"
+        /// The waiting and challenge pills, which open Activity.
+        static let waitingBanner = "notification.waiting"
+        static let challengeBanner = "notification.challenge"
         static let connectionBanner = "notification.connection"
         static let homePreferredSettings = "home.preferredSettings"
         static let homePreferredSettingsEdit = "home.preferredSettings.edit"
@@ -1357,12 +1364,14 @@ extension SurroundUITestContract {
     }
 
     /// Opens the Activity list once at launch, over the offline root:
-    /// `--surround-activity-open sheet`. It needs an Activity state
+    /// `--surround-activity-open sheet`, or `game-popover`, which opens game
+    /// 26268404 and then the game's popover. It needs an Activity state
     /// (`--surround-activity-state`).
     static let activityOpenLaunchArgument = "--surround-activity-open"
 
     enum ActivityOpen: String, CaseIterable {
         case sheet
+        case gamePopover = "game-popover"
     }
 
     enum ActivityOpenError: Error, Equatable, CustomStringConvertible {

@@ -477,11 +477,24 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertNil(try parse([state, "several"]), "A state alone opens nothing.")
         XCTAssertEqual(try parse([state, "several", open, "sheet"]), .sheet)
         XCTAssertEqual(try parse([open, "sheet", state, "waiting"]), .sheet)
+        XCTAssertEqual(try parse([state, "waiting", open, "game-popover"]), .gamePopover)
 
         XCTAssertEqual(failure([state, "several", open]), .missingValue)
-        XCTAssertEqual(failure([state, "several", open, "game-popover"]), .unknownValue("game-popover"))
+        XCTAssertEqual(failure([state, "several", open, "popover"]), .unknownValue("popover"))
         XCTAssertEqual(failure([open, "sheet"]), .needsActivityState)
-        XCTAssertTrue(Contract.ActivityOpenError.unknownValue("x").description.contains("sheet"))
+        XCTAssertEqual(failure([open, "game-popover"]), .needsActivityState)
+        let unknown = Contract.ActivityOpenError.unknownValue("x").description
+        XCTAssertTrue(unknown.contains("sheet") && unknown.contains("game-popover"))
+    }
+
+    func testTheWaitingPillCountsEachStatesLiveSearchesAndChallenges() throws {
+        // As the observer counts them: sent and open challenges and Quick
+        // Match searches that aren't correspondence. Rengo doesn't count.
+        let expected: [State: Int] = [.searching: 1, .waiting: 3, .several: 2, .rematchBothAsked: 1]
+        for state in State.allCases {
+            let (service, _) = try service(state)
+            XCTAssertEqual(service.waitingLiveGames, expected[state] ?? 0, state.rawValue)
+        }
     }
 
     func testActivityIdentifiersTakeTheItemsID() {

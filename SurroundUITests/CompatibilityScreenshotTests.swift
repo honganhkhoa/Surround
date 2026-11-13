@@ -222,8 +222,28 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
             ),
         ]
 
+        // Each search is one compact row in Activity's list.
         for fixture in fixtures {
-            let card = scrollToAutomatchEntry(fixture.uuid, in: app)
+            element(
+                SurroundUITestContract.AccessibilityID.activityRow(
+                    quickMatchItemID(fixture.uuid)
+                ),
+                in: app
+            )
+        }
+        // Each row pushes its search's card, which shows what the waiting
+        // list's card always showed.
+        for fixture in fixtures {
+            let row = scrollToActivityRow(
+                quickMatchItemID(fixture.uuid),
+                in: app
+            )
+            press(row)
+            let card = element(
+                SurroundUITestContract.AccessibilityID
+                    .waitingGamesAutomatchEntry(fixture.uuid),
+                in: app
+            )
             for label in fixture.labels {
                 let content = card.descendants(matching: .any)
                     .matching(NSPredicate(format: "label == %@", label))
@@ -233,12 +253,8 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
                     "Expected \(fixture.uuid) to present \(label)"
                 )
             }
+            goBackToActivityList(in: app)
         }
-
-        XCTAssertTrue(
-            app.staticTexts["Correspondence games"].exists,
-            "The correspondence fixture must be classified into its own section."
-        )
     }
 
     func testNewGameCompatibilityScenesSupportCloseAndReentry() {
@@ -694,29 +710,75 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
         return app
     }
 
-    private func scrollToAutomatchEntry(
-        _ uuid: String,
+    /// A Quick Match search's id in Activity's list.
+    private func quickMatchItemID(_ uuid: String) -> String {
+        "waiting-quick-match-\(uuid)"
+    }
+
+    private func scrollToActivityRow(
+        _ itemID: String,
         in app: XCUIApplication,
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> XCUIElement {
-        let identifier = SurroundUITestContract.AccessibilityID
-            .waitingGamesAutomatchEntry(uuid)
-        let entry = app.descendants(matching: .any)
-            .matching(identifier: identifier)
+        let row = app.descendants(matching: .any)
+            .matching(
+                identifier: SurroundUITestContract.AccessibilityID
+                    .activityRow(itemID)
+            )
             .firstMatch
         var attemptsRemaining = 10
-        while !entry.exists && attemptsRemaining > 0 {
+        while !(row.exists && row.isHittable) && attemptsRemaining > 0 {
             app.swipeUp()
             attemptsRemaining -= 1
         }
         XCTAssertTrue(
-            entry.exists,
-            "Expected waiting Quick Match fixture \(uuid)",
+            row.exists && row.isHittable,
+            "Expected Activity's row \(itemID)",
             file: file,
             line: line
         )
-        return entry
+        return row
+    }
+
+    private func press(_ element: XCUIElement) {
+        #if targetEnvironment(macCatalyst)
+        element.click()
+        #else
+        element.tap()
+        #endif
+    }
+
+    /// Back from a card the list pushed, until the list is on top again.
+    private func goBackToActivityList(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let back = app.navigationBars.buttons
+            .matching(NSPredicate(
+                format: "identifier == %@ OR label == %@ OR label == %@",
+                "BackButton", "Activity", "Back"
+            ))
+            .firstMatch
+        XCTAssertTrue(
+            back.waitForExistence(timeout: 10),
+            "Expected Back on the pushed card",
+            file: file,
+            line: line
+        )
+        press(back)
+        let listOnTop = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: back
+        )
+        XCTAssertEqual(
+            waitWithFinalCheck(for: [listOnTop], timeout: 10),
+            .completed,
+            "Back must return to Activity's list",
+            file: file,
+            line: line
+        )
     }
 
     #if targetEnvironment(macCatalyst)
@@ -859,12 +921,18 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
         case .advancedRules:
             labeledElement("Advanced rules settings", in: app)
         case .waitingGames:
-            labeledElement("Weekend 19×19", in: app)
+            // The hosted open challenge and a Quick Match search, as rows of
+            // Activity's list.
             element(
-                SurroundUITestContract.AccessibilityID
-                    .waitingGamesAutomatchEntry(
-                        "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d0"
-                    ),
+                SurroundUITestContract.AccessibilityID.activityRow(
+                    "waiting-open-93001"
+                ),
+                in: app
+            )
+            element(
+                SurroundUITestContract.AccessibilityID.activityRow(
+                    quickMatchItemID("f0050bcf-f5fc-46c8-9ed6-01dfd898e0d0")
+                ),
                 in: app
             )
         case .preferredSettings:

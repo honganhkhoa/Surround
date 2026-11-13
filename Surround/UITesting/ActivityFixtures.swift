@@ -149,9 +149,11 @@ enum ActivityFixtures {
         return build.seed
     }
 
-    /// After the service exists: read markers, then the moderator's superchat,
-    /// unless `startsSuperchat` is false (the app starts it once per process).
+    /// After the service exists: the waiting pill's count, read markers, then
+    /// the moderator's superchat, unless `startsSuperchat` is false (the app
+    /// starts it once per process).
     static func finish(_ selected: State, service: OGSService, startsSuperchat: Bool = true) {
+        service.countWaitingLiveGamesForActivityFixture()
         // No-ops where the state has no such conversation.
         service.markPrivateMessageThreadAsRead(peerId: Cast.mossLantern.id)
         service.markPrivateMessageThreadAsRead(peerId: Cast.cedarWave.id)

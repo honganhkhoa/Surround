@@ -1203,6 +1203,16 @@ class OGSService: ObservableObject {
     static func isWaitingLive<Detail: OGSChallengeGameDetail>(_ game: Detail) -> Bool {
         game.timeControl.resolvedSpeed(boardWidth: game.width, boardHeight: game.height) != .correspondence
     }
+    #if DEBUG && (MAIN_APP || TESTING)
+    /// An Activity state's service installs no observers, so it counts its
+    /// own live searches and challenges once, as the observer counts them,
+    /// for the waiting pill.
+    func countWaitingLiveGamesForActivityFixture() {
+        waitingLiveGames = challengesSent.filter { OGSService.isWaitingLive($0.game) }.count
+            + openChallengeSentById.values.filter { OGSService.isWaitingLive($0.game) }.count
+            + autoMatchEntryById.values.filter { $0.timeControlSpeed != .correspondence }.count
+    }
+    #endif
     @Published private(set) public var hostingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
     @Published private(set) public var participatingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
     

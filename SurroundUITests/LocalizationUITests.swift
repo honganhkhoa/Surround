@@ -89,7 +89,8 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
             "Opponent": "Lawan",
             "Either clock": "Mana saja",
             "Withdraw live game search": "Batalkan pencarian permainan langsung",
-            "Withdraw quick match search": "Batalkan pencarian lawan cepat",
+            "Withdraw %@": "Batalkan %@",
+            "Quick match": "Cari lawan cepat",
             "Searching for a game…": "Mencari permainan…",
         ]
     }
@@ -217,14 +218,17 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
     private func verifyPendingWaitingWithdrawal(_ language: Language) {
         let app = launchLocalizedApp(language, scene: .waitingGames)
         defer { app.terminate() }
-        let fixtureID = "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d0"
-        element(SurroundUITestContract.AccessibilityID.waitingGamesAutomatchEntry(fixtureID),
-                in: app)
+        // The 13×13 Rapid search: one size at one speed, so its row
+        // withdraws in place.
+        let itemID = "waiting-quick-match-f0050bcf-f5fc-46c8-9ed6-01dfd898e0d0"
+        element(SurroundUITestContract.AccessibilityID.activityRow(itemID), in: app)
         let withdraw = elementAfterScrolling(
-            SurroundUITestContract.AccessibilityID.waitingGamesAutomatchWithdraw(fixtureID),
+            SurroundUITestContract.AccessibilityID.activityRow(itemID, .withdraw),
             in: app, matching: .button)
         scrollIntoTappableArea(withdraw, in: app)
-        XCTAssertEqual(withdraw.label, language.text("Withdraw quick match search"))
+        // Withdraw names its row without the time it has waited.
+        let row = [language.text("Quick match"), language.text("Live"), "13×13"].joined(separator: ", ")
+        XCTAssertEqual(withdraw.label, language.text("Withdraw %@").replacingOccurrences(of: "%@", with: row))
         XCTAssertTrue(withdraw.isEnabled, "The untouched pending fixture must expose its withdrawal action.")
         assertVisible(withdraw, in: app)
         // The visible title uses Withdraw; its AX label intentionally describes

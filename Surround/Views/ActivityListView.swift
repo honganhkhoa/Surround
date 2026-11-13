@@ -10,9 +10,12 @@
 //  their full cards, and conversations push inside the list's own stack.
 //  The list rebuilds its rows each second; offline it reads the user's open
 //  challenges from the window's last-known copy and dims the actions that
-//  need OGS.
+//  need OGS. Each window shows its list from one presenter, a sheet or a
+//  popover by the request, and the controls that open it record where they
+//  are so a popover is anchored there.
 //
 
+import Combine
 import SwiftUI
 
 private typealias ID = SurroundUITestContract.AccessibilityID
@@ -251,13 +254,7 @@ private struct ActivityListContent: View {
     private var density: ActivityRowDensity { placement.density }
     private var source: ActivityListSource { ActivityListSource(ogs: ogs, nav: nav, placement: placement) }
 
-    /// Reconnecting… and Can’t reach OGS both dim the actions that need OGS.
-    private var isOffline: Bool {
-        switch connection.status {
-        case .reconnecting, .unreachable: true
-        default: false
-        }
-    }
+    private var isOffline: Bool { connection.dimsActivityActions }
 
     private var homeTheme: SurroundTheme {
         SurroundTheme.current(storedID: gameThemeID, appliesToWholeApp: themeAppliesToWholeApp)
@@ -284,6 +281,8 @@ private struct ActivityListContent: View {
         .onAppear {
             results.begin(session: session)
             isPresented = true
+            // The cards this list pushes dim by its status.
+            navigation.activityConnection = connection
             if lifetime.release == nil {
                 let results = results
                 let session = session
@@ -622,16 +621,19 @@ private struct ActivityListContent: View {
 
 /// A challenge or search from the list as its full card, pushed inside the
 /// list's stack. Its actions go through the window's results store, so Back
-/// shows their result and a request outlives the card. After a success, or
-/// once the item has gone, the card pops itself.
+/// shows their result and a request outlives the card. While the list is
+/// offline the card's actions dim, as its rows do. After a success, or once
+/// the item has gone, the card pops itself.
 struct ActivityItemCard: View {
     let itemID: String
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
+    @EnvironmentObject private var navigation: StackRouter
 
     var body: some View {
         ActivityItemCardContent(itemID: itemID, ogs: ogs, nav: nav, results: nav.activityResults,
-                                lastKnown: nav.activityLastKnown)
+                                lastKnown: nav.activityLastKnown,
+                                connection: navigation.activityConnection ?? .neverOffline)
     }
 }
 
@@ -641,6 +643,8 @@ private struct ActivityItemCardContent: View {
     let nav: NavigationService
     @ObservedObject var results: ActivityResults
     @ObservedObject var lastKnown: ActivityLastKnown
+    /// The list's own, which pushed the card.
+    @ObservedObject var connection: ConnectionStatusSource
     @EnvironmentObject private var navigation: StackRouter
 
     private enum Target {
@@ -675,7 +679,8 @@ private struct ActivityItemCardContent: View {
                     ActivityEntryLine(
                         itemID: itemID, entry: entry,
                         actionState: ActivityRowActionState(isUnusual: false, isInGamePopover: false,
-                                                            isOffline: false, state: entry.state),
+                                                            isOffline: connection.dimsActivityActions,
+                                                            state: entry.state),
                         retry: { results.retry(itemID: itemID) }, openGame: { _ in }
                     )
                     .padding(.horizontal, 4)
@@ -731,6 +736,7 @@ private struct ActivityItemCardContent: View {
         let session = results.liveSession ?? UUID()
         return ActivityCellActions(
             isPending: results.entries[itemID]?.state.isPending ?? false,
+            isOffline: connection.dimsActivityActions,
             accept: { challenge in
                 let row = source.frozen(itemID)
                 results.accept(challenge: challenge, isLive: Self.isLive(challenge), session: session, itemID: itemID,
@@ -770,25 +776,63 @@ private struct ActivityItemCardContent: View {
     }
 }
 
-// MARK: - Debug opener
+extension ConnectionStatusSource {
+    /// Reconnecting… and Can’t reach OGS both dim the actions that need OGS.
+    var dimsActivityActions: Bool {
+        switch status {
+        case .reconnecting, .unreachable: true
+        default: false
+        }
+    }
 
-#if DEBUG && MAIN_APP
-/// `--surround-activity-open sheet`: opens the list once at launch, as a
-/// sheet over the offline root, for UI tests and captures.
-struct ActivityDebugOpener: ViewModifier {
+    /// For a card without its list: never offline, since it is never shown.
+    fileprivate static let neverOffline = ConnectionStatusSource(
+        socketIsConnected: Just(true).eraseToAnyPublisher(),
+        path: ConstantNetworkPath.satisfied,
+        reconnect: {}
+    )
+}
+
+// MARK: - New game's list
+
+/// The Activity list inside New game's stack, from its Searching and Rengo
+/// links, or as the root of the `waiting-games` capture scene. Each time it
+/// is shown it has a session of its own.
+struct ActivityRouteList: View {
+    @State private var session = UUID()
+
+    var body: some View {
+        ActivityListView(session: session, placement: .route, focus: .top)
+    }
+}
+
+// MARK: - The window's presenter
+
+/// The window's Activity list as a sheet, for a sheet request: the compact
+/// root screens. Done or a swipe closes the request.
+struct ActivitySheetPresenter: ViewModifier {
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
-    @State private var request: ActivityRequest?
-    private static var hasOpened = false
+
+    private var request: Binding<ActivityRequest?> {
+        Binding(
+            get: { nav.main.activity?.style == .sheet ? nav.main.activity : nil },
+            set: { request in
+                if request == nil, nav.main.activity?.style == .sheet {
+                    nav.main.activity = nil
+                }
+            }
+        )
+    }
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: $request) { request in
+            .sheet(item: request) { request in
                 AppNavigationStack {
                     ActivityListView(session: request.sessionID, placement: .sheet, focus: request.focus)
                         .toolbar {
                             ToolbarItem(placement: .confirmationAction) {
-                                Button("Done") { self.request = nil }
+                                Button("Done") { nav.main.activity = nil }
                                     .accessibilityIdentifier(ID.activityDone)
                             }
                         }
@@ -798,12 +842,154 @@ struct ActivityDebugOpener: ViewModifier {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
+    }
+}
+
+/// The window's Activity list as a popover, for a popover request: regular
+/// widths, and every game. It hangs off this always-mounted, invisible
+/// anchor, placed at the opener's frame as it was tapped, so the popover
+/// never depends on its opener staying on screen. An outside tap or Escape
+/// closes the request.
+struct ActivityPopoverPresenter: View {
+    @EnvironmentObject private var ogs: OGSService
+    @EnvironmentObject private var nav: NavigationService
+    /// The latest popover request, whose content stays while it closes.
+    @State private var latest: ActivityRequest?
+
+    private var current: ActivityRequest? {
+        nav.main.activity?.style == .popover ? nav.main.activity : nil
+    }
+
+    private var isPresented: Binding<Bool> {
+        Binding(
+            get: { current != nil },
+            set: { presented in
+                if !presented, current != nil {
+                    nav.main.activity = nil
+                }
+            }
+        )
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let shown = current ?? latest
+            // The anchor is in the window's global space, which this
+            // overlay's own frame need not start at.
+            let origin = proxy.frame(in: .global).origin
+            let anchor = (shown?.anchor ?? .zero).offsetBy(dx: -origin.x, dy: -origin.y)
+            Color.clear
+                .frame(width: anchor.width, height: anchor.height)
+                .allowsHitTesting(false)
+                .popover(isPresented: isPresented, attachmentAnchor: .rect(.bounds)) {
+                    if let shown {
+                        popover(shown)
+                    }
+                }
+                .position(x: anchor.midX, y: anchor.midY)
+        }
+        .onChange(of: current, initial: true) { _, request in
+            if let request { latest = request }
+        }
+    }
+
+    private func popover(_ request: ActivityRequest) -> some View {
+        AppNavigationStack {
+            ActivityListView(
+                session: request.sessionID,
+                placement: request.place.gameID == nil ? .popover : .gamePopover,
+                focus: request.focus
+            )
+        }
+        .environmentObject(ogs)
+        .environmentObject(nav)
+        .frame(idealWidth: 400, idealHeight: 620)
+        .presentationCompactAdaptation(.popover)
+        .id(request.sessionID)
+    }
+}
+
+/// A control that opens the window's Activity list. It keeps its frame in
+/// the window's global space as it changes, without redrawing anything, so
+/// a tap anchors the list where the control is, and a popover it opened
+/// follows it while it stays on screen.
+struct ActivityOpenerButton<Label: View>: View {
+    let source: ActivityRequest.Source
+    var focus: ActivityRequest.Focus = .top
+    @ViewBuilder var label: () -> Label
+
+    @EnvironmentObject private var nav: NavigationService
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var frame = ActivityOpenerFrame()
+
+    var body: some View {
+        Button {
+            nav.openActivity(source: source, focus: focus, anchor: frame.value,
+                             horizontalSizeClass: horizontalSizeClass)
+        } label: {
+            label()
+        }
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .global)
+        } action: { value in
+            frame.value = value
+            nav.moveActivityAnchor(to: value, from: source)
+        }
+    }
+}
+
+/// An opener's latest frame, held by reference so a new frame redraws
+/// nothing.
+private final class ActivityOpenerFrame {
+    var value = CGRect.zero
+}
+
+// MARK: - Debug opener
+
+#if DEBUG && MAIN_APP
+/// `--surround-activity-open sheet|game-popover`: opens the list once at
+/// launch, through the window's presenter, for UI tests and captures.
+/// `sheet` opens a sheet over the offline root. `game-popover` opens game
+/// 26268404, then, a main-queue turn after Game Detail's place settles,
+/// the game's popover from a fixed anchor near the top centre of the window.
+struct ActivityDebugOpener: ViewModifier {
+    @EnvironmentObject private var nav: NavigationService
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var awaitsGame = false
+    @State private var window = CGRect.zero
+    private static var hasOpened = false
+
+    func body(content: Content) -> some View {
+        content
+            .onGeometryChange(for: CGRect.self) { proxy in
+                proxy.frame(in: .global)
+            } action: { value in
+                window = value
+            }
             .onAppear {
                 // Read first, so a malformed flag stops the launch.
-                guard SurroundUITestContract.activityOpen == .sheet, !Self.hasOpened else { return }
+                guard let open = SurroundUITestContract.activityOpen, !Self.hasOpened else { return }
                 Self.hasOpened = true
-                nav.onCloseActivity = { request = nil }
-                request = ActivityRequest(source: .debug, style: .sheet)
+                switch open {
+                case .sheet:
+                    nav.main.activity = ActivityRequest(
+                        source: .debug, style: .sheet, place: nav.activityPlaces.place(in: nav.main.rootView))
+                case .gamePopover:
+                    guard let route = AppRoute(rootView: .home, ogsGameID: SurroundUITestContract.fixtureGameID)
+                    else { return }
+                    awaitsGame = true
+                    nav.requestGameOpen(route)
+                }
+            }
+            .onReceive(nav.activityPlaces.stateDidChange) { state in
+                guard awaitsGame, state.places[.home]?.gameID == SurroundUITestContract.fixtureGameID else { return }
+                awaitsGame = false
+                let anchor = CGRect(x: window.midX - 22, y: window.minY + 8, width: 44, height: 44)
+                let sizeClass = horizontalSizeClass
+                let nav = nav
+                DispatchQueue.main.async { [weak nav] in
+                    nav?.openActivity(source: .debug, anchor: anchor, horizontalSizeClass: sizeClass)
+                }
             }
     }
 }

@@ -4,6 +4,7 @@
 //
 
 import Combine
+import SwiftUI
 import XCTest
 
 final class AppRouteTests: XCTestCase {
@@ -102,7 +103,7 @@ final class AppRouteTests: XCTestCase {
             whiteName: "Public White",
             gameId: .OGS(40)
         )
-        navigation.main.showWaitingGames = true
+        navigation.main.activity = ActivityRequest(source: .homeSearching, style: .sheet)
         navigation.home.showingNewGameView = true
         navigation.home.showingPreferredSettings = true
         navigation.home.showingGameHistory = true
@@ -115,7 +116,7 @@ final class AppRouteTests: XCTestCase {
         )
 
         XCTAssertEqual(navigation.main.rootView, .home)
-        XCTAssertFalse(navigation.main.showWaitingGames)
+        XCTAssertNil(navigation.main.activity, "A link closes the Activity list.")
         XCTAssertFalse(navigation.home.showingNewGameView)
         XCTAssertFalse(navigation.home.showingPreferredSettings)
         XCTAssertFalse(navigation.home.showingGameHistory)
@@ -244,10 +245,12 @@ final class AppRouteTests: XCTestCase {
             gameId: .OGS(40)
         )
         navigation.home.activeGameShowsCarousel = false
-        navigation.main.showWaitingGames = true
+        navigation.openActivity(source: .waitingPill, anchor: CGRect(x: 100, y: 60, width: 120, height: 44),
+                                horizontalSizeClass: .regular)
         navigation.home.showingNewGameView = true
         navigation.home.showingPreferredSettings = true
         navigation.home.showingSettings = true
+        XCTAssertNotNil(navigation.main.activity)
 
         navigation.goToActiveGame(game: liveGame)
 
@@ -256,10 +259,57 @@ final class AppRouteTests: XCTestCase {
         XCTAssertTrue(navigation.home.activeGameShowsCarousel)
         XCTAssertFalse(navigation.home.showingGameHistory)
         XCTAssertNil(navigation.gameHistory.activeGame)
-        XCTAssertFalse(navigation.main.showWaitingGames)
+        XCTAssertNil(navigation.main.activity, "Opening a game closes the Activity list.")
         XCTAssertFalse(navigation.home.showingNewGameView)
         XCTAssertFalse(navigation.home.showingPreferredSettings)
         XCTAssertFalse(navigation.home.showingSettings)
+    }
+
+    // MARK: - Opening the Activity list
+
+    @MainActor
+    func testActivityOpensAsASheetOrAPopoverByWidthAndPlace() {
+        let navigation = NavigationService()
+        let card = CGRect(x: 16, y: 120, width: 360, height: 52)
+
+        navigation.openActivity(source: .homeSearching, anchor: card, horizontalSizeClass: .compact)
+        let sheet = navigation.main.activity
+        XCTAssertEqual(sheet?.style, .sheet, "A compact root screen gets the sheet.")
+        XCTAssertEqual(sheet?.source, .homeSearching)
+        XCTAssertEqual(sheet?.place, .root(isMessagesTab: false))
+
+        navigation.openActivity(source: .homeSearching, anchor: card, horizontalSizeClass: .regular)
+        XCTAssertEqual(navigation.main.activity?.style, .popover, "A regular width gets a popover.")
+        XCTAssertEqual(navigation.main.activity?.anchor, card, "It is anchored where its opener was tapped.")
+        XCTAssertNotEqual(navigation.main.activity?.sessionID, sheet?.sessionID, "Each request is a new session.")
+
+        let game = ActivityModel.Place.game(id: 42, isOwnGame: true, isLive: true, isOver: false)
+        navigation.activityPlaces.set(.init(place: game, root: .home, isOnTop: true), for: UUID())
+        let settled = expectation(description: "The place settles a main-queue turn later.")
+        DispatchQueue.main.async { settled.fulfill() }
+        wait(for: [settled], timeout: 1)
+        navigation.openActivity(source: .waitingPill, horizontalSizeClass: .compact)
+        XCTAssertEqual(navigation.main.activity?.style, .popover, "A game gets a popover at any width.")
+        XCTAssertEqual(navigation.main.activity?.place, game)
+    }
+
+    @MainActor
+    func testAnActivityPopoverFollowsOnlyItsOwnOpener() {
+        let navigation = NavigationService()
+        let pill = CGRect(x: 120, y: 60, width: 140, height: 44)
+        let moved = pill.offsetBy(dx: 200, dy: 0)
+        navigation.openActivity(source: .waitingPill, anchor: pill, horizontalSizeClass: .regular)
+        let session = navigation.main.activity?.sessionID
+
+        navigation.moveActivityAnchor(to: moved, from: .challengePill)
+        XCTAssertEqual(navigation.main.activity?.anchor, pill, "Another opener moves nothing.")
+        navigation.moveActivityAnchor(to: moved, from: .waitingPill)
+        XCTAssertEqual(navigation.main.activity?.anchor, moved, "The popover follows its opener, as on rotation.")
+        XCTAssertEqual(navigation.main.activity?.sessionID, session, "It is the same list.")
+
+        navigation.openActivity(source: .homeSearching, anchor: pill, horizontalSizeClass: .compact)
+        navigation.moveActivityAnchor(to: moved, from: .homeSearching)
+        XCTAssertEqual(navigation.main.activity?.anchor, pill, "A sheet has nothing to follow.")
     }
 
     // MARK: - Game detail display reset
@@ -577,7 +627,9 @@ final class AppRouteTests: XCTestCase {
         navigation.home.activeGame = homeGame
         navigation.home.showingNewGameView = true
         navigation.home.showingSettings = true
-        navigation.main.showWaitingGames = true
+        let activity = ActivityRequest(source: .challengePill, style: .popover,
+                                       anchor: CGRect(x: 10, y: 20, width: 44, height: 44))
+        navigation.main.activity = activity
         navigation.main.accountSheet = .profile
         let resetID = navigation.navigationResetID
         cover.isRaised = true
@@ -595,7 +647,7 @@ final class AppRouteTests: XCTestCase {
         XCTAssertTrue(navigation.home.activeGame === homeGame)
         XCTAssertTrue(navigation.home.showingNewGameView)
         XCTAssertTrue(navigation.home.showingSettings)
-        XCTAssertTrue(navigation.main.showWaitingGames)
+        XCTAssertEqual(navigation.main.activity, activity, "The Activity list stays as it was.")
         XCTAssertEqual(navigation.main.accountSheet, .profile)
         XCTAssertEqual(navigation.navigationResetID, resetID)
         XCTAssertEqual(publishes.value, 0, "Holding publishes nothing, so nothing redraws.")
