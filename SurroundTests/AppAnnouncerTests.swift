@@ -402,6 +402,31 @@ final class AppAnnouncerTests: XCTestCase {
                        "Game found now and Activity's Game started later are one event.")
     }
 
+    func testActivityResultsAreOneEventPerItemAndAction() {
+        typealias Key = AppAnnouncement.Key
+        let withdrawn = Key.activityResult(itemID: "waiting-open-93001", action: .withdraw)
+        XCTAssertEqual(withdrawn, .activityResult(itemID: "waiting-open-93001", action: .withdraw))
+        XCTAssertNotEqual(withdrawn, .activityFailure(itemID: "waiting-open-93001", action: .withdraw))
+        XCTAssertNotEqual(withdrawn, .activityResult(itemID: "waiting-open-93002", action: .withdraw))
+        XCTAssertNotEqual(Key.activityResult(itemID: "challenge-7", action: .accept),
+                          .activityResult(itemID: "challenge-7", action: .reject))
+        XCTAssertNotEqual(Key.activityFailure(itemID: "waiting-rengo-5", action: .leave),
+                          .activityFailure(itemID: "waiting-rengo-5", action: .start))
+
+        let clock = Clock(), output = Output()
+        let announcer = makeAnnouncer(clock, scenes(open: [windowA, windowB], frontmost: windowA), output)
+        XCTAssertEqual(announcer.post(said(withdrawn, "Withdrawn", .anyWindow), from: windowB), .posted,
+                       "The window where the user acted speaks, even behind another.")
+        clock.now += 0.2
+        XCTAssertEqual(announcer.post(said(withdrawn, "Withdrawn", .anyWindow), from: windowA), .duplicate)
+        XCTAssertEqual(
+            announcer.post(said(.activityFailure(itemID: "waiting-open-93001", action: .withdraw),
+                                "Couldn’t withdraw", .anyWindow), from: windowA),
+            .posted, "A failure is its own event."
+        )
+        XCTAssertEqual(output.spoken, ["Withdrawn", "Couldn’t withdraw"])
+    }
+
     func testEachNavigationServiceIsItsOwnWindow() {
         let first = NavigationService(), second = NavigationService()
         XCTAssertNotEqual(first.announcerWindow, second.announcerWindow)

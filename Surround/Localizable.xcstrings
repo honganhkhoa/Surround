@@ -23989,6 +23989,23 @@
         }
       }
     },
+    "Couldn’t accept" : {
+      "comment" : "Activity: accepting a challenge failed; shown with Retry",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat menerima"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat menerima"
+          }
+        }
+      }
+    },
     "Couldn’t accept friend request" : {
       "localizations" : {
         "de" : {
@@ -24232,6 +24249,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法確認訊息是否送達。請先查看對話，再嘗試重新傳送。"
+          }
+        }
+      }
+    },
+    "Couldn’t leave" : {
+      "comment" : "Activity: leaving a Rengo challenge you joined failed; shown with Retry",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat keluar"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat keluar"
           }
         }
       }
@@ -24725,6 +24759,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法載入交手紀錄"
+          }
+        }
+      }
+    },
+    "Couldn’t reject" : {
+      "comment" : "Activity: rejecting a challenge failed; shown with Retry",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat menolak"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat menolak"
           }
         }
       }
@@ -25223,6 +25274,23 @@
         }
       }
     },
+    "Couldn’t start" : {
+      "comment" : "Activity: starting a Rengo game you host failed; shown with Retry",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat memulai"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat memulakan"
+          }
+        }
+      }
+    },
     "Couldn’t start the search" : {
       "comment" : "Title of an error alert when a Quick Match request cannot be sent.",
       "localizations" : {
@@ -25385,6 +25453,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法更新預測落子"
+          }
+        }
+      }
+    },
+    "Couldn’t withdraw" : {
+      "comment" : "Activity: withdrawing your own challenge or Quick Match search failed; shown with Retry",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat membatalkan"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat menarik balik"
           }
         }
       }
@@ -34757,6 +34842,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "離開"
+          }
+        }
+      }
+    },
+    "Left" : {
+      "comment" : "Activity: you left a Rengo challenge you had joined",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sudah keluar"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Telah keluar"
           }
         }
       }
@@ -49036,6 +49138,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拒絕悔棋"
+          }
+        }
+      }
+    },
+    "Rejected" : {
+      "comment" : "Activity: you rejected a challenge sent to you",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ditolak"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ditolak"
           }
         }
       }
@@ -69538,6 +69657,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在撤回快速配對搜尋"
+          }
+        }
+      }
+    },
+    "Withdrawn" : {
+      "comment" : "Activity: you withdrew your own challenge or Quick Match search",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dibatalkan"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ditarik balik"
           }
         }
       }

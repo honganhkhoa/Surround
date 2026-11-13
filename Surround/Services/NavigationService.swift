@@ -266,6 +266,12 @@ class NavigationService: ObservableObject {
     /// changes never publish through this service. Only Activity's hosts
     /// observe the registry, which settles a main-queue turn later.
     let activityPlaces = ActivityPlaceRegistry()
+    /// What this window's Activity lists started, and what came of it. It
+    /// outlives each list, so a request still finishes after its list closes.
+    let activityResults = ActivityResults()
+    /// The user's own open challenges and Rengo as last known while
+    /// connected, which Activity lists while the socket is down.
+    let activityLastKnown = ActivityLastKnown()
 
     /// Set by the window's root: navigation waits while this window's account
     /// is covered by a moderator superchat.

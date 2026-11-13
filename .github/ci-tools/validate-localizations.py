@@ -46,7 +46,7 @@ EXCLUDED_COMPILER_KEYS = {
     "Back": ("Components/NotificationPopup.swift", 343, "DEBUG notification preview"),
     "Custom game": ("Views/CustomGameForm.swift", 779, "DEBUG custom-game preview"),
     "Preferred settings": ("Views/PreferredSettingsView.swift", 290, "DEBUG preferred-settings preview"),
-    "The web view is unavailable in offline UI tests.": ("Services/NavigationService.swift", 635, "DEBUG offline browser placeholder"),
+    "The web view is unavailable in offline UI tests.": ("Services/NavigationService.swift", 641, "DEBUG offline browser placeholder"),
     "Game layout geometry": ("Views/GameDetail/SingleGameView.swift", 1078, "DEBUG offline layout probe"),
     "Chat panel layout sizes": ("Views/GameDetail/SingleGameView.swift", 1084, "DEBUG offline chat layout probe"),
     "Clock model": ("Views/GameDetail/SingleGameView.swift", 1092, "DEBUG offline clock probe"),
