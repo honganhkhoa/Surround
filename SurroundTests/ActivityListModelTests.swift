@@ -251,6 +251,12 @@ final class ActivityListModelTests: XCTestCase {
         XCTAssertEqual(ActivityAcceptRule(isLive: false, gameID: 902), .stay(outcome: .gameStarted(gameID: 902)))
     }
 
+    func testPendingActionsSayWhatIsBeingSent() {
+        XCTAssertEqual([ActivityAction.accept, .reject, .withdraw, .leave, .start].map(\.pendingText), [
+            "Accepting…", "Rejecting…", "Withdrawing…", "Leaving…", "Starting…",
+        ])
+    }
+
     func testResultsAndFailuresReadAsTheRowShowsThem() {
         XCTAssertEqual(ActivityOutcome.gameStarted(gameID: 1).text, "Game started")
         XCTAssertEqual(ActivityOutcome.rejected.text, "Rejected")
@@ -259,6 +265,68 @@ final class ActivityListModelTests: XCTestCase {
         XCTAssertEqual([ActivityAction.accept, .reject, .withdraw, .leave, .start].map(\.failureText), [
             "Couldn’t accept", "Couldn’t reject", "Couldn’t withdraw", "Couldn’t leave", "Couldn’t start",
         ])
+    }
+
+    // MARK: Rows and cards
+
+    func testAnItemIDNamesTheChallengeOrWaitingItemItsCardShows() {
+        XCTAssertEqual(ActivityItemRef.parse("challenge-95001"), .challenge(95_001))
+        XCTAssertEqual(ActivityItemRef.parse("waiting-quick-match-a1c7"), .waiting(.quickMatch("a1c7")))
+        XCTAssertEqual(ActivityItemRef.parse("waiting-open-95101"), .waiting(.openChallenge(95_101)))
+        XCTAssertEqual(ActivityItemRef.parse("waiting-sent-95201"), .waiting(.sentChallenge(95_201)))
+        XCTAssertEqual(ActivityItemRef.parse("waiting-rengo-95301"), .waiting(.rengo(95_301)))
+        for other in ["game-91004001", "conversation-915100", "correspondence-games", "challenge-", "challenge-05",
+                      "challenge-x", "waiting-", "waiting-open-x", "open-95101", "95001"] {
+            XCTAssertNil(ActivityItemRef.parse(other), other)
+        }
+
+        typealias WaitingID = ActivityModel.WaitingID
+        XCTAssertEqual(ActivityItemRef.parse(challenge(7).id), .challenge(7), "An item's own id reads back.")
+        XCTAssertEqual(ActivityItemRef.parse(waiting(WaitingID.quickMatch("u-1"), kind: .quickMatch).id),
+                       .waiting(.quickMatch("u-1")))
+        XCTAssertEqual(ActivityItemRef.parse(waiting(WaitingID.rengo(9), kind: .rengo).id), .waiting(.rengo(9)))
+    }
+
+    func testAPositionIsTheRowsSectionAndTheRowBeforeIt() {
+        let sections = Sections.sections(
+            list: [game(1), game(2), challenge(3), waiting("open-4")],
+            resolved: [resolved("waiting-open-5", after: "waiting-open-4")]
+        )
+        let second = Sections.position(of: "game-2", in: sections)
+        XCTAssertEqual(second?.section, .liveGames)
+        XCTAssertEqual(second?.after, "game-1")
+        let first = Sections.position(of: "game-1", in: sections)
+        XCTAssertEqual(first?.section, .liveGames)
+        XCTAssertNil(first?.after, "It leads its section.")
+        XCTAssertEqual(Sections.position(of: "challenge-3", in: sections)?.section, .challengesReceived)
+        XCTAssertNil(Sections.position(of: "challenge-3", in: sections)?.after, "Sections don't run into each other.")
+        XCTAssertEqual(Sections.position(of: "waiting-open-5", in: sections)?.after, "waiting-open-4",
+                       "A resolved row has a place too.")
+        XCTAssertNil(Sections.position(of: "waiting-open-9", in: sections))
+    }
+
+    func testElapsedTimeReadsMinutesThenHours() {
+        XCTAssertEqual(ActivityElapsed.text(0), "0:00")
+        XCTAssertEqual(ActivityElapsed.text(72), "1:12")
+        XCTAssertEqual(ActivityElapsed.text(220.9), "3:40", "Whole seconds, rounded down.")
+        XCTAssertEqual(ActivityElapsed.text(3_599), "59:59")
+        XCTAssertEqual(ActivityElapsed.text(3_600), "1:00:00")
+        XCTAssertEqual(ActivityElapsed.text(36_125), "10:02:05")
+        XCTAssertEqual(ActivityElapsed.text(-3), "0:00", "A clock that went back reads no time.")
+    }
+
+    func testAQuickMatchRowWithdrawsInPlaceOnlyForOneSizeAtOneSpeed() {
+        func entry(_ options: [(Int, TimeControlSpeed)]) -> OGSAutomatchEntry {
+            OGSAutomatchEntry(
+                sizeSpeedOptions: options.map { OGSAutomatchSizeSpeedOption(size: $0.0, speed: $0.1, system: .byoyomi) },
+                uuid: "u", creationTimestamp: nil
+            )
+        }
+        XCTAssertTrue(ActivityQuickMatchRow.withdrawsInPlace(entry([(19, .live)])))
+        XCTAssertTrue(ActivityQuickMatchRow.withdrawsInPlace(entry([(19, .live), (19, .live)])),
+                      "The same size and speed twice is still one search.")
+        XCTAssertFalse(ActivityQuickMatchRow.withdrawsInPlace(entry([(19, .correspondence), (13, .correspondence)])))
+        XCTAssertFalse(ActivityQuickMatchRow.withdrawsInPlace(entry([(19, .blitz), (19, .live)])))
     }
 
     // MARK: Quick Match withdraws

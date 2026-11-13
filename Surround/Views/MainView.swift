@@ -72,6 +72,9 @@ struct MainView: View {
     @State private var displaySleepWindow = UUID()
     /// Withdraws the request if this window's views go without an onDisappear.
     @StateObject private var displaySleepLifetime = ViewLifetime()
+    /// Records this window's waiting items as they arrive, for Activity's
+    /// order. Set once, with the window's Activity stores.
+    @State private var activityFirstSeen: ActivityFirstSeenObserver?
 
     @EnvironmentObject var nav: NavigationService
 
@@ -104,6 +107,15 @@ struct MainView: View {
     func endBackgroundTask() {
         SystemPlatformServices.shared.endBackgroundTask(backgroundTask)
         backgroundTask = nil
+    }
+
+    /// Connects the window's Activity stores to its service, once.
+    private func attachActivity() {
+        guard activityFirstSeen == nil else { return }
+        nav.activityResults.attach(client: .live(ogs), navigator: nav,
+                                   scheduler: OGSMainQueueWebsocketScheduler.shared)
+        nav.activityLastKnown.attach(ogs: ogs)
+        activityFirstSeen = ActivityFirstSeenObserver(ogs: ogs)
     }
 
     private func redirectSignedOutAccountDestination() {
@@ -325,6 +337,10 @@ struct MainView: View {
         .sheet(item: $nav.main.accountSheet) { destination in
             IPadAccountSheet(destination: destination)
         }
+        #if DEBUG
+        .modifier(ActivityDebugOpener())
+        #endif
+        .onAppear(perform: attachActivity)
         .onChange(of: ogs.isLoggedIn, initial: true) { _, _ in
             redirectSignedOutAccountDestination()
         }

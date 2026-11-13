@@ -269,6 +269,8 @@ class NavigationService: ObservableObject {
     /// What this window's Activity lists started, and what came of it. It
     /// outlives each list, so a request still finishes after its list closes.
     let activityResults = ActivityResults()
+    /// Closes the Activity list this window shows. Set by its presenter.
+    var onCloseActivity: (() -> Void)?
     /// The user's own open challenges and Rengo as last known while
     /// connected, which Activity lists while the socket is down.
     let activityLastKnown = ActivityLastKnown()
@@ -743,6 +745,21 @@ struct RootViewSwitchingMenu: ViewModifier {
                 }
             }
         }
+    }
+}
+#endif
+
+#if MAIN_APP
+/// What a window's Activity results ask of it. Announcing is
+/// AppAnnouncer+System.swift's `announce(_:)`, so this is app-only.
+extension NavigationService: ActivityNavigating {
+    func closeActivity() {
+        onCloseActivity?()
+    }
+
+    func openGame(_ gameID: Int, closesNewGame: Bool) {
+        guard let route = AppRoute(rootView: .home, ogsGameID: gameID) else { return }
+        requestGameOpen(route, closesNewGame: closesNewGame)
     }
 }
 #endif

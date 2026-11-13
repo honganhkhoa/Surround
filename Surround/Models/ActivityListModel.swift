@@ -227,6 +227,16 @@ enum ActivityListSections {
         return rows
     }
 
+    /// Where a row sits: its section and the id before it there, nil when it
+    /// leads its section. Nil when no section lists it.
+    static func position(of id: String, in sections: [Section]) -> (section: ActivitySection, after: String?)? {
+        for section in sections {
+            guard let index = section.rows.firstIndex(where: { $0.id == id }) else { continue }
+            return (section.kind, index > 0 ? section.rows[index - 1].id : nil)
+        }
+        return nil
+    }
+
     /// Following `after` through the gone rows comes back to `row`.
     private static func leadsBackToItself(
         _ row: ActivityResolvedRow,
@@ -277,12 +287,54 @@ enum ActivityWaitingRef: Equatable {
 
     /// Only the digits `"\(id)"` writes, so "open-05" and "open-+5" are not
     /// challenge 5.
-    private static func number(in id: String, after prefix: String) -> Int? {
+    fileprivate static func number(in id: String, after prefix: String) -> Int? {
         guard let text = remainder(of: id, after: prefix), let number = Int(text),
               String(number) == text else {
             return nil
         }
         return number
+    }
+}
+
+/// What an `ActivityModel.Item.id` names, for a card pushed from the list:
+/// a challenge someone sent the user, or one of the user's own waiting items.
+enum ActivityItemRef: Equatable {
+    case challenge(Int)
+    case waiting(ActivityWaitingRef)
+
+    /// Nil for the other items, which push no card, and for anything the
+    /// model doesn't make.
+    static func parse(_ itemID: String) -> ActivityItemRef? {
+        if let id = ActivityWaitingRef.number(in: itemID, after: "challenge-") {
+            return .challenge(id)
+        }
+        let waitingPrefix = "waiting-"
+        guard itemID.hasPrefix(waitingPrefix),
+              let ref = ActivityWaitingRef.parse(String(itemID.dropFirst(waitingPrefix.count))) else {
+            return nil
+        }
+        return .waiting(ref)
+    }
+}
+
+/// How long a search or open challenge has waited, as the list shows it:
+/// m:ss, then h:mm:ss from an hour.
+enum ActivityElapsed {
+    static func text(_ seconds: TimeInterval) -> String {
+        let whole = Duration.seconds(Int64(max(0, seconds).rounded(.down)))
+        return whole >= .seconds(3_600)
+            ? whole.formatted(.time(pattern: .hourMinuteSecond))
+            : whole.formatted(.time(pattern: .minuteSecond))
+    }
+}
+
+/// A Quick Match row withdraws in place only when its search is one size at
+/// one speed. A search across several opens its card instead, which shows
+/// each one.
+enum ActivityQuickMatchRow {
+    static func withdrawsInPlace(_ entry: OGSAutomatchEntry) -> Bool {
+        Set(entry.sizeSpeedOptions.map(\.size)).count <= 1
+            && Set(entry.sizeSpeedOptions.map(\.speed)).count <= 1
     }
 }
 
@@ -318,6 +370,26 @@ enum ActivityAction: String, Equatable {
                 localized: "Couldn’t start",
                 comment: "Activity: starting a Rengo game you host failed; shown with Retry"
             )
+        }
+    }
+
+    /// What VoiceOver says of the spinner that replaces the action's button
+    /// while it is sent.
+    var pendingText: String {
+        switch self {
+        case .accept:
+            String(localized: "Accepting…", comment: "Activity: VoiceOver, a challenge's Accept is being sent")
+        case .reject:
+            String(localized: "Rejecting…", comment: "Activity: VoiceOver, a challenge's Reject is being sent")
+        case .withdraw:
+            String(
+                localized: "Withdrawing…",
+                comment: "Activity: VoiceOver, withdrawing your own challenge or Quick Match search is being sent"
+            )
+        case .leave:
+            String(localized: "Leaving…", comment: "Activity: VoiceOver, leaving a Rengo challenge you joined is being sent")
+        case .start:
+            String(localized: "Starting…", comment: "Activity: VoiceOver, starting a Rengo game you host is being sent")
         }
     }
 }

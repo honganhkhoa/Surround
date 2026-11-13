@@ -509,6 +509,19 @@ final class ActivityResultsTests: XCTestCase {
         XCTAssertTrue(store.entries.isEmpty, "Ending a session clears its entries.")
     }
 
+    func testTheLiveSessionIsTheLatestBegunList() {
+        XCTAssertEqual(store.liveSession, session)
+        let popover = UUID()
+        store.begin(session: popover)
+        XCTAssertEqual(store.liveSession, popover, "A card pushed from the list on screen acts for it.")
+        store.begin(session: session)
+        XCTAssertEqual(store.liveSession, session, "Beginning again brings a list back to the top.")
+        store.end(session: session)
+        XCTAssertEqual(store.liveSession, popover)
+        store.end(session: popover)
+        XCTAssertNil(store.liveSession)
+    }
+
     func testACompletionAfterItsSessionEndsRecordsNothingButStillSpeaks() {
         withdraw(22)
         store.end(session: session)

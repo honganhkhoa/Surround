@@ -66,6 +66,10 @@ final class ActivityResults: ObservableObject {
     /// calls `forget(hidden:)` once its source has dropped them.
     @Published private(set) var hiddenIDs: Set<String> = []
 
+    /// The latest begun session, whose entries publish: the list on screen,
+    /// which a card it pushed acts for.
+    var liveSession: UUID? { sessionOrder.last }
+
     /// The live session's entries as rows to merge into the list, by id.
     var resolvedRows: [ActivityResolvedRow] {
         entries

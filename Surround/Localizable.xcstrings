@@ -7754,6 +7754,53 @@
         }
       }
     },
+    "%lld players" : {
+      "comment" : "Activity: how many players a Rengo challenge has",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld player"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld players"
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pemain"
+                }
+              }
+            }
+          }
+        },
+        "ms" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pemain"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld ranks below to %lld ranks above" : {
       "comment" : "Accessible opponent range relative to the user's rank: ranks below followed by ranks above.",
       "localizations" : {
@@ -12682,6 +12729,23 @@
         }
       }
     },
+    "Accept %@’s challenge" : {
+      "comment" : "Activity: VoiceOver, accepting a challenge someone sent the user",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terima tantangan %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terima cabaran %@"
+          }
+        }
+      }
+    },
     "Accept removed stones" : {
       "comment" : "Displayed next to Stone Removal Phase - keep short. eg: 'Accept'",
       "localizations" : {
@@ -12931,6 +12995,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已確認"
+          }
+        }
+      }
+    },
+    "Accepting…" : {
+      "comment" : "Activity: VoiceOver, a challenge's Accept is being sent",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menerima…"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menerima…"
           }
         }
       }
@@ -13194,6 +13275,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "進行中的對局"
+          }
+        }
+      }
+    },
+    "Activity" : {
+      "comment" : "Title of the list of the user's games, challenges, searches and messages",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktivitas"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktiviti"
           }
         }
       }
@@ -14019,6 +14117,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AGA"
+          }
+        }
+      }
+    },
+    "All messages" : {
+      "comment" : "Activity: the last row of Messages; opens the Messages tab",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Semua pesan"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Semua mesej"
           }
         }
       }
@@ -19522,6 +19637,23 @@
         }
       }
     },
+    "Can’t reach OGS" : {
+      "comment" : "Activity: under the title while the app can't connect to OGS; shown with Retry",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat terhubung ke OGS"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat menghubungi OGS"
+          }
+        }
+      }
+    },
     "Captures" : {
       "localizations" : {
         "de" : {
@@ -19847,6 +19979,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "收到挑戰！"
+          }
+        }
+      }
+    },
+    "Challenge to %@" : {
+      "comment" : "Activity: a row for a challenge the user sent to this player",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tantangan untuk %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cabaran kepada %@"
           }
         }
       }
@@ -34846,6 +34995,23 @@
         }
       }
     },
+    "Leaving…" : {
+      "comment" : "Activity: VoiceOver, leaving a Rengo challenge you joined is being sent",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sedang keluar…"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sedang keluar…"
+          }
+        }
+      }
+    },
     "Left" : {
       "comment" : "Activity: you left a Rengo challenge you had joined",
       "localizations" : {
@@ -42155,6 +42321,23 @@
         }
       }
     },
+    "Nothing waiting" : {
+      "comment" : "Activity: the list has no games, challenges, searches or messages",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak ada yang menunggu"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiada apa-apa yang menunggu"
+          }
+        }
+      }
+    },
     "Numbers" : {
       "comment" : "Analyze-board tool that places sequential number labels.",
       "localizations" : {
@@ -43390,6 +43573,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開啟音訊"
+          }
+        }
+      }
+    },
+    "Open challenge" : {
+      "comment" : "Activity: a row for an open challenge the user posted, which anyone can accept",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tantangan terbuka"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cabaran terbuka"
+          }
+        }
+      }
+    },
+    "Open game" : {
+      "comment" : "Activity: opens the correspondence game an accepted challenge started",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buka permainan"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buka permainan"
           }
         }
       }
@@ -48810,6 +49027,23 @@
         }
       }
     },
+    "Reject %@’s challenge" : {
+      "comment" : "Activity: VoiceOver, rejecting a challenge someone sent the user",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tolak tantangan %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tolak cabaran %@"
+          }
+        }
+      }
+    },
     "Reject %@’s friend request?" : {
       "comment" : "Confirmation title. The placeholder is the requesting player’s username.",
       "localizations" : {
@@ -49155,6 +49389,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ditolak"
+          }
+        }
+      }
+    },
+    "Rejecting…" : {
+      "comment" : "Activity: VoiceOver, a challenge's Reject is being sent",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menolak…"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menolak…"
           }
         }
       }
@@ -49899,6 +50150,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "聯棋（%lld）"
+          }
+        }
+      }
+    },
+    "Rengo · %@" : {
+      "comment" : "Activity: a row for a Rengo challenge the user hosts or joined, with its name",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rengo · %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rengo · %@"
           }
         }
       }
@@ -57323,6 +57591,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在發起搜尋…"
+          }
+        }
+      }
+    },
+    "Starting…" : {
+      "comment" : "Activity: VoiceOver, starting a Rengo game you host is being sent",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Memulai…"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Memulakan…"
           }
         }
       }
@@ -65965,6 +66250,23 @@
         }
       }
     },
+    "View" : {
+      "comment" : "Activity: opens a challenge's full card, for a challenge that needs a closer look",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lihat"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lihat"
+          }
+        }
+      }
+    },
     "View %@’s profile" : {
       "comment" : "Accessibility label for a button that opens a player's profile",
       "localizations" : {
@@ -66226,6 +66528,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "檢視個人檔案"
+          }
+        }
+      }
+    },
+    "View the challenge from %@" : {
+      "comment" : "Activity: VoiceOver, the View button of a challenge someone sent the user",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lihat tantangan dari %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lihat cabaran daripada %@"
           }
         }
       }
@@ -67061,6 +67380,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "等待對手"
+          }
+        }
+      }
+    },
+    "Waiting for opponents" : {
+      "comment" : "Activity: the section of the user's own searches and challenges",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menunggu lawan"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menunggu lawan"
           }
         }
       }
@@ -69415,6 +69751,23 @@
         }
       }
     },
+    "Withdraw %@" : {
+      "comment" : "Activity: VoiceOver, the Withdraw button of the user's own search or challenge, with its row",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Batalkan %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarik balik %@"
+          }
+        }
+      }
+    },
     "Withdraw live game search" : {
       "localizations" : {
         "de" : {
@@ -69657,6 +70010,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在撤回快速配對搜尋"
+          }
+        }
+      }
+    },
+    "Withdrawing…" : {
+      "comment" : "Activity: VoiceOver, withdrawing your own challenge or Quick Match search is being sent",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membatalkan…"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menarik balik…"
           }
         }
       }
@@ -70922,6 +71292,23 @@
         }
       }
     },
+    "Your correspondence games" : {
+      "comment" : "Activity: the section with one row for the correspondence games on the user's move",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permainan korespondensi Anda"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permainan surat-menyurat anda"
+          }
+        }
+      }
+    },
     "Your friends" : {
       "localizations" : {
         "de" : {
@@ -71414,6 +71801,53 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "輪到你（%02d）"
+          }
+        }
+      }
+    },
+    "Your move in %lld games" : {
+      "comment" : "Activity: one row for the correspondence games on the user's move; opens the most urgent",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Your move in %lld game"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Your move in %lld games"
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Giliran Anda dalam %lld permainan"
+                }
+              }
+            }
+          }
+        },
+        "ms" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Giliran anda dalam %lld permainan"
+                }
+              }
+            }
           }
         }
       }
