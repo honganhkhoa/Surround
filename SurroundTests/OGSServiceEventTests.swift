@@ -6355,6 +6355,59 @@ final class OGSServiceEventTests: XCTestCase {
         withExtendedLifetime(service) {}
     }
 
+    /// Without a speed tag, a challenge is classified by its clock and board
+    /// size, as Activity classifies it. A challenge with no time limit is
+    /// correspondence and gets no keepalive; an untagged live one still does.
+    func testKeepaliveClassifiesAnUntaggedChallengeByItsClock() {
+        let (service, socket, scheduler) = keepaliveService()
+        var noTimeLimit = seekGraphChallengePayload(id: 62, challengerID: 1)
+        noTimeLimit["time_control_parameters"] = [
+            "system": "none", "time_control": "none",
+        ] as [String: Any]
+        var untaggedLive = seekGraphChallengePayload(id: 63, challengerID: 1)
+        untaggedLive["time_control_parameters"] = [
+            "per_move": 20, "pause_on_weekends": false, "system": "simple", "time_control": "simple",
+        ] as [String: Any]
+        socket.deliver(name: "seekgraph/global", data: [noTimeLimit, untaggedLive])
+
+        XCTAssertEqual(Set(service.openChallengeSentById.keys), [62, 63])
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [63])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+        withExtendedLifetime(service) {}
+    }
+
+    /// The live count and the keepalive share one rule. OGS's tag decides
+    /// when present; without one the clock and board size do, and a clock
+    /// system the client does not know counts as live.
+    func testTheWaitingLiveRuleReadsUntaggedClocksAndKeepsUnknownOnesLive() {
+        let decoder = DictionaryDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        func isWaitingLive(_ timeControl: [String: Any], size: Int = 19) throws -> Bool {
+            var payload = seekGraphChallengePayload(id: 65, challengerID: 1)
+            payload["time_control_parameters"] = timeControl
+            payload["width"] = size
+            payload["height"] = size
+            let challenge = try decoder.decode(OGSSeekgraphChallenge.self, from: payload)
+            return OGSService.isWaitingLive(challenge.game)
+        }
+        let days: [String: Any] = [
+            "system": "fischer", "time_control": "fischer",
+            "initial_time": 259_200, "time_increment": 86_400, "max_time": 604_800,
+        ]
+        var taggedLive = days
+        taggedLive["speed"] = "live"
+        let longGame: [String: Any] = ["system": "absolute", "time_control": "absolute", "total_time": 200_000]
+
+        XCTAssertTrue(try isWaitingLive(taggedLive), "The tag decides when present.")
+        XCTAssertFalse(try isWaitingLive(days))
+        XCTAssertFalse(try isWaitingLive(["system": "none", "time_control": "none"]),
+                       "No time limit is correspondence.")
+        XCTAssertTrue(try isWaitingLive(longGame, size: 19))
+        XCTAssertFalse(try isWaitingLive(longGame, size: 9), "The board size counts.")
+        XCTAssertTrue(try isWaitingLive(["system": "future-clock", "time_control": "future-clock"]),
+                      "An unknown clock counts as live.")
+    }
+
     // MARK: - Challenge send holds
 
     private func seekGraphHoldService() -> (OGSService, FakeWebsocket) {

@@ -315,8 +315,7 @@ enum ActivityModel {
     /// Live once OGS tags it, or from its clock and board size when the tag
     /// is missing; an unknown clock is never live.
     static func isRealtime(_ timeControl: TimeControl, width: Int, height: Int) -> Bool {
-        let speed = timeControl.speed ?? timeControl.inferredSpeed(boardWidth: width, boardHeight: height)
-        return speed?.isRealtime == true
+        timeControl.resolvedSpeed(boardWidth: width, boardHeight: height)?.isRealtime == true
     }
 
     /// A live game on your move, a live challenge, a live game on their

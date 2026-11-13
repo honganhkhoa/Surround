@@ -1189,6 +1189,14 @@ class OGSService: ObservableObject {
     }
     @Published private(set) public var waitingLiveGames: Int = 0
     private var waitingLiveGamesCancellable: AnyCancellable?
+    /// Whether a challenge the user waits on counts as live, for the live
+    /// count and an open challenge's keepalive: by OGS's speed tag, or by the
+    /// clock and board size when the tag is missing. A clock system the
+    /// client does not know counts as live, so an open challenge with one is
+    /// still kept alive.
+    static func isWaitingLive<Detail: OGSChallengeGameDetail>(_ game: Detail) -> Bool {
+        game.timeControl.resolvedSpeed(boardWidth: game.width, boardHeight: game.height) != .correspondence
+    }
     @Published private(set) public var hostingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
     @Published private(set) public var participatingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
     
@@ -1583,11 +1591,11 @@ class OGSService: ObservableObject {
         waitingLiveGamesCancellable = Publishers.CombineLatest3($challengesSent, $openChallengeSentById, $autoMatchEntryById).receive(on: DispatchQueue.main).sink(receiveValue: { challengesSent, openChallengeSentById, autoMatchEntryById in
             self.waitingLiveGames =
                 challengesSent.filter {
-                    $0.game.timeControl.speed != .correspondence
+                    OGSService.isWaitingLive($0.game)
                 }.count
                 +
                 openChallengeSentById.values.filter {
-                    $0.game.timeControl.speed != .correspondence
+                    OGSService.isWaitingLive($0.game)
                 }.count
                 +
                 autoMatchEntryById.values.filter {
@@ -5483,7 +5491,7 @@ class OGSService: ObservableObject {
             return
         }
 
-        let challenges = openChallengeSentById.values.filter { $0.game.timeControl.speed != .correspondence }
+        let challenges = openChallengeSentById.values.filter { OGSService.isWaitingLive($0.game) }
         // The next seek graph event that lists one starts the loop again.
         guard !challenges.isEmpty else {
             return

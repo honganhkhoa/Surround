@@ -445,6 +445,13 @@ struct TimeControl: Codable, Equatable, Hashable {
         system.inferredSpeed(boardWidth: boardWidth, boardHeight: boardHeight)
     }
 
+    /// OGS's speed tag, or the speed the clock and board size give when the
+    /// tag is missing. Nil only for an untagged clock system the client does
+    /// not know.
+    func resolvedSpeed(boardWidth: Int, boardHeight: Int) -> TimeControlSpeed? {
+        speed ?? inferredSpeed(boardWidth: boardWidth, boardHeight: boardHeight)
+    }
+
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         var encodableCodingData = codingData
