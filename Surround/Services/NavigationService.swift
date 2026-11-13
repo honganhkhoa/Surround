@@ -272,6 +272,10 @@ class NavigationService: ObservableObject {
     /// The user's own open challenges and Rengo as last known while
     /// connected, which Activity lists while the socket is down.
     let activityLastKnown = ActivityLastKnown()
+    /// Unsent messages and reading positions by account and peer, shared by
+    /// every stack in this window. A constant, so a keystroke never
+    /// publishes through this service: only conversation views observe it.
+    let conversationDrafts = ConversationDraftStore()
 
     /// Set by the window's root: navigation waits while this window's account
     /// is covered by a moderator superchat.

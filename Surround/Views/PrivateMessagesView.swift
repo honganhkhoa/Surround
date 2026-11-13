@@ -535,16 +535,14 @@ struct MessagesConversationView: View {
                 .accessibilityIdentifier("messages.conversation.heading")
                 Divider()
             }
-            PrivateMessageLog(peer: peer,
+            MessagesConversationLog(drafts: nav.conversationDrafts, peer: peer,
+                accountID: ogs.user?.id,
                 marksThreadAsRead: navigation.path.last == owningStackRoute
                     && navigation.isActive,
-                draft: navigation.conversationDraft(for: peer.id, accountID: ogs.user?.id),
-                scrollBookmark: navigation.conversationScrollBookmark(for: peer.id, accountID: ogs.user?.id),
-                showsProfileToolbar: false,
                 focusIsSuspended: navigation.path.last != owningStackRoute
                     || !navigation.isActive,
                 composerFocusIsSuspended: nav.main.accountSheet != nil,
-                composer: .init(header: endedLine))
+                header: endedLine)
         }
         .background(Color(uiColor: .systemBackground))
     }
@@ -599,6 +597,31 @@ struct MessagesConversationView: View {
         }
         .accessibilityLabel(Text("View \(peer.username)’s profile"))
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileMessageToolbarEntry(peer.id))
+    }
+}
+
+/// The transcript and composer, with the draft and reading position from
+/// the window's store. Only this view observes the store, so a keystroke
+/// redraws the window's conversations, including a second composer for the
+/// same peer, and never the stacks or games around them.
+private struct MessagesConversationLog: View {
+    @ObservedObject var drafts: ConversationDraftStore
+    let peer: OGSUser
+    let accountID: Int?
+    let marksThreadAsRead: Bool
+    let focusIsSuspended: Bool
+    let composerFocusIsSuspended: Bool
+    let header: AnyView?
+
+    var body: some View {
+        PrivateMessageLog(peer: peer,
+            marksThreadAsRead: marksThreadAsRead,
+            draft: drafts.draft(for: peer.id, accountID: accountID),
+            scrollBookmark: drafts.scrollBookmark(for: peer.id, accountID: accountID),
+            showsProfileToolbar: false,
+            focusIsSuspended: focusIsSuspended,
+            composerFocusIsSuspended: composerFocusIsSuspended,
+            composer: .init(header: header))
     }
 }
 
