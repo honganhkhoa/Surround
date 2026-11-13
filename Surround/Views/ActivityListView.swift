@@ -860,9 +860,10 @@ struct ActivityStatusLine: View {
             if connection.status.offersRetry {
                 Text("Can’t reach OGS", comment: "Activity: under the title while the app can't connect to OGS; shown with Retry")
                     .accessibilityIdentifier(statusIdentifier)
+                // Its own style, as a tint loses to the line's secondary one.
                 Button("Retry") { connection.retry() }
                     .font(.subheadline.weight(.semibold))
-                    .tint(MessagesStyle.accent)
+                    .foregroundStyle(MessagesStyle.accent)
                     .frame(minHeight: 44)
                     .accessibilityIdentifier(retryIdentifier)
             } else {
