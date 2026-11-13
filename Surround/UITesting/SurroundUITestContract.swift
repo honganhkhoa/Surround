@@ -854,6 +854,16 @@ enum SurroundUITestContract {
         static func friendRequestRetry(_ playerID: Int) -> String {
             "friend-request.retry.\(playerID)"
         }
+
+        /// The result an accepted or rejected request shows in its inbox row.
+        static func friendRequestResult(_ playerID: Int) -> String {
+            "friend-request.result.\(playerID)"
+        }
+
+        /// View profile, under an accepted request's result.
+        static func friendRequestViewProfile(_ playerID: Int) -> String {
+            "friend-request.view-profile.\(playerID)"
+        }
         static let profileSettingsEntry = "profile.entry.settings"
         static let profileEdit = "profile.edit"
         static let profileShare = "profile.share"

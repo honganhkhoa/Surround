@@ -1800,12 +1800,20 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         enterDraft(draft, in: assertConversation("hakhoa", peerID: firstPeerID,
                                                 presentation: .wideRoot, in: app), app: app)
         let ids = SurroundUITestContract.friendshipFixtureRequestPlayerIDs
+        let usernames = SurroundUITestContract.friendshipFixtureRequestUsernames
         let firstAccept = inboxElement(SurroundUITestContract.AccessibilityID.friendRequestAccept(ids[0]), in: app)
         tap(firstAccept, description: "Accept the offline inbox request whose first response fails", in: app)
         retryFixtureAcceptance(in: app)
         XCTAssertTrue(waitForCondition {
             !self.query(SurroundUITestContract.AccessibilityID.friendRequestProfile(ids[0]), in: app).exists
         })
+        // The accepted request keeps its place and shows what came of it.
+        let firstResult = query(SurroundUITestContract.AccessibilityID.friendRequestResult(ids[0]), in: app)
+        XCTAssertTrue(waitForCondition { firstResult.exists && firstResult.label == "You and \(usernames[0]) are friends" },
+                      "After Retry succeeds, the request row must show its result instead of going.")
+        XCTAssertFalse(query(SurroundUITestContract.AccessibilityID.friendRequestAccept(ids[0]), in: app).exists)
+        let viewProfile = inboxElement(SurroundUITestContract.AccessibilityID.friendRequestViewProfile(ids[0]), in: app)
+        XCTAssertEqual(viewProfile.label, "View \(usernames[0])’s profile")
         XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID,
                                                                presentation: .wideRoot, in: app), timeout: stateSettleTimeout))
         let secondProfile = inboxElement(SurroundUITestContract.AccessibilityID.friendRequestProfile(ids[1]), in: app)
@@ -1815,7 +1823,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         XCTAssertEqual(secondProfile.value as? String, "5k, \(relativeAge)",
                        "The dated request's rank and relative age must be accessible together.")
         tap(secondProfile, description: "Open the other request's full-width Profile", in: app)
-        let username = SurroundUITestContract.friendshipFixtureRequestUsernames[1]
+        let username = usernames[1]
         assertLoadedProfile(named: username, in: app)
         assertFullWidthDestination(SurroundUITestContract.AccessibilityID.screenPlayerProfile, over: bounds, in: app)
         let banner = element(SurroundUITestContract.AccessibilityID.profileFriendRequest, in: app)
@@ -1831,6 +1839,10 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID,
                                                                presentation: .wideRoot, in: app), timeout: stateSettleTimeout))
         XCTAssertFalse(query(SurroundUITestContract.AccessibilityID.friendRequestProfile(ids[1]), in: app).exists)
+        XCTAssertFalse(query(SurroundUITestContract.AccessibilityID.friendRequestResult(ids[1]), in: app).exists,
+                       "A request accepted from Profile shows no result in the inbox.")
+        XCTAssertFalse(query(SurroundUITestContract.AccessibilityID.friendRequestResult(ids[0]), in: app).exists,
+                       "Results clear once the inbox leaves its root.")
         XCTAssertFalse(app.alerts.firstMatch.exists, "The covered inbox must not replay Profile's resolved error after Back.")
         inboxElement(SurroundUITestContract.AccessibilityID.friendRequestAccept(ids[2]), in: app)
     }

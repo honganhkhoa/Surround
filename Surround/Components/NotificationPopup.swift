@@ -7,34 +7,6 @@
 
 import SwiftUI
 
-private func friendshipMessage(for action: OGSFriendshipAction) -> String {
-    switch action {
-    case .send: return String(localized: "Sent friend request")
-    case .accept: return String(localized: "Friend request accepted")
-    case .reject: return String(localized: "Friend request rejected")
-    case .remove: return String(localized: "Removed friend")
-    }
-}
-
-/// Each navigation stack draws the shared notice above its own content,
-/// including stacks presented in sheets. The root popup owns its expiry.
-struct FriendshipNoticeBanner: View {
-    @EnvironmentObject private var ogs: OGSService
-
-    var body: some View {
-        if let notice = ogs.friendshipNotice {
-            Text(verbatim: friendshipMessage(for: notice.action))
-                .bold()
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(Color(.systemIndigo), in: RoundedRectangle(cornerRadius: 10))
-                .padding(16)
-                .allowsHitTesting(false)
-        }
-    }
-}
-
 /// Message access in the global notice row, on every screen including Game
 /// Detail, until the game gets a design of its own for it. It opens the
 /// window's Activity list at Messages.
@@ -121,7 +93,6 @@ struct NotificationPopup: View {
     /// live games wait.
     @State private var livePillFrame = ActivityOpenerFrame()
 
-    @State private var friendshipNotice: OGSFriendshipNotice?
     /// When a banner already on screen starts to fade in after the socket
     /// leaves `.connected` (2 s, so a short blip shows nothing). One mounted
     /// while offline is opaque at once and has none.
@@ -287,18 +258,6 @@ struct NotificationPopup: View {
         .task(id: connectionBannerShown) { await publishConnectionBanner() }
         .onDisappear {
             if nav.connectionBannerVisible { nav.connectionBannerVisible = false }
-        }
-        .onReceive(ogs.$friendshipNotice) { notice in
-            friendshipNotice = notice
-            if let notice {
-                nav.announce(.init(.friendshipResult(notice.id), audience: .anyWindow, speech: friendshipMessage(for: notice.action)))
-            }
-        }
-        .task(id: friendshipNotice?.id) {
-            guard let noticeID = friendshipNotice?.id else { return }
-            do { try await Task.sleep(for: .seconds(3)) }
-            catch { return }
-            ogs.dismissFriendshipNotice(id: noticeID)
         }
     }
 }

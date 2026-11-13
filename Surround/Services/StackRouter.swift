@@ -814,9 +814,6 @@ struct AppNavigationStack<Content: View>: View {
                 }
         }
         .modifier(GameDetailLegacyTint(color: legacyGameDetailTint))
-        .overlay(alignment: .bottom) {
-            if navigation.isActive { FriendshipNoticeBanner() }
-        }
         .environmentObject(navigation)
         .environment(\.hasGlobalNotificationOverlay, rootView != nil)
         // Presented stacks reset it: a sheet or popover inherits its

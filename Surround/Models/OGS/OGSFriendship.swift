@@ -108,6 +108,8 @@ struct OGSFriendInvitation: Decodable, Identifiable, Equatable {
 struct OGSFriendshipNotice: Identifiable {
     let id = UUID()
     let action: OGSFriendshipAction
+    /// The other player.
+    let user: OGSUser
 }
 
 struct OGSFriendshipFailure: Identifiable {

@@ -281,6 +281,9 @@ class NavigationService: ObservableObject {
     /// every stack in this window. A constant, so a keystroke never
     /// publishes through this service: only conversation views observe it.
     let conversationDrafts = ConversationDraftStore()
+    /// Who speaks this window's confirmed friendship actions: the Messages
+    /// request row that shows the result, or else the window, once.
+    let friendshipConfirmations = FriendshipConfirmations()
 
     /// Set by the window's root: navigation waits while this window's account
     /// is covered by a moderator superchat.
@@ -779,6 +782,83 @@ extension NavigationService {
               request.anchor != anchor else { return }
         request.anchor = anchor
         main.activity = request
+    }
+}
+
+/// Who speaks a friendship action OGS confirmed in one window. A Messages
+/// request row the user acted on shows the result in its place; when
+/// VoiceOver was on that row's controls, the row moves focus to the result
+/// and claims the notice as it arrives. Otherwise the window speaks it,
+/// once, a main-queue turn after it arrives, so a claim made as the notice
+/// arrived counts whichever saw it first. Then the notice is dismissed.
+/// Main thread by convention, like its owner.
+final class FriendshipConfirmations {
+    private let scheduler: OGSWebsocketScheduling
+    /// Notices whose turn hasn't come, so one delivered twice is decided once.
+    private var waitingIDs: Set<UUID> = []
+    private var claimedIDs: Set<UUID> = []
+
+    init(scheduler: OGSWebsocketScheduling = OGSMainQueueWebsocketScheduler.shared) {
+        self.scheduler = scheduler
+    }
+
+    /// A request row moved VoiceOver focus to the result this notice
+    /// confirms, so the window stays silent.
+    func claim(_ noticeID: UUID) {
+        claimedIDs.insert(noticeID)
+    }
+
+    /// Speaks `notice` through `announce` a turn later, unless a row claimed
+    /// it by then, and then calls `dismiss`.
+    func receive(
+        _ notice: OGSFriendshipNotice,
+        announce: @escaping (AppAnnouncement) -> Void,
+        dismiss: @escaping () -> Void
+    ) {
+        guard waitingIDs.insert(notice.id).inserted else { return }
+        scheduler.async { [weak self] in
+            guard let self else { return }
+            waitingIDs.remove(notice.id)
+            let claimed = claimedIDs.remove(notice.id) != nil
+            // Every notice still to be decided is waiting, so older claims
+            // can't silence anything.
+            if waitingIDs.isEmpty {
+                claimedIDs.removeAll()
+            }
+            if !claimed {
+                announce(AppAnnouncement(.friendshipResult(notice.id), audience: .anyWindow,
+                                         speech: notice.action.confirmation(with: notice.user)))
+            }
+            dismiss()
+        }
+    }
+}
+
+extension OGSFriendshipAction {
+    /// What a confirmed action says: in the Messages request row the user
+    /// acted on, and spoken when no row shows it.
+    func confirmation(with player: OGSUser) -> String {
+        switch self {
+        case .send:
+            String(localized: "Sent friend request")
+        case .accept:
+            String(
+                localized: "You and \(player.username) are friends",
+                comment: "Messages: the result of accepting a friend request, in place of the request and spoken. The placeholder is the other player’s username."
+            )
+        case .reject(notifyRequestor: true):
+            String(
+                localized: "Rejected. \(player.username) was told.",
+                comment: "Messages: the result of rejecting a friend request and letting its sender know, in place of the request and spoken. The placeholder is the sender’s username."
+            )
+        case .reject(notifyRequestor: false):
+            String(
+                localized: "Rejected quietly.",
+                comment: "Messages: the result of rejecting a friend request without letting its sender know, in place of the request and spoken."
+            )
+        case .remove:
+            String(localized: "Removed friend")
+        }
     }
 }
 #endif

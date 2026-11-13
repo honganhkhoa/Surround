@@ -227,6 +227,8 @@ private struct ActivityListContent: View {
     /// The list is shown, or covered only by what it pushed.
     @State private var isPresented = true
     @State private var hasFocused = false
+    /// Where VoiceOver is among the rows' controls and results.
+    @AccessibilityFocusState private var voiceOverFocus: ActivityFocus?
     /// The two settings Home reads, so the live games' clocks match Home's.
     @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
     private var gameThemeID = SurroundTheme.standard.rawValue
@@ -307,6 +309,29 @@ private struct ActivityListContent: View {
         }
         .onChange(of: isPresented && scenePhase != .background, initial: true) { _, visible in
             connection.setVisible(visible)
+        }
+        .onReceive(results.$entries) { claimResults($0) }
+    }
+
+    /// Sends a row's request. VoiceOver on the control that sent it moves to
+    /// the spinner standing in for it, where the result can take it over.
+    private func send(_ control: ActivityFocusControl, of itemID: String, _ request: () -> Void) {
+        if let next = ActivityFocus.sending(control, of: itemID, from: voiceOverFocus) {
+            voiceOverFocus = next
+        }
+        request()
+    }
+
+    /// As a result publishes, a row whose control or spinner has VoiceOver
+    /// focus moves it to the result and claims it, in this same callback,
+    /// before the store decides a turn later. Waiting for the redraw could
+    /// be too late. `results.entries` still holds the value before `next`.
+    private func claimResults(_ next: [String: ActivityResults.Entry]) {
+        let before = results.entries
+        for (itemID, entry) in next where !entry.state.isPending && before[itemID]?.state != entry.state {
+            guard ActivityFocus.resultTakesFocus(from: voiceOverFocus, row: itemID) else { continue }
+            voiceOverFocus = .result(itemID)
+            results.claim(itemID: itemID)
         }
     }
 
@@ -459,8 +484,9 @@ private struct ActivityListContent: View {
         case .resolved(let resolved):
             ActivityResolvedRowView(
                 row: resolved, entry: results.entries[resolved.id], density: density,
-                actionState: actionState(for: resolved.id),
-                retry: { results.retry(itemID: resolved.id) }, openGame: openGame
+                actionState: actionState(for: resolved.id), focus: $voiceOverFocus,
+                retry: { send(.retry, of: resolved.id) { results.retry(itemID: resolved.id) } },
+                openGame: openGame
             )
         }
     }
@@ -507,16 +533,21 @@ private struct ActivityListContent: View {
         return ActivityChallengeRow(
             itemID: itemID, challenge: challenge, content: content, density: density,
             actionState: actionState(for: itemID, isUnusual: model.isUnusual), entry: results.entries[itemID],
+            focus: $voiceOverFocus,
             accept: {
-                results.accept(challenge: challenge, isLive: model.isLive, session: session, itemID: itemID,
-                               display: content.display, section: .challengesReceived, after: after)
+                send(.action(.accept), of: itemID) {
+                    results.accept(challenge: challenge, isLive: model.isLive, session: session, itemID: itemID,
+                                   display: content.display, section: .challengesReceived, after: after)
+                }
             },
             reject: {
-                results.reject(challenge: challenge, session: session, itemID: itemID,
-                               display: content.display, section: .challengesReceived, after: after)
+                send(.action(.reject), of: itemID) {
+                    results.reject(challenge: challenge, session: session, itemID: itemID,
+                                   display: content.display, section: .challengesReceived, after: after)
+                }
             },
             view: { push(itemID) },
-            retry: { results.retry(itemID: itemID) },
+            retry: { send(.retry, of: itemID) { results.retry(itemID: itemID) } },
             openGame: openGame
         )
     }
@@ -548,18 +579,21 @@ private struct ActivityListContent: View {
             withdrawLabel: ActivityRowContents.withdrawLabel(content, hasElapsedTime: hasElapsedTime),
             open: opensCard ? { push(itemID) } : nil,
             actionState: actionState(for: itemID), entry: results.entries[itemID],
+            focus: $voiceOverFocus,
             withdraw: {
-                switch target {
-                case .search(let entry):
-                    results.withdraw(automatch: entry, session: session, itemID: itemID,
-                                     display: content.display, section: .waiting, after: after)
-                default:
-                    guard let challenge = target.challenge else { return }
-                    results.withdraw(challenge: challenge, session: session, itemID: itemID,
-                                     display: content.display, section: .waiting, after: after)
+                send(.action(.withdraw), of: itemID) {
+                    switch target {
+                    case .search(let entry):
+                        results.withdraw(automatch: entry, session: session, itemID: itemID,
+                                         display: content.display, section: .waiting, after: after)
+                    default:
+                        guard let challenge = target.challenge else { return }
+                        results.withdraw(challenge: challenge, session: session, itemID: itemID,
+                                         display: content.display, section: .waiting, after: after)
+                    }
                 }
             },
-            retry: { results.retry(itemID: itemID) },
+            retry: { send(.retry, of: itemID) { results.retry(itemID: itemID) } },
             openGame: openGame
         )
     }
@@ -638,6 +672,8 @@ private struct ActivityItemCardContent: View {
     /// The list's own, which pushed the card.
     @ObservedObject var connection: ConnectionStatusSource
     @EnvironmentObject private var navigation: StackRouter
+    /// Where VoiceOver is among the card's controls and its failure line.
+    @AccessibilityFocusState private var voiceOverFocus: ActivityFocus?
 
     private enum Target {
         case challenge(any OGSSubmittedChallenge)
@@ -673,7 +709,8 @@ private struct ActivityItemCardContent: View {
                         actionState: ActivityRowActionState(isUnusual: false, isInGamePopover: false,
                                                             isOffline: connection.dimsActivityActions,
                                                             state: entry.state),
-                        retry: { results.retry(itemID: itemID) }, openGame: { _ in }
+                        focus: $voiceOverFocus,
+                        retry: { send(.retry) { results.retry(itemID: itemID) } }, openGame: { _ in }
                     )
                     .padding(.horizontal, 4)
                 }
@@ -702,6 +739,27 @@ private struct ActivityItemCardContent: View {
         .onChange(of: results.entries[itemID]?.state) { _, state in
             if case .succeeded = state { pop() }
         }
+        .onReceive(results.$entries) { claimFailure($0) }
+    }
+
+    /// Sends one of the card's requests. VoiceOver on the control that sent
+    /// it moves to the spinner standing in for it.
+    private func send(_ control: ActivityFocusControl, _ request: () -> Void) {
+        if let next = ActivityFocus.sending(control, of: itemID, from: voiceOverFocus) {
+            voiceOverFocus = next
+        }
+        request()
+    }
+
+    /// A failure shows above the card. When VoiceOver is on the card's
+    /// control or spinner as it publishes, the failure takes focus and
+    /// claims it, as the list's rows do. A success pops the card, so the
+    /// store speaks it.
+    private func claimFailure(_ next: [String: ActivityResults.Entry]) {
+        guard next[itemID]?.state == .failed, results.entries[itemID]?.state != .failed,
+              ActivityFocus.resultTakesFocus(from: voiceOverFocus, row: itemID) else { return }
+        voiceOverFocus = .result(itemID)
+        results.claim(itemID: itemID)
     }
 
     private func title(_ target: Target?) -> Text {
@@ -726,38 +784,54 @@ private struct ActivityItemCardContent: View {
         let itemID = itemID
         let source = source
         let session = results.liveSession ?? UUID()
+        let current = results.entries[itemID]
         return ActivityCellActions(
-            isPending: results.entries[itemID]?.state.isPending ?? false,
+            isPending: current?.state.isPending ?? false,
             isOffline: connection.dimsActivityActions,
+            focus: $voiceOverFocus,
+            itemID: itemID,
+            pendingAction: current?.state.isPending == true ? current?.action : nil,
             accept: { challenge in
-                let row = source.frozen(itemID)
-                results.accept(challenge: challenge, isLive: Self.isLive(challenge), session: session, itemID: itemID,
-                               display: row.display, section: row.section, after: row.after)
+                send(.action(.accept)) {
+                    let row = source.frozen(itemID)
+                    results.accept(challenge: challenge, isLive: Self.isLive(challenge), session: session,
+                                   itemID: itemID, display: row.display, section: row.section, after: row.after)
+                }
             },
             reject: { challenge in
-                let row = source.frozen(itemID)
-                results.reject(challenge: challenge, session: session, itemID: itemID,
-                               display: row.display, section: row.section, after: row.after)
+                send(.action(.reject)) {
+                    let row = source.frozen(itemID)
+                    results.reject(challenge: challenge, session: session, itemID: itemID,
+                                   display: row.display, section: row.section, after: row.after)
+                }
             },
             withdraw: { challenge in
-                let row = source.frozen(itemID)
-                results.withdraw(challenge: challenge, session: session, itemID: itemID,
-                                 display: row.display, section: row.section, after: row.after)
+                send(.action(.withdraw)) {
+                    let row = source.frozen(itemID)
+                    results.withdraw(challenge: challenge, session: session, itemID: itemID,
+                                     display: row.display, section: row.section, after: row.after)
+                }
             },
             withdrawSearch: { entry in
-                let row = source.frozen(itemID)
-                results.withdraw(automatch: entry, session: session, itemID: itemID,
-                                 display: row.display, section: row.section, after: row.after)
+                send(.action(.withdraw)) {
+                    let row = source.frozen(itemID)
+                    results.withdraw(automatch: entry, session: session, itemID: itemID,
+                                     display: row.display, section: row.section, after: row.after)
+                }
             },
             leave: { challenge in
-                let row = source.frozen(itemID)
-                results.leave(rengo: challenge, session: session, itemID: itemID,
-                              display: row.display, section: row.section, after: row.after)
+                send(.action(.leave)) {
+                    let row = source.frozen(itemID)
+                    results.leave(rengo: challenge, session: session, itemID: itemID,
+                                  display: row.display, section: row.section, after: row.after)
+                }
             },
             start: { challenge in
-                let row = source.frozen(itemID)
-                results.start(rengo: challenge, isLive: Self.isLive(challenge), session: session, itemID: itemID,
-                              display: row.display, section: row.section, after: row.after)
+                send(.action(.start)) {
+                    let row = source.frozen(itemID)
+                    results.start(rengo: challenge, isLive: Self.isLive(challenge), session: session,
+                                  itemID: itemID, display: row.display, section: row.section, after: row.after)
+                }
             }
         )
     }

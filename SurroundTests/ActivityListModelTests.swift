@@ -405,4 +405,52 @@ final class ActivityListModelTests: XCTestCase {
         XCTAssertNil(Withdrawal.nextDeadline(entries: Withdrawal.expire(expired, at: 111)), "Nothing left to wait for.")
         XCTAssertNil(Withdrawal.nextDeadline(entries: [String: Withdrawal.Entry]()))
     }
+
+    // MARK: VoiceOver focus on results
+
+    func testSendingMovesVoiceOverToTheSpinnerOnlyFromTheControlThatSent() {
+        typealias Focus = ActivityFocus
+        XCTAssertEqual(Focus.sending(.action(.accept), of: "challenge-7", from: .control("challenge-7", .action(.accept))),
+                       .pending("challenge-7"))
+        XCTAssertEqual(Focus.sending(.retry, of: "challenge-7", from: .control("challenge-7", .retry)),
+                       .pending("challenge-7"))
+        XCTAssertNil(Focus.sending(.action(.accept), of: "challenge-7", from: .control("challenge-7", .action(.reject))),
+                     "Only the control that sent it.")
+        XCTAssertNil(Focus.sending(.action(.accept), of: "challenge-7", from: .control("challenge-8", .action(.accept))))
+        XCTAssertNil(Focus.sending(.action(.withdraw), of: "waiting-open-5", from: nil), "VoiceOver is off or elsewhere.")
+    }
+
+    func testAResultTakesFocusFromItsOwnRowsControlsOrSpinnerOnly() {
+        typealias Focus = ActivityFocus
+        XCTAssertTrue(Focus.resultTakesFocus(from: .pending("challenge-7"), row: "challenge-7"))
+        XCTAssertTrue(Focus.resultTakesFocus(from: .control("challenge-7", .action(.accept)), row: "challenge-7"))
+        XCTAssertTrue(Focus.resultTakesFocus(from: .control("challenge-7", .action(.reject)), row: "challenge-7"),
+                      "The row's other control, which the result replaces too.")
+        XCTAssertTrue(Focus.resultTakesFocus(from: .control("waiting-rengo-5", .retry), row: "waiting-rengo-5"))
+        XCTAssertFalse(Focus.resultTakesFocus(from: .pending("challenge-8"), row: "challenge-7"), "Another row.")
+        XCTAssertFalse(Focus.resultTakesFocus(from: .control("challenge-8", .action(.accept)), row: "challenge-7"))
+        XCTAssertFalse(Focus.resultTakesFocus(from: .result("challenge-7"), row: "challenge-7"),
+                       "VoiceOver wouldn't read a result that changes under it, so the store speaks.")
+        XCTAssertFalse(Focus.resultTakesFocus(from: nil, row: "challenge-7"), "Elsewhere, or VoiceOver is off.")
+
+        typealias Request = ResultFocus<Int, String>
+        XCTAssertTrue(Request.resultTakesFocus(from: .pending(912_001), row: 912_001),
+                      "Friend request rows follow the same rule.")
+        XCTAssertFalse(Request.resultTakesFocus(from: .control(912_002, "reject"), row: 912_001))
+    }
+
+    func testAResolvedRowGoesBackAfterTheRowBeforeItOrFirst() {
+        typealias Order = ResolvedRowOrder
+        XCTAssertEqual(Order.merge(live: [3, 4], resolved: [(id: 1, after: nil), (id: 2, after: 1)]), [1, 2, 3, 4],
+                       "A chain of resolved rows keeps its order.")
+        XCTAssertEqual(Order.merge(live: [1, 3], resolved: [(id: 2, after: 1)]), [1, 2, 3])
+        XCTAssertEqual(Order.merge(live: [4], resolved: [(id: 3, after: 2), (id: 1, after: nil), (id: 2, after: 1)]),
+                       [1, 2, 3, 4], "Resolved in any order, each follows the row it followed.")
+        XCTAssertEqual(Order.merge(live: [5], resolved: [(id: 2, after: 9)]), [2, 5],
+                       "A row whose predecessor has gone leads.")
+        XCTAssertEqual(Order.merge(live: [1, 2], resolved: [(id: 2, after: 1), (id: 3, after: 3)]), [3, 1, 2],
+                       "A live id keeps its place, and a row pointing at itself leads.")
+        XCTAssertEqual(Order.merge(live: [Int](), resolved: [(id: 1, after: 2), (id: 2, after: 1)]), [1, 2],
+                       "Rows pointing at each other all show.")
+    }
 }
