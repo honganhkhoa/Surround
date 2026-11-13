@@ -926,6 +926,12 @@ class OGSService: ObservableObject {
         /// A non-nil dictionary makes every profile lookup deterministic,
         /// including missing profiles, without falling back to HTTP.
         var playerProfilesById: [Int: OGSPlayerProfile]? = nil
+
+        #if DEBUG && (MAIN_APP || TESTING)
+        /// An Activity state's own answers to Accept, Reject and Withdraw
+        /// (`--surround-activity-actions`); nil sends them to OGS.
+        var activityActions: ActivityFixtures.Actions?
+        #endif
     }
 
     static var instances = [String: OGSService]()
@@ -1212,6 +1218,58 @@ class OGSService: ObservableObject {
             + openChallengeSentById.values.filter { OGSService.isWaitingLive($0.game) }.count
             + autoMatchEntryById.values.filter { $0.timeControlSpeed != .correspondence }.count
     }
+
+    /// An Activity state's answers to Accept, Reject and Withdraw, when its
+    /// launch asks for them; nil sends them to OGS.
+    private var activityActions: ActivityFixtures.Actions?
+    /// Challenges whose first action `fail-once` has failed.
+    private var activityActionFailures = Set<Int>()
+
+    /// The fixture's answer to an action on `challenge`, a delay after it is
+    /// sent: under `fail-once`, a failure the first time. Otherwise `change`
+    /// makes the service what OGS's next update would, and its value answers.
+    private func answerForActivityFixture<Value>(
+        _ challenge: any OGSSubmittedChallenge, actions: ActivityFixtures.Actions,
+        change: @escaping (OGSService) -> Value?
+    ) -> AnyPublisher<Value, Error> {
+        let challengeID = challenge.id
+        return Future<Value, Error> { [weak self] promise in
+            DispatchQueue.main.asyncAfter(deadline: .now() + actions.delay) {
+                guard let self else { return promise(.failure(OGSServiceError.staleAuthenticationContext)) }
+                if actions.mode == .failOnce, self.activityActionFailures.insert(challengeID).inserted {
+                    promise(.failure(URLError(.networkConnectionLost)))
+                } else if let value = change(self) {
+                    promise(.success(value))
+                } else {
+                    promise(.failure(OGSServiceError.invalidJSON))
+                }
+            }
+        }.eraseToAnyPublisher()
+    }
+
+    /// A challenge the user withdrew, rejected or accepted leaves its list.
+    private func removeChallengeForActivityFixture(_ id: Int) {
+        if challengesReceived.contains(where: { $0.id == id }) { challengesReceived.removeAll { $0.id == id } }
+        if challengesSent.contains(where: { $0.id == id }) { challengesSent.removeAll { $0.id == id } }
+        if openChallengeSentById[id] != nil { openChallengeSentById[id] = nil }
+        if hostingRengoChallengeById[id] != nil { hostingRengoChallengeById[id] = nil }
+        if participatingRengoChallengeById[id] != nil { participatingRengoChallengeById[id] = nil }
+        countWaitingLiveGamesForActivityFixture()
+    }
+
+    /// The game an accepted challenge starts joins the active games, and the
+    /// challenge goes; the game's id answers.
+    private func startGameForActivityFixture(from challenge: any OGSSubmittedChallenge,
+                                             actions: ActivityFixtures.Actions) -> Int? {
+        guard let user, let template = activeGames[SurroundUITestContract.fixtureGameID],
+              let game = ActivityFixtures.acceptedGame(challenge, user: user, template: template, clock: actions.clock),
+              let gameID = game.ogsID else { return nil }
+        game.ogs = self
+        activeGames[gameID] = game
+        sortActiveGames(activeGames: activeGames.values)
+        removeChallengeForActivityFixture(challenge.id)
+        return gameID
+    }
     #endif
     @Published private(set) public var hostingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
     @Published private(set) public var participatingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
@@ -1445,6 +1503,9 @@ class OGSService: ObservableObject {
         finishedGamesSnapshot = state.finishedGamesSnapshot
         finishedGamesByPlayerId = state.finishedGamesByPlayerId
         playerProfilesById = state.playerProfilesById
+        #if DEBUG && (MAIN_APP || TESTING)
+        activityActions = state.activityActions
+        #endif
 
         for game in activeGames.values {
             game.ogs = self
@@ -4580,6 +4641,12 @@ class OGSService: ObservableObject {
     #endif
     
     func withdrawOrDeclineChallenge(challenge: any OGSSubmittedChallenge) -> AnyPublisher<Void, Error> {
+        #if DEBUG && (MAIN_APP || TESTING)
+        if let actions = activityActions {
+            let id = challenge.id
+            return answerForActivityFixture(challenge, actions: actions) { $0.removeChallengeForActivityFixture(id) }
+        }
+        #endif
         return Future<Void, Error> { promise in
             let url = challenge.challenged == nil ?
                 "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)" :
@@ -4604,6 +4671,13 @@ class OGSService: ObservableObject {
     }
     
     func acceptChallenge(challenge: any OGSSubmittedChallenge) -> AnyPublisher<Int, Error> {
+        #if DEBUG && (MAIN_APP || TESTING)
+        if let actions = activityActions {
+            return answerForActivityFixture(challenge, actions: actions) {
+                $0.startGameForActivityFixture(from: challenge, actions: actions)
+            }
+        }
+        #endif
         return Future<Int, Error> { promise in
             let url = challenge.challenged == nil ?
                 "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/accept" :
