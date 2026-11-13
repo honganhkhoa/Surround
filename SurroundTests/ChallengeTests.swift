@@ -64,6 +64,8 @@ final class ChallengeTests: XCTestCase {
         let challenge = try! decoder.decode(OGSSeekgraphChallenge.self, from: seekgraphChallenge.data(using: .utf8)!)
         
         XCTAssertEqual(challenge.id, 28448023)
+        XCTAssertEqual(challenge.createdAt, Date(timeIntervalSince1970: 1_710_989_889),
+                       "\"2024-03-21T02:58:09\" has no zone, and OGS means UTC.")
         XCTAssertEqual(challenge.challenger?.id, 655163)
         XCTAssertEqual(challenge.challenger?.username, "Spidermonkey")
         XCTAssertEqual(challenge.game.minRank, 23)
@@ -430,5 +432,31 @@ final class ChallengeTests: XCTestCase {
         
         let redecodedChallenge = try! JSONSerialization.jsonObject(with: encodedChallenge) as! [String: Any]
         XCTAssertEqual(redecodedChallenge["challenger_color"] as? String, "random")
+    }
+
+    func testTheSeekGraphsCreationTimeIsReadAsUTCAndNeverFailsAChallenge() throws {
+        let sent = Date(timeIntervalSince1970: 1_710_989_889)
+        XCTAssertEqual(OGSSeekgraphChallenge.createdDate(from: "2024-03-21T02:58:09"), sent)
+        XCTAssertEqual(OGSSeekgraphChallenge.createdDate(from: "2024-03-21T02:58:09Z"), sent)
+        XCTAssertEqual(OGSSeekgraphChallenge.createdDate(from: "2024-03-21T04:58:09+02:00"), sent)
+        XCTAssertEqual(OGSSeekgraphChallenge.createdDate(from: "2024-03-21T02:58:09.250")?.timeIntervalSince1970,
+                       1_710_989_889.25)
+        XCTAssertNil(OGSSeekgraphChallenge.createdDate(from: "before 2023-05-26"))
+        XCTAssertNil(OGSSeekgraphChallenge.createdDate(from: ""))
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        for created in [#""created": "yesterday","#, #""created": null,"#, #""created": 5,"#, ""] {
+            let challenge = try decoder.decode(OGSSeekgraphChallenge.self, from: Data("""
+                {\(created) "challenge_id": 7, "user_id": 2, "username": "player", "rank": 25.0,
+                 "game_id": 1007, "name": "Created", "ranked": false, "handicap": 0, "komi": null,
+                 "rules": "japanese", "width": 9, "height": 9, "challenger_color": "black",
+                 "disable_analysis": false,
+                 "time_control_parameters": {"per_move": 20, "pause_on_weekends": false,
+                                             "speed": "live", "system": "simple", "time_control": "simple"}}
+                """.utf8))
+            XCTAssertEqual(challenge.id, 7, "A challenge with \(created.isEmpty ? "no created" : created) still decodes.")
+            XCTAssertNil(challenge.createdAt)
+        }
     }
 }

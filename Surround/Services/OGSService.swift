@@ -4606,12 +4606,12 @@ class OGSService: ObservableObject {
                 ).validate().responseJSON { response in
                     switch response.result {
                     case .success:
-                        if let data = response.value as? [String: Any] {
-                            if let newGameId = data["game"] as? Int {
-                                promise(.success(newGameId))
-                            }
+                        if let data = response.value as? [String: Any],
+                           let newGameId = Self.gameID(inChallengeResponse: data) {
+                            promise(.success(newGameId))
+                        } else {
+                            promise(.failure(OGSServiceError.invalidJSON))
                         }
-                        promise(.failure(OGSServiceError.invalidJSON))
                     case .failure(let error):
                         promise(.failure(error))
                     }
@@ -4621,7 +4621,14 @@ class OGSService: ObservableObject {
             }
         }.eraseToAnyPublisher()
     }
-    
+
+    /// The new game's id in a reply to sending or accepting a challenge. OGS
+    /// sends the game as an id or as an object with one; the web client
+    /// reads both.
+    static func gameID(inChallengeResponse response: [String: Any]) -> Int? {
+        (response["game"] as? Int) ?? ((response["game"] as? [String: Any])?["id"] as? Int)
+    }
+
     func joinRengoChallenge(challenge: OGSSeekgraphChallenge) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
             let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/join"
@@ -5653,10 +5660,7 @@ class OGSService: ObservableObject {
                     case .success(let data):
                         if let result = data as? [String: Any] {
                             if result["status"] as? String == "ok" {
-                                // OGS sends the game as an id or as an object
-                                // with one; the web client reads both.
-                                let gameID = (result["game"] as? Int)
-                                    ?? ((result["game"] as? [String: Any])?["id"] as? Int)
+                                let gameID = Self.gameID(inChallengeResponse: result)
                                 if let challengeID = result["challenge"] as? Int, gameID != nil {
                                     // An open challenge's keepalive starts once
                                     // the seek graph lists it; the hold keeps

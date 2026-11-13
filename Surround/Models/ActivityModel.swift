@@ -66,6 +66,14 @@ enum ActivityModel {
         var since: TimeInterval
     }
 
+    /// A waiting item's id names its kind and the object it stands for.
+    enum WaitingID {
+        static func quickMatch(_ uuid: String) -> String { "quick-match-\(uuid)" }
+        static func openChallenge(_ id: Int) -> String { "open-\(id)" }
+        static func sentChallenge(_ id: Int) -> String { "sent-\(id)" }
+        static func rengo(_ id: Int) -> String { "rengo-\(id)" }
+    }
+
     struct Conversation: Equatable {
         var peerID: Int
         var isUnread: Bool
@@ -482,9 +490,10 @@ extension ActivityModel.Input {
         func since(_ id: String, created: TimeInterval? = nil) -> TimeInterval {
             created ?? firstSeen[id] ?? now
         }
+        typealias WaitingID = ActivityModel.WaitingID
         var waiting = [ActivityModel.Waiting]()
         for entry in ogs.autoMatchEntryById.values {
-            let id = "quick-match-\(entry.uuid)"
+            let id = WaitingID.quickMatch(entry.uuid)
             waiting.append(.init(
                 id: id,
                 kind: .quickMatch,
@@ -493,16 +502,16 @@ extension ActivityModel.Input {
             ))
         }
         for challenge in ogs.openChallengeSentById.values {
-            let id = "open-\(challenge.id)"
+            let id = WaitingID.openChallenge(challenge.id)
             waiting.append(.init(
                 id: id,
                 kind: .openChallenge,
                 isLive: ActivityModel.isRealtime(challenge.game.timeControl, width: challenge.game.width, height: challenge.game.height),
-                since: since(id)
+                since: since(id, created: challenge.createdAt?.timeIntervalSince1970)
             ))
         }
         for challenge in ogs.challengesSent {
-            let id = "sent-\(challenge.id)"
+            let id = WaitingID.sentChallenge(challenge.id)
             waiting.append(.init(
                 id: id,
                 kind: .sentChallenge,
@@ -512,12 +521,12 @@ extension ActivityModel.Input {
         }
         let rengo = ogs.participatingRengoChallengeById.merging(ogs.hostingRengoChallengeById) { current, _ in current }
         for challenge in rengo.values {
-            let id = "rengo-\(challenge.id)"
+            let id = WaitingID.rengo(challenge.id)
             waiting.append(.init(
                 id: id,
                 kind: .rengo,
                 isLive: ActivityModel.isRealtime(challenge.game.timeControl, width: challenge.game.width, height: challenge.game.height),
-                since: since(id)
+                since: since(id, created: challenge.createdAt?.timeIntervalSince1970)
             ))
         }
         self.waiting = waiting
