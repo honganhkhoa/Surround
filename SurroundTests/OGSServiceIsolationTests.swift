@@ -2404,6 +2404,67 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertEqual(service.superchatEndings, [moderator: SuperchatEnding(at: 1_000, wasMissed: true)])
     }
 
+    func testAWaitThroughTheBackgroundLiftsAtAPingAfterTheReturn() throws {
+        let (store, scheduler) = makeSuperchatStore()
+        let (service, socket) = try makeSuperchatWindow(
+            userID: superchatPlayer, store: store, label: "superchat-background"
+        )
+        socket.serverEventCallback?("private-superchat", superchat(moderator, player: superchatPlayer))
+        socket.serverEventCallback?("surround/socketAuthenticated", nil)
+        socket.serverEventCallback?(
+            "surround/socketAuthenticationAnswered",
+            OGSWebsocketAuthenticationAnswer(userID: superchatPlayer, outcome: .confirmed)
+        )
+        XCTAssertEqual(scheduler.pendingDelays, [SuperchatStore.resendWindow])
+
+        // The app leaves and comes back before the system suspends it: the
+        // socket stays open, so it never authenticates again.
+        store.enterBackground()
+        store.enterForeground()
+        XCTAssertEqual(scheduler.pendingDelays, [], "The deadline waits for a ping after the return.")
+        socket.serverEventCallback?("net/pong", pong)
+        XCTAssertEqual(scheduler.pendingDelays, [SuperchatStore.resendWindow])
+        scheduler.advance()
+        XCTAssertNil(service.superchatCover, "No re-send came: the cover lifted by itself.")
+        XCTAssertEqual(service.superchatEndings, [moderator: SuperchatEnding(at: 1_000, wasMissed: true)])
+    }
+
+    func testAnEndIsTimedByOGSClockForTheEndedLine() throws {
+        let (store, _) = makeSuperchatStore()
+        let (service, socket) = try makeSuperchatWindow(
+            userID: superchatPlayer, store: store, label: "superchat-ended-line"
+        )
+        // The device's clock reads 1_000 s, and a pong puts OGS's 5 s ahead.
+        socket.serverEventCallback?(
+            "net/pong", ["client": 1_000_000 as NSNumber, "server": 1_005_000 as NSNumber]
+        )
+        XCTAssertEqual(socket.drift, -5_000)
+        socket.serverEventCallback?("private-superchat", superchat(moderator, player: superchatPlayer))
+        // The moderator's last message, which OGS stamped 2 s before the end.
+        service.handlePrivateMessage(
+            privateMessage(from: moderator, to: superchatPlayer, id: "last", timestamp: 1_003)
+        )
+        socket.serverEventCallback?("private-superchat", superchat(moderator, enable: false, player: superchatPlayer))
+        XCTAssertEqual(service.superchatEndings, [moderator: SuperchatEnding(at: 1_005, wasMissed: false)])
+        XCTAssertTrue(service.showsSuperchatEndedLine(peerID: moderator), "The last message came before the end.")
+        service.handlePrivateMessage(
+            privateMessage(from: superchatPlayer, to: moderator, id: "reply", timestamp: 1_010)
+        )
+        XCTAssertFalse(service.showsSuperchatEndedLine(peerID: moderator), "A message after the end hides the line.")
+
+        // An end is never before the conversation's newest message, even
+        // where OGS stamped it later than the pong's estimate of its clock.
+        socket.serverEventCallback?("private-superchat", superchat(secondModerator, player: superchatPlayer))
+        service.handlePrivateMessage(
+            privateMessage(from: secondModerator, to: superchatPlayer, id: "second-last", timestamp: 1_009)
+        )
+        socket.serverEventCallback?(
+            "private-superchat", superchat(secondModerator, enable: false, player: superchatPlayer)
+        )
+        XCTAssertEqual(service.superchatEndings[secondModerator], SuperchatEnding(at: 1_009, wasMissed: false))
+        XCTAssertTrue(service.showsSuperchatEndedLine(peerID: secondModerator))
+    }
+
     func testTheModeratorsNameComesFromTheEvent() throws {
         let (store, _) = makeSuperchatStore()
         let (service, socket) = try makeSuperchatWindow(
@@ -2459,6 +2520,42 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertEqual(first.superchatCover, firstCover)
         XCTAssertEqual(second.superchatCover, firstCover)
         XCTAssertEqual(store.covers, [superchatPlayer: firstCover, otherPlayer: secondCover])
+    }
+
+    func testASignedOutWindowIsCoveredOnceAnotherWindowSignsIn() throws {
+        let (store, _) = makeSuperchatStore()
+        let (first, firstSocket) = try makeSuperchatWindow(userID: nil, store: store, label: "superchat-signed-out")
+        let (second, _) = try makeSuperchatWindow(userID: nil, store: store, sharing: first)
+        XCTAssertFalse(first.isLoggedIn)
+        XCTAssertFalse(second.isLoggedIn)
+        XCTAssertNil(second.superchatCoverAccountID)
+
+        // Window 1 signs in. Window 2 hasn't checked its own sign-in since,
+        // but its cover follows the stored one, which it hears for no account.
+        try signInForPrivateMessageTest(first, userID: superchatPlayer)
+        firstSocket.authenticatedUserID = superchatPlayer
+        drainMainQueue()
+        XCTAssertFalse(second.isLoggedIn)
+        XCTAssertEqual(second.superchatCoverAccountID, superchatPlayer)
+        XCTAssertNil(second.superchatAccountID)
+
+        firstSocket.serverEventCallback?("private-superchat", superchat(moderator, player: superchatPlayer))
+        let cover = try XCTUnwrap(store.covers[superchatPlayer])
+        XCTAssertEqual(first.superchatCover, cover)
+        XCTAssertEqual(second.superchatCover, cover, "The signed-out window is covered too.")
+        let presentation = try XCTUnwrap(SuperchatCoverPresentation(
+            cover: cover, selectedModeratorID: nil, windowUserID: second.user?.id, accountID: superchatPlayer
+        ))
+        XCTAssertTrue(presentation.isStale, "It shows the header and the end card, not the conversation.")
+        XCTAssertFalse(presentation.showsReplyField)
+        XCTAssertFalse(presentation.showsLiveGames)
+
+        // Window 1 signs out: with no stored sign-in, neither window is covered.
+        first.logout()
+        drainMainQueue()
+        XCTAssertNil(first.superchatCover)
+        XCTAssertNil(second.superchatCover, "The sign-out reached window 2 too.")
+        XCTAssertEqual(store.covers[superchatPlayer], cover, "The account's cover waits for its next sign-in.")
     }
 
     func testAServiceThatGoesAwayEndsItsWait() throws {
@@ -2813,10 +2910,12 @@ final class OGSServiceIsolationTests: XCTestCase {
     private let otherPlayer = 202
     private let moderator = 301
     private let secondModerator = 302
-    /// A `net/pong` the service accepts as a clock sample.
-    private let pong: [String: Any] = ["client": 1_000 as NSNumber, "server": 2_000 as NSNumber]
+    /// A `net/pong` the service accepts as a clock sample: on a superchat
+    /// window's clock, OGS's agrees with the device's.
+    private let pong: [String: Any] = ["client": 1_000_000 as NSNumber, "server": 1_000_000 as NSNumber]
 
-    /// A superchat store of the test's own, on a manual scheduler and a fixed clock.
+    /// A superchat store of the test's own, on a manual scheduler and a fixed
+    /// clock, which superchat windows share.
     private func makeSuperchatStore(preferences: UserDefaults? = nil) -> (SuperchatStore, ManualScheduler) {
         let scheduler = ManualScheduler()
         return (SuperchatStore(preferences: preferences, scheduler: scheduler, now: { 1_000 }), scheduler)
@@ -2830,17 +2929,19 @@ final class OGSServiceIsolationTests: XCTestCase {
     }
 
     /// One window of the app, signed in as `userID` on a socket that
-    /// authenticated as it, and reporting to `store`. A window made
+    /// authenticated as it, or signed out without one, and reporting to
+    /// `store`. Its clock reads 1_000 s, as the store's does. A window made
     /// `sharing` another uses its preferences, so the two share the stored
     /// sign-in, as the app's windows do.
     private func makeSuperchatWindow(
-        userID: Int, store: SuperchatStore, sharing other: OGSService? = nil,
+        userID: Int?, store: SuperchatStore, sharing other: OGSService? = nil,
         isSuperuser: Bool? = nil, uiClass: String? = nil, isModerator: Bool? = nil,
         label: String = "superchat-window"
     ) throws -> (OGSService, StubWebsocket) {
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
         let httpClient = makeHTTPClient(responseUsername: label)
         let socket = StubWebsocket()
+        let clock: () -> TimeInterval = { 1_000 }
         let service: OGSService
         if let other {
             service = OGSService(
@@ -2852,14 +2953,19 @@ final class OGSServiceIsolationTests: XCTestCase {
                 usesSurroundOverviewService: false,
                 enablesAppSideEffects: false,
                 startsTimers: false,
-                installsObservers: false
+                installsObservers: false,
+                currentTime: clock
             )
         } else {
-            service = makeService(environment: environment, httpClient: httpClient, socket: socket, label: label)
+            service = makeService(
+                environment: environment, httpClient: httpClient, socket: socket, label: label, currentTime: clock
+            )
         }
-        try signInForPrivateMessageTest(
-            service, userID: userID, isSuperuser: isSuperuser, uiClass: uiClass, isModerator: isModerator
-        )
+        if let userID {
+            try signInForPrivateMessageTest(
+                service, userID: userID, isSuperuser: isSuperuser, uiClass: uiClass, isModerator: isModerator
+            )
+        }
         socket.authenticatedUserID = userID
         service.superchatStore = store
         return (service, socket)
@@ -2892,7 +2998,8 @@ final class OGSServiceIsolationTests: XCTestCase {
         environment: OGSEnvironment,
         httpClient: AlamofireOGSHTTPClient,
         socket: OGSWebsocketProtocol = StubWebsocket(),
-        label: String
+        label: String,
+        currentTime: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 }
     ) -> OGSService {
         let suite = "com.honganhkhoa.Surround.IsolationTests.\(label).\(UUID().uuidString)"
         preferenceSuites.append(suite)
@@ -2905,7 +3012,8 @@ final class OGSServiceIsolationTests: XCTestCase {
             usesSurroundOverviewService: false,
             enablesAppSideEffects: false,
             startsTimers: false,
-            installsObservers: false
+            installsObservers: false,
+            currentTime: currentTime
         )
     }
 

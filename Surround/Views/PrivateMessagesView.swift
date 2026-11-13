@@ -552,9 +552,7 @@ struct MessagesConversationView: View {
     /// Above the composer while this session's superchat ending for the
     /// peer, live or missed, is newer than every message in the conversation.
     private var endedLine: AnyView? {
-        guard let ending = ogs.superchatEndings[peer.id],
-              !(ogs.privateMessagesByPeerId[peer.id] ?? []).contains(where: { $0.content.timestamp > ending.at })
-        else { return nil }
+        guard ogs.showsSuperchatEndedLine(peerID: peer.id) else { return nil }
         return AnyView(
             Text("The moderator ended this chat.")
                 .font(.footnote)

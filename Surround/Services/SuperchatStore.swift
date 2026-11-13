@@ -41,6 +41,9 @@ struct SuperchatCover: Equatable {
 
 /// An end this session, for the line Messages shows in that conversation.
 struct SuperchatEnding: Equatable {
+    /// A live end by OGS's clock, as the window that heard it estimates, so
+    /// it compares with the times OGS gives messages; a missed one by the
+    /// store's own clock.
     var at: TimeInterval
     var wasMissed: Bool
 }
@@ -58,7 +61,8 @@ final class SuperchatStore: ObservableObject {
     /// An account whose cover went away without Done, so the window the
     /// user is in can say why.
     let coverLiftedWithoutDone = PassthroughSubject<Int, Never>()
-    /// While the app is in the background no wait opens, starts or lifts.
+    /// While the app is in the background no deadline starts or lifts a
+    /// cover. Waits still open, and are kept for the return.
     private(set) var isInBackground = false
 
     private let preferences: UserDefaults?
@@ -72,9 +76,11 @@ final class SuperchatStore: ObservableObject {
         let accountID: Int
         /// Superchats still on that no connection of the account has heard again.
         var awaiting: Set<Int>
-        /// The connection answered a ping since it authenticated.
+        /// The connection answered a ping since it authenticated, and since
+        /// the app last came back to the foreground.
         var answeredPing = false
-        /// OGS didn't answer: the deadline starts at the next answered ping.
+        /// OGS didn't answer, or answered before or during a stay in the
+        /// background: the deadline starts at the next answered ping.
         var startsAtPing = false
         var deadline: Cancellable?
     }
@@ -98,7 +104,11 @@ final class SuperchatStore: ObservableObject {
     // MARK: What a window's socket hears
 
     /// A `private-superchat` that passed the window's checks (OGSService.handleSuperchat).
-    func receive(enable: Bool, moderatorID: Int, username: String?, accountID: Int) {
+    /// - Parameter endedAt: For an end, when it happened by OGS's clock, as
+    ///   the window estimates it. Without one, the store's own clock.
+    func receive(
+        enable: Bool, moderatorID: Int, username: String?, accountID: Int, endedAt: TimeInterval? = nil
+    ) {
         guard accountID > 0, moderatorID > 0, moderatorID != accountID else { return }
         let name = username?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         var cover = covers[accountID] ?? SuperchatCover(moderators: [])
@@ -120,7 +130,7 @@ final class SuperchatStore: ObservableObject {
         } else {
             // Copies, and ends the app never saw start, change nothing.
             guard let index, cover.moderators[index].isOn else { return }
-            let time = now()
+            let time = endedAt ?? now()
             cover.moderators[index].endedAt = time
             endings[accountID, default: [:]][moderatorID] = SuperchatEnding(at: time, wasMissed: false)
         }
@@ -129,10 +139,11 @@ final class SuperchatStore: ObservableObject {
     }
 
     /// The window's socket sent `authenticate` as `accountID`; a re-send
-    /// from now on counts for it.
+    /// from now on counts for it. In the background too: a socket that
+    /// reconnects there can still be open when the app comes back.
     func connectionAuthenticating(_ connection: UUID, accountID: Int) {
         waits.removeValue(forKey: connection)?.deadline?.cancel()
-        guard !isInBackground, let cover = covers[accountID], cover.isOn else { return }
+        guard let cover = covers[accountID], cover.isOn else { return }
         waits[connection] = ResendWait(
             accountID: accountID, awaiting: Set(cover.moderators.filter(\.isOn).map(\.id)))
     }
@@ -141,15 +152,20 @@ final class SuperchatStore: ObservableObject {
     func connectionAnswered(
         _ connection: UUID, accountID: Int, _ outcome: OGSWebsocketAuthenticationAnswer.Outcome
     ) {
-        guard !isInBackground, var wait = waits[connection], wait.accountID == accountID,
+        guard var wait = waits[connection], wait.accountID == accountID,
               wait.deadline == nil else { return }
         switch outcome {
-        case .confirmed:
+        case .confirmed where !isInBackground:
             startDeadline(&wait, connection)
-        case .unanswered:
-            // No answer within the callback timeout. Start once the
-            // connection has shown it is alive, so a deaf one never lifts.
-            if wait.answeredPing { startDeadline(&wait, connection) } else { wait.startsAtPing = true }
+        case .confirmed, .unanswered:
+            // No answer within the callback timeout, or an answer in the
+            // background. Start once the connection has shown it is alive in
+            // the foreground, so a deaf or suspended one never lifts.
+            if wait.answeredPing, !isInBackground {
+                startDeadline(&wait, connection)
+            } else {
+                wait.startsAtPing = true
+            }
         case .rejected:
             // OGS isn't listening as this account, so no re-send can come.
             waits[connection] = nil
@@ -158,7 +174,8 @@ final class SuperchatStore: ObservableObject {
         waits[connection] = wait
     }
 
-    /// A `net/pong` arrived on the connection.
+    /// A `net/pong` arrived on the connection. In the background it counts
+    /// for nothing: only a pong after the return shows the socket survived.
     func connectionAnsweredPing(_ connection: UUID) {
         guard !isInBackground, var wait = waits[connection] else { return }
         wait.answeredPing = true
@@ -173,14 +190,27 @@ final class SuperchatStore: ObservableObject {
     }
 
     /// The app left the foreground. A suspended socket can miss the re-send
-    /// without closing first, so nothing opens or lifts until it is back; a
-    /// socket that survives then waits for its next authentication.
+    /// without closing first, and a deadline that came due during the
+    /// suspension would run before the socket's buffered frames. So every
+    /// deadline stops, and each wait OGS has answered starts again at its
+    /// connection's first answered ping after the return. That pong comes
+    /// after every frame OGS sent before it, and a socket the system
+    /// dropped answers none and closes. A socket that survives the
+    /// background never authenticates again, so its wait must not go.
     func enterBackground() {
         isInBackground = true
-        waits.values.forEach { $0.deadline?.cancel() }
-        waits.removeAll()
+        for (connection, var wait) in waits {
+            let wasAnswered = wait.deadline != nil || wait.startsAtPing
+            wait.deadline?.cancel()
+            wait.deadline = nil
+            wait.answeredPing = false
+            wait.startsAtPing = wasAnswered
+            waits[connection] = wait
+        }
     }
 
+    /// The app is back in the foreground: each wait starts at its
+    /// connection's next answered ping, or at OGS's answer if none came yet.
     func enterForeground() {
         isInBackground = false
     }

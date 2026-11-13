@@ -1309,6 +1309,14 @@ class OGSService: ObservableObject {
         if superchatEndings != ends { superchatEndings = ends }
     }
 
+    /// Whether the conversation with `peerID` says that the moderator ended
+    /// the chat: this session has that peer's end, live or missed, and no
+    /// message in the conversation is newer than it.
+    func showsSuperchatEndedLine(peerID: Int) -> Bool {
+        guard let ending = superchatEndings[peerID] else { return false }
+        return !(privateMessagesByPeerId[peerID] ?? []).contains { $0.content.timestamp > ending.at }
+    }
+
     deinit {
         // Production services never go away. Fixture, preview and test
         // services can, and a wait they left could otherwise still lift a cover.
@@ -6037,11 +6045,11 @@ class OGSService: ObservableObject {
     }
 
     /// The account whose cover this window shows: the stored sign-in every
-    /// window shares, so a window that kept another account is covered too;
-    /// a fixture's user without one.
+    /// window shares, so a window that kept another account, or that is still
+    /// signed out after another window signed in, is covered too. A fixture
+    /// or preview service uses its own user, while it is signed in.
     var superchatCoverAccountID: Int? {
-        guard isLoggedIn else { return nil }
-        let id = persistsRecentPrivateMessagePeers ? ogsUIConfig?.user.id : user?.id
+        let id = persistsRecentPrivateMessagePeers ? ogsUIConfig?.user.id : (isLoggedIn ? user?.id : nil)
         return id.flatMap { $0 > 0 ? $0 : nil }
     }
 
@@ -6200,12 +6208,27 @@ class OGSService: ObservableObject {
         #if MAIN_APP || TESTING
         superchatStore?.receive(
             enable: enable, moderatorID: moderatorID,
-            username: config["moderator_username"] as? String, accountID: accountID)
+            username: config["moderator_username"] as? String, accountID: accountID,
+            endedAt: enable ? nil : superchatEndTime(moderatorID: moderatorID))
         #else
         // The widget and the notification extensions keep no superchat state.
         _ = enable
         #endif
     }
+
+    #if MAIN_APP || TESTING
+    /// When an end heard now happened by OGS's clock, which stamps every
+    /// message, so Messages can tell which messages came after it. Once a
+    /// pong on this connection has given a sample, the device's clock is
+    /// moved by its drift. The end is never before the conversation's newest
+    /// message, since every message the window has came before it.
+    private func superchatEndTime(moderatorID: Int) -> TimeInterval {
+        // `drift` is the device's clock minus OGS's, in milliseconds.
+        let now = currentTime() - (hasFreshServerClockSample ? drift / 1_000 : 0)
+        let newest = privateMessagesByPeerId[moderatorID]?.map(\.content.timestamp).max() ?? now
+        return max(now, newest)
+    }
+    #endif
 
     #if DEBUG && MAIN_APP
     /// Stands in for a reconnect in offline UI-test runs: this window's

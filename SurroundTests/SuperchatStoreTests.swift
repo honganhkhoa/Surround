@@ -462,9 +462,10 @@ final class SuperchatStoreTests: XCTestCase {
         XCTAssertTrue(lifted.isEmpty)
     }
 
-    func testTheBackgroundCancelsEveryWaitAndOpensNone() {
+    func testWaitsOutlastTheBackgroundAndStartAtAPingAfterTheReturn() {
         let store = makeStore()
         start(store, moderator)
+        // A's deadline runs; OGS hasn't answered B yet.
         store.connectionAuthenticating(connectionA, accountID: player)
         store.connectionAnswered(connectionA, accountID: player, .confirmed)
         store.connectionAuthenticating(connectionB, accountID: player)
@@ -474,33 +475,63 @@ final class SuperchatStoreTests: XCTestCase {
         XCTAssertTrue(store.isInBackground)
         XCTAssertTrue(scheduler.pendingDelays.isEmpty, "Every deadline is cancelled.")
 
-        // In the background a socket can still authenticate, be answered and ping.
-        store.connectionAuthenticating(connectionA, accountID: player)
-        store.connectionAnswered(connectionA, accountID: player, .confirmed)
-        store.connectionAnswered(connectionB, accountID: player, .unanswered)
-        store.connectionAnsweredPing(connectionA)
-        store.connectionAnsweredPing(connectionB)
-        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "No wait opens or starts its deadline.")
+        // In the background a socket can still reconnect, be answered and ping.
+        let reconnected = UUID()
+        store.connectionAuthenticating(reconnected, accountID: player)
+        store.connectionAnswered(reconnected, accountID: player, .confirmed)
+        for connection in [connectionA, connectionB, reconnected] {
+            store.connectionAnsweredPing(connection)
+        }
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "No deadline starts in the background.")
         clock.now = 1_060
         scheduler.advance()
         XCTAssertEqual(store.covers[player]?.isOn, true, "Nothing lifts.")
         XCTAssertTrue(lifted.isEmpty)
 
-        // Back in the foreground, a socket that survived waits for its next authentication.
+        // Back in the foreground, sockets that survived don't authenticate
+        // again: each answered wait starts at its first ping after the return.
         store.enterForeground()
         XCTAssertFalse(store.isInBackground)
-        store.connectionAnswered(connectionB, accountID: player, .unanswered)
-        store.connectionAnsweredPing(connectionB)
-        store.connectionAnswered(connectionA, accountID: player, .confirmed)
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "Nothing starts before a ping.")
         store.connectionAnsweredPing(connectionA)
-        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "No wait outlived the background.")
-        store.connectionAuthenticating(connectionA, accountID: player)
-        store.connectionAnswered(connectionA, accountID: player, .confirmed)
-        XCTAssertEqual(scheduler.pendingDelays, [SuperchatStore.resendWindow])
+        store.connectionAnsweredPing(reconnected)
+        XCTAssertEqual(scheduler.pendingDelays, [SuperchatStore.resendWindow, SuperchatStore.resendWindow],
+                       "A's wait from before the background, and the one opened in it, start.")
+        store.connectionAnsweredPing(connectionB)
+        XCTAssertEqual(scheduler.pendingDelays.count, 2, "B still waits for OGS's answer.")
+        store.connectionAnswered(connectionB, accountID: player, .confirmed)
+        XCTAssertEqual(scheduler.pendingDelays.count, 3)
+
         clock.now = 1_080
         scheduler.advance()
-        XCTAssertNil(store.covers[player])
+        XCTAssertNil(store.covers[player], "No re-send came: the cover lifts by itself.")
         XCTAssertEqual(lifted, [player])
+        XCTAssertEqual(store.endings, [player: [moderator: SuperchatEnding(at: 1_080, wasMissed: true)]])
+    }
+
+    func testAResendAfterTheReturnBeforeThePingKeepsTheCover() {
+        let store = makeStore()
+        start(store, moderator)
+        start(store, secondModerator, username: "second")
+        store.connectionAuthenticating(connectionA, accountID: player)
+        store.connectionAnswered(connectionA, accountID: player, .confirmed)
+        store.enterBackground()
+        store.enterForeground()
+
+        // The socket held the first moderator's re-send while the app was
+        // suspended, so it comes before the socket's next pong.
+        start(store, moderator)
+        store.connectionAnsweredPing(connectionA)
+        XCTAssertEqual(scheduler.pendingDelays, [SuperchatStore.resendWindow], "The second is still awaited.")
+
+        clock.now = 1_020
+        scheduler.advance()
+        XCTAssertEqual(store.covers[player]?.isOn, true, "The re-sent superchat keeps the cover.")
+        XCTAssertEqual(store.covers[player]?.moderators.map(\.id), [secondModerator, moderator])
+        XCTAssertEqual(store.covers[player]?.moderators.map(\.isOn), [false, true])
+        XCTAssertEqual(store.endings, [player: [secondModerator: SuperchatEnding(at: 1_020, wasMissed: true)]],
+                       "Only the superchat OGS didn't re-send ended.")
+        XCTAssertTrue(lifted.isEmpty)
     }
 
     func testOnlyTheMissedModeratorEnds() {
