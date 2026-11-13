@@ -103,6 +103,17 @@ extension AppAnnouncement.Key {
     /// A cover lifted because every superchat ended while Surround wasn't
     /// listening; every window hears it from the store.
     static func superchatLifted(_ accountID: Int) -> Self { Self("superchat.lifted.\(accountID)") }
+
+    /// The result of what the user did to an item in Activity's list, such
+    /// as a withdrawn challenge. Each item and action is its own event.
+    static func activityResult(itemID: String, action: ActivityAction) -> Self {
+        Self("activity.result.\(action.rawValue).\(itemID)")
+    }
+
+    /// What the user did to an item in Activity's list failed.
+    static func activityFailure(itemID: String, action: ActivityAction) -> Self {
+        Self("activity.failure.\(action.rawValue).\(itemID)")
+    }
 }
 
 /// The app's windows and which one the user is in. Each window's anchor
