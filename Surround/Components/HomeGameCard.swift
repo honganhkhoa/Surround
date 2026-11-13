@@ -180,6 +180,9 @@ struct HomeClockChip<Leading: View>: View {
     let facts: HomeGameFacts
     let color: StoneColor
     var size: Size = .row
+    /// Activity's low time (`ActivityModel.isLowOnTime`), which also counts
+    /// a live game's last seconds: the chip wears the warning look.
+    var marksLowTime = false
     @ViewBuilder var leading: () -> Leading
 
     @Environment(\.surroundTheme) private var theme
@@ -187,7 +190,7 @@ struct HomeClockChip<Leading: View>: View {
 
     private var state: GameDetailClockState { facts.clock(color) }
     private var lowOnTime: Bool { color == facts.userColor && facts.userLowOnTime }
-    private var warning: Bool { lowOnTime || (state.running && state.suddenDeath) }
+    private var warning: Bool { marksLowTime || lowOnTime || (state.running && state.suddenDeath) }
     private var warningColor: Color { theme.clockSuddenDeathAccent(color, scheme: colorScheme) }
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: size.radius, style: .continuous) }
 

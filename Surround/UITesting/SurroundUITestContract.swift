@@ -731,6 +731,19 @@ enum SurroundUITestContract {
         do { return try NoticesHostProbe.parse(ProcessInfo.processInfo.arguments) }
         catch { preconditionFailure("Invalid notices host probe flags: \(error)") }
     }()
+
+    /// The launch's Activity opener, read once. A malformed flag, or one
+    /// without a UI-testing Activity state, stops the launch.
+    static let activityOpen: ActivityOpen? = {
+        let open: ActivityOpen?
+        do { open = try parseActivityOpen(ProcessInfo.processInfo.arguments) }
+        catch { preconditionFailure("\(error)") }
+        guard let open else { return nil }
+        guard ActivityFixtures.selected != nil else {
+            preconditionFailure("\(activityOpenLaunchArgument) needs \(launchArgument) with \(activityStateLaunchArgument).")
+        }
+        return open
+    }()
     #else
     static let isEnabled = false
     static let isCapturingAppStoreScreenshots = false
@@ -862,6 +875,28 @@ enum SurroundUITestContract {
         static let messagesSuperchatEnded = "messages.superchatEnded"
         static func superchatCoverModerator(_ id: Int) -> String { "superchat.cover.moderator.\(id)" }
         static func superchatCoverLiveGame(_ id: Int) -> String { "superchat.cover.liveGame.\(id)" }
+
+        /// The Activity list (ActivityListView.swift). Rows and their
+        /// controls take the item's id as a string, such as "challenge-95001"
+        /// or "waiting-open-95101": this file also builds into the widget.
+        static let activityList = "activity.list"
+        static let activityEmpty = "activity.empty"
+        static let activityAllMessages = "activity.allMessages"
+        static let activityDone = "activity.done"
+        /// "Reconnecting…", or "Can’t reach OGS" with its Retry.
+        static let activityStatus = "activity.status"
+        static let activityStatusRetry = "activity.status.retry"
+        enum ActivityRowControl: String {
+            case accept, reject, view, withdraw, openGame, retry
+        }
+        /// `liveGames`, `challengesReceived`, `waiting`, `correspondence` or `messages`.
+        static func activitySection(_ name: String) -> String { "activity.section.\(name)" }
+        static func activityRow(_ itemID: String) -> String { "activity.row.\(itemID)" }
+        static func activityRow(_ itemID: String, _ control: ActivityRowControl) -> String {
+            "activity.row.\(itemID).\(control.rawValue)"
+        }
+        /// A row's result or failure line, which replaces its actions.
+        static func activityRowResult(_ itemID: String) -> String { "activity.row.\(itemID).result" }
 
         static let profileRengoMenuPrefix = "profile.menu.rengo."
         static let profileActiveGames = "profile.active-games"
@@ -1319,6 +1354,43 @@ extension SurroundUITestContract {
     /// passes TEST_RUNNER_SURROUND_UI_NOTICES_HOST_PROBE), split on whitespace.
     static func noticesHostProbeArguments(_ environment: [String: String]) -> [String] {
         (environment["SURROUND_UI_NOTICES_HOST_PROBE"] ?? "").split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+
+    /// Opens the Activity list once at launch, over the offline root:
+    /// `--surround-activity-open sheet`. It needs an Activity state
+    /// (`--surround-activity-state`).
+    static let activityOpenLaunchArgument = "--surround-activity-open"
+
+    enum ActivityOpen: String, CaseIterable {
+        case sheet
+    }
+
+    enum ActivityOpenError: Error, Equatable, CustomStringConvertible {
+        case missingValue, unknownValue(String), needsActivityState
+
+        var description: String {
+            switch self {
+            case .missingValue:
+                "\(activityOpenLaunchArgument) needs a value: "
+                    + ActivityOpen.allCases.map(\.rawValue).joined(separator: ", ")
+            case .unknownValue(let raw):
+                "Unknown \(activityOpenLaunchArgument) value '\(raw)'. Use one of: "
+                    + ActivityOpen.allCases.map(\.rawValue).joined(separator: ", ")
+            case .needsActivityState:
+                "\(activityOpenLaunchArgument) needs \(activityStateLaunchArgument)."
+            }
+        }
+    }
+
+    /// Nil without `--surround-activity-open`. A missing or unknown value,
+    /// or no Activity state, throws.
+    static func parseActivityOpen(_ arguments: [String]) throws -> ActivityOpen? {
+        guard let index = arguments.firstIndex(of: activityOpenLaunchArgument) else { return nil }
+        guard arguments.indices.contains(index + 1) else { throw ActivityOpenError.missingValue }
+        let raw = arguments[index + 1]
+        guard let open = ActivityOpen(rawValue: raw) else { throw ActivityOpenError.unknownValue(raw) }
+        guard arguments.contains(activityStateLaunchArgument) else { throw ActivityOpenError.needsActivityState }
+        return open
     }
 }
 #endif

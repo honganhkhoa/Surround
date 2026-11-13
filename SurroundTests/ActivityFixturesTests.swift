@@ -11,6 +11,7 @@ import XCTest
 
 final class ActivityFixturesTests: XCTestCase {
     private typealias Fixtures = ActivityFixtures
+    private typealias Contract = SurroundUITestContract
     private typealias State = SurroundUITestContract.ActivityFixtureState
     private typealias ID = SurroundUITestContract.ActivityFixtureID
     private let baseID = SurroundUITestContract.fixtureGameID
@@ -455,6 +456,43 @@ final class ActivityFixturesTests: XCTestCase {
         let running = Fixtures.Clock(reference: clock.reference, isFrozen: false)
         XCTAssertEqual(try parse([state, "several", clockFlag, "running", ticks]),
                        Fixtures.Launch(state: .several, clock: running))
+    }
+
+    func testTheActivityOpenerNeedsAStateAndAKnownStyle() throws {
+        let open = Contract.activityOpenLaunchArgument
+        let state = Contract.activityStateLaunchArgument
+        func parse(_ arguments: [String]) throws -> Contract.ActivityOpen? {
+            try Contract.parseActivityOpen(arguments)
+        }
+        func failure(_ arguments: [String]) -> Contract.ActivityOpenError? {
+            do {
+                _ = try parse(arguments)
+                return nil
+            } catch {
+                return error as? Contract.ActivityOpenError
+            }
+        }
+
+        XCTAssertNil(try parse([]))
+        XCTAssertNil(try parse([state, "several"]), "A state alone opens nothing.")
+        XCTAssertEqual(try parse([state, "several", open, "sheet"]), .sheet)
+        XCTAssertEqual(try parse([open, "sheet", state, "waiting"]), .sheet)
+
+        XCTAssertEqual(failure([state, "several", open]), .missingValue)
+        XCTAssertEqual(failure([state, "several", open, "game-popover"]), .unknownValue("game-popover"))
+        XCTAssertEqual(failure([open, "sheet"]), .needsActivityState)
+        XCTAssertTrue(Contract.ActivityOpenError.unknownValue("x").description.contains("sheet"))
+    }
+
+    func testActivityIdentifiersTakeTheItemsID() {
+        typealias ID = SurroundUITestContract.AccessibilityID
+        XCTAssertEqual(ID.activityRow("challenge-95001"), "activity.row.challenge-95001")
+        XCTAssertEqual(ID.activityRow("waiting-open-95101", .withdraw), "activity.row.waiting-open-95101.withdraw")
+        XCTAssertEqual(ID.activityRow("challenge-95003", .openGame), "activity.row.challenge-95003.openGame")
+        XCTAssertEqual(ID.activityRowResult("challenge-95003"), "activity.row.challenge-95003.result")
+        XCTAssertEqual(ID.activitySection("waiting"), "activity.section.waiting")
+        XCTAssertEqual([ID.activityList, ID.activityEmpty, ID.activityAllMessages, ID.activityDone],
+                       ["activity.list", "activity.empty", "activity.allMessages", "activity.done"])
     }
 }
 #endif

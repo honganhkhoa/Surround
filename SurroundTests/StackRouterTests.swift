@@ -225,6 +225,35 @@ final class StackRouterTests: XCTestCase {
         XCTAssertTrue(router.games.isEmpty)
     }
 
+    func testAStackWhoseGamesOpenElsewherePushesNoGame() {
+        let router = Router()
+        let nav = NavigationService()
+        let service = OGSService.previewInstance(user: firstPlayer)
+        let game = Game(width: 19, height: 19, blackName: "Black", whiteName: "White", gameId: .OGS(123))
+        var opened = [Int]()
+        router.gameOpenOverride = { opened.append($0) }
+        router.openProfile(firstPlayer)
+        router.openGame(game, using: nav)
+        router.openAbout(OGSPlayerProfile(user: firstPlayer, about: "Game link"))
+        router.openGame(gameID: 124, using: nav, service: service)
+        router.openGame(gameID: 0, using: nav, service: service)
+
+        XCTAssertEqual(opened, [123, 124], "Each game opens outside the stack; an invalid id opens nothing.")
+        XCTAssertEqual(router.path, [.profile(playerID: firstPlayer.id, selectionID: nil), .playerAbout(firstPlayer.id)])
+        XCTAssertTrue(router.games.isEmpty)
+    }
+
+    func testAnActivityItemIsItsOwnRoute() {
+        let router = Router()
+        router.present(.activityItem("challenge-95002"))
+        router.present(.activityItem("challenge-95002"))
+        XCTAssertEqual(router.path, [.activityItem("challenge-95002")], "The same card is pushed once.")
+        router.present(.activityItem("waiting-rengo-95301"))
+        router.remove(.activityItem("waiting-rengo-95301"))
+        XCTAssertEqual(router.path, [.activityItem("challenge-95002")])
+        XCTAssertFalse(StackRoute.activityItem("challenge-95002").showsGameDetail)
+    }
+
     func testProfileListsRetainOnlyTheirOwnPayloads() throws {
         let router = Router()
         let service = OGSService.previewInstance(user: firstPlayer)

@@ -459,16 +459,25 @@ extension ActivityModel.Input {
     ///     as seen now.
     ///   - sessionStart: The start of this app session, for recent
     ///     conversations.
+    ///   - openChallenges: The user's own open and Rengo challenges, when
+    ///     they come from elsewhere than the service, such as the window's
+    ///     last-known copy while the socket is down. Nil reads the service's.
     init(
         ogs: OGSService,
         place: ActivityModel.Place,
         startedGames: [Int: TimeInterval] = [:],
         firstSeen: [String: TimeInterval] = [:],
         sessionStart: TimeInterval = 0,
-        now: TimeInterval = Date().timeIntervalSince1970
+        now: TimeInterval = Date().timeIntervalSince1970,
+        openChallenges: ActivityLastKnown.OpenChallenges? = nil
     ) {
         self.init(startedGames: startedGames, sessionStart: sessionStart, now: now, place: place)
         guard let user = ogs.user else { return }
+        let seekGraph = openChallenges ?? ActivityLastKnown.OpenChallenges(
+            openChallengeSentById: ogs.openChallengeSentById,
+            participatingRengoChallengeById: ogs.participatingRengoChallengeById,
+            hostingRengoChallengeById: ogs.hostingRengoChallengeById
+        )
 
         liveGames = ogs.liveGames.compactMap { ActivityModel.LiveGame(game: $0, userID: user.id) }
         correspondenceGamesOnYourMove = ogs.sortedActiveCorrespondenceGamesOnUserTurn.compactMap { game in
@@ -501,7 +510,7 @@ extension ActivityModel.Input {
                 since: since(id, created: entry.creationTimestamp)
             ))
         }
-        for challenge in ogs.openChallengeSentById.values {
+        for challenge in seekGraph.openChallengeSentById.values {
             let id = WaitingID.openChallenge(challenge.id)
             waiting.append(.init(
                 id: id,
@@ -519,7 +528,8 @@ extension ActivityModel.Input {
                 since: since(id)
             ))
         }
-        let rengo = ogs.participatingRengoChallengeById.merging(ogs.hostingRengoChallengeById) { current, _ in current }
+        let rengo = seekGraph.participatingRengoChallengeById
+            .merging(seekGraph.hostingRengoChallengeById) { current, _ in current }
         for challenge in rengo.values {
             let id = WaitingID.rengo(challenge.id)
             waiting.append(.init(

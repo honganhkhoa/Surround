@@ -212,6 +212,7 @@
 		BC042B5924AB2DD10050B2D1 /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
 		BC042B5C24AB2E360050B2D1 /* URLImage in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B5B24AB2E360050B2D1 /* URLImage */; };
 		BC08720725E504FB006CA8B9 /* WaitingGamesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */; };
+		5C3E00192026111200000019 /* ActivityListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E00182026111200000018 /* ActivityListView.swift */; };
 		BC08721525E791A3006CA8B9 /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
 		BC08721625E791A6006CA8B9 /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
 		BC08721725E791A8006CA8B9 /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
@@ -219,6 +220,8 @@
 		BC0F1C40252451B300E3E66B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C3F252451B300E3E66B /* SettingsView.swift */; };
 		BC0F1C4D2526EF6700E3E66B /* OGSChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */; };
 		BC0F1C522527290900E3E66B /* ChallengeCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C512527290900E3E66B /* ChallengeCell.swift */; };
+		5C3E001B202611120000001B /* ActivityRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E001A202611120000001A /* ActivityRows.swift */; };
+		5C3E001D202611120000001D /* AutomatchEntryCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E001C202611120000001C /* AutomatchEntryCell.swift */; };
 		BC285B2D2557FAEB005378F9 /* UserNotifications.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC285B2C2557FAEB005378F9 /* UserNotifications.framework */; };
 		BC285B2F2557FAEB005378F9 /* UserNotificationsUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC285B2E2557FAEB005378F9 /* UserNotificationsUI.framework */; };
 		BC285B322557FAEB005378F9 /* NotificationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC285B312557FAEB005378F9 /* NotificationViewController.swift */; };
@@ -748,10 +751,13 @@
 		BC042B4324AB2DD10050B2D1 /* OGSService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSService.swift; sourceTree = "<group>"; };
 		BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimeUtilities.swift; sourceTree = "<group>"; };
 		BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitingGamesView.swift; sourceTree = "<group>"; };
+		5C3E00182026111200000018 /* ActivityListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityListView.swift; sourceTree = "<group>"; };
 		BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSAutomatchEntry.swift; sourceTree = "<group>"; };
 		BC0F1C3F252451B300E3E66B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChallenge.swift; sourceTree = "<group>"; };
 		BC0F1C512527290900E3E66B /* ChallengeCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeCell.swift; sourceTree = "<group>"; };
+		5C3E001A202611120000001A /* ActivityRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityRows.swift; sourceTree = "<group>"; };
+		5C3E001C202611120000001C /* AutomatchEntryCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomatchEntryCell.swift; sourceTree = "<group>"; };
 		BC285B2B2557FAEB005378F9 /* SurroundNotificationContent.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SurroundNotificationContent.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC285B2C2557FAEB005378F9 /* UserNotifications.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotifications.framework; path = System/Library/Frameworks/UserNotifications.framework; sourceTree = SDKROOT; };
 		BC285B2E2557FAEB005378F9 /* UserNotificationsUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotificationsUI.framework; path = System/Library/Frameworks/UserNotificationsUI.framework; sourceTree = SDKROOT; };
@@ -1174,6 +1180,7 @@
 				BC92008125CE5BE400C14433 /* UserSelectionView.swift */,
 				BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */,
 				BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */,
+				5C3E00182026111200000018 /* ActivityListView.swift */,
 				BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */,
 				9932FB46E36E47B6A222B4A8 /* MessagesFriendsView.swift */,
 				07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */,
@@ -1272,6 +1279,8 @@
 				FC2410010000000000000002 /* FeltControlSurface.swift */,
 				CC2611080000000000000002 /* ChristmasKeepsakeSurfaces.swift */,
 				BC0F1C512527290900E3E66B /* ChallengeCell.swift */,
+				5C3E001A202611120000001A /* ActivityRows.swift */,
+				5C3E001C202611120000001C /* AutomatchEntryCell.swift */,
 				BC5EEBF6259C42EC00675761 /* ChatLine.swift */,
 				BC5EEC5D25A41D7900675761 /* ChatLog.swift */,
 				BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */,
@@ -1850,6 +1859,8 @@
 				BC042B4F24AB2DD10050B2D1 /* OGSGame.swift in Sources */,
 				A389720DAEAD420B956A2398 /* FinishedGameSummary.swift in Sources */,
 				BC0F1C522527290900E3E66B /* ChallengeCell.swift in Sources */,
+				5C3E001B202611120000001B /* ActivityRows.swift in Sources */,
+				5C3E001D202611120000001D /* AutomatchEntryCell.swift in Sources */,
 				BC042B4924AB2DD10050B2D1 /* MainView.swift in Sources */,
 				D03000012026093000000001 /* DuoTabContainer.swift in Sources */,
 				D00600012026100600000001 /* IPadTabContainer.swift in Sources */,
@@ -1921,6 +1932,7 @@
 				BC463AFE26624B6100D40D3A /* OGSPuzzle.swift in Sources */,
 				BC70596A25FF209300AC4DE9 /* SupporterView.swift in Sources */,
 				BC08720725E504FB006CA8B9 /* WaitingGamesView.swift in Sources */,
+				5C3E00192026111200000019 /* ActivityListView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

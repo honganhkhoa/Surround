@@ -6476,6 +6476,26 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(since["open-42"], 6, "Without one, the first sighting stands in.")
     }
 
+    func testTheInputReadsTheOpenChallengesItIsGiven() {
+        let service = makeService(socket: FakeWebsocket())
+        service.user = OGSUser(username: "current", id: 1, rank: 25)
+        service.onSeekGraphEvent(data: [seekGraphChallengePayload(id: 41, challengerID: 1)])
+        let place = ActivityModel.Place.root(isMessagesTab: false)
+        XCTAssertEqual(ActivityModel.Input(ogs: service, place: place, now: 100).waiting.map(\.id), ["open-41"],
+                       "Without a copy, the service's own rows.")
+
+        var open = OGSChallengeSampleData.sampleOpenChallenge
+        open.id = 43
+        var rengo = OGSChallengeSampleData.sampleRengoChallenge
+        rengo.id = 44
+        let lastKnown = ActivityLastKnown.OpenChallenges(
+            openChallengeSentById: [43: open], participatingRengoChallengeById: [44: rengo]
+        )
+        let input = ActivityModel.Input(ogs: service, place: place, now: 100, openChallenges: lastKnown)
+        XCTAssertEqual(Set(input.waiting.map(\.id)), ["open-43", "rengo-44"],
+                       "The window's last-known rows stand in for the service's.")
+    }
+
     // MARK: - Challenge send holds
 
     private func seekGraphHoldService() -> (OGSService, FakeWebsocket) {

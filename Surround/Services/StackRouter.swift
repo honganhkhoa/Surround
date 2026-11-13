@@ -17,6 +17,9 @@ enum StackRoute: Hashable {
     case opponentPicker(UUID)
     case messagesConversation(Int)
     case conversation(Int)
+    /// A challenge or search from the Activity list, by its item id
+    /// (`ActivityModel.Item.id`), shown as its full card.
+    case activityItem(String)
 }
 
 extension StackRoute {
@@ -169,10 +172,19 @@ final class StackRouter: ObservableObject {
         else { present(route) }
     }
 
+    /// Set by a stack whose games open outside it, as Activity's own stack
+    /// does: a game opened from a profile there closes the list and opens
+    /// in the window instead of being pushed.
+    var gameOpenOverride: ((Int) -> Void)?
+
     /// Opening a game already below the profile returns to that same screen,
     /// retaining its analysis, chat draft and connection owner.
     func openGame(_ game: Game, using navigation: NavigationService) {
         guard let gameID = game.ogsID, gameID > 0 else { return }
+        if let gameOpenOverride {
+            gameOpenOverride(gameID)
+            return
+        }
         if returnToExistingGame(gameID: gameID, using: navigation) { return }
         games[gameID] = game
         present(.game(gameID))
@@ -182,6 +194,10 @@ final class StackRouter: ObservableObject {
     /// retain their connection owner; an uncached destination loads REST detail.
     func openGame(gameID: Int, using navigation: NavigationService, service: OGSService) {
         guard gameID > 0 else { return }
+        if let gameOpenOverride {
+            gameOpenOverride(gameID)
+            return
+        }
         if returnToExistingGame(gameID: gameID, using: navigation) { return }
         if let game = service.knownProfileGame(gameID: gameID)
             ?? service.cachedOverviewGame(gameID: gameID) {
@@ -878,6 +894,8 @@ struct AppNavigationStack<Content: View>: View {
                     .navigationTitle("Select your opponent ")
                     .navigationBarTitleDisplayMode(.inline)
             }
+        case .activityItem(let itemID):
+            ActivityItemCard(itemID: itemID)
         }
     }
 }
