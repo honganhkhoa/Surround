@@ -667,15 +667,18 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
             return settled != nil
         }
         keepScreenshot("Largest text, the end card, \(context)", in: app)
-        guard let frames = settled, let cover = frames[ID.superchatCover],
+        guard let frames = settled, let reported = frames[ID.superchatCover],
               let conversation = frames[ID.profileConversation], let ended = frames[ID.superchatCoverEnded],
               let doneFrame = frames[ID.superchatCoverDone], let reply = frames[ID.superchatCoverReply] else {
             attach(app.debugDescription, name: "Accessibility hierarchy – the end card, \(context)")
             return XCTFail("\(context): the end card's frames settle", file: file, line: line)
         }
+        // The part of the cover in the window, as assertCoverFits measures it.
+        let window = app.frame
+        let cover = reported.intersection(window)
         attach("""
             \(context)
-            cover \(cover)
+            cover \(cover) in the window \(window) (reported \(reported))
             conversation \(conversation)
             ended line \(ended)
             Done \(doneFrame)
@@ -717,7 +720,11 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
             attach(app.debugDescription, name: "Accessibility hierarchy – largest text, \(context)")
             return XCTFail("The cover's frames settle in \(context)", file: file, line: line)
         }
-        let cover = frames.cover, conversation = frames.conversation
+        // In landscape on iPadOS 18, XCTest reports the cover's frame reaching
+        // above the top of the screen, though everything in it lays out on
+        // screen. So the checks measure the part of the cover in the window.
+        let window = app.frame
+        let cover = frames.cover.intersection(window), conversation = frames.conversation
         let usesColumns = conversation.minX > cover.minX + 1
         let header = frames.headerScroll ?? (usesColumns
             ? CGRect(x: cover.minX, y: cover.minY, width: conversation.minX - cover.minX, height: cover.height)
@@ -729,7 +736,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
         let contentHeight = bottom - top
         attach("""
             \(context), \(usesColumns ? "two columns" : "one column")
-            cover \(cover)
+            cover \(cover) in the window \(window) (reported \(frames.cover))
             header \(header) (own scroll view: \(frames.headerScroll != nil))
             title \(frames.title)
             Reconnecting… \(frames.status.map { "\($0)" } ?? "not shown")
