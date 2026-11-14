@@ -1068,12 +1068,12 @@ struct Stones: View {
                 Path(whitePaths[index]).fill(fill(white))
                 .shadow(color: dropShadow, radius: 2 * shadowScale, x: shadowXSign * shadowOffset, y: shadowOffset)
             }
-            Path(whiteLivingPath).stroke(edge(white), lineWidth: 0.5)
+            Path(whiteLivingPath).stroke(edge(white), lineWidth: drawsShadow ? 0.5 : white.flatOutlineWidth(forStoneDiameter: marker.stoneDiameter))
             ForEach(blackPaths.indices, id: \.self) { index in
                 Path(blackPaths[index]).fill(fill(black))
                 .shadow(color: dropShadow, radius: 2 * shadowScale, x: shadowXSign * shadowOffset, y: shadowOffset)
             }
-            Path(blackLivingPath).stroke(edge(black), lineWidth: drawsShadow ? 0.75 : 0.5)
+            Path(blackLivingPath).stroke(edge(black), lineWidth: drawsShadow ? 0.75 : black.flatOutlineWidth(forStoneDiameter: marker.stoneDiameter))
             // The Canvas overhangs the board for edge shadows, and that
             // overhang widens the board's accessibility frame. Mount it only
             // for themes with image stones; the choice follows the theme, not

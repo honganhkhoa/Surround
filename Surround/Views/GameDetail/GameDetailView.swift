@@ -1337,7 +1337,7 @@ private struct GameToolbarLayout: ViewModifier {
         // native bar item from its Label drops that value on recent iOS.
         return ZStack {
             Button(action: cycleFlowingInk) {
-                Label("Flowing Ink", systemImage: "pencil.and.scribble")
+                Label("Flowing Ink", systemImage: "paintbrush.pointed")
                     .labelStyle(.iconOnly)
                     .modifier(GameToolbarMinimumTouchTarget())
                     .contentShape(Rectangle())

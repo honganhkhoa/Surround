@@ -59,6 +59,10 @@ struct StonePalette: Equatable {
     var flat: Color
     /// A thin edge on flat stones.
     var outline: Color? = nil
+    /// Flat-stone contour width in points, shared by boards and standalone stones.
+    var outlineWidth: CGFloat = 0.5
+    /// Optional diameter where the contour starts growing, up to twice its base width.
+    var outlineReferenceDiameter: CGFloat? = nil
     /// A thin edge on shaded stones.
     var rim: Color? = nil
     /// The last-move ring and pending-move cross.
@@ -72,6 +76,11 @@ struct StonePalette: Equatable {
     var detailedMarkerCasing: Color? = nil
 
     var territoryMark: Color { territory ?? flat }
+
+    func flatOutlineWidth(forStoneDiameter diameter: CGFloat) -> CGFloat {
+        guard let reference = outlineReferenceDiameter, reference > 0 else { return outlineWidth }
+        return outlineWidth * min(2, max(1, diameter / reference))
+    }
 }
 
 /// Rendered stones: a few variants per player, so a full board does not
@@ -1103,7 +1112,7 @@ struct Stone: View {
                                 Circle().fill(palette.flat)
                             }
                             if let edge = detailed ? palette.outline ?? palette.rim : palette.outline {
-                                Circle().stroke(edge, lineWidth: 0.5)
+                                Circle().stroke(edge, lineWidth: detailed ? 0.5 : palette.flatOutlineWidth(forStoneDiameter: size))
                             }
                         }
                     }

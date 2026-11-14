@@ -138,14 +138,14 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         }
         if isFlowingInk, scheme == .dark {
             var night = board
-            // Medium graphite/jade separates both solid stone colors. A
+            // Medium graphite, jade or wood separates both solid stone colors. A
             // near-black board would hide the ink stones and their contours.
-            let paper = Color(themeHex: flowingInkUsesColor ? 0x748478 : 0x777777)
-            let ink = Color(themeHex: flowingInkUsesColor ? 0x183326 : 0x171717)
+            let paper = flowingInkColors.nightBoard
+            let ink = flowingInkColors.nightInk
             night.boardColor = paper
             night.compactBoardColor = paper
             night.boardEdge = Color.black.opacity(0.85)
-            night.dameColor = flowingInkUsesColor ? Color(themeHex: 0x3D2A10) : ink
+            night.dameColor = flowingInkColors.nightDame
             night.highlightColor = ink
             night.crosshair = .init(valid: ink,
                                    invalid: flowingInkUsesColor ? Color(themeHex: 0x4D161C) : .black,
@@ -1287,7 +1287,7 @@ extension SurroundTheme {
     var pageBackground: Color {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
-            flowingInkUsesColor ? FlowingInkColors.jadePage : FlowingInkColors.monoPage
+            flowingInkColors.page
         case .standard: Color(uiColor: .systemGroupedBackground)
         case .nebulaPearl: Color(themeHex: 0x070A1C)
         case .rakedGarden: RakedGardenColors.page
@@ -1303,7 +1303,7 @@ extension SurroundTheme {
     var panel: Color {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
-            flowingInkUsesColor ? FlowingInkColors.jadePanel : FlowingInkColors.monoPanel
+            flowingInkColors.panel
         case .standard: Color(uiColor: .secondarySystemGroupedBackground)
         case .nebulaPearl: Color(themeHex: 0x141938)
         case .rakedGarden: RakedGardenColors.panel
@@ -1319,7 +1319,7 @@ extension SurroundTheme {
     var foreground: Color {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
-            flowingInkUsesColor ? FlowingInkColors.jadeForeground : FlowingInkColors.monoForeground
+            flowingInkColors.foreground
         case .standard, .nebulaPearl: .primary
         case .rakedGarden: RakedGardenColors.foreground
         case .surroundStudio: SurroundStudioColors.foreground
@@ -1336,7 +1336,7 @@ extension SurroundTheme {
     var detailSecondaryForeground: Color {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
-            flowingInkUsesColor ? FlowingInkColors.jadeSecondary : FlowingInkColors.monoSecondary
+            flowingInkColors.secondary
         case .feltMeadow: FeltMeadowColors.detailSecondary
         case .nightGarden: NightGardenColors.detailSecondary
         case .christmasKeepsakes: ChristmasKeepsakesColors.detailSecondary
@@ -1486,7 +1486,7 @@ extension SurroundTheme {
     var chatBubble: Color {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
-            flowingInkUsesColor ? FlowingInkColors.jadeChat : FlowingInkColors.monoChat
+            flowingInkColors.chat
         case .standard: Color(.systemGray4)
         case .nebulaPearl: Color(themeHex: 0x2C2F5E)
         case .rakedGarden: RakedGardenColors.chatBubble
@@ -1526,7 +1526,7 @@ extension SurroundTheme {
     var conditionalMark: Color? {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
-            flowingInkUsesColor ? FlowingInkColors.jadeConditional : FlowingInkColors.monoSelection
+            flowingInkColors.conditional
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xE0A86A)
         case .rakedGarden: RakedGardenColors.conditional
@@ -1607,7 +1607,7 @@ extension SurroundTheme {
     var stoneRemovalMark: Color {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
-            flowingInkUsesColor ? FlowingInkColors.jadeConditional : FlowingInkColors.monoSelection
+            flowingInkColors.conditional
         case .standard: Color(uiColor: .systemOrange)
         case .nebulaPearl: Color(themeHex: 0xF2B279)
         case .rakedGarden: RakedGardenColors.conditional
@@ -1624,7 +1624,7 @@ extension SurroundTheme {
     func idleGameMark(scheme: ColorScheme) -> Color {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
-            flowingInkUsesColor ? FlowingInkColors.jadeIdle : FlowingInkColors.monoIdle
+            flowingInkColors.idle
         case .standard: Color(uiColor: scheme == .dark ? .systemGray5 : .systemBackground)
         case .nebulaPearl: Color(themeHex: 0x2A2F55)
         case .rakedGarden: RakedGardenColors.idle
@@ -1729,9 +1729,7 @@ extension SurroundTheme {
     func clockSolidSurface(_ color: StoneColor) -> Color {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
-            color == .black
-                ? (flowingInkUsesColor ? FlowingInkColors.jadeBlack : FlowingInkColors.monoBlack)
-                : (flowingInkUsesColor ? FlowingInkColors.jadeWhite : FlowingInkColors.monoWhite)
+            color == .black ? flowingInkColors.black : flowingInkColors.white
         case .standard: color == .black ? Color(white: 0.06) : Color(white: 0.98)
         case .nebulaPearl: color == .black ? Color(themeHex: 0x1C1240) : Color(themeHex: 0xF6F0EA)
         case .rakedGarden: color == .black ? RakedGardenColors.blackSolid : RakedGardenColors.whiteGlass
@@ -1766,7 +1764,7 @@ extension SurroundTheme {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
             // White clocks keep dark text even when filled actions lighten
             // against the charcoal page. Metadata needs text-level contrast.
-            color == .black ? .white : (flowingInkUsesColor ? FlowingInkColors.jadeInk : FlowingInkColors.ink)
+            color == .black ? .white : flowingInkColors.ink
         case .standard: Color(uiColor: .systemIndigo)
         case .nebulaPearl: color == .black ? Color(themeHex: 0xCDBEFF) : Color(themeHex: 0x5B3FC4)
         case .rakedGarden: color == .black ? RakedGardenColors.blackAccent : RakedGardenColors.whiteAccent
@@ -1880,7 +1878,7 @@ extension SurroundTheme {
     func turnOutline(scheme: ColorScheme) -> Color {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
-            flowingInkUsesColor ? FlowingInkColors.jadeTurnOutline : FlowingInkColors.monoTurnOutline
+            flowingInkColors.turnOutline
         case .standard:
             scheme == .dark
                 ? Color(red: 125 / 255, green: 122 / 255, blue: 1)
@@ -2533,7 +2531,26 @@ private struct PaperBlossomsSceneContent: View, Equatable {
 
 // MARK: - Flowing Ink
 
-private enum FlowingInkColors {
+private struct FlowingInkColors {
+    let board: Color
+    let nightBoard: Color
+    let ink: Color
+    let nightInk: Color
+    let dame: Color
+    let nightDame: Color
+    let page: Color
+    let panel: Color
+    let foreground: Color
+    let secondary: Color
+    let chat: Color
+    let action: Color
+    let selection: Color
+    let conditional: Color
+    let idle: Color
+    let black: Color
+    let white: Color
+    let turnOutline: Color
+
     private static func adaptive(_ light: UInt, _ dark: UInt) -> Color {
         Color(uiColor: UIColor { traits in
             let hex = traits.userInterfaceStyle == .dark ? dark : light
@@ -2545,49 +2562,68 @@ private enum FlowingInkColors {
 
     // Board inks stay explicit; page ink and filled-button pigment have
     // different jobs in Dark Mode and must not share the board's colors.
-    static let ink = Color(themeHex: 0x171717)
-    static let jade = Color(themeHex: 0xDDE7DB)
-    static let jadeInk = Color(themeHex: 0x28513F)
-    static let ochre = Color(themeHex: 0x6B4C22)
-    static let monoPage = adaptive(0xFFFFFF, 0x242424)
-    static let jadePage = adaptive(0xFFFFFF, 0x242A27)
-    static let monoPanel = adaptive(0xFAFAFA, 0x2D2D2D)
-    static let jadePanel = adaptive(0xFAFAFA, 0x2A332E)
-    static let monoForeground = adaptive(0x171717, 0xF1F1F1)
-    static let jadeForeground = adaptive(0x171717, 0xEAF0EB)
-    static let monoSecondary = adaptive(0x555555, 0xC5C5C5)
-    static let jadeSecondary = adaptive(0x555555, 0xC2CCC4)
-    static let monoChat = adaptive(0xECECEC, 0x393939)
-    static let jadeChat = adaptive(0xE1E9E0, 0x39463D)
-    static let monoAction = adaptive(0x171717, 0x6E6E6E)
-    static let jadeAction = adaptive(0x28513F, 0x4D7B61)
-    static let monoSelection = adaptive(0x171717, 0xE0E0E0)
-    static let jadeSelection = adaptive(0x28513F, 0xB7D6BF)
-    static let jadeConditional = adaptive(0x6B4C22, 0xE1C391)
+    static let monochrome = Self(
+        board: .white, nightBoard: Color(themeHex: 0x777777),
+        ink: Color(themeHex: 0x171717), nightInk: Color(themeHex: 0x171717),
+        dame: Color(themeHex: 0x171717), nightDame: Color(themeHex: 0x171717),
+        page: adaptive(0xFFFFFF, 0x242424), panel: adaptive(0xFAFAFA, 0x2D2D2D),
+        foreground: adaptive(0x171717, 0xF1F1F1), secondary: adaptive(0x555555, 0xC5C5C5),
+        chat: adaptive(0xECECEC, 0x393939), action: adaptive(0x171717, 0x6E6E6E),
+        selection: adaptive(0x171717, 0xE0E0E0), conditional: adaptive(0x171717, 0xE0E0E0),
+        idle: adaptive(0xE5E5E5, 0x484848),
+        black: adaptive(0x000000, 0x0B0B0B), white: adaptive(0xFFFFFF, 0xDADADA),
+        turnOutline: adaptive(0x171717, 0x777777)
+    )
+    static let jade = Self(
+        board: Color(themeHex: 0xDDE7DB), nightBoard: Color(themeHex: 0x748478),
+        ink: Color(themeHex: 0x28513F), nightInk: Color(themeHex: 0x183326),
+        dame: Color(themeHex: 0x6B4C22), nightDame: Color(themeHex: 0x3D2A10),
+        page: adaptive(0xFFFFFF, 0x242A27), panel: adaptive(0xFAFAFA, 0x2A332E),
+        foreground: adaptive(0x171717, 0xEAF0EB), secondary: adaptive(0x555555, 0xC2CCC4),
+        chat: adaptive(0xE1E9E0, 0x39463D), action: adaptive(0x28513F, 0x4D7B61),
+        selection: adaptive(0x28513F, 0xB7D6BF), conditional: adaptive(0x6B4C22, 0xE1C391),
+        idle: adaptive(0xDFE7DD, 0x414E45),
+        black: adaptive(0x000000, 0x0A0C0B), white: adaptive(0xFFFFFF, 0xD9DEDA),
+        turnOutline: adaptive(0x28513F, 0x617F67)
+    )
+    static let wood = Self(
+        board: Color(themeHex: 0xE6BD76), nightBoard: Color(themeHex: 0x99825D),
+        ink: Color(themeHex: 0x62421F), nightInk: Color(themeHex: 0x35240F),
+        dame: Color(themeHex: 0x4C4830), nightDame: Color(themeHex: 0x2B2C17),
+        page: adaptive(0xFAF5EA, 0x29251F), panel: adaptive(0xFFFBF2, 0x342E25),
+        foreground: adaptive(0x2C2418, 0xF4EBDD), secondary: adaptive(0x655744, 0xCFC2AD),
+        chat: adaptive(0xEEE1C9, 0x453A2B), action: adaptive(0x62421F, 0x886638),
+        selection: adaptive(0x62421F, 0xE5C78E), conditional: adaptive(0x4C4830, 0xCEC99F),
+        idle: adaptive(0xE9DDC5, 0x514532),
+        black: adaptive(0x000000, 0x0D0B08), white: adaptive(0xFFFFFF, 0xE2D9C9),
+        turnOutline: adaptive(0x62421F, 0x987A4E)
+    )
     static let keyline = adaptive(0xFFFFFF, 0x171717)
-    static let monoIdle = adaptive(0xE5E5E5, 0x484848)
-    static let jadeIdle = adaptive(0xDFE7DD, 0x414E45)
-    static let monoBlack = adaptive(0x000000, 0x0B0B0B)
-    static let jadeBlack = adaptive(0x000000, 0x0A0C0B)
-    static let monoWhite = adaptive(0xFFFFFF, 0xDADADA)
-    static let jadeWhite = adaptive(0xFFFFFF, 0xD9DEDA)
     static let blackBorder = adaptive(0x666666, 0x999999)
-    static let monoTurnOutline = adaptive(0x171717, 0x777777)
-    static let jadeTurnOutline = adaptive(0x28513F, 0x617F67)
 }
 
 extension SurroundTheme {
+    private var flowingInkColors: FlowingInkColors {
+        switch self {
+        case .flowingInkJade: .jade
+        // Retain the stored mode ID while giving the paper-only color mode
+        // its own wooden board and coordinated warm surfaces.
+        case .flowingInkJadePlain: .wood
+        default: .monochrome
+        }
+    }
+
     private var flowingInkAction: Color {
-        flowingInkUsesColor ? FlowingInkColors.jadeAction : FlowingInkColors.monoAction
+        flowingInkColors.action
     }
 
     private var flowingInkSelection: Color {
-        flowingInkUsesColor ? FlowingInkColors.jadeSelection : FlowingInkColors.monoSelection
+        flowingInkColors.selection
     }
 
     private var flowingInkBoard: BoardAppearance {
-        let paper = flowingInkUsesColor ? FlowingInkColors.jade : Color.white
-        let accent = flowingInkUsesColor ? FlowingInkColors.jadeInk : FlowingInkColors.ink
+        let paper = flowingInkColors.board
+        let accent = flowingInkColors.ink
         return BoardAppearance(
             boardColor: paper,
             compactBoardColor: paper,
@@ -2599,10 +2635,11 @@ extension SurroundTheme {
             black: StonePalette(highlight: .black, shade: .black, flat: .black,
                                 lastMove: .white, label: .white),
             white: StonePalette(highlight: .white, shade: .white, flat: .white,
-                                outline: .black, lastMove: .black, label: .black),
+                                outline: .black, outlineWidth: 0.75, outlineReferenceDiameter: 18,
+                                lastMove: .black, label: .black),
             emptyPointMarker: .black,
             markOutline: .black,
-            dameColor: flowingInkUsesColor ? FlowingInkColors.ochre : FlowingInkColors.ink,
+            dameColor: flowingInkColors.dame,
             highlightColor: accent,
             highlightCasing: .white,
             crosshair: .init(valid: accent, invalid: flowingInkUsesColor ? Color(themeHex: 0x842F34) : .black,
@@ -2692,11 +2729,11 @@ private struct FlowingInkScene: View {
     @Environment(\.colorScheme) private var colorScheme
     let usesColor: Bool
     let showsLandscape: Bool
+    let paper: Color
 
     var body: some View {
         GeometryReader { geometry in
             let layout = FlowingInkSceneLayout(size: geometry.size)
-            let paper = usesColor ? FlowingInkColors.jadePage : FlowingInkColors.monoPage
             ZStack {
                 paper
                 ZStack(alignment: .topLeading) {
@@ -3434,7 +3471,8 @@ struct GameDetailBackdrop: View {
     var body: some View {
         switch theme {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
-            FlowingInkScene(usesColor: theme.flowingInkUsesColor, showsLandscape: theme.showsSceneArt)
+            FlowingInkScene(usesColor: theme.flowingInkUsesColor, showsLandscape: theme.showsSceneArt,
+                            paper: theme.pageBackground)
         case .standard:
             theme.pageBackground
         case .nebulaPearl:

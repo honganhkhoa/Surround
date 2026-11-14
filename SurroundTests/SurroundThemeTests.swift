@@ -1309,8 +1309,13 @@ final class SurroundThemeTests: XCTestCase {
             for scheme: ColorScheme in [.light, .dark] {
                 let board = theme.board(for: scheme)
                 if scheme == .light {
-                    XCTAssertEqual(board.boardColor, theme.flowingInkUsesColor ? Color(themeHex: 0xDDE7DB) : .white,
-                                   "An explicit Light appearance preserves the original concept")
+                    let expected: Color = switch theme {
+                    case .flowingInkJade: Color(themeHex: 0xDDE7DB)
+                    case .flowingInkJadePlain: Color(themeHex: 0xE6BD76)
+                    default: .white
+                    }
+                    XCTAssertEqual(board.boardColor, expected,
+                                   "Color uses jade with landscape and wooden yellow without it")
                 } else {
                     XCTAssertLessThan(luminance(board.boardColor, style: .dark),
                                       luminance(theme.board(for: .light).boardColor))
@@ -1338,7 +1343,8 @@ final class SurroundThemeTests: XCTestCase {
         }
         for scheme: ColorScheme in [.light, .dark] {
             XCTAssertEqual(SurroundTheme.flowingInk.board(for: scheme), SurroundTheme.flowingInkPlain.board(for: scheme))
-            XCTAssertEqual(SurroundTheme.flowingInkJade.board(for: scheme), SurroundTheme.flowingInkJadePlain.board(for: scheme))
+            XCTAssertNotEqual(SurroundTheme.flowingInkJade.board(for: scheme).boardColor,
+                              SurroundTheme.flowingInkJadePlain.board(for: scheme).boardColor)
         }
     }
 
