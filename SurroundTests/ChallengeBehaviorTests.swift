@@ -241,7 +241,9 @@ final class ChallengeBehaviorTests: XCTestCase {
     func testRematchTreatsMissingGamePrivacyAsPublic() throws {
         let game = try makeRematchGame()
         let participant = try XCTUnwrap(game.whitePlayer)
-        game.ogs = OGSService.previewInstance(user: participant)
+        // `Game.ogs` is weak, so the test keeps each game's service.
+        let service = OGSService.previewInstance(user: participant)
+        game.ogs = service
 
         XCTAssertNil(game.gameData?.private)
         XCTAssertEqual(
@@ -250,13 +252,15 @@ final class ChallengeBehaviorTests: XCTestCase {
         )
 
         let publicGame = try makeRematchGame(isPrivate: false)
-        publicGame.ogs = OGSService.previewInstance(
+        let publicService = OGSService.previewInstance(
             user: try XCTUnwrap(publicGame.whitePlayer)
         )
+        publicGame.ogs = publicService
         XCTAssertEqual(
             OGSChallengeTemplate.rematch(for: publicGame)?.game.isPrivate,
             false
         )
+        withExtendedLifetime((service, publicService)) {}
     }
 
     /// Passing `nil` for `isPrivate` omits the key entirely, matching the

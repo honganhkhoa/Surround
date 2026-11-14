@@ -266,6 +266,55 @@ class NavigationService: ObservableObject {
     /// changes never publish through this service. Only Activity's hosts
     /// observe the registry, which settles a main-queue turn later.
     let activityPlaces = ActivityPlaceRegistry()
+
+    /// Set by the window's root: navigation waits while this window's account
+    /// is covered by a moderator superchat.
+    var navigationHold: NavigationHold?
+
+    /// What the app itself asked for while covered.
+    enum HeldNavigation {
+        case route(AppRoute)
+        case gameOpen(AppRoute, closesNewGame: Bool)
+        case activeGame(Game)
+    }
+    /// The latest link, widget or notification tap this window received,
+    /// with its app-wide ticket.
+    private(set) var heldTap: (ticket: Int, route: AppRoute)?
+    /// This window's latest internal open.
+    private(set) var heldInternalNavigation: HeldNavigation?
+
+    private func holdsInternal(_ navigation: HeldNavigation) -> Bool {
+        guard navigationHold?.isCovered == true else { return false }
+        heldInternalNavigation = navigation
+        return true
+    }
+
+    /// The window's cover lowered. The app's latest tap wins; otherwise this
+    /// window's latest internal open runs. Older taps are dropped.
+    func replayHeldNavigation() {
+        guard navigationHold?.isCovered != true else { return }   // covered again: keep both
+        let tap = heldTap
+        let internalNavigation = heldInternalNavigation
+        heldTap = nil
+        heldInternalNavigation = nil
+        if let tap, navigationHold?.isLatest(tap.ticket) == true {
+            handle(route: tap.route)
+            return
+        }
+        switch internalNavigation {
+        case .route(let route): handle(route: route)
+        case .gameOpen(let route, let closesNewGame): requestGameOpen(route, closesNewGame: closesNewGame)
+        case .activeGame(let game): goToActiveGame(game: game)
+        case nil: break
+        }
+    }
+
+    /// The window's views went away: it closed, or the system disconnected
+    /// its scene. What it held is lost, so no later lowering replays it.
+    func dropHeldNavigation() {
+        heldTap = nil
+        heldInternalNavigation = nil
+    }
     #endif
     /// The Reconnecting… badges each Game Detail context is rendering. The
     /// app's connection banner gives way only while a visible game shows one;
@@ -366,11 +415,20 @@ class NavigationService: ObservableObject {
     @discardableResult
     func handle(appURL: URL) -> Bool {
         guard let route = AppRoute(url: appURL) else { return false }
+        #if MAIN_APP || TESTING
+        if let hold = navigationHold, hold.isCovered {
+            heldTap = (hold.nextTicket(), route)
+            return true
+        }
+        #endif
         handle(route: route)
         return true
     }
 
     func handle(route: AppRoute) {
+        #if MAIN_APP || TESTING
+        if holdsInternal(.route(route)) { return }
+        #endif
         dismissTrackedNavigation(
             preservingActiveGameIn: route.ogsGameID == nil
                 ? nil
@@ -385,10 +443,15 @@ class NavigationService: ObservableObject {
     }
 
     /// Publishes a game-open request without applying the broad dismissal
-    /// policy used for external URLs. Internal flows such as challenge
-    /// acceptance retain ownership of the sheets they intentionally dismiss.
-    func requestGameOpen(_ route: AppRoute) {
+    /// policy used for external URLs, so internal flows such as challenge
+    /// acceptance keep the navigation they own. `closesNewGame` closes New
+    /// game with the open, so both wait while the window is covered.
+    func requestGameOpen(_ route: AppRoute, closesNewGame: Bool = false) {
+        #if MAIN_APP || TESTING
+        if holdsInternal(.gameOpen(route, closesNewGame: closesNewGame)) { return }
+        #endif
         guard let ogsGameID = route.ogsGameID else { return }
+        if closesNewGame { home.showingNewGameView = false }
 
         main.rootView = route.rootView
         pendingGameOpen = PendingGameOpen(
@@ -445,6 +508,9 @@ class NavigationService: ObservableObject {
     #endif
     
     func goToActiveGame(game: Game) {
+        #if MAIN_APP || TESTING
+        if holdsInternal(.activeGame(game)) { return }
+        #endif
         // Reuse Home's detail destination, including when another game is
         // already open. Clear pending routes so they cannot replace this tap.
         dismissTrackedNavigation(preservingActiveGameIn: .home)

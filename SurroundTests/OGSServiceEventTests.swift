@@ -6162,7 +6162,8 @@ final class OGSServiceEventTests: XCTestCase {
     /// With the socket gone and no close event yet, the tick stops cleanly,
     /// and the next authentication starts the loop again.
     func testAuthenticationRestartsAKeepaliveThatStoppedOnAClosedSocket() {
-        let (_, socket, scheduler) = keepaliveService()
+        // The socket's callbacks hold the service weakly, so the test keeps it.
+        let (service, socket, scheduler) = keepaliveService()
         listOwnChallenge(52, on: socket)
         socket.opened = false
         scheduler.advance()
@@ -6173,6 +6174,7 @@ final class OGSServiceEventTests: XCTestCase {
         socket.markAuthenticated()
         XCTAssertEqual(keptAliveChallengeIDs(socket), [52, 52])
         XCTAssertEqual(scheduler.pendingDelays, [1])
+        withExtendedLifetime(service) {}
     }
 
     /// The loop used to give up for good when its first tick came before the
@@ -6234,7 +6236,8 @@ final class OGSServiceEventTests: XCTestCase {
     }
 
     func testKeepaliveWaitsForAnAuthenticatedSocket() {
-        let (_, socket, scheduler) = keepaliveService()
+        // The socket's callbacks hold the service weakly, so the test keeps it.
+        let (service, socket, scheduler) = keepaliveService()
         socket.authenticated = false
         listOwnChallenge(60, on: socket)
         XCTAssertTrue(keptAliveChallengeIDs(socket).isEmpty)
@@ -6243,6 +6246,7 @@ final class OGSServiceEventTests: XCTestCase {
         socket.markAuthenticated()
         XCTAssertEqual(keptAliveChallengeIDs(socket), [60])
         XCTAssertEqual(scheduler.pendingDelays, [1])
+        withExtendedLifetime(service) {}
     }
 
     func testKeepaliveNeverRunsTwoLoops() {

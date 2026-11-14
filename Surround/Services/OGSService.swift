@@ -935,6 +935,12 @@ class OGSService: ObservableObject {
             return result
         } else {
             let result = OGSService()
+            #if MAIN_APP
+            // Every window reports to, and is covered from, the app's one
+            // superchat store. Init already ran checkLoginStatus, so the
+            // mirror is computed at once.
+            result.superchatStore = .shared
+            #endif
             instances[sceneID] = result
             return result
         }
@@ -1264,8 +1270,68 @@ class OGSService: ObservableObject {
     @Published private(set) public var privateMessagesUnreadCount: Int = 0
     @Published private(set) public var privateMessagesUnreadPeerIds = Set<Int>()
     @Published private(set) public var privateMessagesActivePeerIds = Set<Int>()
-    @Published private(set) public var superchatPeerIds = Set<Int>()
-    
+
+    #if MAIN_APP || TESTING
+    /// The app-wide superchat record this window reports to and is covered
+    /// from: SuperchatStore.shared in production and offline UI-test windows,
+    /// nil in previews, a test's own store in SurroundTests.
+    var superchatStore: SuperchatStore? {
+        didSet { observeSuperchatStore() }
+    }
+    /// This window's account's cover, or nil.
+    @Published private(set) var superchatCover: SuperchatCover?
+    /// This session's superchat ends for this window's account, by moderator.
+    @Published private(set) var superchatEndings: [Int: SuperchatEnding] = [:]
+    private var superchatSubscriptions = Set<AnyCancellable>()
+    /// This service's socket in the store's waits: its own UUID, which no
+    /// later service reuses.
+    private var superchatConnection: UUID { privateMessageInstanceID }
+
+    private func observeSuperchatStore() {
+        superchatSubscriptions.removeAll()
+        // @Published sends before the value is stored: use the value sent.
+        superchatStore?.$covers
+            .sink { [weak self] covers in self?.refreshSuperchatMirror(covers: covers) }
+            .store(in: &superchatSubscriptions)
+        superchatStore?.$endings
+            .sink { [weak self] endings in self?.refreshSuperchatMirror(endings: endings) }
+            .store(in: &superchatSubscriptions)
+        refreshSuperchatMirror()
+    }
+
+    func refreshSuperchatMirror(
+        covers: [Int: SuperchatCover]? = nil, endings: [Int: [Int: SuperchatEnding]]? = nil
+    ) {
+        let account = superchatCoverAccountID
+        let cover = account.flatMap { (covers ?? superchatStore?.covers)?[$0] }
+        if superchatCover != cover { superchatCover = cover }
+        let ends = account.flatMap { (endings ?? superchatStore?.endings)?[$0] } ?? [:]
+        if superchatEndings != ends { superchatEndings = ends }
+    }
+
+    /// Whether the conversation with `peerID` says that the moderator ended
+    /// the chat: this session has that peer's end, live or missed, and no
+    /// message in the conversation is newer than it.
+    func showsSuperchatEndedLine(peerID: Int) -> Bool {
+        guard let ending = superchatEndings[peerID] else { return false }
+        return !(privateMessagesByPeerId[peerID] ?? []).contains { $0.content.timestamp > ending.at }
+    }
+
+    deinit {
+        // Production services never go away. Fixture, preview and test
+        // services can, and a wait they left could otherwise still lift a cover.
+        guard let store = superchatStore else { return }
+        let connection = superchatConnection
+        if Thread.isMainThread {
+            store.connectionEnded(connection)
+        } else {
+            // The store is main thread only, and the last release can come
+            // from a closure on another queue. Capture the store, never self.
+            DispatchQueue.main.async { store.connectionEnded(connection) }
+        }
+    }
+    #endif
+
     @Published private(set) public var chatMessagesByChannel = [String: [OGSChatMessage]]()
     
     /// Account-scoped view of OGS remote settings.
@@ -1534,13 +1600,27 @@ class OGSService: ObservableObject {
                       let sourceID = notification.userInfo?["source"] as? UUID,
                       sourceID != self.privateMessageInstanceID else { return }
                 self.resetPrivateMessageState()
+                #if MAIN_APP || TESTING
+                // The stored sign-in changed: this window's cover follows it.
+                self.refreshSuperchatMirror()
+                // A wait this window's socket opened was for the earlier
+                // sign-in, which the window no longer hears for, so a re-send
+                // it drops could let that wait lift a cover still on. Ending
+                // a wait lifts nothing.
+                self.superchatStore?.connectionEnded(self.superchatConnection)
+                #endif
             }
         }
 
         ogsWebsocket.authenticationConfigProvider = { [weak self] in self?.ogsUIConfig }
-        ogsWebsocket.serverEventCallback = self.onWebsocketServerEvent(name:data:)
-        ogsWebsocket.onStatusChanged = {
+        // The service holds its socket, so the socket's callbacks hold the
+        // service weakly: a service nothing else keeps can go away.
+        ogsWebsocket.serverEventCallback = { [weak self] name, data in
+            self?.onWebsocketServerEvent(name: name, data: data)
+        }
+        ogsWebsocket.onStatusChanged = { [weak self] in
             DispatchQueue.main.async {
+                guard let self else { return }
                 self.socketStatus = self.ogsWebsocket.status
             }
         }
@@ -1642,6 +1722,10 @@ class OGSService: ObservableObject {
             gamesAwaitingAutoResignReset.formUnion(connectedGames.keys)
             self.connectedGames.removeAll()
             self.connectedWithChat.removeAll()
+            #if MAIN_APP || TESTING
+            // A closed connection can no longer show that a superchat ended.
+            superchatStore?.connectionEnded(superchatConnection)
+            #endif
         case "surround/socketOpened":
             hasFreshServerClockSample = false
             socketAuthenticationGeneration = UUID()
@@ -1673,6 +1757,15 @@ class OGSService: ObservableObject {
             if enablesAppSideEffects {
                 self.syncRemoteStorage()
             }
+            #if MAIN_APP || TESTING
+            // OGS re-sends every superchat still on to a new connection. The
+            // conversations it replays were asked for above, with the
+            // authentication; a superchat it doesn't re-send ended unseen.
+            if let accountID = superchatAccountID {
+                superchatStore?.connectionAuthenticating(
+                    superchatConnection, accountID: accountID, endTime: superchatEndTimer)
+            }
+            #endif
         case "user/jwt":
             // OGS rotates this token independently of the account identity.
             // Keep it for the next natural socket authentication without
@@ -1694,6 +1787,9 @@ class OGSService: ObservableObject {
                     ogsWebsocket.latency = latency
                     ogsWebsocket.drift = drift
                     hasFreshServerClockSample = true
+                    #if MAIN_APP || TESTING
+                    superchatStore?.connectionAnsweredPing(superchatConnection)
+                    #endif
                     if let activeLiveAutomatchEntry {
                         reconsiderOrphanRealtimeGameStartedNotifications(
                             for: activeLiveAutomatchEntry
@@ -1851,6 +1947,15 @@ class OGSService: ObservableObject {
                 let gameEvent = String(components[2])
                 self.onWebsocketServerGameEvent(ogsGameId: ogsGameId, eventName: gameEvent, data: data)
             }
+        case "surround/socketAuthenticationAnswered":
+            #if MAIN_APP || TESTING
+            // OGS's answer to this connection's authenticate starts its
+            // re-send deadline, or closes its wait (OGSWebsocket).
+            if let answer = data as? OGSWebsocketAuthenticationAnswer,
+               let accountID = superchatAccountID, answer.userID == accountID {
+                superchatStore?.connectionAnswered(superchatConnection, accountID: accountID, answer.outcome)
+            }
+            #endif
         default:
             break
         }
@@ -2128,6 +2233,12 @@ class OGSService: ObservableObject {
                 // finished-game or chat subscriptions under the new identity.
                 invalidateAllGameConnections()
                 activeGames.removeAll()
+                #if MAIN_APP || TESTING
+                // The socket no longer speaks for the previous account, so its
+                // wait can't show that a superchat ended. Ended before the
+                // socket reconnects below.
+                superchatStore?.connectionEnded(superchatConnection)
+                #endif
             }
 
             // Login requests have just established a fresh cookie session, so
@@ -2339,6 +2450,9 @@ class OGSService: ObservableObject {
         } else {
             user = nil
         }
+        #if MAIN_APP || TESTING
+        refreshSuperchatMirror()
+        #endif
     }
     
     /// Loads one profile without changing the logged-in user or shared game state.
@@ -5931,6 +6045,24 @@ class OGSService: ObservableObject {
         return user?.id
     }
 
+    /// The account whose cover this window shows: the stored sign-in every
+    /// window shares, so a window that kept another account, or that is still
+    /// signed out after another window signed in, is covered too. A fixture
+    /// or preview service uses its own user, while it is signed in.
+    var superchatCoverAccountID: Int? {
+        let id = persistsRecentPrivateMessagePeers ? ogsUIConfig?.user.id : (isLoggedIn ? user?.id : nil)
+        return id.flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    /// The account this window hears and answers superchats for: its own,
+    /// when its socket last authenticated as it. Fixture and preview
+    /// services have no real socket, so their user stands in.
+    var superchatAccountID: Int? {
+        guard let accountID = currentPrivateMessageAccountID, accountID > 0 else { return nil }
+        guard persistsRecentPrivateMessagePeers else { return accountID }
+        return ogsWebsocket.authenticatedUserID == accountID ? accountID : nil
+    }
+
     private func migrateLegacyPrivateMessageReadMarkers(for accountID: Int?) {
         guard let accountID, accountID > 0,
               let legacyMarkers = preferences[.lastSeenPrivateMessageByOGSUserId],
@@ -5952,7 +6084,6 @@ class OGSService: ObservableObject {
         privateMessagesActivePeerIds.removeAll()
         privateMessagesUnreadPeerIds.removeAll()
         privateMessagesUnreadCount = 0
-        superchatPeerIds.removeAll()
     }
 
     private func rememberRecentPrivateMessagePeer(_ peerID: Int, timestamp: Double) {
@@ -6003,7 +6134,15 @@ class OGSService: ObservableObject {
         guard persistsRecentPrivateMessagePeers,
               let accountID = currentPrivateMessageAccountID else { return }
         let recentPeers = preferences[.recentPrivateMessagePeerIDsByOGSAccountID]?[accountID] ?? []
-        let peerIDs = privateMessagesActivePeerIds.union(recentPeers).filter { $0 > 0 }
+        var peerIDs = privateMessagesActivePeerIds.union(recentPeers).filter { $0 > 0 }
+        #if MAIN_APP || TESTING
+        // OGS re-sends a superchat only as the last frame of its
+        // conversation's replay, so ask for every moderator still on the
+        // account's cover, even one this window never loaded.
+        if let moderators = superchatStore?.covers[accountID]?.moderators {
+            peerIDs.formUnion(moderators.filter(\.isOn).map(\.id))
+        }
+        #endif
         for peerID in peerIDs.sorted() {
             if _receivedMessagesKeysByPeerId[peerID] == nil {
                 setUpNewPeerIfNecessary(peerId: peerID)
@@ -6052,17 +6191,64 @@ class OGSService: ObservableObject {
         }
     }
     
+    /// A moderator's `private-superchat` (Goban ServerToClient.ts:348-365).
+    /// Start and end share one shape. OGS sends it to every open connection
+    /// and re-sends an active one to each new connection, so the app-wide
+    /// store merges copies from every window.
     func handleSuperchat(config: [String: Any]) {
-        guard currentPrivateMessageAccountID != nil else { return }
-        if let moderatorId = config["moderator_id"] as? Int, let enabled = config["enable"] as? Bool {
-            setUpNewPeerIfNecessary(peerId: moderatorId)
-            if enabled {
-                superchatPeerIds.insert(moderatorId)
-            } else {
-                superchatPeerIds.remove(moderatorId)
-            }
-        }
+        guard let accountID = superchatAccountID,
+              let moderatorID = positiveInteger(config["moderator_id"]),
+              let enable = config["enable"] as? Bool else { return }
+        // The moderator's own connections hear it too (PrivateChat.tsx:935-941).
+        guard moderatorID != accountID else { return }
+        // A copy for another account, from a socket still speaking for it.
+        if config["player_id"] != nil, positiveInteger(config["player_id"]) != accountID { return }
+        setUpNewPeerIfNecessary(peerId: moderatorID)
+        // Superusers are exempt by is_superuser alone (PrivateChat.tsx:921-934).
+        guard user?.isSuperuser != true else { return }
+        #if MAIN_APP || TESTING
+        superchatStore?.receive(
+            enable: enable, moderatorID: moderatorID,
+            username: config["moderator_username"] as? String, accountID: accountID,
+            endedAt: enable ? nil : superchatEndTime(moderatorID: moderatorID))
+        #else
+        // The widget and the notification extensions keep no superchat state.
+        _ = enable
+        #endif
     }
+
+    #if MAIN_APP || TESTING
+    /// When a superchat ends now by OGS's clock, which stamps every message,
+    /// so Messages can tell which messages came after the end: one this
+    /// window hears, or one its connection's wait infers when no re-send
+    /// came. Once a pong on this connection has given a sample, the device's
+    /// clock is moved by its drift. The end is never before the
+    /// conversation's newest message, since every message the window has
+    /// came before it.
+    private func superchatEndTime(moderatorID: Int) -> TimeInterval {
+        // `drift` is the device's clock minus OGS's, in milliseconds.
+        let now = currentTime() - (hasFreshServerClockSample ? drift / 1_000 : 0)
+        let newest = privateMessagesByPeerId[moderatorID]?.map(\.content.timestamp).max() ?? now
+        return max(now, newest)
+    }
+
+    /// `superchatEndTime(moderatorID:)` for the store to time an end this
+    /// connection's wait infers; nil once this window's service has gone.
+    private var superchatEndTimer: (Int) -> TimeInterval? {
+        { [weak self] moderatorID in self?.superchatEndTime(moderatorID: moderatorID) }
+    }
+    #endif
+
+    #if DEBUG && MAIN_APP
+    /// Stands in for a reconnect in offline UI-test runs: this window's
+    /// socket authenticates again and OGS confirms it, with no re-send, so
+    /// the cover lifts after the re-send window (SuperchatDebugCommands).
+    func simulateSuperchatReconnectForUITests() {
+        guard let accountID = superchatAccountID else { return }
+        superchatStore?.connectionAuthenticating(superchatConnection, accountID: accountID, endTime: superchatEndTimer)
+        superchatStore?.connectionAnswered(superchatConnection, accountID: accountID, .confirmed)
+    }
+    #endif
 
     private func _calculatePrivateMessageUnreadCount() {
         guard let accountID = currentPrivateMessageAccountID, accountID > 0 else {

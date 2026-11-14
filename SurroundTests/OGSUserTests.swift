@@ -137,6 +137,35 @@ final class OGSUserTests: XCTestCase {
         XCTAssertEqual(OGSUser.mergeUserInfoFromCache(user: explicit, cachedUser: cached), explicit)
     }
 
+    /// The superchat exemption reads `user.isSuperuser` from the stored
+    /// sign-in, so the flag must survive `ui/config` and preferences.
+    func testSuperuserFlagSurvivesUIConfigAndPreferences() throws {
+        let suite = "com.honganhkhoa.Surround.OGSUserTests.\(UUID().uuidString)"
+        addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: suite) }
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
+        // As OGSService.login and fetchUIConfig decode `ui/config`.
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let flags: [(json: String, expected: Bool?)] = [
+            (#","is_superuser":true"#, true),
+            (#","is_superuser":false"#, false),
+            ("", nil),
+            // An admin by ui_class alone is no superuser.
+            (#","ui_class":"admin""#, nil),
+        ]
+        for (json, expected) in flags {
+            let config = try decoder.decode(OGSUIConfig.self, from: Data("""
+                {"csrf_token":"csrf","user_jwt":"jwt","user":{"id":42,"username":"player","anonymous":false\(json)}}
+                """.utf8))
+            XCTAssertEqual(config.user.isSuperuser, expected, "ui/config \(json)")
+
+            preferences[.ogsUIConfig] = config
+            let stored = try XCTUnwrap(preferences[.ogsUIConfig], "preferences \(json)")
+            XCTAssertEqual(stored.user.isSuperuser, expected, "preferences \(json)")
+            XCTAssertEqual(stored.user.id, 42)
+        }
+    }
+
     private func kyu(_ rank: Int) -> String {
         String(localized: "\(rank)kyu")
     }

@@ -256,7 +256,7 @@ private func appReviewContext(
         || ogs.waitingLiveGames > 0
         || !ogs.autoMatchEntryById.isEmpty
         || ogs.pendingRengoGames > 0
-        || !ogs.superchatPeerIds.isEmpty
+        || ogs.superchatCover != nil
         || !ogs.conditionalMoveSubmissionGameIDs.isEmpty
         || ogs.liveGames.contains { $0.gamePhase != .finished }
         || ogs.activeGames.values.contains { $0.gamePhase == .stoneRemoval }

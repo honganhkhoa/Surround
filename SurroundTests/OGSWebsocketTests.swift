@@ -114,6 +114,17 @@ final class OGSWebsocketTests: XCTestCase {
         var errorDescription: String? { "Connection lost" }
     }
 
+    /// What a socket reported about OGS's answer to `authenticate`: its
+    /// `surround/socketAuthenticationAnswered` events and its log lines.
+    private final class AnswerReports {
+        var answers = [OGSWebsocketAuthenticationAnswer]()
+        var logs = [String]()
+
+        var answerLogs: [String] {
+            logs.filter { $0.contains("Authentication answer") }
+        }
+    }
+
     func testFrameCodecRoundTripsCallbacksAndRedactsCredentials() throws {
         let encoded = try OGSWebsocketFrameCodec.encode(
             command: "authenticate",
@@ -583,11 +594,297 @@ final class OGSWebsocketTests: XCTestCase {
         )
     }
 
+    // MARK: - OGS's answer to authenticate
+
+    func testAnAnswerNamingTheAccountConfirmsIt() throws {
+        // OGS sends the id as a JSON number; its digits in a string count too.
+        for answer in [#"{"id":1,"username":"player"}"#, #"{"id":"1","username":"player"}"#] {
+            let scheduler = Scheduler()
+            let factory = TransportFactory()
+            let reports = AnswerReports()
+            let config = try makeConfig(jwt: "player-jwt", anonymous: false)
+            let socket = makeSocket(scheduler: scheduler, factory: factory, reports: reports) { config }
+            socket.connect()
+            let transport = try XCTUnwrap(factory.transports.last)
+            transport.open()
+
+            let frame = try authenticateFrame(on: transport)
+            XCTAssertEqual(frame.count, 3, "A signed-in connection asks for OGS's answer.")
+            XCTAssertEqual((frame[1] as? [String: String])?["jwt"], "player-jwt")
+            let authenticateID = try XCTUnwrap(frame[2] as? Int)
+            XCTAssertEqual(reports.answers, [], "Nothing is reported before OGS answers.")
+
+            transport.receive("[\(authenticateID),\(answer)]")
+            XCTAssertEqual(
+                reports.answers,
+                [OGSWebsocketAuthenticationAnswer(userID: 1, outcome: .confirmed)],
+                answer
+            )
+            XCTAssertEqual(reports.answerLogs, ["[websocket] Authentication answer: confirmed"], answer)
+            XCTAssertEqual(scheduler.scheduledDelays, [10], "The answer cancelled its timeout; the ping remains.")
+            socket.close()
+        }
+    }
+
+    func testOtherAnswersReject() throws {
+        let answers = [
+            "null", // undefined: OGS names no account
+            #"{"username":"player"}"#, // no id
+            #"{"id":2,"username":"other"}"#, // another account
+            #"{"id":true,"username":"player"}"#, // a Boolean is not an id
+            #"{"id":1.5,"username":"player"}"#, // nor is a fraction
+            #"null,{"code":"invalid_jwt","message":"Invalid JWT"}"#, // OGS's error answer
+        ]
+        for answer in answers {
+            let scheduler = Scheduler()
+            let factory = TransportFactory()
+            let reports = AnswerReports()
+            let config = try makeConfig(jwt: "player-jwt", anonymous: false)
+            let socket = makeSocket(scheduler: scheduler, factory: factory, reports: reports) { config }
+            socket.connect()
+            let transport = try XCTUnwrap(factory.transports.last)
+            transport.open()
+            let authenticateID = try XCTUnwrap(authenticateFrame(on: transport).last as? Int)
+
+            transport.receive("[\(authenticateID),\(answer)]")
+            XCTAssertEqual(
+                reports.answers,
+                [OGSWebsocketAuthenticationAnswer(userID: 1, outcome: .rejected)],
+                answer
+            )
+            XCTAssertEqual(reports.answerLogs, ["[websocket] Authentication answer: rejected"], answer)
+            socket.close()
+        }
+    }
+
+    func testNoAnswerWithinTheTimeoutIsUnanswered() throws {
+        let config = try makeConfig(jwt: "player-jwt", anonymous: false)
+        let scheduler = Scheduler()
+        let factory = TransportFactory()
+        let reports = AnswerReports()
+        let socket = makeSocket(
+            scheduler: scheduler, factory: factory, reports: reports, callbackTimeout: 5
+        ) { config }
+        socket.connect()
+        let transport = try XCTUnwrap(factory.transports.last)
+        transport.open()
+        let authenticateID = try XCTUnwrap(authenticateFrame(on: transport).last as? Int)
+        XCTAssertEqual(reports.answers, [])
+
+        XCTAssertTrue(scheduler.runNext(after: 5))
+        XCTAssertEqual(reports.answers, [OGSWebsocketAuthenticationAnswer(userID: 1, outcome: .unanswered)])
+        XCTAssertEqual(reports.answerLogs, ["[websocket] Authentication answer: unanswered"])
+        transport.receive("[\(authenticateID),{\"id\":1,\"username\":\"player\"}]")
+        XCTAssertEqual(reports.answers.count, 1, "A late answer adds nothing.")
+        socket.close()
+
+        // A connection error reports nothing: the connection's socketClosed
+        // ends its wait. Here the transport fails before OGS answers…
+        let droppedScheduler = Scheduler()
+        let droppedFactory = TransportFactory()
+        let droppedReports = AnswerReports()
+        let dropped = makeSocket(
+            scheduler: droppedScheduler, factory: droppedFactory, reports: droppedReports, callbackTimeout: 5
+        ) { config }
+        dropped.connect()
+        let droppedTransport = try XCTUnwrap(droppedFactory.transports.last)
+        droppedTransport.open()
+        droppedTransport.fail()
+        XCTAssertFalse(droppedScheduler.runNext(after: 5), "The failure completed the callback.")
+
+        // …and here the authenticate frame itself can't be sent, while the
+        // identity is still the one sent.
+        let unsentScheduler = Scheduler()
+        let unsentFactory = TransportFactory()
+        let unsentReports = AnswerReports()
+        let unsent = makeSocket(
+            scheduler: unsentScheduler, factory: unsentFactory, reports: unsentReports, callbackTimeout: 5
+        ) { config }
+        unsent.connect()
+        let unsentTransport = try XCTUnwrap(unsentFactory.transports.last)
+        unsentTransport.sendError = TestError.connectionLost
+        unsentTransport.open()
+        XCTAssertEqual(try authenticateFrame(on: unsentTransport).count, 3)
+        XCTAssertFalse(unsentScheduler.runNext(after: 5), "The failed send completed the callback.")
+
+        for (name, failed) in [("dropped", droppedReports), ("unsent", unsentReports)] {
+            XCTAssertEqual(failed.answers, [], name)
+            XCTAssertEqual(failed.answerLogs, [], name)
+        }
+        dropped.close()
+        unsent.close()
+
+        // A timeout that outlives its identity reports nothing either.
+        // connect() on an open socket replaces the transport but leaves its
+        // callbacks waiting, so account 1's authenticate times out after
+        // account 2's is confirmed. Only the identity guard drops it.
+        var switchedConfig = config
+        let switchedScheduler = Scheduler()
+        let switchedFactory = TransportFactory()
+        let switchedReports = AnswerReports()
+        let switched = makeSocket(
+            scheduler: switchedScheduler, factory: switchedFactory, reports: switchedReports, callbackTimeout: 5
+        ) { switchedConfig }
+        switched.connect()
+        try XCTUnwrap(switchedFactory.transports.last).open()
+        switchedConfig = try makeConfig(jwt: "second-jwt", userID: 2, anonymous: false)
+        switched.connect()
+        let secondTransport = try XCTUnwrap(switchedFactory.transports.last)
+        secondTransport.open()
+        let secondID = try XCTUnwrap(authenticateFrame(on: secondTransport).last as? Int)
+        secondTransport.receive("[\(secondID),{\"id\":2,\"username\":\"player\"}]")
+        XCTAssertTrue(switchedScheduler.runNext(after: 5), "Account 1's authenticate times out.")
+        XCTAssertEqual(switchedReports.answers, [OGSWebsocketAuthenticationAnswer(userID: 2, outcome: .confirmed)])
+        XCTAssertEqual(switchedReports.answerLogs, ["[websocket] Authentication answer: confirmed"])
+        switched.close()
+    }
+
+    func testAnAnswerAfterReconnectingConfirmsNothing() throws {
+        let scheduler = Scheduler()
+        let factory = TransportFactory()
+        let reports = AnswerReports()
+        let config = try makeConfig(jwt: "player-jwt", anonymous: false)
+        let socket = makeSocket(scheduler: scheduler, factory: factory, reports: reports) { config }
+        socket.connect()
+        let first = try XCTUnwrap(factory.transports.last)
+        first.open()
+        let firstID = try XCTUnwrap(authenticateFrame(on: first).last as? Int)
+
+        first.fail()
+        XCTAssertTrue(scheduler.runNext(after: 1))
+        let second = try XCTUnwrap(factory.transports.last)
+        XCTAssertFalse(second === first)
+        second.open()
+        let secondID = try XCTUnwrap(authenticateFrame(on: second).last as? Int)
+        XCTAssertNotEqual(secondID, firstID)
+
+        // The first authenticate's answer, late on its own transport or on the new one.
+        let identity = #"{"id":1,"username":"player"}"#
+        first.receive("[\(firstID),\(identity)]")
+        second.receive("[\(firstID),\(identity)]")
+        XCTAssertEqual(reports.answers, [], "Only the open transport's own authenticate is answered.")
+        XCTAssertEqual(reports.answerLogs, [])
+
+        second.receive("[\(secondID),\(identity)]")
+        XCTAssertEqual(reports.answers, [OGSWebsocketAuthenticationAnswer(userID: 1, outcome: .confirmed)])
+        socket.close()
+    }
+
+    func testAnonymousSocketsAskForNoAnswer() throws {
+        // A guest, a guest with an id, and an identity without one.
+        let identities: [(userID: Int, anonymous: Bool)] = [(0, true), (7, true), (0, false)]
+        for identity in identities {
+            let scheduler = Scheduler()
+            let factory = TransportFactory()
+            let reports = AnswerReports()
+            let config = try makeConfig(jwt: "guest-jwt", userID: identity.userID, anonymous: identity.anonymous)
+            let socket = makeSocket(scheduler: scheduler, factory: factory, reports: reports) { config }
+            socket.connect()
+            let transport = try XCTUnwrap(factory.transports.last)
+            transport.open()
+
+            XCTAssertEqual(try authenticateFrame(on: transport).count, 2, "\(identity): today's frame")
+            XCTAssertEqual(scheduler.scheduledDelays, [10], "\(identity): only the ping is scheduled")
+            socket.emit(command: "command/with-callback", data: nil) { _, _ in }
+            XCTAssertEqual(
+                transport.sentMessages.last,
+                #"["command\/with-callback",null,1]"#,
+                "\(identity): the next callback gets id 1"
+            )
+            socket.close()
+            XCTAssertEqual(reports.answers, [], "\(identity)")
+            XCTAssertEqual(reports.answerLogs, [], "\(identity)")
+        }
+    }
+
+    func testAuthenticatedUserIDFollowsTheTransport() throws {
+        let scheduler = Scheduler()
+        let factory = TransportFactory()
+        let reports = AnswerReports()
+        var config = try makeConfig(jwt: "first-jwt", userID: 1, anonymous: false)
+        let socket: OGSWebsocketProtocol = makeSocket(
+            scheduler: scheduler, factory: factory, reports: reports
+        ) { config }
+        XCTAssertNil(socket.authenticatedUserID)
+
+        socket.connect()
+        XCTAssertNil(socket.authenticatedUserID, "Nothing is sent before the transport opens.")
+        let first = try XCTUnwrap(factory.transports.last)
+        first.open()
+        XCTAssertEqual(socket.authenticatedUserID, 1, "Set at the send, before OGS answers.")
+        XCTAssertEqual(reports.answers, [])
+
+        config = try makeConfig(jwt: "second-jwt", userID: 2, anonymous: false)
+        first.fail()
+        XCTAssertNil(socket.authenticatedUserID, "A reconnect clears it.")
+        XCTAssertTrue(scheduler.runNext(after: 1))
+        XCTAssertNil(socket.authenticatedUserID, "The new transport hasn't opened.")
+        let second = try XCTUnwrap(factory.transports.last)
+        second.open()
+        XCTAssertEqual(socket.authenticatedUserID, 2, "The next connection's identity.")
+
+        socket.close()
+        XCTAssertNil(socket.authenticatedUserID, "A close clears it.")
+        XCTAssertEqual(reports.answers, [])
+
+        let offline: OGSWebsocketProtocol = OGSOfflineNoOpWebsocket()
+        XCTAssertNil(offline.authenticatedUserID, "A fake that doesn't model identity has none.")
+    }
+
+    // MARK: - A superchat through the real socket
+
+    func testAResendOnARealSocketKeepsTheCover() throws {
+        let run = try makeSuperchatRun()
+        let (second, authenticateID) = try reconnectAfterASuperchat(run)
+
+        // The replay the request asked for ends with the re-send, here before
+        // OGS answers authenticate. Then the re-send window passes.
+        second.receive(superchatFrame(enable: true))
+        second.receive("[\(authenticateID),{\"id\":1,\"username\":\"player\"}]")
+        XCTAssertEqual(run.storeScheduler.scheduledDelays, [], "The re-send closed the wait.")
+        run.clock.now = 1_010
+        XCTAssertFalse(run.storeScheduler.runNext(after: SuperchatStore.resendWindow), "No deadline to pass.")
+
+        XCTAssertEqual(run.service.superchatCover?.moderators.map(\.id), [superchatModerator])
+        XCTAssertEqual(run.service.superchatCover?.isOn, true, "The cover stays.")
+        XCTAssertEqual(run.service.superchatEndings, [:])
+        XCTAssertEqual(saved(run)?.map(\.id), [superchatModerator], "It is still saved for a relaunch.")
+        run.socket.close()
+    }
+
+    func testNoResendOnARealSocketLiftsTheCover() throws {
+        let run = try makeSuperchatRun()
+        var lifted = [Int]()
+        let liftedSubscription = run.store.coverLiftedWithoutDone.sink { lifted.append($0) }
+        let (second, authenticateID) = try reconnectAfterASuperchat(run)
+
+        // OGS answers, and nothing is re-sent: the superchat ended while the
+        // connection was down. The deadline runs from the answer.
+        second.receive("[\(authenticateID),{\"id\":1,\"username\":\"player\"}]")
+        XCTAssertEqual(run.storeScheduler.scheduledDelays, [SuperchatStore.resendWindow])
+        run.clock.now = 1_010
+        XCTAssertTrue(run.storeScheduler.runNext(after: SuperchatStore.resendWindow))
+
+        XCTAssertNil(run.service.superchatCover, "The cover lifted by itself.")
+        XCTAssertNil(run.store.covers[superchatPlayer])
+        XCTAssertEqual(run.service.superchatEndings, [
+            superchatModerator: SuperchatEnding(at: 1_010, wasMissed: true),
+        ], "Messages can say the chat ended.")
+        XCTAssertEqual(lifted, [superchatPlayer])
+        XCTAssertNil(saved(run), "Nothing is left to restore.")
+        liftedSubscription.cancel()
+        run.socket.close()
+    }
+
     private func makeConfig(jwt: String, anonymous: Bool) throws -> OGSUIConfig {
+        try makeConfig(jwt: jwt, userID: anonymous ? 0 : 1, anonymous: anonymous)
+    }
+
+    private func makeConfig(jwt: String, userID: Int, anonymous: Bool) throws -> OGSUIConfig {
         let object: [String: Any] = [
             "csrf_token": "csrf",
             "user_jwt": jwt,
-            "user": ["username": anonymous ? "guest" : "player", "id": anonymous ? 0 : 1, "anonymous": anonymous]
+            "user": ["username": anonymous ? "guest" : "player", "id": userID, "anonymous": anonymous]
         ]
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -597,5 +894,156 @@ final class OGSWebsocketTests: XCTestCase {
     private func callbackID(in message: String) throws -> Int {
         let frame = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(message.utf8)) as? [Any])
         return try XCTUnwrap(frame.last as? Int)
+    }
+
+    /// A socket on this file's fake transports and scheduler, recording its
+    /// answer events and log lines in `reports`. It reads `config` at each
+    /// authentication.
+    private func makeSocket(
+        scheduler: Scheduler,
+        factory: TransportFactory,
+        reports: AnswerReports,
+        callbackTimeout: TimeInterval = OGSWebsocket.defaultCallbackTimeout,
+        config: @escaping () -> OGSUIConfig?
+    ) -> OGSWebsocket {
+        let socket = OGSWebsocket(
+            rootURL: URL(string: "https://ogs.test")!,
+            authenticationConfigProvider: config,
+            transportFactory: factory.make,
+            scheduler: scheduler,
+            anonymousConfigLoader: { _, _ in XCTFail("Every identity here comes from the provider.") },
+            callbackTimeout: callbackTimeout,
+            logger: { reports.logs.append($0) }
+        )
+        socket.serverEventCallback = { name, data in
+            guard name == "surround/socketAuthenticationAnswered" else { return }
+            if let answer = data as? OGSWebsocketAuthenticationAnswer {
+                reports.answers.append(answer)
+            } else {
+                XCTFail("Unexpected answer payload: \(String(describing: data))")
+            }
+        }
+        return socket
+    }
+
+    /// The first frame a transport sent: its connection's `authenticate`.
+    private func authenticateFrame(on transport: Transport) throws -> [Any] {
+        let message = try XCTUnwrap(transport.sentMessages.first)
+        let frame = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(message.utf8)) as? [Any])
+        XCTAssertEqual(frame.first as? String, "authenticate")
+        return frame
+    }
+
+    // MARK: Superchat runs
+
+    /// The signed-in player of `makeConfig(jwt:anonymous:)`, and a moderator.
+    private let superchatPlayer = 1
+    private let superchatModerator = 101
+
+    private final class Clock {
+        var now: TimeInterval = 1_000
+    }
+
+    /// A signed-in OGSService on a fresh suite, on a real socket with this
+    /// file's fake transports, reporting to a store on its own manual
+    /// scheduler. The service and the store read the run's clock, as both
+    /// read the device's in the app.
+    private struct SuperchatRun {
+        let service: OGSService
+        let socket: OGSWebsocket
+        let socketScheduler: Scheduler
+        let factory: TransportFactory
+        let preferences: UserDefaults
+        let store: SuperchatStore
+        let storeScheduler: Scheduler
+        let clock: Clock
+    }
+
+    private func makeSuperchatRun() throws -> SuperchatRun {
+        let suite = "com.honganhkhoa.Surround.OGSWebsocketTests.\(UUID().uuidString)"
+        addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: suite) }
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let socketScheduler = Scheduler()
+        let factory = TransportFactory()
+        let socket = OGSWebsocket(
+            rootURL: URL(string: "https://ogs.test")!,
+            authenticationConfigProvider: { nil },
+            transportFactory: factory.make,
+            scheduler: socketScheduler,
+            anonymousConfigLoader: { _, _ in XCTFail("The service gives the socket its signed-in identity.") },
+            logger: { _ in }
+        )
+        let clock = Clock()
+        let service = OGSService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: OGSOfflineRejectingHTTPClient(),
+            preferences: preferences,
+            ogsWebsocket: socket,
+            connectsAutomatically: false,
+            installsObservers: false,
+            currentTime: { clock.now }
+        )
+        preferences[.ogsSessionId] = "test-session"
+        service.ogsUIConfig = try makeConfig(jwt: "player-jwt", anonymous: false)
+        XCTAssertEqual(service.user?.id, superchatPlayer)
+
+        let storeScheduler = Scheduler()
+        let store = SuperchatStore(preferences: preferences, scheduler: storeScheduler, now: { clock.now })
+        service.superchatStore = store
+        return SuperchatRun(
+            service: service, socket: socket, socketScheduler: socketScheduler, factory: factory,
+            preferences: preferences, store: store, storeScheduler: storeScheduler, clock: clock
+        )
+    }
+
+    /// Opens the run's socket and hears a superchat, then fails the
+    /// transport and lets the socket reconnect. Returns the new transport and
+    /// its `authenticate`'s callback id, before OGS answers it.
+    private func reconnectAfterASuperchat(_ run: SuperchatRun) throws -> (Transport, Int) {
+        run.socket.connect()
+        let first = try XCTUnwrap(run.factory.transports.last)
+        first.open()
+        first.receive(superchatFrame(enable: true))
+        XCTAssertEqual(run.service.superchatCover?.moderators.map(\.id), [superchatModerator])
+        XCTAssertEqual(run.service.superchatCover?.isOn, true)
+
+        first.fail()
+        XCTAssertNil(run.service.superchatAccountID, "A dropped socket hears for no account.")
+        XCTAssertEqual(run.service.superchatCover?.isOn, true, "A drop lifts nothing.")
+        XCTAssertTrue(run.socketScheduler.runNext(after: 1))
+        let second = try XCTUnwrap(run.factory.transports.last)
+        XCTAssertFalse(second === first)
+        second.open()
+
+        // The new connection authenticates as the account and asks for OGS's
+        // answer. With it goes the request for the moderator's conversation,
+        // whose replay brings any re-send.
+        let frame = try authenticateFrame(on: second)
+        XCTAssertEqual(frame.count, 3, "A signed-in connection asks for OGS's answer.")
+        XCTAssertEqual((frame[1] as? [String: String])?["jwt"], "player-jwt")
+        let authenticateID = try XCTUnwrap(frame[2] as? Int)
+        XCTAssertEqual(try conversationRequests(on: second), [superchatModerator])
+        XCTAssertEqual(run.service.superchatAccountID, superchatPlayer)
+        XCTAssertEqual(run.storeScheduler.scheduledDelays, [], "The wait's deadline waits for OGS's answer.")
+        return (second, authenticateID)
+    }
+
+    /// OGS's `private-superchat` for the signed-in player (Goban ServerToClient.ts:348-365).
+    private func superchatFrame(enable: Bool) -> String {
+        #"["private-superchat",{"moderator_id":101,"moderator_username":"moderator","player_id":1,"player_username":"player","enable":\#(enable)}]"#
+    }
+
+    /// The peers a transport asked OGS to replay with `chat/pm/load`, in order.
+    private func conversationRequests(on transport: Transport) throws -> [Int] {
+        try transport.sentMessages.compactMap { message in
+            let frame = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(message.utf8)) as? [Any])
+            guard frame.first as? String == "chat/pm/load" else { return nil }
+            return (frame[1] as? [String: Any])?["player_id"] as? Int
+        }
+    }
+
+    /// The run's superchats still on, as a relaunch would find them.
+    private func saved(_ run: SuperchatRun) -> [SuperchatModerator]? {
+        run.preferences[.superchatModeratorsByOGSAccountID]?[superchatPlayer]
     }
 }

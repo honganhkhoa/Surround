@@ -3,14 +3,14 @@
 //  Surround
 //
 //  The scene cover's window choices, free of UIKit so SurroundTests can
-//  check them without a scene. Debug-only until the superchat cover ships.
+//  check them without a scene. Ships with the moderator superchat cover.
 //
 
-#if DEBUG
 import Foundation
 
-/// How a scene's cover behaves. The defaults are the intended behaviour;
-/// the alternatives exist so the cover-window probe can compare them.
+/// How a scene's cover behaves. The defaults are the adopted behaviour
+/// (10 Nov 2026); the alternatives are fallbacks for checks still open
+/// (Full Keyboard Access, Switch Control, presentations).
 struct SceneCoverOptions: Equatable {
     enum ModalTarget: Equatable {
         /// `accessibilityViewIsModal` on the cover window, so VoiceOver
@@ -28,8 +28,9 @@ struct SceneCoverOptions: Equatable {
     /// off their user interaction.
     var locksWindowsBelow = false
     /// For a window that opens covered: raise while the anchor attaches,
-    /// instead of one run-loop turn later.
-    var raisesWhileAttaching = false
+    /// instead of one run-loop turn later. Only a scene's first request:
+    /// later raises wait a main turn.
+    var raisesWhileAttaching = true
 }
 
 enum SceneCoverPolicy {
@@ -59,5 +60,29 @@ enum SceneCoverPolicy {
         if let content, candidates.contains(where: { $0.id == content }) { return content }
         return candidates.min { $0.level < $1.level }?.id
     }
+
+    /// A window that opens covered raises while its anchor attaches, so no
+    /// frame of the screen underneath shows. Only the scene's first request:
+    /// a later re-attach can come inside a layout pass (forum-224).
+    static func raisesWhileAttaching(
+        attaching: Bool, isFirstRequest: Bool, options: SceneCoverOptions,
+        wantsRaised: Bool, isRaised: Bool
+    ) -> Bool {
+        attaching && isFirstRequest && options.raisesWhileAttaching && wantsRaised && !isRaised
+    }
+
+    /// Less than this added to the leading safe area is only an iPad's
+    /// rounded display corner: 9 pt for a window that fills the screen, whose
+    /// controls stay hidden. Window controls add 66 pt (iPadOS 26.5).
+    static let minimumWindowControlsInset: CGFloat = 32
+
+    /// How far the cover's content moves off its leading edge to clear a
+    /// windowed iPad's window controls: what the content window's
+    /// corner-adapted safe area adds to its plain one. Nothing in full
+    /// screen, and nothing for a display corner alone, which the header's own
+    /// margin already clears.
+    static func windowControlsLeading(isFullScreen: Bool, cornerAdapted: CGFloat, plain: CGFloat) -> CGFloat {
+        let added = cornerAdapted - plain
+        return isFullScreen || added < minimumWindowControlsInset ? 0 : added
+    }
 }
-#endif

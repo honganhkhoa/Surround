@@ -129,6 +129,9 @@ enum SurroundUITestContract {
     /// `frozen` (default): no fixture time moves. `running`: time passes from the
     /// launch second; add `--surround-fixture-clock-ticks` to move clocks too.
     static let activityClockLaunchArgument = "--surround-activity-clock"
+    /// `online` (default), or `offline`: an Activity state's socket starts down
+    /// (`.reconnecting`), as after the connection is lost.
+    static let activityConnectionLaunchArgument = "--surround-activity-connection"
     static let widgetDeepLinkRoutingLaunchArgument =
         "--surround-widget-deep-link-routing"
     static let liveGameBannerNavigationLaunchArgument =
@@ -328,6 +331,10 @@ enum SurroundUITestContract {
         case frozen, running
     }
 
+    enum ActivityFixtureConnection: String {
+        case online, offline
+    }
+
     /// Ids in the Activity fixture states (ActivityFixtures.swift).
     enum ActivityFixtureID {
         static let harborMistGameID = 91_004_001, startedGameID = 91_004_002, stoneRemovalGameID = 91_004_003
@@ -339,7 +346,27 @@ enum SurroundUITestContract {
         static let liveQuickMatchUUID = "a1c7f100-0000-4000-8000-000000000001"
         static let correspondenceQuickMatchUUID = "a1c7f100-0000-4000-8000-000000000002"
         static let moderatorID = 916_002
+        static let secondModeratorID = 916_003
     }
+
+    #if DEBUG
+    /// Darwin notifications standing in for OGS in offline UI-test runs:
+    /// every window's service hears each one.
+    enum SuperchatCommand: String, CaseIterable {
+        case start = "com.honganhkhoa.Surround.debug.superchat.start"
+        case end = "com.honganhkhoa.Surround.debug.superchat.end"
+        case startSecond = "com.honganhkhoa.Surround.debug.superchat.start-second"
+        case endSecond = "com.honganhkhoa.Surround.debug.superchat.end-second"
+        /// The moderator's own echo (moderator_id is the user's id): never covers.
+        case echo = "com.honganhkhoa.Surround.debug.superchat.echo"
+        /// Every window's socket authenticates again and OGS confirms it,
+        /// with no re-send: the cover lifts after the re-send window.
+        case reconnect = "com.honganhkhoa.Surround.debug.superchat.reconnect"
+    }
+    /// `start@0,end@30,start@60`: the commands at those seconds after launch,
+    /// for runs that can't post Darwin notifications (a device, the Mac).
+    static let superchatDebugScriptLaunchArgument = "--surround-superchat-debug-script"
+    #endif
 
     #if DEBUG && MAIN_APP
     static var isEnabled: Bool {
@@ -822,6 +849,20 @@ enum SurroundUITestContract {
         static let profileChallengeWithSettings = "profile.challenge-with-settings"
         static let profileBannerAvatarPrefix = "profile.entry.banner.avatar."
         static let privateMessageComposer = "messages.composer"
+
+        /// The moderator superchat cover (SuperchatCover.swift).
+        static let superchatCover = "superchat.cover"
+        static let superchatCoverStatus = "superchat.cover.status"
+        static let superchatCoverTitle = "superchat.cover.title"
+        static let superchatCoverSubtitle = "superchat.cover.subtitle"
+        static let superchatCoverReply = "superchat.cover.reply"
+        static let superchatCoverSend = "superchat.cover.send"
+        static let superchatCoverEnded = "superchat.cover.ended"
+        static let superchatCoverDone = "superchat.cover.done"
+        static let messagesSuperchatEnded = "messages.superchatEnded"
+        static func superchatCoverModerator(_ id: Int) -> String { "superchat.cover.moderator.\(id)" }
+        static func superchatCoverLiveGame(_ id: Int) -> String { "superchat.cover.liveGame.\(id)" }
+
         static let profileRengoMenuPrefix = "profile.menu.rengo."
         static let profileActiveGames = "profile.active-games"
         static let profileActiveGamesRetry = "profile.active-games.retry"

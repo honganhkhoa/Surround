@@ -56,9 +56,11 @@ final class ActivityFixturesTests: XCTestCase {
         return suite
     }
 
-    /// One window's service in `selected`. Windows of one app share `suite`.
-    private func service(_ selected: State, clock: Fixtures.Clock? = nil,
-                         suite: String? = nil) throws -> (OGSService, Fixtures.Seed) {
+    /// One window's service in `selected`. Windows of one app share `suite`
+    /// and `store`, the app's superchat store; without one, nothing is covered.
+    private func service(_ selected: State, clock: Fixtures.Clock? = nil, suite: String? = nil,
+                         store: SuperchatStore? = nil,
+                         startsSuperchat: Bool = true) throws -> (OGSService, Fixtures.Seed) {
         var state = try journeyState()
         let seed = Fixtures.apply(selected, to: &state, clock: clock ?? self.clock)
         let service = OGSService(
@@ -67,7 +69,8 @@ final class ActivityFixturesTests: XCTestCase {
             ogsWebsocket: OGSOfflineNoOpWebsocket(), connectsAutomatically: false,
             usesSurroundOverviewService: false, enablesAppSideEffects: false, startsTimers: false,
             installsObservers: false, initialState: state)
-        Fixtures.finish(selected, service: service)
+        service.superchatStore = store
+        Fixtures.finish(selected, service: service, startsSuperchat: startsSuperchat)
         return (service, seed)
     }
 
@@ -262,15 +265,48 @@ final class ActivityFixturesTests: XCTestCase {
     }
 
     func testTheModeratorChatIsActiveWithAnUnreadConversation() throws {
-        let (ogs, _) = try service(.superchat)
-        XCTAssertEqual(ogs.superchatPeerIds, [ID.moderatorID])
-        XCTAssertEqual(ogs.privateMessagesUnreadPeerIds, [ID.moderatorID])
+        let store = SuperchatStore(preferences: nil)
+        let (ogs, _) = try service(.superchat, store: store)
         let user = try XCTUnwrap(ogs.user)
+        let cover = try XCTUnwrap(store.covers[user.id], "The state covers its user.")
+        XCTAssertEqual(cover.moderators.map(\.id), [ID.moderatorID])
+        XCTAssertEqual(cover.moderators.first?.username, Fixtures.Cast.moderator.username)
+        XCTAssertTrue(cover.isOn)
+        XCTAssertEqual(ogs.superchatCover, cover, "The window shows the store's cover.")
+        XCTAssertEqual(ogs.privateMessagesUnreadPeerIds, [ID.moderatorID])
         let payload = Fixtures.superchatPayload(for: user, enable: false)
         XCTAssertEqual(payload["player_id"] as? Int, user.id)
         XCTAssertEqual(payload["moderator_id"] as? Int, ID.moderatorID)
         ogs.handleSuperchat(config: payload)
-        XCTAssertTrue(ogs.superchatPeerIds.isEmpty)
+        XCTAssertEqual(store.covers[user.id]?.awaitsDone, true, "The end waits for Done.")
+        store.done(accountID: user.id)
+        XCTAssertNil(store.covers[user.id])
+        XCTAssertNil(ogs.superchatCover)
+
+        // The Debug commands' payloads: the moderator's own echo never covers, and
+        // the second moderator, who has no profile, is named from the event.
+        let echo = Fixtures.superchatEchoPayload(for: user, enable: true)
+        // Well formed for this account, so only the echo rule can turn it away.
+        XCTAssertEqual(echo["moderator_id"] as? Int, user.id)
+        XCTAssertEqual(echo["player_id"] as? Int, user.id)
+        XCTAssertEqual(echo["enable"] as? Bool, true)
+        ogs.handleSuperchat(config: echo)
+        XCTAssertNil(store.covers[user.id])
+        let second = Fixtures.Cast.secondModerator
+        XCTAssertFalse(Fixtures.Cast.all.contains(second))
+        ogs.handleSuperchat(config: Fixtures.superchatPayload(for: user, enable: true, moderator: second))
+        XCTAssertEqual(store.covers[user.id]?.moderators.map(\.id), [ID.secondModeratorID])
+        XCTAssertEqual(store.covers[user.id]?.moderators.first?.username, "SentinelHeron")
+    }
+
+    /// The app starts the state's superchat in its first window only: later
+    /// services join the store as it is.
+    func testFinishCanLeaveTheSuperchatAlone() throws {
+        let store = SuperchatStore(preferences: nil)
+        let (ogs, _) = try service(.superchat, store: store, startsSuperchat: false)
+        XCTAssertTrue(store.covers.isEmpty)
+        XCTAssertNil(ogs.superchatCover)
+        XCTAssertEqual(ogs.privateMessagesUnreadPeerIds, [ID.moderatorID], "The moderator's message is still there.")
     }
 
     func testRematchDataWaitsForTheLabel() throws {
@@ -298,11 +334,18 @@ final class ActivityFixturesTests: XCTestCase {
 
     func testTwoWindowsBuildTheSameState() throws {
         for state in State.allCases {
-            // Two windows of one app share its preferences suite.
+            // Two windows of one app share its preferences suite and its superchat store.
             let suite = newSuite()
-            let (first, firstSeed) = try service(state, suite: suite)
-            let (second, secondSeed) = try service(state, suite: suite)
+            let store = SuperchatStore(preferences: nil)
+            let (first, firstSeed) = try service(state, suite: suite, store: store)
+            let (second, secondSeed) = try service(state, suite: suite, store: store)
             XCTAssertEqual(firstSeed, secondSeed, "\(state)")
+            // In the superchat state both windows start it; the store holds one moderator.
+            let user = try XCTUnwrap(first.user, "\(state)")
+            XCTAssertEqual(store.covers[user.id]?.moderators.map(\.id) ?? [],
+                           state == .superchat ? [ID.moderatorID] : [], "\(state)")
+            XCTAssertEqual(first.superchatCover, store.covers[user.id], "\(state)")
+            XCTAssertEqual(second.superchatCover, store.covers[user.id], "\(state)")
             // Inputs list waiting items in dictionary order; snapshots sort them.
             for place in [ActivityModel.Place.root(isMessagesTab: false), basePlace(state)] {
                 XCTAssertEqual(ActivityModel.snapshot(input(first, place, firstSeed)),
@@ -362,6 +405,7 @@ final class ActivityFixturesTests: XCTestCase {
     func testLaunchArguments() throws {
         let state = SurroundUITestContract.activityStateLaunchArgument
         let clockFlag = SurroundUITestContract.activityClockLaunchArgument
+        let connectionFlag = SurroundUITestContract.activityConnectionLaunchArgument
         let ticks = SurroundUITestContract.fixtureClockTicksLaunchArgument
         let reference = clock.reference + 0.75
         func parse(_ arguments: [String]) throws -> Fixtures.Launch? {
@@ -378,8 +422,16 @@ final class ActivityFixturesTests: XCTestCase {
 
         XCTAssertNil(try parse([]))
         XCTAssertNil(try parse([clockFlag, "running"]), "The clock alone selects nothing.")
+        XCTAssertNil(try parse([connectionFlag, "offline"]), "The connection alone selects nothing.")
         XCTAssertEqual(try parse([state, "several"]), Fixtures.Launch(state: .several, clock: clock),
                        "Frozen by default, at the floored reference.")
+        XCTAssertEqual(try parse([state, "several"])?.connection, .online, "Online by default.")
+        XCTAssertEqual(try parse([state, "superchat", connectionFlag, "offline"]),
+                       Fixtures.Launch(state: .superchat, clock: clock, connection: .offline))
+        XCTAssertEqual(try parse([state, "superchat", connectionFlag, "online"])?.connection, .online)
+        // The Debug script rewrites no data a state owns, so it combines with every state.
+        XCTAssertEqual(try parse([state, "superchat", SurroundUITestContract.superchatDebugScriptLaunchArgument,
+                                  "end@2,start@4"])?.state, .superchat)
         XCTAssertEqual(try parse([state, "several", clockFlag, "frozen"]), Fixtures.Launch(state: .several, clock: clock))
         for selected in State.allCases {
             XCTAssertEqual(try parse([state, selected.rawValue])?.state, selected)
@@ -390,6 +442,9 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertEqual(failure([state]), .missingValue(state))
         XCTAssertEqual(failure([state, "several", clockFlag]), .missingValue(clockFlag))
         XCTAssertEqual(failure([state, "several", clockFlag, "slow"]), .unknownClock("slow"))
+        XCTAssertEqual(failure([state, "several", connectionFlag]), .missingValue(connectionFlag))
+        XCTAssertEqual(failure([state, "several", connectionFlag, "x"]), .unknownConnection("x"))
+        XCTAssertTrue(Fixtures.LaunchError.unknownConnection("x").description.contains("offline"))
         for flag in [SurroundUITestContract.screenshotLaunchArgument,
                      SurroundUITestContract.compatibilityScreenshotLaunchArgument,
                      SurroundUITestContract.homeStatesLaunchArgument] {

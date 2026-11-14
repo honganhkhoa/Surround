@@ -285,10 +285,7 @@ struct RengoActions: View {
                             rootView: .home,
                             ogsGameID: newGameId
                         ) {
-                            if challenge.challenged == nil {
-                                nav.home.showingNewGameView = false
-                            }
-                            nav.requestGameOpen(route)
+                            nav.requestGameOpen(route, closesNewGame: challenge.challenged == nil)
                         }
                     }
                 }
@@ -444,10 +441,7 @@ struct ChallengeCell: View {
                             rootView: .home,
                             ogsGameID: newGameId
                         ) {
-                            if challenge.challenged == nil {
-                                nav.home.showingNewGameView = false
-                            }
-                            nav.requestGameOpen(route)
+                            nav.requestGameOpen(route, closesNewGame: challenge.challenged == nil)
                         }
                     }
                 }
