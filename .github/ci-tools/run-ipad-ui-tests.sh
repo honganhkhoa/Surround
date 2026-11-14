@@ -38,6 +38,11 @@ if ! [[ "$simulator_id" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:x
   exit 64
 fi
 
+# The own-game navigation journey takes about 45 seconds a cycle on a hosted
+# iPad, so its default 20 cycles come near the 15-minute test allowance below.
+# Twelve keep it well inside; a caller can still set another count.
+export TEST_RUNNER_SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES="${TEST_RUNNER_SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES:-12}"
+
 if [[ -n "${RUNNER_TEMP:-}" ]]; then
   derived_data_root="$RUNNER_TEMP"
 else
