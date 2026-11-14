@@ -1762,7 +1762,8 @@ class OGSService: ObservableObject {
             // conversations it replays were asked for above, with the
             // authentication; a superchat it doesn't re-send ended unseen.
             if let accountID = superchatAccountID {
-                superchatStore?.connectionAuthenticating(superchatConnection, accountID: accountID)
+                superchatStore?.connectionAuthenticating(
+                    superchatConnection, accountID: accountID, endTime: superchatEndTimer)
             }
             #endif
         case "user/jwt":
@@ -6217,16 +6218,24 @@ class OGSService: ObservableObject {
     }
 
     #if MAIN_APP || TESTING
-    /// When an end heard now happened by OGS's clock, which stamps every
-    /// message, so Messages can tell which messages came after it. Once a
-    /// pong on this connection has given a sample, the device's clock is
-    /// moved by its drift. The end is never before the conversation's newest
-    /// message, since every message the window has came before it.
+    /// When a superchat ends now by OGS's clock, which stamps every message,
+    /// so Messages can tell which messages came after the end: one this
+    /// window hears, or one its connection's wait infers when no re-send
+    /// came. Once a pong on this connection has given a sample, the device's
+    /// clock is moved by its drift. The end is never before the
+    /// conversation's newest message, since every message the window has
+    /// came before it.
     private func superchatEndTime(moderatorID: Int) -> TimeInterval {
         // `drift` is the device's clock minus OGS's, in milliseconds.
         let now = currentTime() - (hasFreshServerClockSample ? drift / 1_000 : 0)
         let newest = privateMessagesByPeerId[moderatorID]?.map(\.content.timestamp).max() ?? now
         return max(now, newest)
+    }
+
+    /// `superchatEndTime(moderatorID:)` for the store to time an end this
+    /// connection's wait infers; nil once this window's service has gone.
+    private var superchatEndTimer: (Int) -> TimeInterval? {
+        { [weak self] moderatorID in self?.superchatEndTime(moderatorID: moderatorID) }
     }
     #endif
 
@@ -6236,7 +6245,7 @@ class OGSService: ObservableObject {
     /// the cover lifts after the re-send window (SuperchatDebugCommands).
     func simulateSuperchatReconnectForUITests() {
         guard let accountID = superchatAccountID else { return }
-        superchatStore?.connectionAuthenticating(superchatConnection, accountID: accountID)
+        superchatStore?.connectionAuthenticating(superchatConnection, accountID: accountID, endTime: superchatEndTimer)
         superchatStore?.connectionAnswered(superchatConnection, accountID: accountID, .confirmed)
     }
     #endif

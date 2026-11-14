@@ -41,9 +41,9 @@ struct SuperchatCover: Equatable {
 
 /// An end this session, for the line Messages shows in that conversation.
 struct SuperchatEnding: Equatable {
-    /// A live end by OGS's clock, as the window that heard it estimates, so
-    /// it compares with the times OGS gives messages; a missed one by the
-    /// store's own clock.
+    /// By OGS's clock, as the window that heard the end, or whose wait ran
+    /// out, estimates it, so it compares with the times OGS gives messages.
+    /// The store's own clock stands in where no window can tell.
     var at: TimeInterval
     var wasMissed: Bool
 }
@@ -76,6 +76,9 @@ final class SuperchatStore: ObservableObject {
         let accountID: Int
         /// Superchats still on that no connection of the account has heard again.
         var awaiting: Set<Int>
+        /// When a moderator's superchat ended by OGS's clock, as the
+        /// connection's window estimates it; nil once the window is gone.
+        let endTime: ((Int) -> TimeInterval?)?
         /// The connection answered a ping since it authenticated, and since
         /// the app last came back to the foreground.
         var answeredPing = false
@@ -141,11 +144,16 @@ final class SuperchatStore: ObservableObject {
     /// The window's socket sent `authenticate` as `accountID`; a re-send
     /// from now on counts for it. In the background too: a socket that
     /// reconnects there can still be open when the app comes back.
-    func connectionAuthenticating(_ connection: UUID, accountID: Int) {
+    /// - Parameter endTime: Times an end the wait infers, by moderator id,
+    ///   on OGS's clock as the window estimates it. Without one, or once it
+    ///   returns nil, the store's own clock.
+    func connectionAuthenticating(
+        _ connection: UUID, accountID: Int, endTime: ((Int) -> TimeInterval?)? = nil
+    ) {
         waits.removeValue(forKey: connection)?.deadline?.cancel()
         guard let cover = covers[accountID], cover.isOn else { return }
         waits[connection] = ResendWait(
-            accountID: accountID, awaiting: Set(cover.moderators.filter(\.isOn).map(\.id)))
+            accountID: accountID, awaiting: Set(cover.moderators.filter(\.isOn).map(\.id)), endTime: endTime)
     }
 
     /// How OGS answered that `authenticate` (OGSWebsocket).
@@ -238,10 +246,13 @@ final class SuperchatStore: ObservableObject {
     private func resendWindowEnded(_ connection: UUID) {
         guard !isInBackground, let wait = waits.removeValue(forKey: connection),
               var cover = covers[wait.accountID] else { return }
-        let time = now()
+        let storeTime = now()
         var missedAny = false
         for index in cover.moderators.indices
         where cover.moderators[index].isOn && wait.awaiting.contains(cover.moderators[index].id) {
+            // On OGS's clock where the connection's window can tell, as a
+            // live end is, so Messages compares it with OGS's message times.
+            let time = wait.endTime?(cover.moderators[index].id) ?? storeTime
             cover.moderators[index].endedAt = time
             cover.moderators[index].endWasMissed = true
             endings[wait.accountID, default: [:]][cover.moderators[index].id] =

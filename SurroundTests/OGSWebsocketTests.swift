@@ -945,7 +945,9 @@ final class OGSWebsocketTests: XCTestCase {
     }
 
     /// A signed-in OGSService on a fresh suite, on a real socket with this
-    /// file's fake transports, reporting to a store on its own manual scheduler.
+    /// file's fake transports, reporting to a store on its own manual
+    /// scheduler. The service and the store read the run's clock, as both
+    /// read the device's in the app.
     private struct SuperchatRun {
         let service: OGSService
         let socket: OGSWebsocket
@@ -971,20 +973,21 @@ final class OGSWebsocketTests: XCTestCase {
             anonymousConfigLoader: { _, _ in XCTFail("The service gives the socket its signed-in identity.") },
             logger: { _ in }
         )
+        let clock = Clock()
         let service = OGSService(
             environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
             httpClient: OGSOfflineRejectingHTTPClient(),
             preferences: preferences,
             ogsWebsocket: socket,
             connectsAutomatically: false,
-            installsObservers: false
+            installsObservers: false,
+            currentTime: { clock.now }
         )
         preferences[.ogsSessionId] = "test-session"
         service.ogsUIConfig = try makeConfig(jwt: "player-jwt", anonymous: false)
         XCTAssertEqual(service.user?.id, superchatPlayer)
 
         let storeScheduler = Scheduler()
-        let clock = Clock()
         let store = SuperchatStore(preferences: preferences, scheduler: storeScheduler, now: { clock.now })
         service.superchatStore = store
         return SuperchatRun(

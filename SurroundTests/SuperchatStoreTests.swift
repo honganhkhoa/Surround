@@ -354,6 +354,34 @@ final class SuperchatStoreTests: XCTestCase {
         XCTAssertTrue(makeStore(preferences: preferences).covers.isEmpty, "A relaunch opens uncovered.")
     }
 
+    func testAMissedEndIsTimedByItsConnectionOrTheStoresClock() {
+        let store = makeStore()
+        start(store, moderator)
+        start(store, secondModerator, username: "second")
+        // A's window times the first moderator's end by OGS's clock. It can't
+        // time the second's, as when its service has gone.
+        let timed = moderator
+        store.connectionAuthenticating(connectionA, accountID: player) { $0 == timed ? 1_003 : nil }
+        store.connectionAnswered(connectionA, accountID: player, .confirmed)
+        clock.now = 1_010
+        scheduler.advance()
+        XCTAssertEqual(store.endings, [player: [
+            moderator: SuperchatEnding(at: 1_003, wasMissed: true),
+            secondModerator: SuperchatEnding(at: 1_010, wasMissed: true),
+        ]], "The window's time where it has one, the store's clock where it hasn't.")
+        XCTAssertEqual(lifted, [player])
+
+        // A connection that came with no way to time an end: the store's clock.
+        clock.now = 1_020
+        start(store, moderator)
+        store.connectionAuthenticating(connectionB, accountID: player)
+        store.connectionAnswered(connectionB, accountID: player, .confirmed)
+        clock.now = 1_030
+        scheduler.advance()
+        XCTAssertEqual(store.endings[player]?[moderator], SuperchatEnding(at: 1_030, wasMissed: true))
+        XCTAssertEqual(lifted, [player, player])
+    }
+
     func testAResendBeforeTheAnswerCounts() {
         let store = makeStore()
         start(store, moderator)
