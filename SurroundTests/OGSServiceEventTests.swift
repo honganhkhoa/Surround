@@ -6412,6 +6412,90 @@ final class OGSServiceEventTests: XCTestCase {
                       "An unknown clock counts as live.")
     }
 
+    func testAcceptChallengeTakesTheGameAsAnIdOrAnObject() throws {
+        for (body, expected) in [(#"{"game":1077}"#, 1077), (#"{"game":{"id":1078}}"#, 1078)] {
+            ChallengePostURLProtocol.body = body
+            let service = makeService(socket: FakeWebsocket(), urlProtocolClass: ChallengePostURLProtocol.self)
+            service.ogsUIConfig = try makeUIConfig(jwt: "jwt", userID: 1)
+
+            let finished = expectation(description: "challenge accepted")
+            var outcome: Result<Int, Error>?
+            let request = service.acceptChallenge(challenge: OGSChallengeSampleData.sampleOpenChallenge).sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        outcome = .failure(error)
+                    }
+                    finished.fulfill()
+                },
+                receiveValue: { outcome = .success($0) }
+            )
+            wait(for: [finished], timeout: 2)
+            XCTAssertEqual(try outcome?.get(), expected, body)
+            request.cancel()
+        }
+        XCTAssertNil(OGSService.gameID(inChallengeResponse: ["game": "1079"]))
+        XCTAssertNil(OGSService.gameID(inChallengeResponse: [:]))
+    }
+
+    // MARK: - Activity's waiting times
+
+    func testTheFirstSeenObserverRecordsWaitingItemsAsTheyArrive() {
+        ActivitySession.reset()
+        defer { ActivitySession.reset() }
+        let service = makeService(socket: FakeWebsocket())
+        service.user = OGSUser(username: "current", id: 1, rank: 25)
+        var clock: TimeInterval = 100
+        let observer = ActivityFirstSeenObserver(ogs: service, now: { clock })
+
+        service.onSeekGraphEvent(data: [seekGraphChallengePayload(id: 31, challengerID: 1)])
+        clock = 160
+        service.onSeekGraphEvent(data: [
+            seekGraphChallengePayload(id: 32, challengerID: 1),
+            seekGraphChallengePayload(id: 33, challengerID: 2),
+        ])
+
+        XCTAssertEqual(ActivitySession.firstSeen["open-31"], 100, "A later sighting keeps the first time.")
+        XCTAssertEqual(ActivitySession.firstSeen["open-32"], 160)
+        XCTAssertNil(ActivitySession.firstSeen["open-33"], "Another player's challenge isn't the user's to wait for.")
+        withExtendedLifetime(observer) {}
+    }
+
+    func testAnOpenChallengeWaitsFromWhenOGSCreatedIt() {
+        let service = makeService(socket: FakeWebsocket())
+        service.user = OGSUser(username: "current", id: 1, rank: 25)
+        var created = seekGraphChallengePayload(id: 41, challengerID: 1)
+        created["created"] = "2024-03-21T02:58:09"
+        service.onSeekGraphEvent(data: [created, seekGraphChallengePayload(id: 42, challengerID: 1)])
+
+        let input = ActivityModel.Input(
+            ogs: service, place: .root(isMessagesTab: false),
+            firstSeen: ["open-41": 5, "open-42": 6], now: 2_000_000_000
+        )
+        let since = Dictionary(uniqueKeysWithValues: input.waiting.map { ($0.id, $0.since) })
+        XCTAssertEqual(since["open-41"], 1_710_989_889, "OGS's creation time beats the first sighting.")
+        XCTAssertEqual(since["open-42"], 6, "Without one, the first sighting stands in.")
+    }
+
+    func testTheInputReadsTheOpenChallengesItIsGiven() {
+        let service = makeService(socket: FakeWebsocket())
+        service.user = OGSUser(username: "current", id: 1, rank: 25)
+        service.onSeekGraphEvent(data: [seekGraphChallengePayload(id: 41, challengerID: 1)])
+        let place = ActivityModel.Place.root(isMessagesTab: false)
+        XCTAssertEqual(ActivityModel.Input(ogs: service, place: place, now: 100).waiting.map(\.id), ["open-41"],
+                       "Without a copy, the service's own rows.")
+
+        var open = OGSChallengeSampleData.sampleOpenChallenge
+        open.id = 43
+        var rengo = OGSChallengeSampleData.sampleRengoChallenge
+        rengo.id = 44
+        let lastKnown = ActivityLastKnown.OpenChallenges(
+            openChallengeSentById: [43: open], participatingRengoChallengeById: [44: rengo]
+        )
+        let input = ActivityModel.Input(ogs: service, place: place, now: 100, openChallenges: lastKnown)
+        XCTAssertEqual(Set(input.waiting.map(\.id)), ["open-43", "rengo-44"],
+                       "The window's last-known rows stand in for the service's.")
+    }
+
     // MARK: - Challenge send holds
 
     private func seekGraphHoldService() -> (OGSService, FakeWebsocket) {

@@ -13,12 +13,17 @@ struct FriendshipControls: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let user: OGSUser
     var presentation: Presentation = .profile
+    /// In Messages' inbox: the row's VoiceOver focus, and the inbox, which
+    /// keeps the request's result in place.
+    var requestHooks: MessagesRequestHooks? = nil
 
     private var isInvitation: Bool {
         presentation != .profile
     }
 
     @State private var confirmingRejection = false
+    /// VoiceOver was on the inbox row's Reject when it opened the dialog.
+    @State private var rejectionHadFocus = false
     @State private var confirmingRemoval = false
     @State private var failedAction: OGSFriendshipAction?
     @State private var errorMessage = ""
@@ -47,6 +52,18 @@ struct FriendshipControls: View {
     private func perform(_ action: OGSFriendshipAction) {
         guard !isBusy, !awaitsActionResult else { return }
         awaitsActionResult = true
+        if let requestHooks {
+            requestHooks.didAct(action)
+            // VoiceOver on the control that acted moves to the spinner; the
+            // result then takes it over. Reject acts from its dialog.
+            let control: MessagesRequestControl = action == .accept ? .accept : .reject
+            let focus: MessagesRequestFocus? = control == .reject && rejectionHadFocus
+                ? .control(user.id, .reject) : requestHooks.focus.wrappedValue
+            if let next = MessagesRequestFocus.sending(control, of: user.id, from: focus) {
+                requestHooks.focus.wrappedValue = next
+            }
+        }
+        rejectionHadFocus = false
         Task { @MainActor in
             defer { awaitsActionResult = false }
             do {
@@ -184,12 +201,18 @@ struct FriendshipControls: View {
             ? AnyLayout(VStackLayout(alignment: alignsTrailing ? .trailing : .center, spacing: 8))
             : AnyLayout(HStackLayout(spacing: presentation == .requestCard ? 20 : 8))
         return layout {
-            if isBusy {
+            // From the tap, so VoiceOver can move to the spinner as the
+            // control that acted goes.
+            if isBusy || awaitsActionResult {
                 ProgressView()
                     .accessibilityLabel(Text("Updating friendship…"))
                     .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.friendRequestBusy(user.id))
+                    .resultFocus(requestHooks?.focus, .pending(user.id))
             } else if presentation == .inboxRow {
-                Button(role: .destructive) { confirmingRejection = true } label: {
+                Button(role: .destructive) {
+                    rejectionHadFocus = requestHooks?.focus.wrappedValue == .control(user.id, .reject)
+                    confirmingRejection = true
+                } label: {
                     Text("Reject")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.red)
@@ -200,6 +223,7 @@ struct FriendshipControls: View {
                         .contentShape(Rectangle())
                 }
                 .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.friendRequestReject(user.id))
+                .resultFocus(requestHooks?.focus, .control(user.id, .reject))
                 compactAcceptButton
             } else {
                 Button(role: .destructive) { confirmingRejection = true } label: {
@@ -233,6 +257,7 @@ struct FriendshipControls: View {
                 .contentShape(Rectangle())
         }
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.friendRequestAccept(user.id))
+        .resultFocus(requestHooks?.focus, .control(user.id, .accept))
     }
 
     @ViewBuilder

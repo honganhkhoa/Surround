@@ -1819,10 +1819,21 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         )
         XCTAssertEqual(findAnother.label, "Find 2 more games")
         // The offline runtime keeps these searches optimistic rather than
-        // inserting server entries, so the destination has no stored requests.
-        tap(banner, description: "Show empty active-search list", in: app)
-        XCTAssertTrue(app.staticTexts["No active searches"].waitForExistence(timeout: 5))
-        keepScreenshot("Waiting games – no active searches", in: app)
+        // inserting server entries, so Activity lists no search of the
+        // user's own. The journey's live game keeps the list from being empty.
+        tap(banner, description: "Show Activity without stored searches", in: app)
+        element(SurroundUITestContract.AccessibilityID.activityList, in: app)
+        element(
+            SurroundUITestContract.AccessibilityID.activityRow("game-\(SurroundUITestContract.fixtureGameID)"),
+            in: app
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "activity.row.waiting-"))
+                .firstMatch.exists,
+            "Optimistic searches have no stored requests to list."
+        )
+        keepScreenshot("Activity – no stored searches", in: app)
     }
 
     func testQuickMatchShowsPendingCorrespondenceSubmission() {
@@ -1918,34 +1929,21 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.CompatibilityScene.waitingGames.rawValue,
         ])
 
-        let exact = element(
-            SurroundUITestContract.AccessibilityID.waitingGamesAutomatchEntry(
-                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d0"
-            ),
-            in: app
-        )
+        let exact = pushedQuickMatchCard("f0050bcf-f5fc-46c8-9ed6-01dfd898e0d0", in: app)
         XCTAssertTrue(exact.staticTexts["Fischer"].exists)
         XCTAssertFalse(exact.staticTexts.matching(
             NSPredicate(format: "label CONTAINS %@", "+")
         ).firstMatch.exists, "Clock values belong in the speed picker, not request cards.")
+        returnToActivityList(in: app)
 
-        let flexible = element(
-            SurroundUITestContract.AccessibilityID.waitingGamesAutomatchEntry(
-                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d1"
-            ),
-            in: app
-        )
+        let flexible = pushedQuickMatchCard("f0050bcf-f5fc-46c8-9ed6-01dfd898e0d1", in: app)
         XCTAssertTrue(flexible.staticTexts["Fischer or Byo-Yomi"].exists)
         XCTAssertFalse(flexible.staticTexts.matching(
             NSPredicate(format: "label CONTAINS %@ OR label CONTAINS %@", "+", "preferred")
         ).firstMatch.exists)
+        returnToActivityList(in: app)
 
-        let mixed = element(
-            SurroundUITestContract.AccessibilityID.waitingGamesAutomatchEntry(
-                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d2"
-            ),
-            in: app
-        )
+        let mixed = pushedQuickMatchCard("f0050bcf-f5fc-46c8-9ed6-01dfd898e0d2", in: app)
         XCTAssertTrue(mixed.staticTexts.matching(
             NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Blitz", "Fischer")
         ).firstMatch.exists)
@@ -1953,7 +1951,30 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Rapid", "Byo-Yomi")
         ).firstMatch.exists)
         XCTAssertTrue(mixed.staticTexts["No handicap"].exists)
-        keepScreenshot("Waiting games – neutral clock summaries", in: app)
+        keepScreenshot("Activity – Quick Match card, neutral clock summaries", in: app)
+    }
+
+    /// Pushes a Quick Match search's card from its row in Activity's list.
+    private func pushedQuickMatchCard(_ uuid: String, in app: XCUIApplication) -> XCUIElement {
+        let row = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.activityRow("waiting-quick-match-\(uuid)"),
+            in: app
+        )
+        scrollIntoTappableArea(row, in: app)
+        tap(row, description: "Open the search's card", in: app)
+        return element(SurroundUITestContract.AccessibilityID.waitingGamesAutomatchEntry(uuid), in: app)
+    }
+
+    /// Back from a card Activity's list pushed, until the list is on top.
+    private func returnToActivityList(in app: XCUIApplication) {
+        let back = app.navigationBars.buttons.matching(NSPredicate(
+            format: "identifier == %@ OR label == %@ OR label == %@", "BackButton", "Activity", "Back"
+        )).firstMatch
+        tap(back, description: "Back to Activity", in: app)
+        let popped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: back)
+        XCTAssertEqual(waitWithFinalCheck(for: [popped], timeout: 10), .completed,
+                       "Back must return to Activity's list.")
+        element(SurroundUITestContract.AccessibilityID.activityList, in: app)
     }
 
     func testQuickMatchActivityIsExposedWithoutRelyingOnColor() {
@@ -2566,35 +2587,81 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         #endif
     }
 
-    func testGameMessageNotificationUsesTheAppPopup() {
+    func testGameMessageButtonOpensActivity() {
         // The basic game fixture has no private messages. Explicitly seed
-        // incoming messages so this journey exercises the unread notice.
+        // incoming messages so this journey exercises the unread button.
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.messagesContentLaunchArgument,
         ], orientation: .portrait)
         let id = SurroundUITestContract.AccessibilityID.self
-        let messageIdentifier = "global.privateMessages"
-        let messageButton = element(messageIdentifier, in: app, matching: .button)
-        let unreadCount = Int(messageButton.value as? String ?? "") ?? 0
-        XCTAssertGreaterThan(unreadCount, 0,
-                             "The notification fixture must contain unread private messages.")
-        tap(id.homeGame(SurroundUITestContract.fixtureGameID), in: app)
-        element(id.gameDetail(SurroundUITestContract.fixtureGameID), in: app)
+        let gameID = SurroundUITestContract.fixtureGameID
+        // The fixture's conversations, newest first: hakhoa, then khoahong.
+        let newestPeerID = 765_826
+        let olderPeerID = 955_348
+        let messageButton = element(id.messagesButton, in: app, matching: .button)
+        func unread() -> Int { Int(messageButton.value as? String ?? "") ?? 0 }
+        let unreadCount = unread()
+        XCTAssertEqual(unreadCount, 2, "The fixture has two unread conversations.")
+        tap(id.homeGame(gameID), in: app)
+        let gameDetail = element(id.gameDetail(gameID), in: app)
 
         // Until Game Detail has a design of its own for messages, it keeps
         // the app's notice row like every other screen, in every pose.
         XCTAssertTrue(messageButton.waitForExistence(timeout: 10))
-        XCTAssertEqual(app.buttons.matching(identifier: messageIdentifier).count, 1,
-                       "Game Detail shows the app's one Messages notice.")
-        XCTAssertFalse(app.navigationBars.buttons[messageIdentifier].exists,
+        XCTAssertEqual(app.buttons.matching(identifier: id.messagesButton).count, 1,
+                       "Game Detail shows the app's one Messages button.")
+        XCTAssertFalse(app.navigationBars.buttons[id.messagesButton].exists,
                        "Game Detail adds no Messages toolbar item.")
         XCTAssertTrue(waitUntilHittable(messageButton, timeout: 10),
                       "Private messages must remain reachable in Game Detail.")
-        XCTAssertEqual(Int(messageButton.value as? String ?? ""), unreadCount,
-                       "The notice keeps the unread-message count.")
-        keepScreenshot("Private-message notice over Game Detail", in: app)
-        tap(messageButton, description: "Open private messages from Game Detail", in: app)
-        element("global.privateMessagesPanel", in: app)
+        XCTAssertEqual(unread(), unreadCount, "The button keeps the unread-message count.")
+        keepScreenshot("Messages button over Game Detail", in: app)
+
+        let popover = app.popovers.firstMatch
+        let conversation = app.descendants(matching: .any).matching(identifier: "messages.conversation").firstMatch
+        // Back inside the popover, never Game Detail's own Back.
+        func backToActivity() {
+            let back = popover.navigationBars.buttons.matching(NSPredicate(
+                format: "identifier == %@ OR label == %@ OR label == %@", "BackButton", "Activity", "Back"
+            )).firstMatch
+            tap(back, description: "Back to Activity", in: app)
+            XCTAssertTrue(pollUntil(timeout: 10) { !conversation.exists }, "Back shows Activity's list.")
+            element(id.activityList, in: app)
+        }
+        func closeActivity() {
+            dismissPopover(in: app)
+            XCTAssertFalse(app.descendants(matching: .any).matching(identifier: id.activityList).firstMatch.exists,
+                           "Closing the popover closes Activity.")
+            XCTAssertTrue(gameDetail.exists, "Closing Activity returns to Game Detail.")
+        }
+
+        // In a game, Activity is a popover at any width. With two unread
+        // conversations it opens at Messages, and neither opens by itself.
+        tap(messageButton, description: "Open Activity from Game Detail's Messages button", in: app)
+        element(id.activityList, in: app)
+        XCTAssertTrue(popover.waitForExistence(timeout: 10), "Over a game, Activity is a popover.")
+        element(id.activitySection("messages"), in: app)
+        let newest = element(id.activityRow("conversation-\(newestPeerID)"), in: app)
+        XCTAssertTrue(waitUntilHittable(newest, timeout: 10), "Activity opens at its Messages section.")
+        XCTAssertFalse(conversation.exists, "With two unread conversations, neither opens by itself.")
+        keepScreenshot("Activity at Messages over Game Detail", in: app)
+
+        // Reading one leaves one unread, which the button then opens at once.
+        tap(newest, description: "Open the newest conversation", in: app)
+        element("messages.conversation.profile.\(newestPeerID)", in: app)
+        backToActivity()
+        closeActivity()
+        XCTAssertTrue(pollUntil(timeout: 10) { unread() == 1 },
+                      "Reading a conversation in Activity marks it read.")
+        tap(messageButton, description: "Open Activity with one unread conversation", in: app)
+        XCTAssertTrue(popover.waitForExistence(timeout: 10), "Over a game, Activity is a popover.")
+        element("messages.conversation.profile.\(olderPeerID)", in: app)
+        keepScreenshot("Activity – the only unread conversation, opened at once", in: app)
+        backToActivity()
+        element(id.activityRow("conversation-\(olderPeerID)"), in: app)
+        closeActivity()
+        XCTAssertTrue(pollUntil(timeout: 10) { !messageButton.exists },
+                      "With nothing unread, the Messages button goes.")
     }
 
     func testLiveGameBannerUsesHomeNavigationStack() {

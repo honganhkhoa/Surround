@@ -5,7 +5,7 @@ set -euo pipefail
 usage() {
   echo "Usage:" >&2
   echo "  $0 derived-data-path <simulator UDID>" >&2
-  echo "  $0 <build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|composer|continuity> <simulator UDID> <result label>" >&2
+  echo "  $0 <build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|activity|composer|continuity> <simulator UDID> <result label>" >&2
 }
 
 if (( $# == 0 )); then
@@ -20,14 +20,14 @@ case "$phase" in
       exit 64
     fi
     ;;
-  build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|composer|continuity)
+  build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|activity|composer|continuity)
     if (( $# != 3 )); then
       usage
       exit 64
     fi
     ;;
   *)
-    echo "Expected phase derived-data-path, build, preflight, main, main-1, main-2, main-3, profile, profile-1, profile-2, profile-3, messages, messages-1, messages-2, composer, or continuity; received: $phase" >&2
+    echo "Expected phase derived-data-path, build, preflight, main, main-1, main-2, main-3, profile, profile-1, profile-2, profile-3, messages, messages-1, messages-2, activity, composer, or continuity; received: $phase" >&2
     exit 64
     ;;
 esac
@@ -101,12 +101,19 @@ readonly composer_test_names=(
 readonly composer_test_classes=(
   SuperchatCoverUITests
 )
+# The Activity list's journeys, its conversations included, have their own
+# phase, which main skips: the Messages and composer steps have no time left
+# for them.
+readonly activity_test_classes=(
+  ActivityListUITests
+  ActivityConversationUITests
+)
 
 # xcodebuild accepts an unknown -only-testing or -skip-testing selector and
 # exits successfully after running zero tests. Keep the isolation manifest tied
 # to its Swift declarations so a rename cannot silently move a composer test
-# into main, leave the profile, Messages, or continuity phase empty, or move a
-# whole class between main's parts.
+# into main, leave the profile, Messages, Activity, or continuity phase empty,
+# or move a whole class between main's parts.
 classes_and_sources=(
   "${test_class}:${test_source}"
   "${profile_test_class}:${profile_test_source}"
@@ -116,8 +123,8 @@ classes_and_sources=(
 for class_and_part in "${main_part_classes[@]}"; do
   classes_and_sources+=("${class_and_part%%:*}:SurroundUITests/${class_and_part%%:*}.swift")
 done
-for composer_test_class in "${composer_test_classes[@]}"; do
-  classes_and_sources+=("${composer_test_class}:SurroundUITests/${composer_test_class}.swift")
+for whole_test_class in "${composer_test_classes[@]}" "${activity_test_classes[@]}"; do
+  classes_and_sources+=("${whole_test_class}:SurroundUITests/${whole_test_class}.swift")
 done
 for class_and_source in "${classes_and_sources[@]}"; do
   class_name="${class_and_source%%:*}"
@@ -157,16 +164,17 @@ for test_name in "$keyboard_preflight_test_name" "${composer_test_names[@]}"; do
   fi
 done
 
-# Each part, and the composer and continuity phases, run under
+# Each part, and the Activity, composer and continuity phases, run under
 # supervise-ipad-ui-test-part.py. CI gives each part step 50 minutes; at 46 the
 # supervisor interrupts xcodebuild, which then has time to write its result
 # bundle and the supervisor its evidence: at most 1:45 of signal grace and
 # under a minute of bounded collection. The composer and continuity steps get
-# 45 minutes and the same margin. A test that a simulator crash killed, or
-# that failed only because XCTest timed out on a UI query, is rerun once,
-# within the same deadline.
+# 45 minutes and the Activity step 30, with the same margin. A test that a
+# simulator crash killed, or that failed only because XCTest timed out on a UI
+# query, is rerun once, within the same deadline.
 readonly part_deadline_seconds=$((46 * 60))
 readonly isolated_phase_deadline_seconds=$((41 * 60))
+readonly activity_phase_deadline_seconds=$((26 * 60))
 
 # The main, profile, and Messages phases each outgrew one CI step, so CI runs
 # main and profile in three parts and Messages in two. Of N parts, part K > 1 runs every
@@ -200,12 +208,12 @@ select_main_tests() {
     "-skip-testing:${messages_test_case}"
     "-skip-testing:${continuity_test_case}"
   )
-  local composer_test_name composer_test_class
+  local composer_test_name whole_test_class
   for composer_test_name in "${composer_test_names[@]}"; do
     selection_arguments+=("-skip-testing:${test_case}/${composer_test_name}")
   done
-  for composer_test_class in "${composer_test_classes[@]}"; do
-    selection_arguments+=("-skip-testing:${test_target}/${composer_test_class}")
+  for whole_test_class in "${composer_test_classes[@]}" "${activity_test_classes[@]}"; do
+    selection_arguments+=("-skip-testing:${test_target}/${whole_test_class}")
   done
 }
 
@@ -366,6 +374,19 @@ case "$phase" in
       -maximum-test-execution-time-allowance 900 \
       -resultBundlePath \
       "TestResults/SurroundUITests-${result_label}-Messages.xcresult"
+    ;;
+
+  activity)
+    mkdir -p TestResults
+    selection_arguments=()
+    for test_class_name in "${activity_test_classes[@]}"; do
+      selection_arguments+=("-only-testing:${test_target}/${test_class_name}")
+    done
+
+    echo "Running the iPad Activity list and conversation UI tests."
+    run_supervised_tests "$activity_phase_deadline_seconds" \
+      "TestResults/SurroundUITests-${result_label}-Activity.xcresult" \
+      "${selection_arguments[@]}"
     ;;
 
   composer)

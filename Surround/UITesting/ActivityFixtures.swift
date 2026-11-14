@@ -5,7 +5,8 @@
 //  Opt-in offline states for Activity, the moderator cover and rematches:
 //  `--surround-ui-testing --surround-activity-state <state>` (TESTING.md).
 //  Every time is an offset from one reference second shared by all windows,
-//  so a state reads the same in every run.
+//  so a state reads the same in every run. With `--surround-activity-actions`
+//  the state's service also answers Accept, Reject and Withdraw itself.
 //
 
 import Foundation
@@ -149,15 +150,50 @@ enum ActivityFixtures {
         return build.seed
     }
 
-    /// After the service exists: read markers, then the moderator's superchat,
-    /// unless `startsSuperchat` is false (the app starts it once per process).
+    /// After the service exists: the waiting pill's count, read markers, then
+    /// the moderator's superchat, unless `startsSuperchat` is false (the app
+    /// starts it once per process).
     static func finish(_ selected: State, service: OGSService, startsSuperchat: Bool = true) {
+        service.countWaitingLiveGamesForActivityFixture()
         // No-ops where the state has no such conversation.
         service.markPrivateMessageThreadAsRead(peerId: Cast.mossLantern.id)
         service.markPrivateMessageThreadAsRead(peerId: Cast.cedarWave.id)
         if startsSuperchat, selected == .superchat, let user = service.user {
             service.handleSuperchat(config: superchatPayload(for: user, enable: true))
         }
+    }
+
+    // MARK: Answering actions
+
+    /// How a state's service answers Accept, Reject and Withdraw itself
+    /// (`--surround-activity-actions`): `delay` after each is sent, with the
+    /// change OGS's next update would bring, except that under `fail-once`
+    /// each challenge's first action fails. Quick Match searches keep the socket.
+    struct Actions: Equatable {
+        var mode: SurroundUITestContract.ActivityActions
+        /// The state's clock. A game an accepted challenge starts begins at its now.
+        var clock: Clock
+        var delay: TimeInterval = 0.35
+    }
+
+    /// The active game OGS starts when the user accepts `challenge`: the
+    /// challenger plays Black and moves first, on an empty board with the
+    /// challenge's settings and clock, so it is live or correspondence as the
+    /// challenge is. Its id is `ActivityFixtureID.acceptedGameID`. Nil
+    /// without a challenger, or when `template` isn't a state's game 26268404.
+    static func acceptedGame(_ challenge: any OGSSubmittedChallenge, user: OGSUser, template: Game,
+                             clock: Clock) -> Game? {
+        guard let challenger = challenge.challenger, template.gameData?.players.white.id == user.id else {
+            return nil
+        }
+        var state = OGSService.BootstrapState()
+        state.user = user
+        state.activeGames[Contract.fixtureGameID] = template
+        // The game starts now, also on a running clock.
+        var build = Builder(state: state, clock: Clock(reference: clock.now.rounded(.down), isFrozen: clock.isFrozen))
+        let id = ID.acceptedGameID(challenge.id)
+        build.accepted(challenge, from: challenger, id: id)
+        return build.state.activeGames[id]
     }
 
     /// OGS's `private-superchat` event, as Goban's ServerToClient protocol declares it.
@@ -269,6 +305,13 @@ enum ActivityFixtures {
                     black: byoyomi(600, periods: 5), white: byoyomi(600, periods: 5), thinking: 5,
                     emptyBoard: true)
             seed.startedGames[id] = clock.ago(5)
+        }
+
+        /// The game the user accepted from `challenge`, just started.
+        mutating func accepted(_ challenge: any OGSSubmittedChallenge, from challenger: OGSUser, id: Int) {
+            let system = challenge.game.timeControl.system
+            addGame(id, vs: challenger, system, toMove: .black, black: start(of: system), white: start(of: system),
+                    thinking: 0, emptyBoard: true, settings: challenge.game)
         }
 
         /// A stone removal the user hasn't accepted.
@@ -412,12 +455,32 @@ enum ActivityFixtures {
                          periodTime: 30, periodTimeLeft: 30)
         }
 
+        /// A player's time when a game on `system` starts.
+        private func start(of system: TimeControlSystem) -> ThinkingTime {
+            switch system {
+            case .ByoYomi(let main, let periods, let periodTime):
+                ThinkingTime(thinkingTime: TimeInterval(main), thinkingTimeLeft: TimeInterval(main), periods: periods,
+                             periodsLeft: periods, periodTime: TimeInterval(periodTime),
+                             periodTimeLeft: TimeInterval(periodTime))
+            case .Canadian(let main, let periodTime, let stones):
+                ThinkingTime(thinkingTime: TimeInterval(main), thinkingTimeLeft: TimeInterval(main), movesLeft: stones,
+                             blockTime: TimeInterval(periodTime), blockTimeLeft: TimeInterval(periodTime))
+            case .Fischer(let initial, _, _): fischer(TimeInterval(initial))
+            case .Simple(let perMove): fischer(TimeInterval(perMove))
+            case .Absolute(let total): fischer(TimeInterval(total))
+            case .None, .Unknown: ThinkingTime()
+            }
+        }
+
         /// A started clock as OGS sends it: `toMove` has thought `thinking` seconds
         /// since the last move; `black` and `white` are the times at that move.
+        /// `settings`, from the challenge an empty board came from, replace the
+        /// template's board, rules and komi.
         private mutating func addGame(
             _ id: Int, vs opponent: OGSUser?, _ system: TimeControlSystem, toMove: StoneColor,
             black: ThinkingTime, white: ThinkingTime, thinking: TimeInterval,
-            phase: OGSGamePhase = .play, paused: Bool = false, emptyBoard: Bool = false
+            phase: OGSGamePhase = .play, paused: Bool = false, emptyBoard: Bool = false,
+            settings: (any OGSChallengeGameDetail)? = nil
         ) {
             var data = template
             data.gameId = id
@@ -435,6 +498,15 @@ enum ActivityFixtures {
                 data.freeHandicapPlacement = false
                 data.komi = 6.5
                 data.rules = .japanese
+                if let settings {
+                    data.gameName = settings.name
+                    data.width = settings.width
+                    data.height = settings.height
+                    data.ranked = settings.ranked
+                    data.handicap = settings.handicap
+                    data.komi = settings.komi ?? data.komi
+                    data.rules = settings.rules
+                }
             } else if phase == .play && toMove == .black {
                 data.moves = Array(template.moves.dropLast())   // 185 moves leave White to play
             }
@@ -500,6 +572,7 @@ extension ActivityFixtures {
         guard let selected = Self.selected else { return nil }
         var state = state
         selectedSeed = apply(selected.state, to: &state, clock: selected.clock)
+        state.activityActions = SurroundUITestContract.activityActions.map { Actions(mode: $0, clock: selected.clock) }
         let service = make(state)
         finish(selected.state, service: service, startsSuperchat: !hasStartedSuperchat)
         hasStartedSuperchat = true

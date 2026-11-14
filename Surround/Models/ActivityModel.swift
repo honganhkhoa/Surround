@@ -66,6 +66,14 @@ enum ActivityModel {
         var since: TimeInterval
     }
 
+    /// A waiting item's id names its kind and the object it stands for.
+    enum WaitingID {
+        static func quickMatch(_ uuid: String) -> String { "quick-match-\(uuid)" }
+        static func openChallenge(_ id: Int) -> String { "open-\(id)" }
+        static func sentChallenge(_ id: Int) -> String { "sent-\(id)" }
+        static func rengo(_ id: Int) -> String { "rengo-\(id)" }
+    }
+
     struct Conversation: Equatable {
         var peerID: Int
         var isUnread: Bool
@@ -451,16 +459,25 @@ extension ActivityModel.Input {
     ///     as seen now.
     ///   - sessionStart: The start of this app session, for recent
     ///     conversations.
+    ///   - openChallenges: The user's own open and Rengo challenges, when
+    ///     they come from elsewhere than the service, such as the window's
+    ///     last-known copy while the socket is down. Nil reads the service's.
     init(
         ogs: OGSService,
         place: ActivityModel.Place,
         startedGames: [Int: TimeInterval] = [:],
         firstSeen: [String: TimeInterval] = [:],
         sessionStart: TimeInterval = 0,
-        now: TimeInterval = Date().timeIntervalSince1970
+        now: TimeInterval = Date().timeIntervalSince1970,
+        openChallenges: ActivityLastKnown.OpenChallenges? = nil
     ) {
         self.init(startedGames: startedGames, sessionStart: sessionStart, now: now, place: place)
         guard let user = ogs.user else { return }
+        let seekGraph = openChallenges ?? ActivityLastKnown.OpenChallenges(
+            openChallengeSentById: ogs.openChallengeSentById,
+            participatingRengoChallengeById: ogs.participatingRengoChallengeById,
+            hostingRengoChallengeById: ogs.hostingRengoChallengeById
+        )
 
         liveGames = ogs.liveGames.compactMap { ActivityModel.LiveGame(game: $0, userID: user.id) }
         correspondenceGamesOnYourMove = ogs.sortedActiveCorrespondenceGamesOnUserTurn.compactMap { game in
@@ -482,9 +499,10 @@ extension ActivityModel.Input {
         func since(_ id: String, created: TimeInterval? = nil) -> TimeInterval {
             created ?? firstSeen[id] ?? now
         }
+        typealias WaitingID = ActivityModel.WaitingID
         var waiting = [ActivityModel.Waiting]()
         for entry in ogs.autoMatchEntryById.values {
-            let id = "quick-match-\(entry.uuid)"
+            let id = WaitingID.quickMatch(entry.uuid)
             waiting.append(.init(
                 id: id,
                 kind: .quickMatch,
@@ -492,17 +510,17 @@ extension ActivityModel.Input {
                 since: since(id, created: entry.creationTimestamp)
             ))
         }
-        for challenge in ogs.openChallengeSentById.values {
-            let id = "open-\(challenge.id)"
+        for challenge in seekGraph.openChallengeSentById.values {
+            let id = WaitingID.openChallenge(challenge.id)
             waiting.append(.init(
                 id: id,
                 kind: .openChallenge,
                 isLive: ActivityModel.isRealtime(challenge.game.timeControl, width: challenge.game.width, height: challenge.game.height),
-                since: since(id)
+                since: since(id, created: challenge.createdAt?.timeIntervalSince1970)
             ))
         }
         for challenge in ogs.challengesSent {
-            let id = "sent-\(challenge.id)"
+            let id = WaitingID.sentChallenge(challenge.id)
             waiting.append(.init(
                 id: id,
                 kind: .sentChallenge,
@@ -510,14 +528,15 @@ extension ActivityModel.Input {
                 since: since(id)
             ))
         }
-        let rengo = ogs.participatingRengoChallengeById.merging(ogs.hostingRengoChallengeById) { current, _ in current }
+        let rengo = seekGraph.participatingRengoChallengeById
+            .merging(seekGraph.hostingRengoChallengeById) { current, _ in current }
         for challenge in rengo.values {
-            let id = "rengo-\(challenge.id)"
+            let id = WaitingID.rengo(challenge.id)
             waiting.append(.init(
                 id: id,
                 kind: .rengo,
                 isLive: ActivityModel.isRealtime(challenge.game.timeControl, width: challenge.game.width, height: challenge.game.height),
-                since: since(id)
+                since: since(id, created: challenge.createdAt?.timeIntervalSince1970)
             ))
         }
         self.waiting = waiting

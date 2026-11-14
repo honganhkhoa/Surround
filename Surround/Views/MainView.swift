@@ -72,6 +72,9 @@ struct MainView: View {
     @State private var displaySleepWindow = UUID()
     /// Withdraws the request if this window's views go without an onDisappear.
     @StateObject private var displaySleepLifetime = ViewLifetime()
+    /// Records this window's waiting items as they arrive, for Activity's
+    /// order. Set once, with the window's Activity stores.
+    @State private var activityFirstSeen: ActivityFirstSeenObserver?
 
     @EnvironmentObject var nav: NavigationService
 
@@ -104,6 +107,27 @@ struct MainView: View {
     func endBackgroundTask() {
         SystemPlatformServices.shared.endBackgroundTask(backgroundTask)
         backgroundTask = nil
+    }
+
+    /// Connects the window's Activity stores to its service, and its list
+    /// to this presenter, once.
+    private func attachActivity() {
+        guard activityFirstSeen == nil else { return }
+        nav.activityResults.attach(client: .live(ogs), navigator: nav,
+                                   scheduler: OGSMainQueueWebsocketScheduler.shared)
+        nav.activityLastKnown.attach(ogs: ogs)
+        activityFirstSeen = ActivityFirstSeenObserver(ogs: ogs)
+        let nav = nav
+        nav.onCloseActivity = { [weak nav] in nav?.main.activity = nil }
+    }
+
+    /// Another account's list, results, drafts and last-known rows don't
+    /// carry over.
+    private func resetActivity(keepingAccount accountID: Int?) {
+        nav.main.activity = nil
+        nav.activityResults.reset()
+        nav.conversationDrafts.discardDrafts(exceptAccount: accountID)
+        nav.activityLastKnown.reset()
     }
 
     private func redirectSignedOutAccountDestination() {
@@ -304,26 +328,22 @@ struct MainView: View {
         }
         return ZStack(alignment: .top) {
             tabNavigation
-            .sheet(isPresented: $nav.main.showWaitingGames) {
-                AppNavigationStack {
-                    WaitingGamesView()
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button(action: { nav.main.showWaitingGames = false }) {
-                                    Text("Close")
-                                }
-                            }
-                        }
-                        .environmentObject(ogs)
-                        .environmentObject(nav)
-                }
-            }
+                .modifier(ActivitySheetPresenter())
             if ogs.isLoggedIn {
                 NotificationPopup()
             }
         }
+        // The popover's anchor, above everything it may be opened from.
+        .overlay { ActivityPopoverPresenter() }
         .sheet(item: $nav.main.accountSheet) { destination in
             IPadAccountSheet(destination: destination)
+        }
+        #if DEBUG
+        .modifier(ActivityDebugOpener())
+        #endif
+        .onAppear(perform: attachActivity)
+        .onChange(of: ogs.user?.id) { _, accountID in
+            resetActivity(keepingAccount: accountID)
         }
         .onChange(of: ogs.isLoggedIn, initial: true) { _, _ in
             redirectSignedOutAccountDestination()
@@ -335,6 +355,17 @@ struct MainView: View {
             // The account can change while Home is visible and no game route
             // exists to discard its old drafts or cancel pending callbacks.
             gameChatSessions.discardOtherAccounts(keeping: accountID)
+        }
+        // A friendship action's result shows where the user acted, and is
+        // spoken once from here unless a Messages request row took
+        // VoiceOver focus for it.
+        .onReceive(ogs.$friendshipNotice.compactMap { $0 }) { notice in
+            let ogs = ogs, nav = nav
+            nav.friendshipConfirmations.receive(
+                notice,
+                announce: { [weak nav] in nav?.announce($0) },
+                dismiss: { [weak ogs] in ogs?.dismissFriendshipNotice(id: notice.id) }
+            )
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
             guard allowsRemoteActivity else { return }

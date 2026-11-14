@@ -234,6 +234,26 @@ struct RengoActions: View {
     @State var ogsRequestCancellable: AnyCancellable?
     @EnvironmentObject var nav: NavigationService
     @Environment(\.openPlayerConversation) private var openPlayerConversation
+    @Environment(\.activityCellActions) private var activityCellActions
+
+    /// A request is in flight: the card's own (Join), or Activity's.
+    private var isRequesting: Bool {
+        (activityCellActions?.isPending ?? false) || ogsRequestCancellable != nil
+    }
+
+    /// In a card Activity pushed, Cancel, Start and Leave go through the
+    /// window's results store, which also decides what a started game does.
+    private func cancel() {
+        if let activityCellActions { activityCellActions.withdraw(challenge) } else { cancelRengoChallenge() }
+    }
+
+    private func start() {
+        if let activityCellActions { activityCellActions.start(challenge) } else { startRengoGame() }
+    }
+
+    private func leave() {
+        if let activityCellActions { activityCellActions.leave(challenge) } else { leaveRengoChallenge() }
+    }
 
     private var messageOrganizerLabel: some View {
         HStack(spacing: 4) {
@@ -279,14 +299,17 @@ struct RengoActions: View {
                 let newGameId = value.0
                 self.ogsRequestCancellable?.cancel()
                 self.ogsRequestCancellable = nil
-                if !nav.main.showWaitingGames {  // Waiting games list view is meant to preserve context, so don't perform navigation when accepting games from there
-                    withAnimation {
-                        if let route = AppRoute(
-                            rootView: .home,
-                            ogsGameID: newGameId
-                        ) {
-                            nav.requestGameOpen(route, closesNewGame: challenge.challenged == nil)
-                        }
+                // A live game opens. A correspondence game leaves the user
+                // where they are; the challenge goes with the next update.
+                guard ActivityModel.isRealtime(
+                    challenge.game.timeControl, width: challenge.game.width, height: challenge.game.height
+                ) else { return }
+                withAnimation {
+                    if let route = AppRoute(
+                        rootView: .home,
+                        ogsGameID: newGameId
+                    ) {
+                        nav.requestGameOpen(route, closesNewGame: challenge.challenged == nil)
                     }
                 }
             })
@@ -296,19 +319,22 @@ struct RengoActions: View {
         if let participants = challenge.game.rengoParticipants, let userId = ogs.user?.id, let host = challenge.challenger {
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
-                    if ogsRequestCancellable != nil {
+                    if isRequesting {
                         ProgressView()
+                            .activityCardPending(activityCellActions)
                     } else {
                         if userId == host.id {
                             HStack {
-                                Button(role: .destructive, action: { cancelRengoChallenge() }) {
+                                Button(role: .destructive, action: { cancel() }) {
                                     Text("Cancel").bold()
                                 }
+                                .activityCardAction(activityCellActions, .withdraw)
                                 Spacer()
-                                Button(action: { startRengoGame() }) {
+                                Button(action: { start() }) {
                                     Text("Start").bold()
                                 }
                                 .disabled(!challenge.game.rengoReadyToStart)
+                                .activityCardAction(activityCellActions, .start)
                             }
                         } else {
                             if participants.firstIndex(of: userId) == nil {
@@ -319,9 +345,10 @@ struct RengoActions: View {
                                     }
                                 }
                             } else {
-                                Button(role: .destructive, action: { leaveRengoChallenge() }) {
+                                Button(role: .destructive, action: { leave() }) {
                                     Text("Leave", comment: "leaveRengoChallenge").bold()
                                 }
+                                .activityCardAction(activityCellActions, .leave)
                             }
                         }
                     }
@@ -362,10 +389,30 @@ struct ChallengeCell: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     @Environment(\.openPlayerProfile) private var openPlayerProfile
+    @Environment(\.activityCellActions) private var activityCellActions
     var challenge: any OGSChallenge
     var hidePlayerDetails: Bool = false
     @State var ogsRequestCancellable: AnyCancellable?
     @State private var draftAccessibilityID = UUID()
+
+    /// A request is in flight: the cell's own, or Activity's.
+    private var isRequesting: Bool {
+        (activityCellActions?.isPending ?? false) || ogsRequestCancellable != nil
+    }
+
+    /// In a card Activity pushed, Accept, Reject and Withdraw go through the
+    /// window's results store, which also decides what an accepted game does.
+    private func accept(_ challenge: any OGSSubmittedChallenge) {
+        if let activityCellActions { activityCellActions.accept(challenge) } else { acceptChallenge(challenge: challenge) }
+    }
+
+    private func reject(_ challenge: any OGSSubmittedChallenge) {
+        if let activityCellActions { activityCellActions.reject(challenge) } else { withdrawOrDeclineChallenge(challenge: challenge) }
+    }
+
+    private func withdraw(_ challenge: any OGSSubmittedChallenge) {
+        if let activityCellActions { activityCellActions.withdraw(challenge) } else { withdrawOrDeclineChallenge(challenge: challenge) }
+    }
 
     private var challengeAccessibilityID: String {
         if let challenge = challenge as? any OGSSubmittedChallenge {
@@ -435,14 +482,18 @@ struct ChallengeCell: View {
                 let newGameId = value.0
                 self.ogsRequestCancellable?.cancel()
                 self.ogsRequestCancellable = nil
-                if !nav.main.showWaitingGames {  // Waiting games list view is meant to preserve context, so don't perform navigation when accepting games from there
-                    withAnimation {
-                        if let route = AppRoute(
-                            rootView: .home,
-                            ogsGameID: newGameId
-                        ) {
-                            nav.requestGameOpen(route, closesNewGame: challenge.challenged == nil)
-                        }
+                // A live game opens. A correspondence game leaves the user
+                // where they are; its row goes when the overview drops the
+                // challenge.
+                guard ActivityModel.isRealtime(
+                    challenge.game.timeControl, width: challenge.game.width, height: challenge.game.height
+                ) else { return }
+                withAnimation {
+                    if let route = AppRoute(
+                        rootView: .home,
+                        ogsGameID: newGameId
+                    ) {
+                        nav.requestGameOpen(route, closesNewGame: challenge.challenged == nil)
                     }
                 }
             })
@@ -538,23 +589,27 @@ struct ChallengeCell: View {
                         Spacer()
                         if let challenge = challenge as? (any OGSSubmittedChallenge) {
                             if challenger.id == ogs.user?.id {
-                                if ogsRequestCancellable != nil {
+                                if isRequesting {
                                     ProgressView()
+                                        .activityCardPending(activityCellActions)
                                 } else {
-                                    Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
+                                    Button(action: { withdraw(challenge) }) {
                                         Text("Withdraw")
                                             .bold()
                                             .foregroundColor(.red)
                                     }
+                                    .activityCardAction(activityCellActions, .withdraw)
                                 }
                             } else if challenge.challenged == nil {
-                                if ogsRequestCancellable != nil {
+                                if isRequesting {
                                     ProgressView()
+                                        .activityCardPending(activityCellActions)
                                 } else {
-                                    Button(action: { acceptChallenge(challenge: challenge) }) {
+                                    Button(action: { accept(challenge) }) {
                                         Text("Accept")
                                             .bold()
                                     }
+                                    .activityCardAction(activityCellActions, .accept)
                                 }
                             }
                         }
@@ -568,7 +623,7 @@ struct ChallengeCell: View {
                             Text(verbatim: challenged.usernameAndRank)
                             if challenged.id == ogs.user?.id {
                                 HStack {
-                                    Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
+                                    Button(action: { reject(challenge) }) {
                                         Text("Reject")
                                             .bold()
                                             .foregroundColor(.red)
@@ -577,7 +632,8 @@ struct ChallengeCell: View {
                                     .padding(.vertical, 5)
                                     .contentShape(RoundedRectangle(cornerRadius: 10))
                                     .hoverEffect(.highlight)
-                                    Button(action: { self.acceptChallenge(challenge: challenge) }) {
+                                    .activityCardAction(activityCellActions, .reject)
+                                    Button(action: { accept(challenge) }) {
                                         Text("Accept")
                                             .bold()
                                     }
@@ -585,7 +641,11 @@ struct ChallengeCell: View {
                                     .padding(.vertical, 5)
                                     .contentShape(RoundedRectangle(cornerRadius: 10))
                                     .hoverEffect(.highlight)
-                                }.offset(x: 10)
+                                    .activityCardAction(activityCellActions, .accept)
+                                }
+                                .offset(x: 10)
+                                // Only Activity's request waits here; the cell's own sends at once.
+                                .disabled(activityCellActions?.isPending == true)
                             }
                         }
                         if SurroundUITestContract.isCapturingAppStoreScreenshots
@@ -704,18 +764,7 @@ struct ChallengeCell: View {
             if challenge.isUnusual {
                 HStack {
                     VStack(alignment: .leading) {
-                        if challenge.useCustomKomi {
-                            Label("Custom komi: \(challenge.game.komi!, specifier: "%.1f")", systemImage: "exclamationmark.triangle.fill")
-                        }
-                        if challenge.hasHandicap {
-                            Label("Has handicap: \(challenge.game.handicap)", systemImage: "exclamationmark.triangle.fill")
-                        }
-                        if challenge.game.timeControl.system.isUnusual {
-                            Label("Unusual time settings", systemImage: "exclamationmark.triangle.fill")
-                        }
-                        if challenge.unusualBoardSize {
-                            Label("Unusual board size: \(challenge.game.width)×\(challenge.game.height)", systemImage: "exclamationmark.triangle.fill")
-                        }
+                        ChallengeWarningLines(challenge: challenge)
                         Spacer().frame(height: 10)
                     }
                     .font(Font.subheadline.bold())
@@ -726,6 +775,27 @@ struct ChallengeCell: View {
             gameDetails
         }
         .appReviewPresentationBlocked(ogsRequestCancellable != nil)
+    }
+}
+
+/// What makes a challenge unusual, one warning per line: the challenge card
+/// and Activity's rows show the same.
+struct ChallengeWarningLines: View {
+    let challenge: any OGSChallenge
+
+    var body: some View {
+        if challenge.useCustomKomi {
+            Label("Custom komi: \(challenge.game.komi!, specifier: "%.1f")", systemImage: "exclamationmark.triangle.fill")
+        }
+        if challenge.hasHandicap {
+            Label("Has handicap: \(challenge.game.handicap)", systemImage: "exclamationmark.triangle.fill")
+        }
+        if challenge.game.timeControl.system.isUnusual {
+            Label("Unusual time settings", systemImage: "exclamationmark.triangle.fill")
+        }
+        if challenge.unusualBoardSize {
+            Label("Unusual board size: \(challenge.game.width)×\(challenge.game.height)", systemImage: "exclamationmark.triangle.fill")
+        }
     }
 }
 

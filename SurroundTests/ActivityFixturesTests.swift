@@ -7,10 +7,12 @@
 //
 
 #if DEBUG
+import Combine
 import XCTest
 
 final class ActivityFixturesTests: XCTestCase {
     private typealias Fixtures = ActivityFixtures
+    private typealias Contract = SurroundUITestContract
     private typealias State = SurroundUITestContract.ActivityFixtureState
     private typealias ID = SurroundUITestContract.ActivityFixtureID
     private let baseID = SurroundUITestContract.fixtureGameID
@@ -59,10 +61,11 @@ final class ActivityFixturesTests: XCTestCase {
     /// One window's service in `selected`. Windows of one app share `suite`
     /// and `store`, the app's superchat store; without one, nothing is covered.
     private func service(_ selected: State, clock: Fixtures.Clock? = nil, suite: String? = nil,
-                         store: SuperchatStore? = nil,
-                         startsSuperchat: Bool = true) throws -> (OGSService, Fixtures.Seed) {
+                         store: SuperchatStore? = nil, startsSuperchat: Bool = true,
+                         actions: Fixtures.Actions? = nil) throws -> (OGSService, Fixtures.Seed) {
         var state = try journeyState()
         let seed = Fixtures.apply(selected, to: &state, clock: clock ?? self.clock)
+        state.activityActions = actions
         let service = OGSService(
             environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
             httpClient: OGSOfflineRejectingHTTPClient(), preferences: UserDefaults(suiteName: suite ?? newSuite())!,
@@ -76,6 +79,21 @@ final class ActivityFixturesTests: XCTestCase {
 
     private func input(_ ogs: OGSService, _ place: ActivityModel.Place, _ seed: Fixtures.Seed) -> ActivityModel.Input {
         Fixtures.input(ogs, place: place, seed: seed, clock: clock)
+    }
+
+    /// A request's one answer, once it comes.
+    @discardableResult
+    private func answer<Value>(_ reply: AnyPublisher<Value, Error>,
+                               file: StaticString = #filePath, line: UInt = #line) throws -> Value {
+        let done = expectation(description: "The request answers")
+        var result: Result<Value, Error>?
+        let subscription = reply.sink(receiveCompletion: { end in
+            if case .failure(let error) = end { result = .failure(error) }
+            done.fulfill()
+        }, receiveValue: { result = .success($0) })
+        wait(for: [done], timeout: 5)
+        subscription.cancel()
+        return try XCTUnwrap(result, "The request answered", file: file, line: line).get()
     }
 
     /// "no bar", "started game-N", the item's id, or "N waiting".
@@ -455,6 +473,151 @@ final class ActivityFixturesTests: XCTestCase {
         let running = Fixtures.Clock(reference: clock.reference, isFrozen: false)
         XCTAssertEqual(try parse([state, "several", clockFlag, "running", ticks]),
                        Fixtures.Launch(state: .several, clock: running))
+    }
+
+    func testTheActivityOpenerNeedsAStateAndAKnownStyle() throws {
+        let open = Contract.activityOpenLaunchArgument
+        let state = Contract.activityStateLaunchArgument
+        func parse(_ arguments: [String]) throws -> Contract.ActivityOpen? {
+            try Contract.parseActivityOpen(arguments)
+        }
+        func failure(_ arguments: [String]) -> Contract.ActivityOpenError? {
+            do {
+                _ = try parse(arguments)
+                return nil
+            } catch {
+                return error as? Contract.ActivityOpenError
+            }
+        }
+
+        XCTAssertNil(try parse([]))
+        XCTAssertNil(try parse([state, "several"]), "A state alone opens nothing.")
+        XCTAssertEqual(try parse([state, "several", open, "sheet"]), .sheet)
+        XCTAssertEqual(try parse([open, "sheet", state, "waiting"]), .sheet)
+        XCTAssertEqual(try parse([state, "waiting", open, "game-popover"]), .gamePopover)
+
+        XCTAssertEqual(failure([state, "several", open]), .missingValue)
+        XCTAssertEqual(failure([state, "several", open, "popover"]), .unknownValue("popover"))
+        XCTAssertEqual(failure([open, "sheet"]), .needsActivityState)
+        XCTAssertEqual(failure([open, "game-popover"]), .needsActivityState)
+        let unknown = Contract.ActivityOpenError.unknownValue("x").description
+        XCTAssertTrue(unknown.contains("sheet") && unknown.contains("game-popover"))
+    }
+
+    func testTheActionFlagNeedsAStateAndAKnownMode() throws {
+        let actions = Contract.activityActionsLaunchArgument
+        let state = Contract.activityStateLaunchArgument
+        func parse(_ arguments: [String]) throws -> Contract.ActivityActions? {
+            try Contract.parseActivityActions(arguments)
+        }
+        func failure(_ arguments: [String]) -> Contract.ActivityActionsError? {
+            do {
+                _ = try parse(arguments)
+                return nil
+            } catch {
+                return error as? Contract.ActivityActionsError
+            }
+        }
+
+        XCTAssertNil(try parse([]))
+        XCTAssertNil(try parse([state, "waiting"]), "A state alone leaves its actions to OGS.")
+        XCTAssertEqual(try parse([state, "waiting", actions, "succeed"]), .succeed)
+        XCTAssertEqual(try parse([actions, "fail-once", state, "challenge-received"]), .failOnce)
+
+        XCTAssertEqual(failure([state, "waiting", actions]), .missingValue)
+        XCTAssertEqual(failure([state, "waiting", actions, "fail"]), .unknownValue("fail"))
+        XCTAssertEqual(failure([actions, "succeed"]), .needsActivityState)
+        let unknown = Contract.ActivityActionsError.unknownValue("x").description
+        XCTAssertTrue(unknown.contains("succeed") && unknown.contains("fail-once"))
+    }
+
+    func testTheActionFixtureAnswersAsOGSWould() throws {
+        let actions = Fixtures.Actions(mode: .succeed, clock: clock, delay: 0)
+
+        // An accepted challenge starts a game, live or correspondence as it is.
+        let (received, receivedSeed) = try service(.challengeReceived, actions: actions)
+        let usual = try XCTUnwrap(received.challengesReceived.first { $0.id == ID.usualChallengeID })
+        let liveID = ID.acceptedGameID(ID.usualChallengeID)
+        XCTAssertEqual(liveID, 995_001)
+        XCTAssertEqual(try answer(received.acceptChallenge(challenge: usual)), liveID)
+        let live = try XCTUnwrap(received.activeGames[liveID])
+        XCTAssertTrue(live.ogs === received)
+        XCTAssertEqual(live.blackPlayer?.id, Fixtures.Cast.cedarWave.id, "The challenger plays Black.")
+        XCTAssertEqual(live.whitePlayer?.id, received.user?.id)
+        XCTAssertEqual(live.gameData?.moves.count, 0, "The game has just started.")
+        XCTAssertEqual(live.gameData?.timeControl.system, usual.game.timeControl.system)
+        XCTAssertTrue(received.liveGames.contains { $0.ogsID == liveID })
+        XCTAssertTrue(received.challengesReceived.isEmpty, "The accepted challenge leaves its list.")
+        // Both on their move, so by id.
+        let list = ActivityModel.snapshot(input(received, .root(isMessagesTab: false), receivedSeed)).list.map(\.id)
+        XCTAssertEqual(list, ["game-\(liveID)", "game-\(baseID)"])
+
+        let (leads, _) = try service(.nothingLeads, actions: actions)
+        let correspondence = try XCTUnwrap(leads.challengesReceived.first)
+        let correspondenceID = ID.acceptedGameID(ID.correspondenceChallengeID)
+        XCTAssertEqual(try answer(leads.acceptChallenge(challenge: correspondence)), correspondenceID)
+        XCTAssertTrue(leads.sortedActiveCorrespondenceGamesNotOnUserTurn.contains { $0.ogsID == correspondenceID },
+                      "The challenger moves first.")
+        XCTAssertFalse(leads.liveGames.contains { $0.ogsID == correspondenceID })
+
+        // Withdrawn and rejected challenges leave their lists; the pill counts what's left.
+        let (waiting, _) = try service(.waiting, actions: actions)
+        XCTAssertEqual(waiting.waitingLiveGames, 3)
+        let open = try XCTUnwrap(waiting.openChallengeSentById[ID.openChallengeID])
+        try answer(waiting.withdrawOrDeclineChallenge(challenge: open))
+        let sent = try XCTUnwrap(waiting.challengesSent.first)
+        try answer(waiting.withdrawOrDeclineChallenge(challenge: sent))
+        XCTAssertNil(waiting.openChallengeSentById[ID.openChallengeID])
+        XCTAssertTrue(waiting.challengesSent.isEmpty)
+        XCTAssertEqual(waiting.waitingLiveGames, 1, "Only the live search is left.")
+        XCTAssertEqual(waiting.autoMatchEntryById.count, 2, "Searches are withdrawn over the socket.")
+
+        let (rejecting, _) = try service(.unusualChallenge, actions: actions)
+        try answer(rejecting.withdrawOrDeclineChallenge(challenge: try XCTUnwrap(rejecting.challengesReceived.first)))
+        XCTAssertTrue(rejecting.challengesReceived.isEmpty)
+    }
+
+    func testFailOnceFailsEachChallengesFirstAction() throws {
+        let (waiting, _) = try service(.waiting, actions: Fixtures.Actions(mode: .failOnce, clock: clock, delay: 0))
+        let open = try XCTUnwrap(waiting.openChallengeSentById[ID.openChallengeID])
+        XCTAssertThrowsError(try answer(waiting.withdrawOrDeclineChallenge(challenge: open)))
+        XCTAssertNotNil(waiting.openChallengeSentById[ID.openChallengeID], "A failure changes nothing.")
+        try answer(waiting.withdrawOrDeclineChallenge(challenge: open))
+        XCTAssertNil(waiting.openChallengeSentById[ID.openChallengeID], "The next try goes through.")
+        let sent = try XCTUnwrap(waiting.challengesSent.first)
+        XCTAssertThrowsError(try answer(waiting.withdrawOrDeclineChallenge(challenge: sent)), "Each challenge fails once.")
+
+        let (received, _) = try service(.challengeReceived, actions: Fixtures.Actions(mode: .failOnce, clock: clock, delay: 0))
+        let usual = try XCTUnwrap(received.challengesReceived.first)
+        XCTAssertThrowsError(try answer(received.acceptChallenge(challenge: usual)))
+        XCTAssertNil(received.activeGames[ID.acceptedGameID(usual.id)])
+        XCTAssertEqual(try answer(received.acceptChallenge(challenge: usual)), ID.acceptedGameID(usual.id))
+
+        // Without the flag, the offline service fails at once, as before.
+        let (plain, _) = try service(.challengeReceived)
+        XCTAssertThrowsError(try answer(plain.acceptChallenge(challenge: try XCTUnwrap(plain.challengesReceived.first))))
+        XCTAssertEqual(plain.challengesReceived.count, 1)
+    }
+
+    func testTheWaitingPillCountsEachStatesLiveSearchesAndChallenges() throws {
+        // As the observer counts them: sent and open challenges and Quick
+        // Match searches that aren't correspondence. Rengo doesn't count.
+        let expected: [State: Int] = [.searching: 1, .waiting: 3, .several: 2, .rematchBothAsked: 1]
+        for state in State.allCases {
+            let (service, _) = try service(state)
+            XCTAssertEqual(service.waitingLiveGames, expected[state] ?? 0, state.rawValue)
+        }
+    }
+
+    func testActivityIdentifiersTakeTheItemsID() {
+        typealias ID = SurroundUITestContract.AccessibilityID
+        XCTAssertEqual(ID.activityRow("challenge-95001"), "activity.row.challenge-95001")
+        XCTAssertEqual(ID.activityRow("waiting-open-95101", .withdraw), "activity.row.waiting-open-95101.withdraw")
+        XCTAssertEqual(ID.activityRow("challenge-95003", .openGame), "activity.row.challenge-95003.openGame")
+        XCTAssertEqual(ID.activityRowResult("challenge-95003"), "activity.row.challenge-95003.result")
+        XCTAssertEqual(ID.activitySection("waiting"), "activity.section.waiting")
+        XCTAssertEqual([ID.activityList, ID.activityEmpty, ID.activityAllMessages, ID.activityDone],
+                       ["activity.list", "activity.empty", "activity.allMessages", "activity.done"])
     }
 }
 #endif
