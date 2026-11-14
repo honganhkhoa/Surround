@@ -3453,6 +3453,222 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     @MainActor
+    func testNightGardenPanesKeepActualTextReservesOpaqueAndReadable() throws {
+        let theme = SurroundTheme.nightGarden
+        let scale = 3
+        let linear = (0...255).map { byte -> Double in
+            let value = Double(byte) / 255
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        let players = [OGSUser(username: "ordinary", id: 1),
+                       OGSUser(username: "moderator", id: 2, isModerator: true),
+                       OGSUser(username: "admin", id: 3, isSuperuser: true),
+                       OGSUser(username: "professional", id: 4, professional: true),
+                       OGSUser(username: "supporter", id: 5, supporter: true),
+                       OGSUser(username: "bot", id: 6, isBot: true)]
+        // Actual caller reserves, including the tight Home and header chips.
+        // Enlarging the test's reserve would conceal a bevel under real text.
+        let cases: [(name: String, role: NightGardenPaneRole, size: CGSize,
+                     inset: CGSize, compact: Bool)] = [
+            ("Home clock", .clock, CGSize(width: 140, height: 28), CGSize(width: 9, height: 5), true),
+            ("inline clock", .clock, CGSize(width: 320, height: 34), CGSize(width: 8, height: 6), true),
+            ("compact clock", .clock, CGSize(width: 160, height: 52), CGSize(width: 8, height: 4), true),
+            ("full clock", .clock, CGSize(width: 190, height: 96), CGSize(width: 12, height: 4), false),
+            ("narrow clock", .clock, CGSize(width: 104, height: 144), CGSize(width: 10, height: 8), true),
+            ("wide clock", .clock, CGSize(width: 420, height: 96), CGSize(width: 12, height: 4), false),
+            ("large clock", .clock, CGSize(width: 680, height: 144), CGSize(width: 12, height: 4), false),
+            ("row player", .player, CGSize(width: 156, height: 52), CGSize(width: 4, height: 8), false),
+            ("short row player", .player, CGSize(width: 108, height: 52), CGSize(width: 4, height: 8), false),
+            ("compact column player", .player, CGSize(width: 126, height: 84), CGSize(width: 5, height: 5), true),
+            ("full vertical player", .player, CGSize(width: 156, height: 144), CGSize(width: 8, height: 8), true),
+            ("header player", .player, CGSize(width: 220, height: 44), CGSize(width: 4, height: 8), true)
+        ]
+        for scheme: ColorScheme in [.light, .dark] {
+            let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+            for color: StoneColor in [.black, .white] {
+                let playerSolid = try XCTUnwrap(theme.identityChipColors(color).first)
+                let identityInks: [(String, Color)] = [
+                    ("identity", theme.identityForeground(color)), ("secondary", theme.identitySecondary(color))
+                ] + players.map { ($0.username, theme.roleColor(for: $0, on: color)) }
+                let clockInks: [(String, Color)] = [
+                    ("clock", theme.clockForeground(color, scheme: scheme)),
+                    ("accent", theme.clockAccent(color)),
+                    ("sudden death", theme.clockSuddenDeathAccent(color, scheme: scheme)),
+                    ("agreement", theme.clockAgreementAccent(color, scheme: scheme)),
+                    ("disconnected", theme.clockDisconnectedAccent(color, scheme: scheme)),
+                    ("undo", theme.clockUndoAccent(color, scheme: scheme)),
+                    ("Home active", theme.homeChipAccent(color))
+                ] + identityInks
+                for sample in cases {
+                    let solid = sample.role == .player ? playerSolid : theme.clockSolidSurface(color)
+                    let plain = try nativeMaterialPixels(NightGardenPaneOutline(compact: sample.compact).fill(solid)
+                        .frame(width: sample.size.width, height: sample.size.height)
+                        .environment(\.colorScheme, scheme))
+                    for detailed in [false, true] {
+                        let actual = try nativeMaterialPixels(NightGardenPaneMaterial(color: color, role: sample.role,
+                            colorScheme: scheme, showsDetail: detailed, compact: sample.compact)
+                            .frame(width: sample.size.width, height: sample.size.height)
+                            .environment(\.colorScheme, scheme))
+                        let message = "\(sample.name), \(scheme), \(color), detailed=\(detailed)"
+                        XCTAssertEqual(actual.width, Int(sample.size.width) * scale, message)
+                        XCTAssertEqual(actual.height, Int(sample.size.height) * scale, message)
+                        let reserve = CGRect(origin: .zero, size: sample.size)
+                            .insetBy(dx: sample.inset.width, dy: sample.inset.height)
+                        var minimum = Double.infinity, maximum = -Double.infinity
+                        var minimumPoint = CGPoint.zero, maximumPoint = CGPoint.zero
+                        var minimumAlpha: UInt8 = 255
+                        for y in Int(reserve.minY) * scale..<Int(reserve.maxY) * scale {
+                            for x in Int(reserve.minX) * scale..<Int(reserve.maxX) * scale {
+                                let offset = (y * actual.width + x) * 4
+                                minimumAlpha = min(minimumAlpha, actual.pixels[offset + 3])
+                                let value = 0.2126 * linear[Int(actual.pixels[offset])]
+                                    + 0.7152 * linear[Int(actual.pixels[offset + 1])]
+                                    + 0.0722 * linear[Int(actual.pixels[offset + 2])]
+                                if value < minimum {
+                                    minimum = value
+                                    minimumPoint = CGPoint(x: x, y: y)
+                                }
+                                if value > maximum {
+                                    maximum = value
+                                    maximumPoint = CGPoint(x: x, y: y)
+                                }
+                            }
+                        }
+                        XCTAssertEqual(minimumAlpha, 255, "Every actual text-reserve pixel stays opaque: \(message)")
+                        for (name, ink) in sample.role == .player ? identityInks : clockInks {
+                            let value = luminance(ink, style: style)
+                            let nearest = min(maximum, max(minimum, value))
+                            let ratio = (max(value, nearest) + 0.05) / (min(value, nearest) + 0.05)
+                            let worst = value >= maximum ? maximumPoint : minimumPoint
+                            XCTAssertGreaterThanOrEqual(ratio, 4.5,
+                                "\(name) ratio=\(ratio), inkL=\(value), materialL=\(minimum)...\(maximum), "
+                                + "minXY=\(minimumPoint), maxXY=\(maximumPoint), nearestXY=\(worst) at native3x; \(message)")
+                        }
+                        if !detailed {
+                            XCTAssertEqual(actual.pixels, plain.pixels,
+                                "Fallback is exactly the role's solid outline without glass or relief: \(message)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testNightGardenPanesKeepSolidFallbackAndStayInsideControlBounds() throws {
+        let scale = 3, padding = 8
+        let cases: [(role: NightGardenPaneRole, size: CGSize, compact: Bool)] = [
+            (.clock, CGSize(width: 140, height: 28), true),
+            (.clock, CGSize(width: 190, height: 96), false),
+            (.clock, CGSize(width: 104, height: 144), true),
+            (.player, CGSize(width: 156, height: 52), false),
+            (.player, CGSize(width: 126, height: 84), true),
+            (.player, CGSize(width: 220, height: 44), true)
+        ]
+        for scheme: ColorScheme in [.light, .dark] {
+            for color: StoneColor in [.black, .white] {
+                for sample in cases {
+                    func material(_ detailed: Bool) throws -> (pixels: [UInt8], width: Int, height: Int) {
+                        try nativeMaterialPixels(NightGardenPaneMaterial(color: color, role: sample.role,
+                            colorScheme: scheme, showsDetail: detailed, compact: sample.compact)
+                            .frame(width: sample.size.width, height: sample.size.height)
+                            .padding(CGFloat(padding)).environment(\.colorScheme, scheme))
+                    }
+                    let detailed = try material(true), fallback = try material(false)
+                    let message = "\(scheme), \(color), \(sample.role), \(sample.size), compact=\(sample.compact)"
+                    var exteriorAlpha: UInt8 = 0, changedEdge = 0, edgeCount = 0
+                    for y in 0..<detailed.height {
+                        for x in 0..<detailed.width {
+                            let offset = (y * detailed.width + x) * 4
+                            let localX = CGFloat(x) / CGFloat(scale) - CGFloat(padding)
+                            let localY = CGFloat(y) / CGFloat(scale) - CGFloat(padding)
+                            if localX < 0 || localY < 0 || localX >= sample.size.width || localY >= sample.size.height {
+                                exteriorAlpha = max(exteriorAlpha, detailed.pixels[offset + 3], fallback.pixels[offset + 3])
+                            } else if localX > 12 && localX < sample.size.width - 12
+                                        && (localY < 3 || localY > sample.size.height - 3) {
+                                edgeCount += 1
+                                let delta = (0..<3).map { abs(Int(detailed.pixels[offset + $0]) - Int(fallback.pixels[offset + $0])) }.max()!
+                                if delta >= 8 { changedEdge += 1 }
+                            }
+                        }
+                    }
+                    XCTAssertEqual(exteriorAlpha, 0, "Panes never invade adjacent content or hit targets: \(message)")
+                    XCTAssertGreaterThan(Double(changedEdge) / Double(edgeCount), 0.2,
+                        "The native glass shoulder must visibly differ from a flat card: \(message)")
+                    // These accessibility values are read-only platform
+                    // environments. The explicit fallback is verified above;
+                    // this render checks the ordinary wrapper's appearance
+                    // forwarding without inventing a test-only environment.
+                    let surface = try nativeMaterialPixels(NightGardenPaneSurface(color: color, role: sample.role,
+                        compact: sample.compact)
+                        .frame(width: sample.size.width, height: sample.size.height).padding(CGFloat(padding))
+                        .environment(\.colorScheme, scheme))
+                    XCTAssertEqual(surface.pixels, detailed.pixels,
+                        "The ordinary production wrapper forwards the selected appearance and material: \(message)")
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testNightGardenPaneTexturesCacheTheSameArtworkAtBothMaterialScales() throws {
+        var fields = [Data]()
+        for color: StoneColor in [.black, .white] {
+            let regular = try XCTUnwrap(NightGardenPaneTexture.image(color: color))
+            let compact = try XCTUnwrap(NightGardenPaneTexture.image(color: color, compact: true))
+            XCTAssertTrue(regular === NightGardenPaneTexture.image(color: color), "Clock ticks reuse decoded regular glass")
+            XCTAssertTrue(compact === NightGardenPaneTexture.image(color: color, compact: true), "Compact chips reuse decoded glass")
+            let source = try XCTUnwrap(regular.cgImage)
+            XCTAssertTrue(source === compact.cgImage, "Changing role/size does not repaint or resample the source artwork")
+            XCTAssertGreaterThan(source.width, 256)
+            XCTAssertGreaterThan(source.width, source.height, "Panes are wide source fields, not stretched stone art")
+            for (image, isCompact) in [(regular, false), (compact, true)] {
+                XCTAssertEqual(image.scale, isCompact ? 8 : 4)
+                let caps = NightGardenPaneTexture.capInsets(compact: isCompact)
+                XCTAssertGreaterThan(caps.leading, 0)
+                XCTAssertGreaterThan(caps.top, 0)
+                XCTAssertEqual(caps.leading, caps.trailing)
+                XCTAssertEqual(caps.top, caps.bottom)
+                XCTAssertLessThan(caps.leading + caps.trailing, image.size.width,
+                                  "Keep a nonempty quiet center to stretch between the source shoulders")
+                XCTAssertLessThan(caps.top + caps.bottom, image.size.height)
+            }
+            fields.append(Data(try rgbaPixels(for: source, side: 256)))
+        }
+        XCTAssertNotEqual(fields[0], fields[1], "Amethyst and champagne retain distinct photographed material")
+    }
+
+    func testNightGardenPaneOutlinesKeepFiniteNestedGeometry() {
+        for compact in [false, true] {
+            let shape = NightGardenPaneOutline(compact: compact)
+            for size in [CGSize(width: 1, height: 1), CGSize(width: 12, height: 12),
+                         CGSize(width: 140, height: 28), CGSize(width: 104, height: 144),
+                         CGSize(width: 680, height: 144)] {
+                let rect = CGRect(origin: CGPoint(x: 17, y: 23), size: size)
+                let path = shape.path(in: rect)
+                XCTAssertFalse(path.isEmpty)
+                XCTAssertEqual(path.boundingRect, rect, "The pane keeps its caller's exact geometry")
+                for amount: CGFloat in [0.25, 0.5, 2, 5] where amount * 2 < min(size.width, size.height) {
+                    let inset = shape.inset(by: amount).path(in: rect)
+                    XCTAssertFalse(inset.isEmpty)
+                    XCTAssertTrue(rect.contains(inset.boundingRect))
+                    XCTAssertEqual(inset.boundingRect.minX, rect.minX + amount, accuracy: 0.001)
+                    XCTAssertEqual(inset.boundingRect.minY, rect.minY + amount, accuracy: 0.001)
+                    XCTAssertEqual(inset.boundingRect.maxX, rect.maxX - amount, accuracy: 0.001)
+                    XCTAssertEqual(inset.boundingRect.maxY, rect.maxY - amount, accuracy: 0.001)
+                    XCTAssertTrue(inset.contains(CGPoint(x: rect.midX, y: rect.midY)))
+                }
+            }
+            for rect in [CGRect.zero, CGRect.null, CGRect.infinite,
+                         CGRect(x: 0, y: 0, width: CGFloat.nan, height: 20),
+                         CGRect(x: 0, y: 0, width: 20, height: 0)] {
+                XCTAssertTrue(shape.path(in: rect).isEmpty, "Invalid/transitional layout slots draw no path")
+            }
+            XCTAssertTrue(shape.inset(by: 20).path(in: CGRect(x: 0, y: 0, width: 12, height: 12)).isEmpty)
+        }
+    }
+
+    @MainActor
     func testChristmasKeepsakeOrnamentTextRegionsStayOpaqueAndReadable() throws {
         let theme = SurroundTheme.christmasKeepsakes
         let scale = 3

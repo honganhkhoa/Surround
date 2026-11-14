@@ -557,7 +557,32 @@ Winter Window uses one stationary upper-left daylight field across the tabletop,
 
 Paper Blossoms is Debug-only (`--surround-ui-theme paperBlossoms`) and follows the selected appearance. Its rice-paper board keeps a straight native vermilion grid and image-based ink/ivory folded stones at detailed sizes; boards below 14 pt cells use solid colors. `ArtboardPhoneAuditTests/testPaperBlossomsThemeStates` and its `Night` counterpart capture Play, Chat, Analyze and Zen in both orientations; the same suite has scoring, control-state, small-phone, panel-transition and day/night marker-gallery selectors. iPad offers `testPaperBlossomsThemeOrientations`, day/night `testPaperBlossomsThemePanels`, and native narrow/tall-window selectors that restore the full window. Duo offers day/night `testPaperBlossomsThemeStates` using the physical-pose contract above. Inspect the paper garden at phone, tablet and divided-display sizes: decorations stay behind the playing surface and controls, lanterns and buildings preserve their proportions, and dense stones, move labels and scoring marks remain distinct. Theme tests cover compact contrast, control roles, opaque paper, transparent stone padding and scene proportions; the native marker export also accepts `paperBlossoms`.
 
+Night Garden clocks and player chips use generated amethyst/champagne satin-glass
+panes. Check broad peripheral facets, quiet text centers and the thin lower edge
+at logical phone size. Regular and compact versions share their artwork; fixed
+corner slices keep compact Home clocks, toolbar chips and constrained columns
+from stretching the facets. All artwork and state rings stay inside existing
+control bounds. Inspect the gold running cue, red urgent cue, paused clocks,
+scoring, long names and large text in both appearances. Increase Contrast and
+Reduce Transparency use solid faces. Native pane tests cover text-reserve
+opacity/contrast, accessibility fallbacks, bounded geometry and cached assets.
+
 ### Board marker matrix
+
+Night Garden uses one pair of satin-cut glass stone images at every detailed
+size. The broad asymmetric planes, soft upper-left reflection and natural
+shoulder shading should read as the same material on phone and tablet boards.
+Check clustered amethyst and champagne stones using
+`--surround-board-marker-export-themes nightGarden` and
+`--surround-board-marker-export-groups stone-groups,dense-position`.
+The `glass-group` and `glass-group-artwork` samples share their position, images,
+spacing and shadows. Both use artwork-only shading for this theme, so their
+rendered boards should match; compare retained builds for artwork revisions.
+Inspect 14, 20, 30, 40 and 64 pt cells in Light and Dark for clear boundaries,
+opaque faces, legible markers and correctly faded removed stones. There is no
+size-dependent artwork blend or added bright contour. Below the 14 pt detail
+threshold, the board and stones remain solid; include 7 and 13 pt to check that
+fallback. Refresh the native picker previews after changing either stone image.
 
 Christmas Keepsakes uses painted wooden ornament clocks (including Home clocks) and player chips, with no ropes, drilled holes or attachment tabs. Inspect their fine horizontal paint/grain, clipped corners and exposed natural-wood bevels at logical phone size. Regular clocks and row player chips retain their lower thickness and contact shadow within the existing 7 pt allowance. Explicit compact profiles keep the wood inside the original bounds in Home/inline clocks, constrained clock columns, and vertical/header/avatar-only player chips. Painted text reservations remain unchanged; fine grain should match the selected painted finish rather than rough bare stock. Native text reservations, hit targets and semantic clock rings remain unchanged. Increase Contrast or Reduce Transparency uses exact solid faces without texture or bevels. `testChristmasKeepsakeOrnamentTextRegionsStayOpaqueAndReadable` covers actual text reserves, role/status contrast, opacity and solid fallbacks. `testChristmasKeepsakeOrnamentsKeepVisibleWoodAndBoundedDepth` checks visible wood material, paint grain, bounded depth and compact suppression; `testChristmasKeepsakeOrnamentAssetsLoadOpaqueCachedTextures` covers packaged texture integrity and reuse. The two material sources are in the Debug catalog; cookie textures are not packaged.
 

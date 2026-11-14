@@ -515,7 +515,9 @@
 		FC2410010000000000000001 /* FeltControlSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2410010000000000000002 /* FeltControlSurface.swift */; };
 		FC2410010000000000000003 /* FeltControlSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2410010000000000000002 /* FeltControlSurface.swift */; };
 		CC2611080000000000000001 /* ChristmasKeepsakeSurfaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC2611080000000000000002 /* ChristmasKeepsakeSurfaces.swift */; };
+		4E4726111400000000000001 /* NightGardenPaneSurfaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E4726111400000000000002 /* NightGardenPaneSurfaces.swift */; };
 		CC2611080000000000000003 /* ChristmasKeepsakeSurfaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC2611080000000000000002 /* ChristmasKeepsakeSurfaces.swift */; };
+		4E4726111400000000000003 /* NightGardenPaneSurfaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E4726111400000000000002 /* NightGardenPaneSurfaces.swift */; };
 		FC2510010000000000000002 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
 		FC2510010000000000000003 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
 		FC2510010000000000000004 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
@@ -881,6 +883,7 @@
 		F06A00023D00000000000002 /* LocalizationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationUITests.swift; sourceTree = "<group>"; };
 		FC2410010000000000000002 /* FeltControlSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeltControlSurface.swift; sourceTree = "<group>"; };
 		CC2611080000000000000002 /* ChristmasKeepsakeSurfaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChristmasKeepsakeSurfaces.swift; sourceTree = "<group>"; };
+		4E4726111400000000000002 /* NightGardenPaneSurfaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightGardenPaneSurfaces.swift; sourceTree = "<group>"; };
 		FC2510010000000000000001 /* FeltEdgeFibers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeltEdgeFibers.swift; sourceTree = "<group>"; };
 		FC2610290000000000000001 /* SearchSpinner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchSpinner.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -1279,6 +1282,7 @@
 				BCFA11510000000000000007 /* HomeGameCard.swift */,
 				FC2410010000000000000002 /* FeltControlSurface.swift */,
 				CC2611080000000000000002 /* ChristmasKeepsakeSurfaces.swift */,
+				4E4726111400000000000002 /* NightGardenPaneSurfaces.swift */,
 				BC0F1C512527290900E3E66B /* ChallengeCell.swift */,
 				5C3E001A202611120000001A /* ActivityRows.swift */,
 				5C3E001C202611120000001C /* AutomatchEntryCell.swift */,
@@ -1846,6 +1850,7 @@
 				BCFA11510000000000000008 /* HomeGameCard.swift in Sources */,
 				FC2410010000000000000001 /* FeltControlSurface.swift in Sources */,
 				CC2611080000000000000001 /* ChristmasKeepsakeSurfaces.swift in Sources */,
+				4E4726111400000000000001 /* NightGardenPaneSurfaces.swift in Sources */,
 				BCFA1151000000000000000A /* HomeRules.swift in Sources */,
 				BC33384B250B6F410002F4D8 /* AppStoreScreenshotAvatar.swift in Sources */,
 				BC0F1C4D2526EF6700E3E66B /* OGSChallenge.swift in Sources */,
@@ -1989,6 +1994,7 @@
 				33D3DFBAA384CA900DFCD5B9 /* GameDetailTheme.swift in Sources */,
 				FC2410010000000000000003 /* FeltControlSurface.swift in Sources */,
 				CC2611080000000000000003 /* ChristmasKeepsakeSurfaces.swift in Sources */,
+				4E4726111400000000000003 /* NightGardenPaneSurfaces.swift in Sources */,
 				794B0B8EB0A844FDB16DAA31 /* GameControlStateTests.swift in Sources */,
 				8B5F21EBE5A5494DBCB11929 /* ChatSessionStateTests.swift in Sources */,
 				2C140ECF70E64EA99531999F /* GameDetailInteraction.swift in Sources */,

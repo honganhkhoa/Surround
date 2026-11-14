@@ -412,6 +412,10 @@ private struct GameDetailClockCard: View {
     private var clockCornerRadius: CGFloat { spaciousCompact ? 14 : 12 }
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: clockCornerRadius) }
     private var compactPaperCorner: Bool { style != .full }
+    private var compactNightGardenPane: Bool {
+        style == .inline || (style == .compact && !spaciousCompact)
+            || columnCard || narrowFullCard || narrowCompactCard
+    }
     private var leadingContentPadding: CGFloat {
         spaciousCompact ? 14 : (style == .full ? (columnCard ? 10 : 12) : 8)
     }
@@ -483,6 +487,7 @@ private struct GameDetailClockCard: View {
                 .modifier(GameDetailClearGlass(shape: shape,
                                                enabled: !theme.isFlowingInk && theme != .feltMeadow
                                                    && theme != .paperBlossoms && theme != .christmasKeepsakes && theme != .frostPine
+                                                   && theme != .nightGarden
                                                    && !reduceTransparency
                                                    && (!theme.usesLightSceneSurfaces || contrast != .increased),
                                                tint: showsThemeGlass ? theme.clockGlassTint(color) : nil))
@@ -604,7 +609,7 @@ private struct GameDetailClockCard: View {
     /// Scene clocks in a glass theme; header chips already sit on the bar's
     /// glass, and accessibility settings keep the solid surfaces.
     private var showsThemeGlass: Bool {
-        guard !theme.isFlowingInk, theme != .christmasKeepsakes, theme != .frostPine,
+        guard !theme.isFlowingInk, theme != .christmasKeepsakes, theme != .frostPine, theme != .nightGarden,
               theme.usesGlassControls, style != .inline,
               !reduceTransparency, contrast != .increased else {
             return false
@@ -627,6 +632,8 @@ private struct GameDetailClockCard: View {
         } else if theme == .christmasKeepsakes {
             ChristmasOrnamentSurface(color: color, role: .clock,
                                      compact: style == .inline || columnCard || narrowFullCard || narrowCompactCard)
+        } else if theme == .nightGarden {
+            NightGardenPaneSurface(color: color, role: .clock, compact: compactNightGardenPane)
         } else if showsThemeGlass {
             Color.clear
         } else if reduceTransparency || contrast == .increased {
@@ -652,6 +659,21 @@ private struct GameDetailClockCard: View {
                 GameDetailMatteClockOutline(color: color, isRunning: state.running,
                                            isWarning: state.suddenDeath,
                                            cornerRadius: clockCornerRadius, paperCompact: compactPaperCorner)
+            } else if theme == .nightGarden {
+                let outline = NightGardenPaneOutline(compact: compactNightGardenPane)
+                if state.running && contrast != .increased {
+                    outline.strokeBorder(turnGlow.opacity(colorScheme == .dark ? 0.6 : 0.55), lineWidth: 6)
+                        .blur(radius: style == .inline ? 6 : (colorScheme == .dark ? 9 : 8))
+                        .clipShape(outline)
+                }
+                if state.running || contrast == .increased {
+                    outline.strokeBorder(
+                        state.running
+                            ? turnOutline.opacity(contrast == .increased ? 1 : (colorScheme == .dark ? 0.85 : 0.7))
+                            : foreground.opacity(0.5),
+                        lineWidth: contrast == .increased ? 2 : 1
+                    )
+                }
             } else {
                 if state.running && contrast != .increased {
                     shape.strokeBorder(turnGlow.opacity(colorScheme == .dark ? 0.6 : 0.55), lineWidth: 6)
@@ -1289,6 +1311,9 @@ struct GameDetailPlayerIdentity: View {
             } else if theme == .christmasKeepsakes {
                 ChristmasOrnamentSurface(color: color, role: .player,
                                         compact: navigationHeader || compactHeader || avatarOnly || vertical)
+            } else if theme == .nightGarden {
+                NightGardenPaneSurface(color: color, role: .player,
+                                       compact: navigationHeader || compactHeader || avatarOnly || vertical)
             } else if !showsThemeGlass {
                 let translucentScene = theme.usesLightSceneSurfaces && !navigationHeader
                     && !reduceTransparency && contrast != .increased
@@ -1353,7 +1378,7 @@ struct GameDetailPlayerIdentity: View {
     /// Scene chips in a glass theme; the navigation header sits on the bar's
     /// glass, and accessibility settings keep the solid chip.
     private var showsThemeGlass: Bool {
-        guard !theme.isFlowingInk, theme != .christmasKeepsakes, theme != .frostPine,
+        guard !theme.isFlowingInk, theme != .christmasKeepsakes, theme != .frostPine, theme != .nightGarden,
               theme.usesGlassControls, !navigationHeader,
               !reduceTransparency, contrast != .increased else {
             return false

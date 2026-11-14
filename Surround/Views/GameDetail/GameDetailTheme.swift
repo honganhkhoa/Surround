@@ -185,7 +185,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             night.stoneImages?.tint = Color(themeHex: 0xE8E5E0)
             night.gridColor = Color(themeHex: 0x112018)
             night.coordinateColor = Color(themeHex: 0x112018)
-            night.black.flat = Color(themeHex: 0x361336)
+            night.black.flat = Color(themeHex: 0x59315C)
             night.white.flat = Color(themeHex: 0xE4D3B8)
             night.white.outline = Color(themeHex: 0x3D3427)
             night.white.territory = Color(themeHex: 0xE4D3B8)
@@ -597,7 +597,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 coordinateColor: Color(themeHex: 0x17251E),
                 black: StonePalette(
                     highlight: Color(themeHex: 0xA16998), shade: Color(themeHex: 0x210C2A),
-                    flat: Color(themeHex: 0x3E143E), outline: Color(themeHex: 0x210C2A),
+                    flat: Color(themeHex: 0x643C66), outline: Color(themeHex: 0x210C2A),
                     rim: Color(themeHex: 0xC49BB9).opacity(0.6),
                     lastMove: Color(themeHex: 0xFFF1D7), label: Color(themeHex: 0xFFF1D7),
                     detailedMarkerCasing: Color(themeHex: 0x170D1A)

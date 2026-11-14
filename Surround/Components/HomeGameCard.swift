@@ -187,6 +187,7 @@ struct HomeClockChip<Leading: View>: View {
 
     @Environment(\.surroundTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var contrast
 
     private var state: GameDetailClockState { facts.clock(color) }
     private var lowOnTime: Bool { color == facts.userColor && facts.userLowOnTime }
@@ -220,6 +221,8 @@ struct HomeClockChip<Leading: View>: View {
                 FeltControlSurface(color: color, shape: shape)
             } else if theme == .christmasKeepsakes {
                 ChristmasOrnamentSurface(color: color, role: .clock, compact: true)
+            } else if theme == .nightGarden {
+                NightGardenPaneSurface(color: color, role: .clock, compact: true)
             } else {
                 shape.fill(LinearGradient(colors: theme.identityChipColors(color),
                                           startPoint: .top, endPoint: .bottom))
@@ -252,7 +255,20 @@ struct HomeClockChip<Leading: View>: View {
     /// Strokes, not blurred shadows: a list of rows must scroll smoothly.
     @ViewBuilder
     private var ring: some View {
-        if state.running || lowOnTime {
+        if theme == .nightGarden {
+            if state.running || lowOnTime || contrast == .increased {
+                let outline = NightGardenPaneOutline(compact: true)
+                let ringColor = warning ? warningColor
+                    : (state.running ? theme.turnOutline(scheme: colorScheme) : theme.identityForeground(color).opacity(0.5))
+                outline.strokeBorder(ringColor, lineWidth: contrast == .increased ? 2 : 1)
+                    .background {
+                        if (state.running || lowOnTime) && contrast != .increased {
+                            outline.strokeBorder((warning ? warningColor : theme.turnGlow)
+                                .opacity(colorScheme == .dark ? 0.5 : 0.4), lineWidth: 4)
+                        }
+                    }
+            }
+        } else if state.running || lowOnTime {
             let ringColor = warning ? warningColor
                 : (theme == .paperBlossoms ? theme.clockAccent(color) : theme.turnOutline(scheme: colorScheme))
             let glowColor = warning ? warningColor : theme.turnGlow

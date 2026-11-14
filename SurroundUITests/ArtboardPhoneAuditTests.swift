@@ -780,9 +780,11 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
                                  appearance: .light)
     }
 
-    func testNightGardenThemeControlStates() {
+    func testNightGardenThemeControlStates() throws {
         auditThemeControlStates(theme: "nightGarden", title: "Night Garden", appearance: .light,
                                 suffix: "-night-garden")
+        try auditThemeControlInteractions(theme: "nightGarden", title: "Night Garden",
+                                          suffix: "night-garden")
     }
 
     func testNightGardenThemePanelTransitions() throws {
@@ -1463,24 +1465,30 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
     }
 
     func testFrostPineControlInteractions() throws {
+        try auditThemeControlInteractions(theme: "frostPine", title: "Frost", suffix: "frost-pine")
+    }
+
+    /// Material backgrounds must leave the existing clock and profile buttons
+    /// usable, including the compact clock after opening Chat.
+    private func auditThemeControlInteractions(theme: String, title: String, suffix: String) throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
-                          "This smoke test covers the phone's full and inline Frost controls.")
-        let app = launch(artboard: 1, theme: "frostPine", appearance: .light)
+                          "This smoke test covers the phone's full and inline themed controls.")
+        let app = launch(artboard: 1, theme: theme, appearance: .light)
         defer { app.terminate() }
         let position = element(ID.gameBoard, in: app).value as? String
         XCTAssertNotNil(position, "The smoke test retains an identifiable game position")
 
         tap("game.clock.black", in: app, matching: .button)
         element("game.details", in: app)
-        XCTAssertTrue(app.popovers.firstMatch.exists, "The full Frost clock opens its details")
-        keepScreenshot("frost-pine-interaction-full-clock-details", in: app)
+        XCTAssertTrue(app.popovers.firstMatch.exists, "The full \(title) clock opens its details")
+        keepScreenshot("\(suffix)-interaction-full-clock-details", in: app)
         dismissPopover(in: app)
 
         for (entry, name) in [(ID.profileBannerAvatarEntry(915_100), "avatar"),
                               (ID.profileBannerNameEntry(915_100), "name")] {
             tap(entry, in: app, matching: .button)
             element(ID.screenPlayerProfile, in: app)
-            keepScreenshot("frost-pine-interaction-profile-\(name)", in: app)
+            keepScreenshot("\(suffix)-interaction-profile-\(name)", in: app)
             navigateBackFromPlayerProfile(in: app)
             XCTAssertEqual(element(ID.gameBoard, in: app).value as? String, position,
                            "Returning from the \(name) keeps the game position")
@@ -1488,12 +1496,12 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
 
         startChat(in: app, typing: false)
         let inlineClock = app.navigationBars.buttons.matching(identifier: "game.clock.black").firstMatch
-        tap(inlineClock, description: "Open the inline Frost clock", in: app)
+        tap(inlineClock, description: "Open the inline \(title) clock", in: app)
         XCTAssertTrue(app.staticTexts["Time control"].waitForExistence(timeout: 5))
         for color in ["black", "white"] {
             element("game.details.clock.\(color)", in: app)
         }
-        keepScreenshot("frost-pine-interaction-inline-clock-details", in: app)
+        keepScreenshot("\(suffix)-interaction-inline-clock-details", in: app)
     }
 
     func testSingleClockDetailsRetainsBothTimes() {

@@ -378,9 +378,18 @@ struct HistoryGameCell: View {
             .foregroundStyle(theme.identityForeground(color))
             .padding(.horizontal, 9)
             .frame(minHeight: 30)
-            .background(LinearGradient(colors: theme.identityChipColors(color), startPoint: .top, endPoint: .bottom),
-                        in: shape)
-            .overlay { shape.strokeBorder(theme.identityChipBorder(color), lineWidth: 1) }
+            .background {
+                if theme == .nightGarden {
+                    NightGardenPaneSurface(color: color, role: .player, compact: true)
+                } else {
+                    shape.fill(LinearGradient(colors: theme.identityChipColors(color), startPoint: .top, endPoint: .bottom))
+                }
+            }
+            .overlay {
+                if theme != .nightGarden {
+                    shape.strokeBorder(theme.identityChipBorder(color), lineWidth: 1)
+                }
+            }
             .accessibilityElement(children: .combine)
         }
     }
