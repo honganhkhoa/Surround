@@ -13,12 +13,13 @@ import Foundation
 /// have released. A hold keeps the seek graph from the moment a send starts,
 /// so it sees the challenge even if it is added and removed before the
 /// request returns. It ends when this send's challenge has appeared (among
-/// those sent, or, for Rengo, those hosted or joined), when the send fails
-/// or is cancelled, when a direct challenge is sent, when the account
-/// changes, or after a long timeout as a last resort. Once the challenge has
-/// appeared, the service keeps the seek graph for it. Each send holds its own
-/// subscription, so one ending never releases another's, and no screen owns
-/// a hold: they outlive the screen that sent them.
+/// those sent, or, for Rengo, those hosted or joined), when the send fails,
+/// when a direct challenge is sent, when the account changes, or after a
+/// long timeout as a last resort. Once the challenge has appeared, the
+/// service keeps the seek graph for it. `OGSService.sendChallenge` takes one
+/// for each open send. Each holds its own subscription, so one ending never
+/// releases another's, and no screen owns a hold: they outlive the screen
+/// that sent them.
 final class SeekGraphSendHold {
     static let defaultTimeout: TimeInterval = 10 * 60
 

@@ -142,6 +142,14 @@ final class StackRouter: ObservableObject {
         isActive = active
     }
 
+    /// Whether the screen for `route` is on top: nothing is pushed above it and
+    /// it has not been popped. Nil is the stack's root, including Messages'
+    /// side pane. Conversations already read their focus this way
+    /// (MessagesConversationView's read marking and composer focus).
+    func isOnTop(_ route: StackRoute?) -> Bool {
+        path.last == route
+    }
+
     func present(_ route: StackRoute) {
         guard !path.contains(route) else { return }
         switch route {
@@ -569,6 +577,64 @@ extension View {
     }
 }
 
+/// Registers a screen that hides Activity's bar with its window's
+/// ActivityPlaceRegistry. Whether it is covered comes from its stack's path,
+/// not from onDisappear: switching tabs, re-parenting the Duo and iPad tab
+/// hosts and a cancelled back swipe all send disappear and appear while the
+/// screen stays on top of its own stack. Appearing and disappearing only
+/// refresh from the path. The registration ends when SwiftUI drops the
+/// screen's state, including in a scene the system disconnects.
+private struct ActivityPlaceRegistration: ViewModifier {
+    @EnvironmentObject private var nav: NavigationService
+    @EnvironmentObject private var stackRouter: StackRouter
+    @Environment(\.owningStackRoute) private var owningStackRoute
+    @Environment(\.owningTabRoot) private var owningTabRoot
+    @State private var owner = UUID()
+    @StateObject private var lifetime = ViewLifetime()
+    let place: ActivityModel.Place?
+
+    private var registration: ActivityPlaceRegistry.Registration? {
+        guard let place else { return nil }
+        return ActivityPlaceRegistry.Registration(
+            place: place,
+            root: owningTabRoot,
+            isOnTop: stackRouter.isOnTop(owningStackRoute)
+        )
+    }
+
+    func body(content: Content) -> some View {
+        content
+            // These schedule the registry's next turn; nothing publishes
+            // here, even when onAppear runs inside setTabBarHidden's layout.
+            .onAppear { apply(registration) }
+            .onChange(of: registration) { _, newValue in apply(newValue) }
+            .onDisappear { apply(registration) }
+    }
+
+    private func apply(_ registration: ActivityPlaceRegistry.Registration?) {
+        let registry = nav.activityPlaces
+        let owner = owner
+        if lifetime.release == nil {
+            lifetime.release = { registry.remove(owner) }
+        }
+        if let registration {
+            registry.set(registration, for: owner)
+        } else {
+            registry.remove(owner)
+        }
+    }
+}
+
+extension View {
+    /// Hides Activity's bar while this screen is on top of its tab's stack:
+    /// Game Detail and conversations. Pass nil while the screen shows
+    /// nothing that hides it. Apply inside an AppNavigationStack, which
+    /// supplies the StackRouter and the tab.
+    func activityPlace(_ place: ActivityModel.Place?) -> some View {
+        modifier(ActivityPlaceRegistration(place: place))
+    }
+}
+
 #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
 @available(iOS 27.1, *)
 private struct VerticalNavigationContentLayout: ViewModifier {
@@ -689,6 +755,20 @@ extension EnvironmentValues {
     }
 }
 
+private struct OwningTabRootKey: EnvironmentKey {
+    static let defaultValue: RootView? = nil
+}
+
+extension EnvironmentValues {
+    /// The tab whose stack shows this view. AppNavigationStack sets it from
+    /// its rootView, so it is nil in presented stacks (sheets, popovers) and
+    /// in roots without tabs (compatibility scenes, previews).
+    var owningTabRoot: RootView? {
+        get { self[OwningTabRootKey.self] }
+        set { self[OwningTabRootKey.self] = newValue }
+    }
+}
+
 /// Owns the root and StackRoute destination layout. Direct-view and Boolean
 /// pushes use AppNavigationLink/appNavigationDestination for the same policy.
 struct AppNavigationStack<Content: View>: View {
@@ -730,10 +810,16 @@ struct AppNavigationStack<Content: View>: View {
     var body: some View {
         NavigationStack(path: $navigation.path) {
             content()
+                #if DEBUG
+                .modifier(NoticesHostProbeRoot(rootView: rootView))
+                #endif
                 .modifier(AppNavigationContentLayout())
                 .environment(\.owningStackRoute, nil)
                 .navigationDestination(for: StackRoute.self) { route in
                     destination(for: route)
+                        #if DEBUG && targetEnvironment(macCatalyst)
+                        .modifier(NoticesHostProbeDestination())
+                        #endif
                         .modifier(AppNavigationContentLayout(overlaysIPadSidebar: route.showsGameDetail))
                         .environment(\.owningStackRoute, route)
                 }
@@ -744,6 +830,9 @@ struct AppNavigationStack<Content: View>: View {
         }
         .environmentObject(navigation)
         .environment(\.hasGlobalNotificationOverlay, rootView != nil)
+        // Presented stacks reset it: a sheet or popover inherits its
+        // presenter's environment, but never hides that tab's bar.
+        .environment(\.owningTabRoot, rootView)
         .environment(\.iPadTabContext, rootView == nil ? nil : iPadTabContext)
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
         // Presented stacks have their own safe area and chrome ownership.
@@ -883,6 +972,11 @@ private struct StackGameDestination: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        // Activity's bar never shows on a game's route: the loading and error
+        // screens hide it until the game loads, and then the loaded Game
+        // Detail registers its own place.
+        .activityPlace(navigation.games[gameID] == nil
+            ? .game(id: gameID, isOwnGame: false, isLive: false, isOver: false) : nil)
         .task(id: loadIdentity) { await loadGame(for: loadIdentity) }
     }
 

@@ -26,6 +26,20 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         ] == "1"
     }
 
+    /// The Debug toolbar-item probe in every journey: SURROUND_UI_GAME_CONTROL_PROBE
+    /// (Xcode forwards TEST_RUNNER_SURROUND_UI_GAME_CONTROL_PROBE) is `1`, or a
+    /// variant list such as `chip,rail-tile`. Empty, absent or `0` adds nothing.
+    var gameControlProbeLaunchArguments: [String] {
+        let value = ProcessInfo.processInfo.environment["SURROUND_UI_GAME_CONTROL_PROBE"] ?? ""
+        switch value {
+        case "", "0": return []
+        case "1": return [SurroundUITestContract.gameControlProbeLaunchArgument]
+        default:
+            return [SurroundUITestContract.gameControlProbeLaunchArgument,
+                    SurroundUITestContract.gameControlProbeVariantLaunchArgument, value]
+        }
+    }
+
     func traceAnimationTest(_ event: String) {
         guard animationDiagnosticsEnabled else { return }
         let message =
@@ -57,7 +71,10 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         app.launchEnvironment = launchEnvironment
         app.launchArguments = languageLaunchArguments + [
             SurroundUITestContract.launchArgument,
-        ] + additionalLaunchArguments
+        ] + additionalLaunchArguments + gameControlProbeLaunchArguments
+        #if DEBUG
+        app.launchArguments += SurroundUITestContract.noticesHostProbeArguments(ProcessInfo.processInfo.environment)
+        #endif
         if animationDiagnosticsEnabled {
             app.launchArguments.append(
                 SurroundUITestContract.animationDiagnosticsLaunchArgument

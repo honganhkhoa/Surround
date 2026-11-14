@@ -96,13 +96,20 @@ struct DuoTabContainer: UIViewControllerRepresentable {
     let isLoggedIn: Bool
     var messagesBadgeCount = 0
     let content: (RootView) -> AnyView
+    #if DEBUG
+    var noticesProbePlaces: ActivityPlaceRegistry? = nil
+    #endif
 
     func makeCoordinator() -> Coordinator {
         Coordinator(selection: $selection, isLoggedIn: isLoggedIn, content: content)
     }
 
     func makeUIViewController(context: Context) -> UITabBarController {
-        context.coordinator.makeController(
+        #if DEBUG
+        context.coordinator.noticesProbe = NoticesHostProbeUIKit.make(container: .duoTabContainer,
+                                                                      places: noticesProbePlaces)
+        #endif
+        return context.coordinator.makeController(
             regularWidth: context.environment.horizontalSizeClass == .regular,
             layoutDirection: context.environment.layoutDirection
         )
@@ -144,6 +151,7 @@ struct DuoTabContainer: UIViewControllerRepresentable {
         private var hiddenHostBaselines = [DuoHostBaselineKey: UIEdgeInsets]()
         #if DEBUG
         private var previousDiagnostic = ""
+        var noticesProbe: NoticesHostProbeUIKit?
         #endif
 
         init(selection: Binding<RootView>, isLoggedIn: Bool, content: @escaping (RootView) -> AnyView) {
@@ -207,8 +215,19 @@ struct DuoTabContainer: UIViewControllerRepresentable {
             ogsGroup.sidebarAppearance = .rootSection
             applyLayoutDirection(layoutDirection)
             applyTabs(regularWidth: regularWidth)
+            #if DEBUG
+            noticesProbe?.install(on: controller) { [weak self] in self?.noticesProbeState() }
+            #endif
             return controller
         }
+
+        #if DEBUG
+        private func noticesProbeState() -> NoticesHostProbeUIKit.State? {
+            guard let controller else { return nil }
+            return .init(root: controller.selectedTab.flatMap { RootView(rawValue: $0.identifier) } ?? selectedRoot,
+                         tabBarHidden: controller.isTabBarHidden, sidebar: .unavailable)
+        }
+        #endif
 
         func update(
             selection: Binding<RootView>,
@@ -339,8 +358,17 @@ struct DuoTabContainer: UIViewControllerRepresentable {
                 // never be misclassified as sidebar occlusion.
                 controller.sidebar.isHidden = true
                 hiddenHostBaselines.removeAll()
+                #if DEBUG
+                noticesProbe?.tabBarWillChange(hidden: hidden)
+                #endif
                 controller.setTabBarHidden(hidden, animated: controller.view.window != nil)
+                #if DEBUG
+                noticesProbe?.tabBarDidChange(hidden: hidden)
+                #endif
             }
+            #if DEBUG
+            noticesProbe?.refresh(reason: "tabs")
+            #endif
         }
 
         func tabBarController(_ tabBarController: UITabBarController, didSelectTab selectedTab: UITab, previousTab: UITab?) {
@@ -391,6 +419,9 @@ struct DuoTabContainer: UIViewControllerRepresentable {
             }
             previousBoundsSize = size
             measureLayout()
+            #if DEBUG
+            noticesProbe?.controllerDidLayout()
+            #endif
         }
 
         private func measureLayout() {
@@ -489,6 +520,18 @@ struct DuoTabContainer: UIViewControllerRepresentable {
         }
     }
 }
+
+#if DEBUG
+@available(iOS 27.0, *)
+extension DuoTabContainer {
+    /// Lets the notices host probe read this window's registry.
+    func withNoticesHostProbe(places: ActivityPlaceRegistry) -> Self {
+        var copy = self
+        copy.noticesProbePlaces = places
+        return copy
+    }
+}
+#endif
 
 @available(iOS 27.0, *)
 private final class DuoTabGroupContentController: UIViewController {

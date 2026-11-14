@@ -2163,6 +2163,34 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         #endif
     }
 
+    /// Compact portrait keeps Active games as the bottom bar's leading item,
+    /// before the spacer and the modes (the toolbar split, notices item 4).
+    func testCompactBottomBarKeepsActiveGamesBeforeTheModes() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("The Mac keeps Active games in the top toolbar.")
+        #else
+        try XCTSkipIf(
+            UIDevice.current.userInterfaceIdiom != .phone,
+            "This bottom-bar order applies to a portrait iPhone."
+        )
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
+        ], orientation: .portrait)
+        let gameID = SurroundUITestContract.liveBannerCorrespondenceGameIDs[0]
+        let firstGame = elementAfterScrolling(SurroundUITestContract.AccessibilityID.homeGame(gameID), in: app)
+        scrollIntoTappableArea(firstGame, in: app)
+        tap(firstGame, description: "Open the first correspondence game", in: app)
+        element(SurroundUITestContract.AccessibilityID.gameDetail(gameID), in: app)
+
+        let activeGames = element(SurroundUITestContract.AccessibilityID.gameActiveGamesButton, in: app, matching: .button)
+        let analyze = element(SurroundUITestContract.AccessibilityID.gameDisplayModePicker + ".analyze", in: app)
+        XCTAssertGreaterThan(activeGames.frame.minY, app.frame.midY, "Active games sits in the bottom bar")
+        XCTAssertEqual(activeGames.frame.midY, analyze.frame.midY, accuracy: 4, "beside the modes")
+        XCTAssertLessThan(activeGames.frame.maxX, analyze.frame.minX, "and leads them")
+        keepScreenshot("Compact bottom bar order", in: app)
+        #endif
+    }
+
     func testActiveGamesPopoverSwitchesGameAndDismisses() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.liveGameBannerNavigationLaunchArgument,

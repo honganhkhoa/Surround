@@ -234,9 +234,9 @@ struct PreferredSettingsView: View {
 }
 
 /// Sends a saved setting as a challenge, open or to one opponent, at most
-/// one request per setting at a time. Each send holds the seek graph until
-/// its challenge shows up there (see `SeekGraphSendHold`). The stack retains
-/// the result while an opponent picker is open, so it captures only its
+/// one request per setting at a time. The service holds the seek graph for
+/// an open one until its challenge shows up there. The stack retains the
+/// result while an opponent picker is open, so it captures only its
 /// dependencies.
 func preferredSettingChallengeSubmission(
     for setting: OGSChallengeTemplate,
@@ -246,16 +246,12 @@ func preferredSettingChallengeSubmission(
 ) -> (OGSUser?) -> Void {
     return { opponent in
         guard requests.wrappedValue[setting] == nil else { return }
-        let hold = SeekGraphSendHold(service: service)
         requests.wrappedValue[setting] = service.sendChallenge(opponent: opponent, challenge: setting)
-            .handleEvents(receiveCancel: { hold.release() })
             .sink(
-                receiveCompletion: { completion in
+                receiveCompletion: { _ in
                     requests.wrappedValue.removeValue(forKey: setting)
-                    if case .failure = completion { hold.release() }
                 },
-                receiveValue: { challengeID in
-                    hold.challengeSent(id: challengeID, isOpen: opponent == nil)
+                receiveValue: { _ in
                     onSent()
                 }
             )

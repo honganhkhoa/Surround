@@ -110,4 +110,22 @@ final class MessagesLayoutTests: XCTestCase {
         XCTAssertEqual(layout.gap, 1)
     }
 
+    func testActivitysBarNeverChangesTheColumnMode() {
+        // A conversation in the side pane hides Activity's bar, which gives the
+        // content its height back. If the mode followed the height, hiding the
+        // bar could put Messages back in one column and bring the bar back.
+        for width: CGFloat in [659, 660, 700, 1024] {
+            for (withBar, withoutBar) in [(CGFloat(319), CGFloat(375)), (900, 964)] {
+                XCTAssertEqual(
+                    MessagesColumnLayout(size: CGSize(width: width, height: withBar)).usesColumns,
+                    MessagesColumnLayout(size: CGSize(width: width, height: withoutBar)).usesColumns,
+                    "Width \(width)")
+            }
+        }
+        let division = CGRect(x: 540, y: 0, width: 24, height: 720)
+        XCTAssertEqual(
+            MessagesColumnLayout(size: CGSize(width: 1104, height: 656), divisions: [division]),
+            MessagesColumnLayout(size: CGSize(width: 1104, height: 720), divisions: [division]))
+    }
+
 }

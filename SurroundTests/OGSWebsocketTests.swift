@@ -442,6 +442,51 @@ final class OGSWebsocketTests: XCTestCase {
         XCTAssertEqual(socket.status, .disconnected)
     }
 
+    /// Retry and a network that came back use connect(): it restarts the
+    /// backoff at 1 s, and the capped timer left from the old loop can no
+    /// longer start a connection.
+    func testConnectResetsTheReconnectBackoff() throws {
+        let scheduler = Scheduler()
+        let factory = TransportFactory()
+        let socket = OGSWebsocket(
+            rootURL: URL(string: "https://ogs.test")!,
+            authenticationConfigProvider: { try? self.makeConfig(jwt: "jwt", anonymous: true) },
+            transportFactory: factory.make,
+            scheduler: scheduler,
+            connectTimeout: 15,
+            maxReconnectDelay: 30,
+            callbackTimeout: 5,
+            logger: { _ in }
+        )
+        var closedEvents = 0
+        socket.serverEventCallback = { name, _ in
+            if name == "surround/socketClosed" { closedEvents += 1 }
+        }
+
+        socket.connect()
+        try XCTUnwrap(factory.transports.last).fail()
+        for delay: TimeInterval in [1, 2, 4, 8, 16] {
+            XCTAssertEqual(scheduler.scheduledDelays, [delay])
+            XCTAssertTrue(scheduler.runNext(after: delay))
+            try XCTUnwrap(factory.transports.last).fail()
+        }
+        XCTAssertEqual(scheduler.scheduledDelays, [30], "The backoff reached its cap.")
+        XCTAssertEqual(factory.transports.count, 6)
+        XCTAssertEqual(closedEvents, 1)
+
+        socket.connect()
+        XCTAssertEqual(socket.status, .connecting)
+        XCTAssertEqual(factory.transports.count, 7, "A fresh attempt starts at once.")
+        XCTAssertTrue(scheduler.runNext(after: 30))
+        XCTAssertEqual(factory.transports.count, 7, "The old capped timer starts nothing.")
+
+        try XCTUnwrap(factory.transports.last).fail()
+        XCTAssertEqual(socket.status, .reconnecting)
+        XCTAssertEqual(scheduler.scheduledDelays, [1], "connect() restarted the backoff.")
+        XCTAssertEqual(closedEvents, 2, "A failed Retry reports the outage again.")
+        socket.close()
+    }
+
     func testEmitMarksOnlyPreSendFailuresAsDefinitelyNotSent() throws {
         let scheduler = Scheduler()
         let factory = TransportFactory()

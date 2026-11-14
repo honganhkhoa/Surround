@@ -71,6 +71,15 @@ struct MainViewWrapper: View {
             #if DEBUG && OGS_BETA && MAIN_APP && targetEnvironment(simulator)
             .onAppear { BetaSimulatorLoginBridge.startIfRequested(service: ogs) }
             #endif
+            #if DEBUG && MAIN_APP
+            .overlay(alignment: .top) {
+                if ProcessInfo.processInfo.arguments.contains(
+                    SurroundUITestContract.connectionStatusProbeLaunchArgument
+                ) {
+                    ConnectionStatusProbe(ogs: ogs)
+                }
+            }
+            #endif
     }
 
     #if DEBUG && MAIN_APP

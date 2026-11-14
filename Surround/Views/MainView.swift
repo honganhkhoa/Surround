@@ -182,6 +182,9 @@ struct MainView: View {
                 onAccountSheet: { nav.main.accountSheet = $0 },
                 content: hostedTabContent
             )
+            #if DEBUG
+            .withNoticesHostProbe(places: nav.activityPlaces)
+            #endif
             .ignoresSafeArea()
         } else {
             #if canImport(SwiftUI, _version: 8.0)
@@ -192,6 +195,9 @@ struct MainView: View {
                     messagesBadgeCount: messagesBadgeCount,
                     content: hostedTabContent
                 )
+                #if DEBUG
+                .withNoticesHostProbe(places: nav.activityPlaces)
+                #endif
                 // UIKit owns the window and keyboard avoidance.
                 .ignoresSafeArea()
             } else {
@@ -280,6 +286,9 @@ struct MainView: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .modifier(MainTabPlacement(horizontalSizeClass: horizontalSizeClass))
+        #if DEBUG
+        .modifier(NoticesHostProbeTabs(places: nav.activityPlaces, root: nav.main.rootView))
+        #endif
     }
 
     var body: some View {
@@ -355,6 +364,9 @@ struct MainView: View {
         .onDisappear {
             setKeepsDisplayAwake(false)
         }
+        // This window's place in the app-wide announcer, which speaks and
+        // plays haptics once per app, for the window the user is in.
+        .modifier(AppAnnouncerWindowRegistration(window: nav.announcerWindow))
         .onOpenURL { url in
             nav.handle(appURL: url)
         }

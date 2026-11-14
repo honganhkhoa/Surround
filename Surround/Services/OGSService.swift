@@ -900,6 +900,9 @@ class OGSService: ObservableObject {
         var openChallengeSentById = [Int: OGSSeekgraphChallenge]()
         var challengesReceived = [OGSDirectChallenge]()
         var autoMatchEntryById = [String: OGSAutomatchEntry]()
+        var challengesSent = [OGSDirectChallenge]()
+        var hostingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
+        var participatingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
         var automatchAvailableEntryByID =
             [String: OGSAutomatchAvailableEntry]()
 
@@ -957,6 +960,7 @@ class OGSService: ObservableObject {
     private let automatchReconciliationTimeout: TimeInterval
     private let automatchConfirmationTimeout: TimeInterval
     private let currentTime: () -> TimeInterval
+    private let keepAliveScheduler: OGSWebsocketScheduling
 
     private struct PendingConditionalMoveSubmission {
         let expectedPlan: ConditionalMovePlan
@@ -1185,6 +1189,14 @@ class OGSService: ObservableObject {
     }
     @Published private(set) public var waitingLiveGames: Int = 0
     private var waitingLiveGamesCancellable: AnyCancellable?
+    /// Whether a challenge the user waits on counts as live, for the live
+    /// count and an open challenge's keepalive: by OGS's speed tag, or by the
+    /// clock and board size when the tag is missing. A clock system the
+    /// client does not know counts as live, so an open challenge with one is
+    /// still kept alive.
+    static func isWaitingLive<Detail: OGSChallengeGameDetail>(_ game: Detail) -> Bool {
+        game.timeControl.resolvedSpeed(boardWidth: game.width, boardHeight: game.height) != .correspondence
+    }
     @Published private(set) public var hostingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
     @Published private(set) public var participatingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
     
@@ -1346,6 +1358,9 @@ class OGSService: ObservableObject {
         openChallengeSentById = state.openChallengeSentById
         challengesReceived = state.challengesReceived
         autoMatchEntryById = state.autoMatchEntryById
+        challengesSent = state.challengesSent
+        hostingRengoChallengeById = state.hostingRengoChallengeById
+        participatingRengoChallengeById = state.participatingRengoChallengeById
         automatchAvailableEntryByID = state.automatchAvailableEntryByID
         isReconcilingAutomatches = state.isReconcilingAutomatches
         quickMatchPopularityStats = state.quickMatchPopularityStats
@@ -1472,6 +1487,7 @@ class OGSService: ObservableObject {
         currentTime: @escaping () -> TimeInterval = {
             Date().timeIntervalSince1970
         },
+        keepAliveScheduler: OGSWebsocketScheduling = OGSMainQueueWebsocketScheduler.shared,
         remoteSettings: OGSRemoteSetting? = nil,
         finishedGamePreviewCooldown: FinishedGamePreviewCooldown = FinishedGamePreviewCooldown(),
         initialState: BootstrapState? = nil
@@ -1484,6 +1500,7 @@ class OGSService: ObservableObject {
         self.automatchReconciliationTimeout = automatchReconciliationTimeout
         self.automatchConfirmationTimeout = automatchConfirmationTimeout
         self.currentTime = currentTime
+        self.keepAliveScheduler = keepAliveScheduler
         self.finishedGamePreviewCooldown = finishedGamePreviewCooldown
         self.preferences = preferences
         self.remoteSettingStore = remoteSettings ?? OGSRemoteSetting(preferences: preferences)
@@ -1574,11 +1591,11 @@ class OGSService: ObservableObject {
         waitingLiveGamesCancellable = Publishers.CombineLatest3($challengesSent, $openChallengeSentById, $autoMatchEntryById).receive(on: DispatchQueue.main).sink(receiveValue: { challengesSent, openChallengeSentById, autoMatchEntryById in
             self.waitingLiveGames =
                 challengesSent.filter {
-                    $0.game.timeControl.speed != .correspondence
+                    OGSService.isWaitingLive($0.game)
                 }.count
                 +
                 openChallengeSentById.values.filter {
-                    $0.game.timeControl.speed != .correspondence
+                    OGSService.isWaitingLive($0.game)
                 }.count
                 +
                 autoMatchEntryById.values.filter {
@@ -1608,6 +1625,7 @@ class OGSService: ObservableObject {
             seekGraphAwaitingInitialSnapshot = false
             seekGraphConnected = false
             clearSeekGraphSnapshot()
+            stopKeepAliveForOpenLiveChallenges()
             automatchReconciliationGeneration = UUID()
             automatchIDsAwaitingReplay.removeAll()
             pendingRealtimeGameStartedNotifications = nil
@@ -1648,6 +1666,9 @@ class OGSService: ObservableObject {
             )
             reconcileAutomatchAvailabilitySubscription()
             reconcileSeekGraphSubscription()
+            // After a drop the reconnect snapshot restarts it; this covers
+            // challenges the seek graph still lists.
+            startKeepAliveForOpenLiveChallengesIfNeeded()
             invalidateFriendshipSnapshots()
             if enablesAppSideEffects {
                 self.syncRemoteStorage()
@@ -3700,6 +3721,17 @@ class OGSService: ObservableObject {
         ogsWebsocket.reconnectIfNeeded()
     }
 
+    /// Starts a fresh connection attempt now, with the reconnect backoff
+    /// reset (`OGSWebsocket.connect()`), for Retry and for a network that
+    /// came back. It acts only while the socket waits in its reconnect loop:
+    /// on an open socket `connect()` would swap the transport without
+    /// `surround/socketClosed`, leaving game subscriptions stale, and during
+    /// an attempt `connect()` started it would throw that attempt away.
+    func retryConnection() {
+        guard ogsWebsocket.status == .reconnecting else { return }
+        ogsWebsocket.connect()
+    }
+
     /// Invalidates all model and chat subscriptions owned by the previous
     /// authentication context. This must run before closing the socket.
     private func invalidateAllGameConnections() {
@@ -4800,6 +4832,9 @@ class OGSService: ObservableObject {
                 seekGraphReconnectRequiresSnapshot = false
                 reconcileSeekGraphSubscription()
             }
+            // The seek graph is the only source of openChallengeSentById, so
+            // this covers a new send, a reconnect, a relaunch and other windows.
+            startKeepAliveForOpenLiveChallengesIfNeeded()
         }
     }
     
@@ -5427,32 +5462,53 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
-    var sendingKeepAliveSignal = false
-    func sendKeepAliveSignalForOpenLiveChallenges() {
-        guard sendingKeepAliveSignal else {
+    /// The next keepalive tick for this account's open live challenges. At
+    /// most one is pending, so a service never runs two loops; nil means the
+    /// loop is stopped.
+    private var openLiveChallengeKeepAlive: Cancellable?
+
+    /// Starts the keepalive loop if it is stopped. Safe to call from any
+    /// event that may list an open live challenge.
+    func startKeepAliveForOpenLiveChallengesIfNeeded() {
+        guard openLiveChallengeKeepAlive == nil else {
             return
         }
-        
-        guard ogsWebsocket.opened else {
+        sendKeepAliveSignalForOpenLiveChallenges()
+    }
+
+    private func stopKeepAliveForOpenLiveChallenges() {
+        openLiveChallengeKeepAlive?.cancel()
+        openLiveChallengeKeepAlive = nil
+    }
+
+    /// Sends one keepalive per open live challenge and schedules the next
+    /// tick. Every exit leaves the loop either scheduled or stopped, so a
+    /// later event can always start it again.
+    private func sendKeepAliveSignalForOpenLiveChallenges() {
+        stopKeepAliveForOpenLiveChallenges()
+        // Socket authentication starts the loop again.
+        guard ogsWebsocket.opened, ogsWebsocket.authenticated else {
             return
         }
-        
-        let challenges = openChallengeSentById.values.filter { $0.game.timeControl.speed != .correspondence }
-        guard challenges.count > 0 else {
-            sendingKeepAliveSignal = false
+
+        let challenges = openChallengeSentById.values.filter { OGSService.isWaitingLive($0.game) }
+        // The next seek graph event that lists one starts the loop again.
+        guard !challenges.isEmpty else {
             return
         }
-        
+
         for challenge in challenges {
             ogsWebsocket.emit(command: "challenge/keepalive", data: ["challenge_id": challenge.id, "game_id": challenge.game.id])
         }
-        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {
-            self.sendKeepAliveSignalForOpenLiveChallenges()
+        openLiveChallengeKeepAlive = keepAliveScheduler.schedule(after: 1) { [weak self] in
+            self?.sendKeepAliveSignalForOpenLiveChallenges()
         }
     }
     
     /// Publishes the new challenge's id, which an open challenge also carries
-    /// once it arrives through the seek graph.
+    /// once it arrives through the seek graph. Until then an open send holds
+    /// the seek graph, so the challenge is listed, and a live one kept alive,
+    /// even if the screen that sent it closes first.
     func sendChallenge(opponent: OGSUser?, challenge: OGSChallengeTemplate) -> AnyPublisher<Int, Error> {
         var challenge = challenge
         if !challenge.useCustomKomi {
@@ -5466,6 +5522,13 @@ class OGSService: ObservableObject {
                 url = "\(self.ogsRoot)/api/v1/players/\(opponentId)/challenge"
             }
             if let csrfToken = self.ogsUIConfig?.csrfToken {
+                // Taken before the request, so the hold sees the challenge even
+                // if the seek graph lists it before the response arrives.
+                let settleHold = self.holdSeekGraph(forChallengeTo: opponent)
+                let finish: (Result<Int, Error>) -> Void = { result in
+                    settleHold?(result)
+                    promise(result)
+                }
                 self.httpClient.session.request(
                     url,
                     method: .post,
@@ -5477,21 +5540,22 @@ class OGSService: ObservableObject {
                     case .success(let data):
                         if let result = data as? [String: Any] {
                             if result["status"] as? String == "ok" {
-                                if let challengeID = result["challenge"] as? Int, let _ = result["game"] as? Int {
-                                    promise(.success(challengeID))
-                                    if opponent == nil && !self.sendingKeepAliveSignal {
-                                        self.sendingKeepAliveSignal = true
-                                        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {
-                                            self.sendKeepAliveSignalForOpenLiveChallenges()
-                                        }
-                                    }
+                                // OGS sends the game as an id or as an object
+                                // with one; the web client reads both.
+                                let gameID = (result["game"] as? Int)
+                                    ?? ((result["game"] as? [String: Any])?["id"] as? Int)
+                                if let challengeID = result["challenge"] as? Int, gameID != nil {
+                                    // An open challenge's keepalive starts once
+                                    // the seek graph lists it; the hold keeps
+                                    // the seek graph until then.
+                                    finish(.success(challengeID))
                                     return
                                 }
                             }
                         }
-                        promise(.failure(OGSServiceError.invalidJSON))
+                        finish(.failure(OGSServiceError.invalidJSON))
                     case .failure(let error):
-                        promise(.failure(error))
+                        finish(.failure(error))
                     }
                     print(response.result)
                 }
@@ -5501,6 +5565,30 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
+    /// An open challenge reaches the waiting list, and a live one its
+    /// keepalive, only through the seek graph, which the screen that sent it
+    /// may release before the challenge is listed. So each open send holds
+    /// the seek graph itself (see `SeekGraphSendHold`), and the returned
+    /// closure tells the hold how the send ended. A direct challenge never
+    /// appears in the seek graph, and extensions never send challenges, so
+    /// neither holds it.
+    private func holdSeekGraph(forChallengeTo opponent: OGSUser?) -> ((Result<Int, Error>) -> Void)? {
+        #if MAIN_APP || TESTING
+        guard opponent == nil else { return nil }
+        let hold = SeekGraphSendHold(service: self)
+        return { result in
+            switch result {
+            case .success(let challengeID):
+                hold.challengeSent(id: challengeID, isOpen: true)
+            case .failure:
+                hold.release()
+            }
+        }
+        #else
+        return nil
+        #endif
+    }
+
     func addPreferredGameSetting(challenge: OGSChallengeTemplate) -> AnyPublisher<Void, Error> {
         var setting = challenge
         if !setting.useCustomKomi {

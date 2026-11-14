@@ -322,7 +322,7 @@ struct NotificationPopup: View {
         .onReceive(ogs.$friendshipNotice) { notice in
             friendshipNotice = notice
             if let notice {
-                AccessibilityNotification.Announcement(friendshipMessage(for: notice.action)).post()
+                nav.announce(.init(.friendshipResult(notice.id), audience: .anyWindow, speech: friendshipMessage(for: notice.action)))
             }
         }
         .task(id: friendshipNotice?.id) {

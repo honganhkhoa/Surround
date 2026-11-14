@@ -179,8 +179,18 @@ final class OGSServiceEventTests: XCTestCase {
         var gamelistResults: [[String: Any]]?
         private(set) var closeThenReconnectCount = 0
         var onCloseThenReconnect: (() -> Void)?
+        private(set) var connectCount = 0
+        /// Off for a Retry whose attempt fails: the socket reports
+        /// `.connecting` and the test drops it again.
+        var connectOpensSocket = true
 
         func connect() {
+            connectCount += 1
+            guard connectOpensSocket else {
+                status = .connecting
+                onStatusChanged?()
+                return
+            }
             openSocket()
         }
 
@@ -247,6 +257,7 @@ final class OGSServiceEventTests: XCTestCase {
 
     override func tearDown() {
         QuickMatchStatsURLProtocol.reset()
+        ChallengePostURLProtocol.body = ""
         if let preferenceSuite {
             UserDefaults.standard.removePersistentDomain(forName: preferenceSuite)
         }
@@ -6031,6 +6042,372 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    // MARK: - Open live challenge keepalive
+
+    /// Runs scheduled work only when the test advances it.
+    private final class ManualScheduler: OGSWebsocketScheduling {
+        private final class Cancellation: Cancellable {
+            private var handler: (() -> Void)?
+            init(_ handler: @escaping () -> Void) { self.handler = handler }
+            func cancel() {
+                handler?()
+                handler = nil
+            }
+        }
+
+        private var nextID = 0
+        private var work = [Int: (delay: TimeInterval, block: () -> Void)]()
+
+        var pendingDelays: [TimeInterval] { work.values.map { $0.delay } }
+
+        func async(_ block: @escaping () -> Void) { block() }
+
+        func schedule(after delay: TimeInterval, _ block: @escaping () -> Void) -> Cancellable {
+            nextID += 1
+            let id = nextID
+            work[id] = (delay, block)
+            return Cancellation { [weak self] in self?.work.removeValue(forKey: id) }
+        }
+
+        func scheduleRepeating(every interval: TimeInterval, _ block: @escaping () -> Void) -> Cancellable {
+            preconditionFailure("The keepalive schedules one tick at a time.")
+        }
+
+        /// Runs the work that is due, as if one interval passed.
+        func advance() {
+            let due = work.sorted { $0.key < $1.key }
+            work.removeAll()
+            due.forEach { $0.value.block() }
+        }
+    }
+
+    /// Answers every request with `body`, for the challenge POST.
+    private final class ChallengePostURLProtocol: URLProtocol {
+        static var body = ""
+
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+        override func startLoading() {
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(Self.body.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        }
+
+        override func stopLoading() {}
+    }
+
+    private func keepaliveService() -> (OGSService, FakeWebsocket, ManualScheduler) {
+        let socket = FakeWebsocket()
+        let scheduler = ManualScheduler()
+        let service = makeService(socket: socket, keepAliveScheduler: scheduler)
+        service.user = OGSUser(username: "current", id: 1, rank: 25)
+        service.subscribeToSeekGraph()
+        return (service, socket, scheduler)
+    }
+
+    private func listOwnChallenge(_ id: Int, on socket: FakeWebsocket) {
+        socket.deliver(
+            name: "seekgraph/global",
+            data: [seekGraphChallengePayload(id: id, challengerID: 1)]
+        )
+    }
+
+    private func keptAliveChallengeIDs(_ socket: FakeWebsocket) -> [Int] {
+        socket.emissions
+            .filter { $0.command == "challenge/keepalive" }
+            .compactMap { ($0.data as? [String: Any])?["challenge_id"] as? Int }
+    }
+
+    private func liveChallengeTemplate() -> OGSChallengeTemplate {
+        OGSChallengeTemplate(game: .init(
+            width: 9,
+            height: 9,
+            ranked: false,
+            handicap: 0,
+            disableAnalysis: false,
+            name: "keepalive-test",
+            rules: .japanese,
+            timeControl: TimeControlSystem.Fischer(initialTime: 120, timeIncrement: 30, maxTime: 300).timeControlObject
+        ))
+    }
+
+    /// A tick on a closed socket used to return without rescheduling and leave
+    /// a stale flag set, so nothing could start the loop again.
+    func testOpenLiveChallengeKeepaliveResumesAfterTheSocketDrops() {
+        let (service, socket, scheduler) = keepaliveService()
+        listOwnChallenge(51, on: socket)
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [51])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+
+        socket.dropSocket()
+        XCTAssertTrue(service.openChallengeSentById.isEmpty)
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "A closed socket stops the loop.")
+
+        socket.openSocket(authenticate: true)
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [51], "Nothing is listed until the new snapshot.")
+        listOwnChallenge(51, on: socket)
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [51, 51])
+        scheduler.advance()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [51, 51, 51])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+    }
+
+    /// With the socket gone and no close event yet, the tick stops cleanly,
+    /// and the next authentication starts the loop again.
+    func testAuthenticationRestartsAKeepaliveThatStoppedOnAClosedSocket() {
+        let (_, socket, scheduler) = keepaliveService()
+        listOwnChallenge(52, on: socket)
+        socket.opened = false
+        scheduler.advance()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [52])
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty)
+
+        socket.opened = true
+        socket.markAuthenticated()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [52, 52])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+    }
+
+    /// The loop used to give up for good when its first tick came before the
+    /// seek graph listed the new challenge.
+    func testKeepaliveStartsWhenTheSeekGraphListsASentChallengeLate() throws {
+        ChallengePostURLProtocol.body = #"{"status":"ok","challenge":53,"game":1053}"#
+        let socket = FakeWebsocket()
+        let scheduler = ManualScheduler()
+        let service = makeService(
+            socket: socket,
+            urlProtocolClass: ChallengePostURLProtocol.self,
+            keepAliveScheduler: scheduler
+        )
+        service.ogsUIConfig = try makeUIConfig(jwt: "jwt", userID: 1)
+        socket.openSocket(authenticate: true)
+        service.user = OGSUser(username: "current", id: 1, rank: 25)
+        service.subscribeToSeekGraph()
+        service.onSeekGraphEvent(data: [])
+
+        let sent = expectation(description: "challenge sent")
+        var sentID: Int?
+        let request = service.sendChallenge(opponent: nil, challenge: liveChallengeTemplate()).sink(
+            receiveCompletion: { _ in sent.fulfill() },
+            receiveValue: { sentID = $0 }
+        )
+        wait(for: [sent], timeout: 2)
+        XCTAssertEqual(sentID, 53)
+        scheduler.advance()
+        XCTAssertTrue(keptAliveChallengeIDs(socket).isEmpty)
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty)
+
+        listOwnChallenge(53, on: socket)
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [53])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+        request.cancel()
+    }
+
+    /// A fresh service that never posted, as after a relaunch or in another
+    /// window, keeps its own live open challenge alive too.
+    func testKeepaliveCoversALiveOpenChallengeThisServiceDidNotSend() {
+        let (service, socket, scheduler) = keepaliveService()
+        var correspondence = seekGraphChallengePayload(id: 56, challengerID: 1)
+        correspondence["time_control_parameters"] = [
+            "per_move": 86_400, "pause_on_weekends": false, "speed": "correspondence",
+            "system": "simple", "time_control": "simple",
+        ] as [String: Any]
+        socket.deliver(name: "seekgraph/global", data: [
+            seekGraphChallengePayload(id: 55, challengerID: 1),
+            correspondence,
+            seekGraphChallengePayload(id: 57, challengerID: 2),
+        ])
+        XCTAssertEqual(Set(service.openChallengeSentById.keys), [55, 56])
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [55])
+
+        service.onSeekGraphEvent(data: [["challenge_id": 55, "delete": 1]])
+        scheduler.advance()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [55])
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "Nothing live is left, so the loop stops.")
+    }
+
+    func testKeepaliveWaitsForAnAuthenticatedSocket() {
+        let (_, socket, scheduler) = keepaliveService()
+        socket.authenticated = false
+        listOwnChallenge(60, on: socket)
+        XCTAssertTrue(keptAliveChallengeIDs(socket).isEmpty)
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty)
+
+        socket.markAuthenticated()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [60])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+    }
+
+    func testKeepaliveNeverRunsTwoLoops() {
+        let (service, socket, scheduler) = keepaliveService()
+        listOwnChallenge(58, on: socket)
+        listOwnChallenge(58, on: socket)
+        socket.deliver(name: "seekgraph/global", data: [seekGraphChallengePayload(id: 59, challengerID: 2)])
+        socket.markAuthenticated()
+        service.startKeepAliveForOpenLiveChallengesIfNeeded()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [58])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+
+        scheduler.advance()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [58, 58])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+    }
+
+    func testSendChallengeAcceptsTheGameAsAnObject() throws {
+        ChallengePostURLProtocol.body = #"{"status":"ok","challenge":54,"game":{"id":1054}}"#
+        let service = makeService(socket: FakeWebsocket(), urlProtocolClass: ChallengePostURLProtocol.self)
+        service.ogsUIConfig = try makeUIConfig(jwt: "jwt", userID: 1)
+
+        let finished = expectation(description: "challenge sent")
+        var outcome: Result<Int, Error>?
+        let request = service.sendChallenge(opponent: nil, challenge: liveChallengeTemplate()).sink(
+            receiveCompletion: { completion in
+                if case .failure(let error) = completion {
+                    outcome = .failure(error)
+                }
+                finished.fulfill()
+            },
+            receiveValue: { outcome = .success($0) }
+        )
+        wait(for: [finished], timeout: 2)
+        XCTAssertEqual(try outcome?.get(), 54)
+        request.cancel()
+    }
+
+    /// A signed-in service whose challenge POST answers with `challengeID`.
+    private func challengePostService(
+        challengeID: Int
+    ) throws -> (OGSService, FakeWebsocket, ManualScheduler) {
+        ChallengePostURLProtocol.body =
+            #"{"status":"ok","challenge":\#(challengeID),"game":\#(challengeID + 1_000)}"#
+        let socket = FakeWebsocket()
+        let scheduler = ManualScheduler()
+        let service = makeService(
+            socket: socket,
+            urlProtocolClass: ChallengePostURLProtocol.self,
+            keepAliveScheduler: scheduler
+        )
+        service.ogsUIConfig = try makeUIConfig(jwt: "jwt", userID: 1)
+        socket.openSocket(authenticate: true)
+        service.user = OGSUser(username: "current", id: 1, rank: 25)
+        return (service, socket, scheduler)
+    }
+
+    /// Sends an open live challenge and returns the id OGS answered with.
+    private func sendOpenChallenge(using service: OGSService) -> Int? {
+        let sent = expectation(description: "challenge sent")
+        var sentID: Int?
+        let request = service.sendChallenge(opponent: nil, challenge: liveChallengeTemplate()).sink(
+            receiveCompletion: { _ in sent.fulfill() },
+            receiveValue: { sentID = $0 }
+        )
+        wait(for: [sent], timeout: 2)
+        request.cancel()
+        return sentID
+    }
+
+    private func seekGraphConnects(_ socket: FakeWebsocket) -> Int {
+        socket.emissions.filter { $0.command == "seek_graph/connect" }.count
+    }
+
+    /// Closing New game's sheet as the response arrived used to release the
+    /// seek graph before it listed the new challenge, which then never got a
+    /// keepalive. The send holds the seek graph itself.
+    func testAnOpenChallengeKeepsTheSeekGraphAfterItsScreenCloses() throws {
+        let (service, socket, scheduler) = try challengePostService(challengeID: 61)
+        service.subscribeToSeekGraph()
+        service.onSeekGraphEvent(data: [])
+
+        XCTAssertEqual(sendOpenChallenge(using: service), 61)
+        service.unsubscribeFromSeekGraphWhenDone()
+        XCTAssertEqual(seekGraphDisconnects(socket), 0, "The send still holds the seek graph.")
+
+        listOwnChallenge(61, on: socket)
+        drainMainQueue()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [61])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+        XCTAssertEqual(seekGraphDisconnects(socket), 0,
+                       "The service keeps the seek graph for the challenge it now tracks.")
+        withExtendedLifetime(service) {}
+    }
+
+    /// A challenge made from a profile or a conversation has no screen that
+    /// holds the seek graph, so the send connects it.
+    func testAnOpenChallengeConnectsTheSeekGraphWithoutAScreen() throws {
+        let (service, socket, scheduler) = try challengePostService(challengeID: 64)
+        XCTAssertEqual(seekGraphConnects(socket), 0)
+
+        XCTAssertEqual(sendOpenChallenge(using: service), 64)
+        XCTAssertEqual(seekGraphConnects(socket), 1)
+
+        listOwnChallenge(64, on: socket)
+        drainMainQueue()
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [64])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+        XCTAssertEqual(seekGraphDisconnects(socket), 0)
+        withExtendedLifetime(service) {}
+    }
+
+    /// Without a speed tag, a challenge is classified by its clock and board
+    /// size, as Activity classifies it. A challenge with no time limit is
+    /// correspondence and gets no keepalive; an untagged live one still does.
+    func testKeepaliveClassifiesAnUntaggedChallengeByItsClock() {
+        let (service, socket, scheduler) = keepaliveService()
+        var noTimeLimit = seekGraphChallengePayload(id: 62, challengerID: 1)
+        noTimeLimit["time_control_parameters"] = [
+            "system": "none", "time_control": "none",
+        ] as [String: Any]
+        var untaggedLive = seekGraphChallengePayload(id: 63, challengerID: 1)
+        untaggedLive["time_control_parameters"] = [
+            "per_move": 20, "pause_on_weekends": false, "system": "simple", "time_control": "simple",
+        ] as [String: Any]
+        socket.deliver(name: "seekgraph/global", data: [noTimeLimit, untaggedLive])
+
+        XCTAssertEqual(Set(service.openChallengeSentById.keys), [62, 63])
+        XCTAssertEqual(keptAliveChallengeIDs(socket), [63])
+        XCTAssertEqual(scheduler.pendingDelays, [1])
+        withExtendedLifetime(service) {}
+    }
+
+    /// The live count and the keepalive share one rule. OGS's tag decides
+    /// when present; without one the clock and board size do, and a clock
+    /// system the client does not know counts as live.
+    func testTheWaitingLiveRuleReadsUntaggedClocksAndKeepsUnknownOnesLive() {
+        let decoder = DictionaryDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        func isWaitingLive(_ timeControl: [String: Any], size: Int = 19) throws -> Bool {
+            var payload = seekGraphChallengePayload(id: 65, challengerID: 1)
+            payload["time_control_parameters"] = timeControl
+            payload["width"] = size
+            payload["height"] = size
+            let challenge = try decoder.decode(OGSSeekgraphChallenge.self, from: payload)
+            return OGSService.isWaitingLive(challenge.game)
+        }
+        let days: [String: Any] = [
+            "system": "fischer", "time_control": "fischer",
+            "initial_time": 259_200, "time_increment": 86_400, "max_time": 604_800,
+        ]
+        var taggedLive = days
+        taggedLive["speed"] = "live"
+        let longGame: [String: Any] = ["system": "absolute", "time_control": "absolute", "total_time": 200_000]
+
+        XCTAssertTrue(try isWaitingLive(taggedLive), "The tag decides when present.")
+        XCTAssertFalse(try isWaitingLive(days))
+        XCTAssertFalse(try isWaitingLive(["system": "none", "time_control": "none"]),
+                       "No time limit is correspondence.")
+        XCTAssertTrue(try isWaitingLive(longGame, size: 19))
+        XCTAssertFalse(try isWaitingLive(longGame, size: 9), "The board size counts.")
+        XCTAssertTrue(try isWaitingLive(["system": "future-clock", "time_control": "future-clock"]),
+                      "An unknown clock counts as live.")
+    }
+
     // MARK: - Challenge send holds
 
     private func seekGraphHoldService() -> (OGSService, FakeWebsocket) {
@@ -6227,6 +6604,106 @@ final class OGSServiceEventTests: XCTestCase {
         ]
     }
 
+    // MARK: - Announcements once per app
+
+    private final class SpokenText: AppAnnouncerOutput {
+        private(set) var texts = [String]()
+        func speak(_ text: String, priority: AppAnnouncement.Priority) { texts.append(text) }
+        func play(_ haptic: AppAnnouncement.Haptic) {}
+    }
+
+    /// Two windows, each with its own service and socket. makeService keeps
+    /// one preferences suite for tearDown, so the first one is removed here.
+    private func twoWindowServices() throws -> (OGSService, FakeWebsocket, OGSService, FakeWebsocket) {
+        let socketA = FakeWebsocket()
+        let serviceA = makeService(socket: socketA)
+        let suiteA = try XCTUnwrap(preferenceSuite)
+        addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: suiteA) }
+        let socketB = FakeWebsocket()
+        return (serviceA, socketA, makeService(socket: socketB), socketB)
+    }
+
+    /// Every window's socket delivers a search's cancellation. With New game
+    /// open in both windows, Search cancelled is spoken once.
+    func testTwoWindowsSpeakOneSearchCancellationOnce() throws {
+        let (serviceA, socketA, serviceB, socketB) = try twoWindowServices()
+        let windows = AppAnnouncerWindowRegistry()
+        let windowA = UUID(), windowB = UUID()
+        windows.update(windowA, owner: UUID(), activation: .active)
+        windows.update(windowB, owner: UUID(), activation: .active)
+        let output = SpokenText()
+        var time: TimeInterval = 100
+        let announcer = AppAnnouncer(now: { time }, scenes: windows, output: output)
+
+        // What NewGameView does with the event, in each window.
+        func announceCancellations(_ service: OGSService, from window: UUID) -> AnyCancellable {
+            service.automatchLifecycleEvents.sink { event in
+                guard case .cancelled(let uuid?, _) = event.kind else { return }
+                announcer.post(.init(
+                    .quickMatchCancelled(uuid), audience: .anyWindow, speech: "Search cancelled"
+                ), from: window)
+            }
+        }
+        let subscriptions = [
+            announceCancellations(serviceA, from: windowA),
+            announceCancellations(serviceB, from: windowB),
+        ]
+        defer { subscriptions.forEach { $0.cancel() } }
+
+        socketA.deliver(name: "automatch/cancel", data: ["uuid": "search-1"])
+        time += 0.3
+        socketB.deliver(name: "automatch/cancel", data: ["uuid": "search-1"])
+        XCTAssertEqual(output.texts, ["Search cancelled"])
+
+        socketB.deliver(name: "automatch/cancel", data: ["uuid": "search-2"])
+        socketA.deliver(name: "automatch/cancel", data: ["uuid": "search-2"])
+        XCTAssertEqual(output.texts, ["Search cancelled", "Search cancelled"],
+                       "Another search is another event.")
+    }
+
+    /// Only the window that searched learns it found a game, even when the
+    /// user is in the other window; Activity's later Game started is the
+    /// same event.
+    func testOnlyTheWindowThatSearchedSaysGameFoundAndOnlyOnce() throws {
+        let (serviceA, socketA, serviceB, socketB) = try twoWindowServices()
+        let windows = AppAnnouncerWindowRegistry()
+        let windowA = UUID(), windowB = UUID()
+        windows.update(windowA, owner: UUID(), activation: .active)
+        windows.update(windowB, owner: UUID(), activation: .active)
+        XCTAssertEqual(windows.frontmostWindow, windowB)
+        let output = SpokenText()
+        let announcer = AppAnnouncer(now: { 100 }, scenes: windows, output: output)
+
+        // What HomeView does with the event, in each window.
+        func announceGameFound(_ service: OGSService, from window: UUID) -> AnyCancellable {
+            service.automatchLifecycleEvents.sink { event in
+                guard case .started(_, let gameID?, requestedLocally: true) = event.kind else { return }
+                announcer.post(.init(
+                    .gameStarted(gameID), audience: .anyWindow, speech: "Game found"
+                ), from: window)
+            }
+        }
+        let subscriptions = [
+            announceGameFound(serviceA, from: windowA),
+            announceGameFound(serviceB, from: windowB),
+        ]
+        defer { subscriptions.forEach { $0.cancel() } }
+
+        let entry = OGSQuickMatchDraft(
+            mode: .exact, boardSize: 9, speed: .rapid, system: .fischer
+        ).makeAutomatchEntry(uuid: "found-search")
+        XCTAssertTrue(serviceA.findAutomatch(entry: entry))
+        for socket in [socketA, socketB] {
+            socket.deliver(name: "automatch/start", data: ["uuid": entry.uuid, "game_id": 901])
+        }
+        XCTAssertEqual(output.texts, ["Game found"])
+        XCTAssertEqual(
+            announcer.post(.init(.gameStarted(901), audience: .frontmostWindow, speech: "Game started"),
+                           from: windowB),
+            .duplicate
+        )
+    }
+
     private func makeService(
         socket: OGSWebsocketProtocol,
         cachedUsers: [OGSUser] = [],
@@ -6237,7 +6714,10 @@ final class OGSServiceEventTests: XCTestCase {
         conditionalMoveSubmissionTimeout: TimeInterval = 10,
         automatchReconciliationTimeout: TimeInterval = 5,
         automatchConfirmationTimeout: TimeInterval = 8,
-        currentTime: TimeInterval = 2_000_000_000
+        currentTime: TimeInterval = 2_000_000_000,
+        // A scheduler nobody advances, so a test that lists its own live
+        // challenge never leaves a keepalive loop running after it ends.
+        keepAliveScheduler: OGSWebsocketScheduling = ManualScheduler()
     ) -> OGSService {
         preferenceSuite = "com.honganhkhoa.Surround.EventTests.\(UUID().uuidString)"
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
@@ -6272,6 +6752,7 @@ final class OGSServiceEventTests: XCTestCase {
             automatchReconciliationTimeout: automatchReconciliationTimeout,
             automatchConfirmationTimeout: automatchConfirmationTimeout,
             currentTime: { currentTime },
+            keepAliveScheduler: keepAliveScheduler,
             initialState: initialState
         )
     }
@@ -6480,5 +6961,320 @@ final class OGSServiceEventTests: XCTestCase {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(OGSUIConfig.self, from: data)
+    }
+}
+
+// MARK: - Connection status (in-app notices)
+
+extension OGSServiceEventTests {
+    private final class TestClock {
+        var now: TimeInterval = 1_000
+    }
+
+    private final class FakeNetworkPath: NetworkPathMonitoring {
+        let subject: CurrentValueSubject<NetworkPathStatus, Never>
+
+        init(_ status: NetworkPathStatus = .satisfied) {
+            subject = CurrentValueSubject(status)
+        }
+
+        var pathStatus: AnyPublisher<NetworkPathStatus, Never> { subject.eraseToAnyPublisher() }
+    }
+
+    /// An on-screen source for a service whose socket has already opened.
+    private func onScreenSource(
+        for service: OGSService,
+        path: NetworkPathMonitoring = FakeNetworkPath(),
+        scheduler: ManualScheduler,
+        clock: TestClock
+    ) -> ConnectionStatusSource {
+        let source = ConnectionStatusSource(ogs: service, path: path, scheduler: scheduler, now: { clock.now })
+        source.setVisible(true)
+        return source
+    }
+
+    /// Every `--surround-activity-state`, built on the offline journey's game
+    /// 26268404 with the user as White, the offline no-op socket and the
+    /// journey's `.connected` bootstrap.
+    private func activityFixtureServices() throws -> [OGSService] {
+        let bundle = Bundle(for: OGSServiceEventTests.self)
+        let url = try XCTUnwrap(bundle.url(forResource: "game-26268404", withExtension: "json"))
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let game = Game(ogsGame: try decoder.decode(OGSGame.self, from: Data(contentsOf: url)))
+        game.ogsRawData = [:]
+        var journey = OGSService.BootstrapState()
+        journey.user = try XCTUnwrap(game.whitePlayer)
+        journey.isLoggedIn = true
+        journey.socketStatus = .connected
+        journey.isLoadingOverview = false
+        journey.activeGames[SurroundUITestContract.fixtureGameID] = game
+        let suite = "com.honganhkhoa.Surround.EventTests.\(UUID().uuidString)"
+        addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: suite) }
+        let clock = ActivityFixtures.Clock(reference: 1_794_220_920)
+        return SurroundUITestContract.ActivityFixtureState.allCases.map { fixture -> OGSService in
+            var state = journey
+            ActivityFixtures.apply(fixture, to: &state, clock: clock)
+            let service = OGSService(
+                environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+                httpClient: OGSOfflineRejectingHTTPClient(),
+                preferences: UserDefaults(suiteName: suite)!,
+                ogsWebsocket: OGSOfflineNoOpWebsocket(),
+                connectsAutomatically: false,
+                usesSurroundOverviewService: false,
+                enablesAppSideEffects: false,
+                startsTimers: false,
+                installsObservers: false,
+                initialState: state
+            )
+            ActivityFixtures.finish(fixture, service: service)
+            return service
+        }
+    }
+
+    func testConnectionStatusFollowsTheWindowsSocket() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.openSocket()
+        drainMainQueue()
+        let scheduler = ManualScheduler()
+        let clock = TestClock()
+        let source = onScreenSource(for: service, scheduler: scheduler, clock: clock)
+        var announcements = [ConnectionStatusModel.Announcement]()
+        let observation = source.announcements.sink { announcements.append($0) }
+        defer { observation.cancel() }
+        XCTAssertEqual(source.status, .hidden)
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "Nothing runs while connected.")
+
+        socket.dropSocket()
+        drainMainQueue()
+        XCTAssertEqual(scheduler.pendingDelays, [2])
+        clock.now += 1
+        socket.openSocket()
+        drainMainQueue()
+        XCTAssertEqual(source.status, .hidden, "A blip shows nothing.")
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty)
+
+        socket.dropSocket()
+        drainMainQueue()
+        clock.now += 2
+        scheduler.advance()
+        XCTAssertEqual(source.status, .reconnecting)
+        clock.now += 28
+        scheduler.advance()
+        XCTAssertEqual(source.status, .unreachable(.timedOut))
+        socket.openSocket()
+        drainMainQueue()
+        XCTAssertEqual(source.status, .connected)
+        clock.now += 2
+        scheduler.advance()
+        XCTAssertEqual(source.status, .hidden)
+        XCTAssertEqual(announcements, [.reconnecting, .connected])
+    }
+
+    func testRetryAfterCantReachOGSGoesThroughConnect() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.openSocket()
+        drainMainQueue()
+        let scheduler = ManualScheduler()
+        let clock = TestClock()
+        let source = onScreenSource(for: service, scheduler: scheduler, clock: clock)
+        socket.dropSocket()
+        drainMainQueue()
+        clock.now += 2
+        scheduler.advance()
+        clock.now += 28
+        scheduler.advance()
+        XCTAssertEqual(source.status, .unreachable(.timedOut))
+
+        socket.connectOpensSocket = false
+        source.retry()
+        XCTAssertEqual(socket.connectCount, 1, "Retry starts a fresh attempt through connect().")
+        XCTAssertEqual(source.status, .reconnecting)
+        XCTAssertEqual(scheduler.pendingDelays, [30], "Retry restarts the 30 s.")
+        drainMainQueue()
+        XCTAssertEqual(service.socketStatus, .connecting)
+        XCTAssertEqual(source.status, .reconnecting, "An attempt in progress is not a connection.")
+        socket.dropSocket()
+        drainMainQueue()
+        XCTAssertEqual(source.status, .reconnecting,
+                       "The failed attempt's connecting and reconnecting both read as not connected.")
+
+        socket.connectOpensSocket = true
+        clock.now += 30
+        scheduler.advance()
+        XCTAssertEqual(source.status, .unreachable(.timedOut))
+        source.retry()
+        XCTAssertEqual(socket.connectCount, 2)
+        drainMainQueue()
+        XCTAssertEqual(source.status, .connected)
+    }
+
+    func testRetryConnectionActsOnlyWhileTheSocketIsReconnecting() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        for status: OGSWebsocketStatus in [.connected, .connecting, .disconnected] {
+            socket.status = status
+            service.retryConnection()
+        }
+        XCTAssertEqual(socket.connectCount, 0,
+                       "connect() would swap an open transport or throw away an attempt in flight.")
+
+        socket.dropSocket()
+        service.retryConnection()
+        XCTAssertEqual(socket.connectCount, 1, "A socket in its reconnect loop starts again at once.")
+        drainMainQueue()
+    }
+
+    func testTheNetworkComingBackReconnectsTheWindowsSocket() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.openSocket()
+        drainMainQueue()
+        let path = FakeNetworkPath()
+        let scheduler = ManualScheduler()
+        let clock = TestClock()
+        let source = onScreenSource(for: service, path: path, scheduler: scheduler, clock: clock)
+        path.subject.send(.unsatisfied)
+        socket.dropSocket()
+        drainMainQueue()
+        clock.now += 2
+        scheduler.advance()
+        XCTAssertEqual(source.status, .unreachable(.noNetwork))
+        XCTAssertEqual(socket.connectCount, 0)
+
+        path.subject.send(.satisfied)
+        XCTAssertEqual(socket.connectCount, 1, "The socket doesn't sit out its backoff once the network is back.")
+        XCTAssertEqual(source.status, .reconnecting)
+        drainMainQueue()
+        XCTAssertEqual(source.status, .connected)
+    }
+
+    func testEachWindowShowsItsOwnSocketsStatus() {
+        let socketA = FakeWebsocket()
+        let socketB = FakeWebsocket()
+        let serviceA = makeService(socket: socketA)
+        let suiteA = preferenceSuite!
+        addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: suiteA) }
+        let serviceB = makeService(socket: socketB)
+        socketA.openSocket()
+        socketB.openSocket()
+        drainMainQueue()
+        let path = FakeNetworkPath()
+        let clock = TestClock()
+        let schedulerA = ManualScheduler()
+        let schedulerB = ManualScheduler()
+        let sourceA = onScreenSource(for: serviceA, path: path, scheduler: schedulerA, clock: clock)
+        let sourceB = onScreenSource(for: serviceB, path: path, scheduler: schedulerB, clock: clock)
+
+        socketA.dropSocket()
+        drainMainQueue()
+        clock.now += 2
+        schedulerA.advance()
+        schedulerB.advance()
+        XCTAssertEqual(sourceA.status, .reconnecting)
+        XCTAssertEqual(sourceB.status, .hidden, "Each window follows its own socket.")
+
+        path.subject.send(.unsatisfied)
+        XCTAssertEqual(sourceA.status, .unreachable(.noNetwork))
+        XCTAssertEqual(sourceB.status, .hidden, "B's socket still works, so B says nothing.")
+
+        path.subject.send(.satisfied)
+        XCTAssertEqual(socketA.connectCount, 1)
+        XCTAssertEqual(socketB.connectCount, 0, "An open socket is never reconnected.")
+        drainMainQueue()
+        XCTAssertEqual(sourceA.status, .connected)
+        XCTAssertEqual(sourceB.status, .hidden)
+    }
+
+    func testSignedOutWindowsShowConnectionStatus() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.openSocket()
+        drainMainQueue()
+        let scheduler = ManualScheduler()
+        let clock = TestClock()
+        let source = onScreenSource(for: service, scheduler: scheduler, clock: clock)
+        XCTAssertFalse(service.isLoggedIn)
+        XCTAssertNil(service.user)
+
+        socket.dropSocket()
+        drainMainQueue()
+        clock.now += 2
+        scheduler.advance()
+        XCTAssertEqual(source.status, .reconnecting, "Public games use the socket too.")
+    }
+
+    func testAWindowInTheBackgroundShowsNothingAndNoConnectedOnReturn() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.openSocket()
+        drainMainQueue()
+        let scheduler = ManualScheduler()
+        let clock = TestClock()
+        let source = onScreenSource(for: service, scheduler: scheduler, clock: clock)
+        var announcements = [ConnectionStatusModel.Announcement]()
+        let observation = source.announcements.sink { announcements.append($0) }
+        defer { observation.cancel() }
+        socket.dropSocket()
+        drainMainQueue()
+        clock.now += 2
+        scheduler.advance()
+        XCTAssertEqual(source.status, .reconnecting)
+
+        source.setVisible(false)
+        XCTAssertEqual(source.status, .hidden)
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "Nothing runs for a window nobody sees.")
+        socket.openSocket()
+        drainMainQueue()
+        source.setVisible(true)
+        XCTAssertEqual(source.status, .hidden, "Nobody saw the outage end, so no Connected.")
+        XCTAssertEqual(announcements, [.reconnecting])
+    }
+
+    func testOfflineFixturesNeverShowAnOutage() throws {
+        let services = try [OGSService.previewInstance()] + activityFixtureServices()
+        for service in services {
+            XCTAssertEqual(service.socketStatus, .connected)
+            let scheduler = ManualScheduler()
+            let clock = TestClock()
+            let source = ConnectionStatusSource(
+                ogs: service,
+                path: ConstantNetworkPath.satisfied,
+                scheduler: scheduler,
+                now: { clock.now }
+            )
+            var announcements = [ConnectionStatusModel.Announcement]()
+            let observation = source.announcements.sink { announcements.append($0) }
+            source.setVisible(true)
+            source.retry()
+            source.setVisible(false)
+            source.setVisible(true)
+            clock.now += 3_600
+            scheduler.advance()
+            XCTAssertEqual(source.status, .hidden)
+            XCTAssertTrue(scheduler.pendingDelays.isEmpty, "The offline fixtures never run a timer.")
+            XCTAssertTrue(announcements.isEmpty)
+            observation.cancel()
+        }
+    }
+
+    func testTheSocketDownDesignFixtureShowsTheOutage() {
+        let service = OGSService.previewInstance(socketStatus: .reconnecting)
+        let scheduler = ManualScheduler()
+        let clock = TestClock()
+        let source = ConnectionStatusSource(
+            ogs: service,
+            path: ConstantNetworkPath.satisfied,
+            scheduler: scheduler,
+            now: { clock.now }
+        )
+        source.setVisible(true)
+        XCTAssertEqual(source.status, .hidden)
+        clock.now += 2
+        scheduler.advance()
+        XCTAssertEqual(source.status, .reconnecting,
+                       "A design fixture that drops the socket shows the outage, for review.")
     }
 }

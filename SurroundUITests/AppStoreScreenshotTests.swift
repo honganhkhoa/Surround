@@ -539,6 +539,9 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
                 .appStoreScreenshotWidgetProofTokenLaunchArgument,
             appStoreWidgetProofToken,
         ]
+        #if DEBUG
+        app.launchArguments += SurroundUITestContract.noticesHostProbeArguments(ProcessInfo.processInfo.environment)
+        #endif
         if let theme {
             app.launchArguments += [
                 SurroundUITestContract.themeLaunchArgument, theme,

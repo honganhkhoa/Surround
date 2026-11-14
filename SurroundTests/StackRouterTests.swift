@@ -911,4 +911,37 @@ final class StackRouterTests: XCTestCase {
         XCTAssertTrue(nav.home.activeGame === homeGame)
         XCTAssertFalse(nav.home.activeGameShowsCarousel)
     }
+
+    func testIsOnTopFollowsPushesPopsAndMessagesColumns() {
+        let router = Router()
+        XCTAssertTrue(router.isOnTop(nil), "The root, and Messages' side pane with it.")
+
+        router.present(.homeGame)
+        XCTAssertTrue(router.isOnTop(.homeGame))
+        XCTAssertFalse(router.isOnTop(nil))
+
+        let profile = StackRoute.profile(playerID: firstPlayer.id, selectionID: nil)
+        router.openProfile(firstPlayer)
+        XCTAssertFalse(router.isOnTop(.homeGame), "Profile covers Game Detail.")
+        XCTAssertTrue(router.isOnTop(profile))
+
+        router.remove(profile)
+        XCTAssertTrue(router.isOnTop(.homeGame))
+
+        router.path = []
+        router.presentMessagesConversation(firstPlayer)
+        XCTAssertTrue(router.isOnTop(.messagesConversation(firstPlayer.id)))
+
+        router.showMessagesColumns(true, peer: firstPlayer)
+        XCTAssertTrue(router.isOnTop(nil), "In two columns the conversation moves into the pane.")
+
+        router.openProfile(firstPlayer)
+        XCTAssertFalse(router.isOnTop(nil), "Profile from the pane's header covers it.")
+
+        router.showMessagesColumns(false, peer: firstPlayer)
+        XCTAssertEqual(router.path, [.messagesConversation(firstPlayer.id), profile])
+        XCTAssertTrue(router.isOnTop(profile))
+        XCTAssertFalse(router.isOnTop(.messagesConversation(firstPlayer.id)),
+                       "One column puts the conversation under Profile.")
+    }
 }

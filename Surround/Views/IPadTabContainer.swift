@@ -73,6 +73,9 @@ struct IPadTabContainer: UIViewControllerRepresentable {
     var messagesBadgeCount = 0
     let onAccountSheet: (AccountSheet) -> Void
     let content: (RootView) -> AnyView
+    #if DEBUG
+    var noticesProbePlaces: ActivityPlaceRegistry? = nil
+    #endif
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -121,6 +124,9 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         private var changingSidebar = false
         private var selectingTab = false
         private var revealedByPerson = false
+        #if DEBUG
+        private var noticesProbe: NoticesHostProbeUIKit?
+        #endif
 
         init(_ parent: IPadTabContainer) { self.parent = parent }
 
@@ -175,8 +181,29 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             tabs[.about]?.preferredPlacement = .fixed
             applyLayoutDirection(layoutDirection)
             applyTabs(regularWidth: regularWidth)
+            #if DEBUG
+            noticesProbe = NoticesHostProbeUIKit.make(container: .iPadTabContainer, places: parent.noticesProbePlaces)
+            noticesProbe?.install(on: controller) { [weak self] in self?.noticesProbeState() }
+            #endif
             return controller
         }
+
+        #if DEBUG
+        /// Reads the sidebar as measureLayout does: container state, never geometry.
+        private func noticesProbeState() -> NoticesHostProbeUIKit.State? {
+            guard let controller else { return nil }
+            let available: Bool
+            #if canImport(SwiftUI, _version: 8.0)
+            if #available(iOS 27.0, *) { available = controller.sidebar.isAvailable }
+            else { available = regularWidth && controller.mode != .tabBar }
+            #else
+            available = regularWidth && controller.mode != .tabBar
+            #endif
+            let sidebar: ActivityHostPolicy.Sidebar = !available ? .unavailable
+                : controller.sidebar.isHidden ? .hidden : .shown
+            return .init(root: selectedRoot, tabBarHidden: controller.isTabBarHidden, sidebar: sidebar)
+        }
+        #endif
 
         func update(_ parent: IPadTabContainer, regularWidth: Bool, layoutDirection: LayoutDirection) {
             self.parent = parent
@@ -385,6 +412,9 @@ struct IPadTabContainer: UIViewControllerRepresentable {
                         self.saveSidebarChoice(hidden: false)
                     }
                     self.revealedByPerson = false
+                    #if DEBUG
+                    self.noticesProbe?.refresh(reason: "sidebar")
+                    #endif
                 }
             }
         }
@@ -443,7 +473,14 @@ struct IPadTabContainer: UIViewControllerRepresentable {
                     current: logical(hostInsets), closed: hiddenHostBaselines[key].map(logical),
                     physicalTop: physicalTop, physicalBottom: physicalBottom)
             let occluded = visible || revealing
+            #if DEBUG
+            let samplesBaseline = !occluded && !sidebarTransitionInProgress && noticesProbe?.changePending != true
+            noticesProbe?.baselineSample(root: selectedRoot, insets: hostInsets, recorded: samplesBaseline,
+                                         revealing: revealing, tabBarHidden: controller.isTabBarHidden)
+            if samplesBaseline { hiddenHostBaselines[key] = hostInsets }
+            #else
             if !occluded && !sidebarTransitionInProgress { hiddenHostBaselines[key] = hostInsets }
+            #endif
             // Rotation may introduce a new baseline while the drawer is open.
             // With hidden tabs, this outer host reserves only physical vertical
             // edges when closed; the child navigation stack owns its header.
@@ -490,10 +527,19 @@ struct IPadTabContainer: UIViewControllerRepresentable {
                 // closing an open sidebar first leaves the closed host with
                 // the drawer's bottom inset, which shrinks the game's board.
                 hiddenHostBaselines.removeAll()
+                #if DEBUG
+                noticesProbe?.tabBarWillChange(hidden: hidden)
+                #endif
                 controller.setTabBarHidden(hidden, animated: controller.view.window != nil)
+                #if DEBUG
+                noticesProbe?.tabBarDidChange(hidden: hidden)
+                #endif
                 setSidebarHidden(true)
                 restoreSidebarChoice()
             }
+            #if DEBUG
+            noticesProbe?.refresh(reason: "tabs")
+            #endif
         }
 
         private func accessibilityIdentifier(_ root: RootView) -> String? {
@@ -510,6 +556,18 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         }
     }
 }
+
+#if DEBUG
+@available(iOS 18.0, *)
+extension IPadTabContainer {
+    /// Lets the notices host probe read this window's registry.
+    func withNoticesHostProbe(places: ActivityPlaceRegistry) -> Self {
+        var copy = self
+        copy.noticesProbePlaces = places
+        return copy
+    }
+}
+#endif
 
 @available(iOS 18.0, *)
 private final class IPadTabGroupContentController: UIViewController {

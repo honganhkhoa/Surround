@@ -28,6 +28,38 @@
 		4A70F0CEAA1A421A91A36B87 /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
 		4D1739ECA3104C94BEEA82BB /* ArtboardPhoneAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 466027D4E066495A9A16693D /* ArtboardPhoneAuditTests.swift */; };
 		4FE5842749544ABF9C79D912 /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
+		AC7100012026110900000001 /* ActivityModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC7100022026110900000002 /* ActivityModel.swift */; };
+		AC7100032026110900000003 /* ActivityModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC7100022026110900000002 /* ActivityModel.swift */; };
+		AC7100042026110900000004 /* ActivityModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC7100052026110900000005 /* ActivityModelTests.swift */; };
+		ACA1D0012026110900000001 /* ActivityPlaceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */; };
+		ACA1D0032026110900000003 /* ActivityPlaceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */; };
+		ACA1D0042026110900000004 /* ActivityPlaceRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACA1D0052026110900000005 /* ActivityPlaceRegistryTests.swift */; };
+		A7F100012026110900000001 /* ActivityFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F100022026110900000002 /* ActivityFixtures.swift */; };
+		A7F100032026110900000003 /* ActivityFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F100022026110900000002 /* ActivityFixtures.swift */; };
+		A7F100042026110900000004 /* ActivityFixturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F100052026110900000005 /* ActivityFixturesTests.swift */; };
+		6A7E00012026110900000001 /* ActivityHostPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7E00022026110900000002 /* ActivityHostPolicy.swift */; };
+		6A7E00032026110900000003 /* ActivityHostPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7E00022026110900000002 /* ActivityHostPolicy.swift */; };
+		6A7E00042026110900000004 /* ActivityHostPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7E00052026110900000005 /* ActivityHostPolicyTests.swift */; };
+		6A7E00062026110900000006 /* ActivityHostSDK.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7E00072026110900000007 /* ActivityHostSDK.swift */; };
+		6A7E00082026110900000008 /* NoticesHostProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7E00092026110900000009 /* NoticesHostProbe.swift */; };
+		5C0E00012026110900000001 /* SceneCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00022026110900000002 /* SceneCover.swift */; };
+		5C0E00032026110900000003 /* SceneCoverPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00042026110900000004 /* SceneCoverPolicy.swift */; };
+		5C0E00052026110900000005 /* SceneCoverPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00042026110900000004 /* SceneCoverPolicy.swift */; };
+		5C0E00062026110900000006 /* NoticesPlaceholderCoverContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00072026110900000007 /* NoticesPlaceholderCoverContract.swift */; };
+		5C0E00082026110900000008 /* NoticesPlaceholderCoverContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00072026110900000007 /* NoticesPlaceholderCoverContract.swift */; };
+		5C0E00092026110900000009 /* NoticesPlaceholderCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E000A2026110900000010 /* NoticesPlaceholderCover.swift */; };
+		5C0E000B2026110900000011 /* NoticesPlaceholderCoverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E000C2026110900000012 /* NoticesPlaceholderCoverTests.swift */; };
+		C5A700022026110900000002 /* ConnectionStatusModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700012026110900000001 /* ConnectionStatusModel.swift */; };
+		C5A700032026110900000003 /* ConnectionStatusModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700012026110900000001 /* ConnectionStatusModel.swift */; };
+		C5A700052026110900000005 /* ConnectionStatusSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700042026110900000004 /* ConnectionStatusSource.swift */; };
+		C5A700062026110900000006 /* ConnectionStatusSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700042026110900000004 /* ConnectionStatusSource.swift */; };
+		C5A700082026110900000008 /* SystemNetworkPathMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700072026110900000007 /* SystemNetworkPathMonitor.swift */; };
+		C5A7000A202611090000000A /* ConnectionStatusModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700092026110900000009 /* ConnectionStatusModelTests.swift */; };
+		C5A7000C202611090000000C /* ConnectionStatusProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A7000B202611090000000B /* ConnectionStatusProbe.swift */; };
+		AB0A00012026110900000001 /* AppAnnouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0A00022026110900000002 /* AppAnnouncer.swift */; };
+		AB0A00032026110900000003 /* AppAnnouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0A00022026110900000002 /* AppAnnouncer.swift */; };
+		AB0A00042026110900000004 /* AppAnnouncerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0A00052026110900000005 /* AppAnnouncerTests.swift */; };
+		AB0A00062026110900000006 /* AppAnnouncer+System.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0A00072026110900000007 /* AppAnnouncer+System.swift */; };
 		517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00052026102700000005 /* StonePlacementSoundTests.swift */; };
@@ -106,6 +138,13 @@
 		AE6000013B00000000000101 /* GameDetailDisplayReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000105 /* GameDetailDisplayReset.swift */; };
 		AE6000023B00000000000002 /* GameDetailConnectionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */; };
 		AE6000023B00000000000102 /* GameDetailDisplayReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000105 /* GameDetailDisplayReset.swift */; };
+		7B5A00012026110900000001 /* GameToolbarArrangement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A00022026110900000002 /* GameToolbarArrangement.swift */; };
+		7B5A00032026110900000003 /* GameToolbarArrangement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A00022026110900000002 /* GameToolbarArrangement.swift */; };
+		7B5A00042026110900000004 /* GameToolbarArrangementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A00052026110900000005 /* GameToolbarArrangementTests.swift */; };
+		7B5A00062026110900000006 /* GameControlProbeConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A00072026110900000007 /* GameControlProbeConfiguration.swift */; };
+		7B5A00082026110900000008 /* GameControlProbeConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A00072026110900000007 /* GameControlProbeConfiguration.swift */; };
+		7B5A00092026110900000009 /* GameControlProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A000A202611090000000A /* GameControlProbe.swift */; };
+		7B5A000B202611090000000B /* GameControlProbeConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A000C202611090000000C /* GameControlProbeConfigurationTests.swift */; };
 		AE6000033B00000000000003 /* GameHistoryPaginationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000063B00000000000006 /* GameHistoryPaginationState.swift */; };
 		AE6000043B00000000000004 /* GameHistoryPaginationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000063B00000000000006 /* GameHistoryPaginationState.swift */; };
 		AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1000023D00000000000002 /* AnalyzeControlBar.swift */; };
@@ -539,6 +578,29 @@
 		466027D4E066495A9A16693D /* ArtboardPhoneAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtboardPhoneAuditTests.swift; sourceTree = "<group>"; };
 		4C16B1C83F38A637972CA7A3 /* GameDetailTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailTheme.swift; sourceTree = "<group>"; };
 		4FB7716AFD83430980B45D64 /* GameControlState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlState.swift; sourceTree = "<group>"; };
+		AC7100022026110900000002 /* ActivityModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityModel.swift; sourceTree = "<group>"; };
+		AC7100052026110900000005 /* ActivityModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityModelTests.swift; sourceTree = "<group>"; };
+		ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPlaceRegistry.swift; sourceTree = "<group>"; };
+		ACA1D0052026110900000005 /* ActivityPlaceRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPlaceRegistryTests.swift; sourceTree = "<group>"; };
+		A7F100022026110900000002 /* ActivityFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityFixtures.swift; sourceTree = "<group>"; };
+		A7F100052026110900000005 /* ActivityFixturesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityFixturesTests.swift; sourceTree = "<group>"; };
+		6A7E00022026110900000002 /* ActivityHostPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityHostPolicy.swift; sourceTree = "<group>"; };
+		6A7E00052026110900000005 /* ActivityHostPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityHostPolicyTests.swift; sourceTree = "<group>"; };
+		6A7E00072026110900000007 /* ActivityHostSDK.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityHostSDK.swift; sourceTree = "<group>"; };
+		6A7E00092026110900000009 /* NoticesHostProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesHostProbe.swift; sourceTree = "<group>"; };
+		5C0E00022026110900000002 /* SceneCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCover.swift; sourceTree = "<group>"; };
+		5C0E00042026110900000004 /* SceneCoverPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCoverPolicy.swift; sourceTree = "<group>"; };
+		5C0E00072026110900000007 /* NoticesPlaceholderCoverContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesPlaceholderCoverContract.swift; sourceTree = "<group>"; };
+		5C0E000A2026110900000010 /* NoticesPlaceholderCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesPlaceholderCover.swift; sourceTree = "<group>"; };
+		5C0E000C2026110900000012 /* NoticesPlaceholderCoverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticesPlaceholderCoverTests.swift; sourceTree = "<group>"; };
+		C5A700012026110900000001 /* ConnectionStatusModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusModel.swift; sourceTree = "<group>"; };
+		C5A700042026110900000004 /* ConnectionStatusSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusSource.swift; sourceTree = "<group>"; };
+		C5A700072026110900000007 /* SystemNetworkPathMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemNetworkPathMonitor.swift; sourceTree = "<group>"; };
+		C5A700092026110900000009 /* ConnectionStatusModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusModelTests.swift; sourceTree = "<group>"; };
+		C5A7000B202611090000000B /* ConnectionStatusProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusProbe.swift; sourceTree = "<group>"; };
+		AB0A00022026110900000002 /* AppAnnouncer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAnnouncer.swift; sourceTree = "<group>"; };
+		AB0A00052026110900000005 /* AppAnnouncerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAnnouncerTests.swift; sourceTree = "<group>"; };
+		AB0A00072026110900000007 /* AppAnnouncer+System.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppAnnouncer+System.swift"; sourceTree = "<group>"; };
 		517D00022026102700000002 /* StonePlacementSoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundPlayer.swift; sourceTree = "<group>"; };
 		517D00052026102700000005 /* StonePlacementSoundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundTests.swift; sourceTree = "<group>"; };
 		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
@@ -602,6 +664,11 @@
 		AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailConnectionCoordinator.swift; sourceTree = "<group>"; };
 		AE6000053B00000000000105 /* GameDetailDisplayReset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailDisplayReset.swift; sourceTree = "<group>"; };
+		7B5A00022026110900000002 /* GameToolbarArrangement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameToolbarArrangement.swift; sourceTree = "<group>"; };
+		7B5A00052026110900000005 /* GameToolbarArrangementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameToolbarArrangementTests.swift; sourceTree = "<group>"; };
+		7B5A00072026110900000007 /* GameControlProbeConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlProbeConfiguration.swift; sourceTree = "<group>"; };
+		7B5A000A202611090000000A /* GameControlProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlProbe.swift; sourceTree = "<group>"; };
+		7B5A000C202611090000000C /* GameControlProbeConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlProbeConfigurationTests.swift; sourceTree = "<group>"; };
 		AE6000063B00000000000006 /* GameHistoryPaginationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameHistoryPaginationState.swift; sourceTree = "<group>"; };
 		AF1000023D00000000000002 /* AnalyzeControlBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyzeControlBar.swift; sourceTree = "<group>"; };
 		AF2000063E00000000000006 /* OGSConditionalMoves.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSConditionalMoves.swift; sourceTree = "<group>"; };
@@ -861,8 +928,14 @@
 				7E1A2B3C4D5E6F7081920B1C /* BoardMarkerAuditHarness.swift */,
 				AD0800022026090800000002 /* SurroundAnimationDiagnostics.swift */,
 				AE3100083A00000000000008 /* OGSService+Fixtures.swift */,
+				A7F100022026110900000002 /* ActivityFixtures.swift */,
 				AE3100043A00000000000004 /* SurroundUITestContract.swift */,
+				6A7E00092026110900000009 /* NoticesHostProbe.swift */,
+				7B5A00072026110900000007 /* GameControlProbeConfiguration.swift */,
+				C5A7000B202611090000000B /* ConnectionStatusProbe.swift */,
 				AE3100053A00000000000005 /* SurroundUITestOfflineServices.swift */,
+				5C0E00072026110900000007 /* NoticesPlaceholderCoverContract.swift */,
+				5C0E000A2026110900000010 /* NoticesPlaceholderCover.swift */,
 			);
 			path = UITesting;
 			sourceTree = "<group>";
@@ -951,10 +1024,19 @@
 				E271DDB41A1044F0BB9E1A1A /* GameDetailInteractionTests.swift */,
 				1C0AD3E8262AC421242AB561 /* SurroundThemeTests.swift */,
 				517D00052026102700000005 /* StonePlacementSoundTests.swift */,
+				AC7100052026110900000005 /* ActivityModelTests.swift */,
+				ACA1D0052026110900000005 /* ActivityPlaceRegistryTests.swift */,
+				A7F100052026110900000005 /* ActivityFixturesTests.swift */,
+				6A7E00052026110900000005 /* ActivityHostPolicyTests.swift */,
+				5C0E000C2026110900000012 /* NoticesPlaceholderCoverTests.swift */,
+				C5A700092026110900000009 /* ConnectionStatusModelTests.swift */,
+				AB0A00052026110900000005 /* AppAnnouncerTests.swift */,
 				BCFA1151000000000000000C /* HomeRulesTests.swift */,
 				0189D12871764C28AF2D6CE0 /* GameDetailDesignFixtureTests.swift */,
 				87DB1CF4B22A44B2AA1EBCCE /* GameControlRowMetricsTests.swift */,
 				38FC39EF8A664FC6865B488D /* GameDetailLayoutTests.swift */,
+				7B5A00052026110900000005 /* GameToolbarArrangementTests.swift */,
+				7B5A000C202611090000000C /* GameControlProbeConfigurationTests.swift */,
 				DB6E63D75AB347B8BACD9A02 /* GameDetailClockStateTests.swift */,
 				78D0AC1C5BE94978AB949160 /* GameControlStateTests.swift */,
 				A0982EB6654F4DB084896E94 /* ChatSessionStateTests.swift */,
@@ -1074,6 +1156,9 @@
 		BC042B3224AB2DD00050B2D1 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				AC7100022026110900000002 /* ActivityModel.swift */,
+				6A7E00022026110900000002 /* ActivityHostPolicy.swift */,
+				C5A700012026110900000001 /* ConnectionStatusModel.swift */,
 				AA1600012026091600000001 /* ChallengeDraft.swift */,
 				AA1700012026091700000001 /* ProfileRating.swift */,
 				AFA600012026100400000001 /* ProfileBiographyDocument.swift */,
@@ -1150,6 +1235,8 @@
 				BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */,
 				BCA0C72125F0DF5C0077DD28 /* PrivateMessageNotificationView.swift */,
 				BC6B05F525FA0DF8004E1D66 /* BoardDemoView.swift */,
+				5C0E00022026110900000002 /* SceneCover.swift */,
+				5C0E00042026110900000004 /* SceneCoverPolicy.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -1158,10 +1245,14 @@
 			isa = PBXGroup;
 			children = (
 				AA1600022026091600000002 /* StackRouter.swift */,
+				ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */,
+				6A7E00072026110900000007 /* ActivityHostSDK.swift */,
 				8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */,
 				D90700022026090700000002 /* AppReviewPolicy.swift */,
 				D90700092026090700000009 /* AppReviewGameActivity.swift */,
 				AE3000023A00000000000002 /* PlatformServices.swift */,
+				AB0A00022026110900000002 /* AppAnnouncer.swift */,
+				AB0A00072026110900000007 /* AppAnnouncer+System.swift */,
 				517D00022026102700000002 /* StonePlacementSoundPlayer.swift */,
 				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
 				BCFA1151000000000000000E /* SeekGraphSendHold.swift */,
@@ -1170,6 +1261,8 @@
 				BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */,
 				BC649413253DA44C002B2200 /* SurroundNotificationService.swift */,
 				BC649426253FF940002B2200 /* NavigationService.swift */,
+				C5A700042026110900000004 /* ConnectionStatusSource.swift */,
+				C5A700072026110900000007 /* SystemNetworkPathMonitor.swift */,
 				BC7407DA25493B71001D5581 /* SurroundService.swift */,
 				BC39EE3725DBC23C00562C68 /* TextUtilities.swift */,
 			);
@@ -1201,6 +1294,8 @@
 				BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */,
 				AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */,
 				AE6000053B00000000000105 /* GameDetailDisplayReset.swift */,
+				7B5A00022026110900000002 /* GameToolbarArrangement.swift */,
+				7B5A000A202611090000000A /* GameControlProbe.swift */,
 				BC463B0C266353D700D40D3A /* SingleGameView.swift */,
 				BC62A89B2664A6F500BF5F78 /* AnalyzeTreeView.swift */,
 			);
@@ -1638,15 +1733,34 @@
 				BC8346B3A100495EB9BAA832 /* GameControlState.swift in Sources */,
 				B6F7514611BD405D81540CA9 /* ChatSessionState.swift in Sources */,
 				AE6000013B00000000000101 /* GameDetailDisplayReset.swift in Sources */,
+				7B5A00012026110900000001 /* GameToolbarArrangement.swift in Sources */,
+				7B5A00092026110900000009 /* GameControlProbe.swift in Sources */,
+				7B5A00062026110900000006 /* GameControlProbeConfiguration.swift in Sources */,
 				AD0800012026090800000001 /* SurroundAnimationDiagnostics.swift in Sources */,
 				AF2000013E00000000000001 /* OGSConditionalMoves.swift in Sources */,
 				AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */,
 				AE3000013A00000000000001 /* PlatformServices.swift in Sources */,
 				517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */,
+				AC7100012026110900000001 /* ActivityModel.swift in Sources */,
+				ACA1D0012026110900000001 /* ActivityPlaceRegistry.swift in Sources */,
+				6A7E00012026110900000001 /* ActivityHostPolicy.swift in Sources */,
+				6A7E00062026110900000006 /* ActivityHostSDK.swift in Sources */,
+				6A7E00082026110900000008 /* NoticesHostProbe.swift in Sources */,
+				5C0E00012026110900000001 /* SceneCover.swift in Sources */,
+				5C0E00032026110900000003 /* SceneCoverPolicy.swift in Sources */,
+				5C0E00062026110900000006 /* NoticesPlaceholderCoverContract.swift in Sources */,
+				5C0E00092026110900000009 /* NoticesPlaceholderCover.swift in Sources */,
+				C5A700022026110900000002 /* ConnectionStatusModel.swift in Sources */,
+				C5A700052026110900000005 /* ConnectionStatusSource.swift in Sources */,
+				C5A700082026110900000008 /* SystemNetworkPathMonitor.swift in Sources */,
+				C5A7000C202611090000000C /* ConnectionStatusProbe.swift in Sources */,
+				AB0A00012026110900000001 /* AppAnnouncer.swift in Sources */,
+				AB0A00062026110900000006 /* AppAnnouncer+System.swift in Sources */,
 				B10A00012026102900000001 /* BetaSimulatorLoginBridge.swift in Sources */,
 				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
 				AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */,
 				AE3100073A00000000000007 /* OGSService+Fixtures.swift in Sources */,
+				A7F100012026110900000001 /* ActivityFixtures.swift in Sources */,
 				D90700012026090700000001 /* AppReviewPolicy.swift in Sources */,
 				D90700082026090700000008 /* AppReviewGameActivity.swift in Sources */,
 				D90700042026090700000004 /* AppReviewPresentation.swift in Sources */,
@@ -1771,6 +1885,22 @@
 				96BD71A30B7D334BB8E64426 /* SurroundThemeTests.swift in Sources */,
 				517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */,
 				517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */,
+				AC7100032026110900000003 /* ActivityModel.swift in Sources */,
+				AC7100042026110900000004 /* ActivityModelTests.swift in Sources */,
+				ACA1D0032026110900000003 /* ActivityPlaceRegistry.swift in Sources */,
+				ACA1D0042026110900000004 /* ActivityPlaceRegistryTests.swift in Sources */,
+				A7F100032026110900000003 /* ActivityFixtures.swift in Sources */,
+				A7F100042026110900000004 /* ActivityFixturesTests.swift in Sources */,
+				6A7E00032026110900000003 /* ActivityHostPolicy.swift in Sources */,
+				6A7E00042026110900000004 /* ActivityHostPolicyTests.swift in Sources */,
+				5C0E00052026110900000005 /* SceneCoverPolicy.swift in Sources */,
+				5C0E00082026110900000008 /* NoticesPlaceholderCoverContract.swift in Sources */,
+				5C0E000B2026110900000011 /* NoticesPlaceholderCoverTests.swift in Sources */,
+				C5A700032026110900000003 /* ConnectionStatusModel.swift in Sources */,
+				C5A700062026110900000006 /* ConnectionStatusSource.swift in Sources */,
+				C5A7000A202611090000000A /* ConnectionStatusModelTests.swift in Sources */,
+				AB0A00032026110900000003 /* AppAnnouncer.swift in Sources */,
+				AB0A00042026110900000004 /* AppAnnouncerTests.swift in Sources */,
 				BCFA1151000000000000000B /* HomeRules.swift in Sources */,
 				BCFA1151000000000000000D /* HomeRulesTests.swift in Sources */,
 				C1ACC76C51B9DBE9AC72CBCA /* Stone.swift in Sources */,
@@ -1784,6 +1914,10 @@
 				822153073E0C4D8593067A7D /* GameControlState.swift in Sources */,
 				C42D11E94B9A48AEB3E62EC6 /* ChatSessionState.swift in Sources */,
 				AE6000023B00000000000102 /* GameDetailDisplayReset.swift in Sources */,
+				7B5A00032026110900000003 /* GameToolbarArrangement.swift in Sources */,
+				7B5A00042026110900000004 /* GameToolbarArrangementTests.swift in Sources */,
+				7B5A00082026110900000008 /* GameControlProbeConfiguration.swift in Sources */,
+				7B5A000B202611090000000B /* GameControlProbeConfigurationTests.swift in Sources */,
 				C0D100032026082900000003 /* CorrespondenceWidgetGridLayout.swift in Sources */,
 				C0D100052026082900000005 /* CorrespondenceWidgetGridLayoutTests.swift in Sources */,
 				C0D100072026082900000007 /* AppRouteTests.swift in Sources */,
