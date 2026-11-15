@@ -2111,11 +2111,18 @@ extension OGSService {
                 state.friendInvitations = []
                 state.privateMessages = []
             }
+            // Captures keep their own data: no Activity state, superchat or Debug commands.
+            let isCapture = SurroundUITestContract.isCapturingAppStoreScreenshots
+                || SurroundUITestContract.isCapturingCompatibilityScreenshots
+            let startsOffline = !isCapture && ActivityFixtures.selected?.connection == .offline
+            if startsOffline {
+                state.socketStatus = .reconnecting
+            }
             let service = OGSService(
                 environment: .current,
                 httpClient: SurroundUITestRejectingHTTPClient(),
                 preferences: userDefaults,
-                ogsWebsocket: SurroundUITestNoOpWebsocket(),
+                ogsWebsocket: SurroundUITestNoOpWebsocket(status: startsOffline ? .reconnecting : .connected),
                 connectsAutomatically: false,
                 usesSurroundOverviewService: false,
                 enablesAppSideEffects: false,
@@ -2124,6 +2131,12 @@ extension OGSService {
                 remoteSettings: OGSRemoteSetting(preferences: userDefaults),
                 initialState: state
             )
+            if !isCapture {
+                // Every window reports to, and is covered from, the app's one
+                // superchat store, and hears the Debug superchat commands.
+                service.superchatStore = .shared
+                SuperchatDebugCommands.register(service)
+            }
             if SurroundUITestContract.ticksFixtureClocks {
                 FixtureClockTicker.start(Array(state.activeGames.values) + Array(state.publicGames.values))
             }

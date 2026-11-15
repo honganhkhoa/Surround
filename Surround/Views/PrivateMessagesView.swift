@@ -543,9 +543,22 @@ struct MessagesConversationView: View {
                 showsProfileToolbar: false,
                 focusIsSuspended: navigation.path.last != owningStackRoute
                     || !navigation.isActive,
-                composerFocusIsSuspended: nav.main.accountSheet != nil)
+                composerFocusIsSuspended: nav.main.accountSheet != nil,
+                composer: .init(header: endedLine))
         }
         .background(Color(uiColor: .systemBackground))
+    }
+
+    /// Above the composer while this session's superchat ending for the
+    /// peer, live or missed, is newer than every message in the conversation.
+    private var endedLine: AnyView? {
+        guard ogs.showsSuperchatEndedLine(peerID: peer.id) else { return nil }
+        return AnyView(
+            Text("The moderator ended this chat.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.messagesSuperchatEnded))
     }
 
     private var peerHeading: some View {

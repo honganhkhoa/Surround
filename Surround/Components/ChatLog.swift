@@ -1056,10 +1056,12 @@ struct NewChatInput: View {
 
 #Preview("Game chat — Signed out", traits: .fixedLayout(width: 350, height: 400)) {
     @Previewable @StateObject var session = ChatSessionState()
-    let game = TestData.EuropeanChampionshipWithChat
-    game.ogs = OGSService.previewInstance(
+    // `Game.ogs` is weak, so the preview keeps the game's service.
+    @Previewable @StateObject var gameService = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950)
     )
+    let game = TestData.EuropeanChampionshipWithChat
+    game.ogs = gameService
     return ChatLog(game: game, session: session)
         .environmentObject(OGSService.previewInstance())
 }

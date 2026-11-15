@@ -99,6 +99,10 @@ extension AppAnnouncement.Key {
     static func gameStarted(_ gameID: Int) -> Self {
         Self("game.started.\(gameID)")
     }
+
+    /// A cover lifted because every superchat ended while Surround wasn't
+    /// listening; every window hears it from the store.
+    static func superchatLifted(_ accountID: Int) -> Self { Self("superchat.lifted.\(accountID)") }
 }
 
 /// The app's windows and which one the user is in. Each window's anchor

@@ -89,6 +89,18 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         return app
     }
 
+    #if DEBUG
+    /// Posts a Debug superchat command (TESTING.md) through the Darwin notify
+    /// center. The runner shares the simulator's notify server, so every
+    /// offline window's service in the app hears it.
+    func post(_ command: SurroundUITestContract.SuperchatCommand) {
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName(command.rawValue as CFString), nil, nil, true
+        )
+    }
+    #endif
+
     @discardableResult
     func element(
         _ identifier: String,

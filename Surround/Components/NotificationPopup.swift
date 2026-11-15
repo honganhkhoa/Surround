@@ -43,7 +43,7 @@ struct PrivateMessageNotificationButton: View {
 
     static func isVisible(ogs: OGSService, nav: NavigationService) -> Bool {
         guard ogs.socketStatus == .connected else { return false }
-        if !ogs.superchatPeerIds.isEmpty || nav.showingPrivateChatView { return true }
+        if nav.showingPrivateChatView { return true }
         if nav.main.rootView == .privateMessages { return false }
         return ogs.privateMessagesUnreadCount > 0
     }
@@ -65,7 +65,6 @@ struct PrivateMessageNotificationButton: View {
 
     var body: some View {
         Button {
-            guard !nav.showingPrivateChatView || ogs.superchatPeerIds.isEmpty else { return }
             nav.showingPrivateChatView.toggle()
         } label: {
             messageLabel.labelStyle(.iconOnly)
@@ -241,10 +240,6 @@ struct NotificationPopup: View {
     }
     
     func closeChatWindow() {
-        guard ogs.superchatPeerIds.count == 0 else {
-            return
-        }
-        
         nav.showingPrivateChatView = false
     }
     
@@ -308,16 +303,6 @@ struct NotificationPopup: View {
         .task(id: connectionBannerShown) { await publishConnectionBanner() }
         .onDisappear {
             if nav.connectionBannerVisible { nav.connectionBannerVisible = false }
-        }
-        .onChange(of: ogs.superchatPeerIds) { _, superchatPeerIds in
-            if superchatPeerIds.count > 0 {
-                let accountID = ogs.user?.id
-                DispatchQueue.main.async {
-                    guard let accountID, ogs.user?.id == accountID,
-                          !ogs.superchatPeerIds.isEmpty else { return }
-                    nav.showingPrivateChatView = true
-                }
-            }
         }
         .onReceive(ogs.$friendshipNotice) { notice in
             friendshipNotice = notice

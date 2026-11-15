@@ -44,10 +44,16 @@ enum ActivityFixtures {
 
     // MARK: Launch arguments
 
-    struct Launch: Equatable { var state: State; var clock: Clock }
+    struct Launch: Equatable {
+        var state: State
+        var clock: Clock
+        /// `offline` starts the window's socket down.
+        var connection = SurroundUITestContract.ActivityFixtureConnection.online
+    }
 
     enum LaunchError: Error, Equatable, CustomStringConvertible {
-        case missingValue(String), unknownState(String), unknownClock(String), cannotCombine(String)
+        case missingValue(String), unknownState(String), unknownClock(String), unknownConnection(String)
+        case cannotCombine(String)
 
         var description: String {
             switch self {
@@ -55,6 +61,7 @@ enum ActivityFixtures {
             case .unknownState(let raw):
                 "Unknown Activity state '\(raw)'. Use one of: " + State.allCases.map(\.rawValue).joined(separator: ", ")
             case .unknownClock(let raw): "Unknown Activity clock '\(raw)'. Use frozen or running."
+            case .unknownConnection(let raw): "Unknown Activity connection '\(raw)'. Use online or offline."
             case .cannotCombine(let flag): "\(Contract.activityStateLaunchArgument) can't be combined with \(flag)."
             }
         }
@@ -88,13 +95,21 @@ enum ActivityFixtures {
             }
             isFrozen = mode == .frozen
         }
+        var connection = Contract.ActivityFixtureConnection.online
+        if let rawConnection = try value(after: Contract.activityConnectionLaunchArgument) {
+            guard let mode = Contract.ActivityFixtureConnection(rawValue: rawConnection) else {
+                throw LaunchError.unknownConnection(rawConnection)
+            }
+            connection = mode
+        }
         if let flag = conflictingArguments.first(where: { arguments.contains($0) }) {
             throw LaunchError.cannotCombine(flag)
         }
         if isFrozen, arguments.contains(Contract.fixtureClockTicksLaunchArgument) {
             throw LaunchError.cannotCombine(Contract.fixtureClockTicksLaunchArgument)
         }
-        return Launch(state: state, clock: Clock(reference: reference.rounded(.down), isFrozen: isFrozen))
+        return Launch(state: state, clock: Clock(reference: reference.rounded(.down), isFrozen: isFrozen),
+                      connection: connection)
     }
 
     // MARK: Building
@@ -134,20 +149,28 @@ enum ActivityFixtures {
         return build.seed
     }
 
-    /// After the service exists: read markers, then the moderator's superchat.
-    static func finish(_ selected: State, service: OGSService) {
+    /// After the service exists: read markers, then the moderator's superchat,
+    /// unless `startsSuperchat` is false (the app starts it once per process).
+    static func finish(_ selected: State, service: OGSService, startsSuperchat: Bool = true) {
         // No-ops where the state has no such conversation.
         service.markPrivateMessageThreadAsRead(peerId: Cast.mossLantern.id)
         service.markPrivateMessageThreadAsRead(peerId: Cast.cedarWave.id)
-        if selected == .superchat, let user = service.user {
+        if startsSuperchat, selected == .superchat, let user = service.user {
             service.handleSuperchat(config: superchatPayload(for: user, enable: true))
         }
     }
 
     /// OGS's `private-superchat` event, as Goban's ServerToClient protocol declares it.
-    static func superchatPayload(for user: OGSUser, enable: Bool) -> [String: Any] {
-        ["moderator_id": Cast.moderator.id, "moderator_username": Cast.moderator.username,
+    static func superchatPayload(for user: OGSUser, enable: Bool,
+                                 moderator: OGSUser = Cast.moderator) -> [String: Any] {
+        ["moderator_id": moderator.id, "moderator_username": moderator.username,
          "player_id": user.id, "player_username": user.username, "enable": enable]
+    }
+
+    /// The moderator's own copy of a superchat, as OGS sends it to every
+    /// connection of the moderator: `moderator_id` is the user's id, so it never covers.
+    static func superchatEchoPayload(for user: OGSUser, enable: Bool) -> [String: Any] {
+        superchatPayload(for: user, enable: enable, moderator: user)
     }
 
     /// Names, ids and ranks as AppStoreScreenshotProfileData's in
@@ -164,6 +187,11 @@ enum ActivityFixtures {
         static let mossLantern = OGSUser(username: "MossLantern", id: 916_001, ranking: 27)
         static let moderator = OGSUser(username: "WardenKestrel", id: SurroundUITestContract.ActivityFixtureID.moderatorID,
                                        ranking: 29, uiClass: "moderator", isModerator: true)
+        /// The Debug commands' second moderator. Not in `all`, so no state
+        /// caches a profile or history for it: the cover names it from the event.
+        static let secondModerator = OGSUser(
+            username: "SentinelHeron", id: SurroundUITestContract.ActivityFixtureID.secondModeratorID,
+            ranking: 29, uiClass: "moderator", isModerator: true)
         static let all = [cedarWave, jadeLantern, harborMist, quietPine, amberKite, indigoCrane,
                           mapleRidge, tenukiTom, mossLantern, moderator]
     }
@@ -461,6 +489,11 @@ extension ActivityFixtures {
     /// The selected state's seed, once a window has built it.
     private(set) static var selectedSeed: Seed?
 
+    /// Set once the first service is made. The superchat store is app-wide,
+    /// so only that service starts the state's superchat: re-made root
+    /// services and new windows join the store as it is, Done included.
+    private static var hasStartedSuperchat = false
+
     /// The plain offline journey's service in the selected state; nil without one.
     static func selectedService(from state: OGSService.BootstrapState,
                                 make: (OGSService.BootstrapState) -> OGSService) -> OGSService? {
@@ -468,7 +501,8 @@ extension ActivityFixtures {
         var state = state
         selectedSeed = apply(selected.state, to: &state, clock: selected.clock)
         let service = make(state)
-        finish(selected.state, service: service)
+        finish(selected.state, service: service, startsSuperchat: !hasStartedSuperchat)
+        hasStartedSuperchat = true
         return service
     }
 
