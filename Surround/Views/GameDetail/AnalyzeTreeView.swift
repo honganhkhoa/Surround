@@ -142,7 +142,7 @@ struct AnalyzeTreeSlice: View {
 //                                .font(.system(size: 30))
                                 // The board's label pigment keeps this icon
                                 // readable on each colored board material.
-                                .foregroundColor(theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || (theme == .surroundStudio && colorScheme == .dark)
+                                .foregroundColor(theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || (theme == .surroundStudio && colorScheme == .dark)
                                     ? appearance.emptyPointMarker : nil)
                                 .background(appearance.boardColor.cornerRadius(2))
                                 .onTapGesture {

@@ -980,6 +980,43 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         }
     }
 
+    func testSakuraStreamThemeStates() throws {
+        try auditThemeStates(theme: "sakuraStream", title: "Sakura Stream",
+                             suffix: "-sakura-stream", appearance: .light)
+    }
+
+    func testSakuraStreamNightThemeStates() throws {
+        try auditThemeStates(theme: "sakuraStream", title: "Sakura Stream in Dark Mode",
+                             suffix: "-sakura-stream-night", appearance: .dark)
+    }
+
+    func testSakuraStreamThemeScoring() throws {
+        try auditThemeScoring(theme: "sakuraStream", title: "Sakura Stream",
+                              suffix: "-sakura-stream", appearance: .light)
+    }
+
+    func testSakuraStreamNightThemeScoring() throws {
+        try auditThemeScoring(theme: "sakuraStream", title: "Sakura Stream in Dark Mode",
+                              suffix: "-sakura-stream-night", appearance: .dark)
+    }
+
+    func testSakuraStreamThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "sakuraStream", title: "Sakura Stream",
+                                 suffix: "-sakura-stream", appearance: .light)
+    }
+
+    func testSakuraStreamThemeControlStates() {
+        auditThemeControlStates(theme: "sakuraStream", title: "Sakura Stream",
+                                appearance: .light, suffix: "-sakura-stream")
+        auditThemeControlStates(theme: "sakuraStream", title: "Sakura Stream in Dark Mode",
+                                appearance: .dark, suffix: "-sakura-stream-night")
+    }
+
+    func testSakuraStreamThemePanelTransitions() throws {
+        try auditThemePanelTransitions(theme: "sakuraStream", title: "Sakura Stream",
+                                       suffix: "-sakura-stream")
+    }
+
     func testPaperBlossomsThemeStates() throws {
         try auditThemeStates(theme: "paperBlossoms", title: "Paper Blossoms",
                              suffix: "-paper-blossoms", appearance: .light)

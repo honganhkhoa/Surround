@@ -795,7 +795,8 @@ struct GameDetailView: View {
         .environment(\.christmasKeepsakesLightContext,
                      ChristmasKeepsakesLightContext(size: geometry.size, safeAreaInsets: geometry.safeAreaInsets))
         .environment(\.excludesBoardsFromSceneShadows,
-                     SurroundTheme.current(storedID: gameThemeID) == .frostPine)
+                     SurroundTheme.current(storedID: gameThemeID) == .frostPine
+                        || SurroundTheme.current(storedID: gameThemeID) == .sakuraStream)
         .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
         .coordinateSpace(name: ChristmasKeepsakesLightContext.coordinateSpace)
         .onChange(of: showsActiveGamesButton) { _, isVisible in
@@ -818,7 +819,8 @@ struct GameDetailView: View {
         .overlayPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
             GeometryReader { scene in
                 GameDetailSceneForeground(shadowExclusions: anchors.map {
-                                              BoardSceneShadowRegion(bounds: scene[$0.bounds], cornerRadius: $0.cornerRadius)
+                                              BoardSceneShadowRegion(bounds: scene[$0.bounds], cornerRadius: $0.cornerRadius,
+                                                                     isDetailed: $0.isDetailed, cellSize: $0.cellSize)
                                           })
             }
             .ignoresSafeArea(.container)
@@ -1257,7 +1259,7 @@ private struct GameToolbarLayout: ViewModifier {
         }
         .toggleStyle(.button)
         .labelStyle(.iconOnly)
-        .modifier(GameDetailLegacyTint(color: (theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms) && !analyzingIsPresented
+        .modifier(GameDetailLegacyTint(color: (theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream) && !analyzingIsPresented
             ? theme.foreground : .accentColor))
         .accessibilityIdentifier(
             compact
@@ -1632,7 +1634,7 @@ private struct GameToolbarChatButton: View {
     private var iconColor: Color {
         if isSelected { return colorScheme == .dark ? .black : .white }
         if #available(iOS 26.0, macCatalyst 26.0, *) { return .primary }
-        return (theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms) ? theme.foreground : .accentColor
+        return (theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream) ? theme.foreground : .accentColor
     }
 
     var body: some View {

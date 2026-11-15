@@ -17,6 +17,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     case flowingInkJade
     case flowingInkJadePlain
     case flowingInkPlain
+    case sakuraStream
 
     var id: Self { self }
 
@@ -99,6 +100,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         case .nebulaPearl: String(localized: "Nebula & Pearl", comment: "Theme name: a cosmic nebula, dark glass stones and luminous pearls. Use a short, natural title naming the nebula and pearl.")
         case .rakedGarden: String(localized: "Raked Garden", comment: "Theme name: a Japanese dry landscape garden with raked sand, basalt and jade stones. Use a short, natural garden title; the sand pattern is visible in the preview.")
         case .surroundStudio: "Surround Studio"
+        case .sakuraStream: String(localized: "Sakura Stream", comment: "Theme name: a clear stream beside cherry blossoms, with ivory ceramic and pale pink porcelain. Use a short, natural title preserving the cherry-blossom and stream imagery.")
         case .frostPine: String(localized: "Frost & Pine", comment: "Theme name: frost crystals and pine branches. Preserve the winter frost and pine imagery in a short title.")
         case .feltMeadow: String(localized: "Felt Meadow", comment: "Theme name: a meadow crafted from soft wool felt. Felt is the textile material, not the past tense of feel. Use a short, natural title.")
         case .nightGarden: String(localized: "Night Garden", comment: "Theme name: a quiet garden at night with lanterns and glass stones. Use a short, natural title.")
@@ -117,7 +119,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
             nil
-        case .standard, .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms: nil
+        case .standard, .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream: nil
         case .nebulaPearl: .dark
         }
     }
@@ -125,6 +127,27 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     /// Resolve image grading alongside the board palette. The image references
     /// stay cached, so an appearance change does not decode or regenerate art.
     func board(for scheme: ColorScheme) -> BoardAppearance {
+        if self == .sakuraStream, scheme == .dark {
+            var night = board
+            // Evening illumination keeps the ceramic light enough to separate
+            // oxblood and pink. Its native grid and marks retain their pigment.
+            night.boardColor = Color(themeHex: 0xCEC1B5)
+            night.compactBoardColor = Color(themeHex: 0xCEC1B5)
+            night.boardTexture?.tint = Color(themeHex: 0xDDD9D6)
+            night.stoneImages?.tint = Color(themeHex: 0xE7DEE0)
+            night.boardEdge = Color(themeHex: 0x8C7474)
+            night.boardDepth = BoardDepth(
+                upperFace: Color(themeHex: 0xB5A397), lowerFace: Color(themeHex: 0x7C6664),
+                highlight: Color(themeHex: 0xE8DAD0).opacity(0.6),
+                shade: Color(themeHex: 0x695157).opacity(0.6),
+                shadow: Color(themeHex: 0x24191D).opacity(0.32),
+                thicknessRatio: 0.008, maximumThickness: 5)
+            night.black.flat = Color(themeHex: 0x4B1A29)
+            night.black.territory = Color(themeHex: 0x4B1A29)
+            night.white.flat = Color(themeHex: 0xE6CDD6)
+            night.white.territory = Color(themeHex: 0xE6CDD6)
+            return night
+        }
         if self == .paperBlossoms, scheme == .dark {
             var night = board
             // Keep rice paper light enough to separate the ink stones. Only
@@ -360,6 +383,58 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
 
     var board: BoardAppearance {
         switch self {
+        case .sakuraStream:
+            return BoardAppearance(
+                boardColor: Color(themeHex: 0xF2E7D7),
+                compactBoardColor: Color(themeHex: 0xF2E7D7),
+                boardEdge: Color(themeHex: 0xAF9690),
+                boardTexture: SakuraStreamAssets.board,
+                boardBevel: true,
+                boardDepth: BoardDepth(
+                    upperFace: Color(themeHex: 0xE4D2C0), lowerFace: Color(themeHex: 0xB2988F),
+                    highlight: Color(themeHex: 0xFFF8EE).opacity(0.85),
+                    shade: Color(themeHex: 0x927674).opacity(0.45),
+                    shadow: Color(themeHex: 0x503A36).opacity(0.25),
+                    thicknessRatio: 0.008, maximumThickness: 5),
+                // The warm ceramic face has no baked lines. The exact native
+                // plum grid stays thin and clear at every board size.
+                gridLineScale: 1,
+                stoneImages: SakuraStreamAssets.stones,
+                stoneLightDirection: .upperLeft,
+                // A soft cast and tight contact give the convex ceramic
+                // stones weight without changing their grid-centered faces.
+                imageStoneShadow: .raised,
+                imageStoneShading: .artwork,
+                gridColor: Color(themeHex: 0x5A3541),
+                coordinateColor: Color(themeHex: 0x432B35),
+                black: StonePalette(
+                    highlight: Color(themeHex: 0x91505F), shade: Color(themeHex: 0x32121D),
+                    flat: Color(themeHex: 0x571D2C), outline: Color(themeHex: 0x32121D),
+                    rim: Color(themeHex: 0xB37B88).opacity(0.4),
+                    lastMove: Color(themeHex: 0xFFF5E9), label: Color(themeHex: 0xFFF5E9),
+                    territory: Color(themeHex: 0x571D2C),
+                    detailedMarkerCasing: Color(themeHex: 0x32121D)),
+                white: StonePalette(
+                    highlight: Color(themeHex: 0xFFF4F5), shade: Color(themeHex: 0xD3AAB9),
+                    flat: Color(themeHex: 0xF4D9E0), outline: Color(themeHex: 0x764251),
+                    rim: Color(themeHex: 0xA87283).opacity(0.45),
+                    lastMove: Color(themeHex: 0x491D30), label: Color(themeHex: 0x491D30),
+                    territory: Color(themeHex: 0xF4D9E0),
+                    detailedMarkerCasing: Color(themeHex: 0xFFF4F5)),
+                emptyPointMarker: Color(themeHex: 0x432B35),
+                markOutline: Color(themeHex: 0x5A3541),
+                dameColor: Color(themeHex: 0x795123),
+                highlightColor: Color(themeHex: 0x24515C),
+                highlightCasing: Color(themeHex: 0xFFF5E9),
+                crosshair: .init(valid: Color(themeHex: 0x315D42),
+                                 invalid: Color(themeHex: 0x8C2C46),
+                                 removal: Color(themeHex: 0x24515C)),
+                crosshairWidth: 1.5,
+                removeMark: Color(themeHex: 0x8C2C46),
+                restoreMark: Color(themeHex: 0x315D42),
+                removalMarkCasing: Color(themeHex: 0xFFF5E9),
+                removedStoneOutline: Color(themeHex: 0x5A3541)
+            )
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
             return flowingInkBoard
         case .standard:
@@ -777,6 +852,74 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             )
         }
     }
+}
+
+/// Ceramic art carries only material shading. The board grid, game marks and
+/// stone contact shadows are native, so they remain exact across layouts.
+private final class SakuraStreamAssets {
+    private init() {}
+    private static let bundle = Bundle(for: SakuraStreamAssets.self)
+
+    static let stones: StoneImages? = {
+        guard let black = UIImage(named: "SakuraStreamBlackStone", in: bundle, compatibleWith: nil),
+              let white = UIImage(named: "SakuraStreamWhiteStone", in: bundle, compatibleWith: nil) else { return nil }
+        return StoneImages(black: [black], white: [white])
+    }()
+
+    static let board = UIImage(named: "SakuraStreamBoard", in: bundle, compatibleWith: nil)
+        .map { BoardTexture(image: $0, mapping: .board) }
+}
+
+/// Oxblood and pink porcelain keep the two players distinct by value. The
+/// supporting stream, plum and linen pigments follow system appearance.
+private enum SakuraStreamColors {
+    private static func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {
+        Color(uiColor: UIColor { traits in
+            let value = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: CGFloat((value >> 16) & 255) / 255,
+                           green: CGFloat((value >> 8) & 255) / 255,
+                           blue: CGFloat(value & 255) / 255, alpha: 1)
+        })
+    }
+
+    static let page = adaptive(0xEEE7DD, 0x211C23)
+    static let panel = adaptive(0xFFF5EB, 0x352B34)
+    static let foreground = adaptive(0x3B2834, 0xF9ECEC)
+    static let detailSecondary = adaptive(0x65515A, 0xDCC7D1)
+    static let panelBorder = adaptive(0x96767C, 0xCFA9BC)
+    static let blackGlass = adaptive(0x581E30, 0x451C2D)
+    static let whiteGlass = adaptive(0xF5DCE5, 0xDCC4D0)
+    static let whiteIdentityGlass = adaptive(0xF7E3EA, 0xE1CCD5)
+    static let action = adaptive(0x76334F, 0x783A58)
+    static let chatBubble = adaptive(0xE7D8DC, 0x4A3946)
+    static let selection = adaptive(0x245462, 0xB3DDE1)
+    static let conditional = adaptive(0x78501F, 0xF2D2A0)
+    static let cream = adaptive(0xFFF5ED, 0xF9ECE8)
+    static let keyline = adaptive(0xFFF5ED, 0x211C23)
+    static let treeGuide = adaptive(0x9A7D88, 0xC0A6B1)
+    static let idle = adaptive(0xDAC7C9, 0x55414D)
+    static let blackSurfaceTop = adaptive(0x713444, 0x572A3C)
+    static let blackSurfaceBottom = adaptive(0x471727, 0x351723)
+    static let whiteSurfaceTop = adaptive(0xF0D0DB, 0xCDB3C1)
+    static let whiteSurfaceBottom = adaptive(0xFFF0F1, 0xEAD6DF)
+    static let blackSolid = adaptive(0x581E30, 0x451C2D)
+    static let whiteForeground = adaptive(0x3D2130, 0x321C29)
+    static let blackAccent = adaptive(0xC7E5DF, 0xC2E1DC)
+    static let whiteAccent = adaptive(0x24505A, 0x244650)
+    static let turnOutline = adaptive(0x3F7780, 0xAAD4D5)
+    static let turnGlow = adaptive(0x81B8BC, 0xAEDCDB)
+    static let blackBorder = adaptive(0xD7A7B7, 0xC698AC)
+    static let whiteBorder = adaptive(0x835265, 0x71465C)
+    static let blackSecondary = adaptive(0xF0D2DB, 0xEAD0DA)
+    static let whiteSecondary = adaptive(0x634353, 0x523646)
+    static let darkModerator = adaptive(0xE5C8F7, 0xE3C8F4)
+    static let lightModerator = adaptive(0x663475, 0x532B62)
+    static let darkProfessional = adaptive(0xC1E6B8, 0xBADFB2)
+    static let lightProfessional = adaptive(0x2E5734, 0x28492F)
+    static let darkSupporter = adaptive(0xF4D7A4, 0xEED2A1)
+    static let lightSupporter = adaptive(0x74481B, 0x613A19)
+    static let darkOrdinary = adaptive(0xC5E1F2, 0xC1DCEC)
+    static let lightOrdinary = adaptive(0x244E68, 0x214258)
 }
 
 /// Stained-glass artwork is separate from the native board and its grid.
@@ -1295,6 +1438,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.page
         case .feltMeadow: FeltMeadowColors.page
         case .nightGarden: NightGardenColors.page
+        case .sakuraStream: SakuraStreamColors.page
         case .christmasKeepsakes: ChristmasKeepsakesColors.page
         case .paperBlossoms: PaperBlossomsColors.page
         }
@@ -1311,6 +1455,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.panel
         case .feltMeadow: FeltMeadowColors.panel
         case .nightGarden: NightGardenColors.panel
+        case .sakuraStream: SakuraStreamColors.panel
         case .christmasKeepsakes: ChristmasKeepsakesColors.panel
         case .paperBlossoms: PaperBlossomsColors.panel
         }
@@ -1326,6 +1471,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.foreground
         case .feltMeadow: FeltMeadowColors.foreground
         case .nightGarden: NightGardenColors.foreground
+        case .sakuraStream: SakuraStreamColors.foreground
         case .christmasKeepsakes: ChristmasKeepsakesColors.foreground
         case .paperBlossoms: PaperBlossomsColors.foreground
         }
@@ -1339,6 +1485,7 @@ extension SurroundTheme {
             flowingInkColors.secondary
         case .feltMeadow: FeltMeadowColors.detailSecondary
         case .nightGarden: NightGardenColors.detailSecondary
+        case .sakuraStream: SakuraStreamColors.detailSecondary
         case .christmasKeepsakes: ChristmasKeepsakesColors.detailSecondary
         case .paperBlossoms: PaperBlossomsColors.detailSecondary
         default: .secondary
@@ -1361,6 +1508,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.panelBorder.opacity(0.28)
         case .feltMeadow: FeltMeadowColors.panelBorder.opacity(0.28)
         case .nightGarden: NightGardenColors.panelBorder.opacity(0.28)
+        case .sakuraStream: SakuraStreamColors.panelBorder.opacity(0.28)
         case .christmasKeepsakes: ChristmasKeepsakesColors.panelBorder.opacity(0.28)
         case .paperBlossoms: PaperBlossomsColors.panelBorder.opacity(0.28)
         }
@@ -1381,7 +1529,7 @@ extension SurroundTheme {
 
     /// The natural scenes use their own foregrounds, translucent pigment
     /// on older systems, and opaque controls under Increase Contrast.
-    var usesLightSceneSurfaces: Bool { isFlowingInk || self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms }
+    var usesLightSceneSurfaces: Bool { isFlowingInk || self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream }
 
     /// Tinted Liquid Glass for a player's clock, in the stone's color.
     /// Light stones use a strong tint to preserve their material color over
@@ -1403,6 +1551,8 @@ extension SurroundTheme {
             color == .black ? FeltMeadowColors.blackGlass.opacity(0.82) : FeltMeadowColors.whiteGlass.opacity(0.84)
         case .nightGarden:
             color == .black ? NightGardenColors.blackGlass.opacity(0.82) : NightGardenColors.whiteGlass.opacity(0.84)
+        case .sakuraStream:
+            color == .black ? SakuraStreamColors.blackGlass.opacity(0.82) : SakuraStreamColors.whiteGlass.opacity(0.84)
         case .christmasKeepsakes:
             color == .black ? ChristmasKeepsakesColors.blackGlass.opacity(0.82) : ChristmasKeepsakesColors.whiteGlass.opacity(0.84)
         case .paperBlossoms:
@@ -1429,6 +1579,8 @@ extension SurroundTheme {
             color == .black ? FeltMeadowColors.blackGlass.opacity(0.86) : FeltMeadowColors.whiteIdentityGlass.opacity(0.90)
         case .nightGarden:
             color == .black ? NightGardenColors.blackGlass.opacity(0.86) : NightGardenColors.whiteIdentityGlass.opacity(0.90)
+        case .sakuraStream:
+            color == .black ? SakuraStreamColors.blackGlass.opacity(0.86) : SakuraStreamColors.whiteIdentityGlass.opacity(0.90)
         case .christmasKeepsakes:
             color == .black ? ChristmasKeepsakesColors.blackGlass.opacity(0.86) : ChristmasKeepsakesColors.whiteIdentityGlass.opacity(0.90)
         case .paperBlossoms:
@@ -1449,6 +1601,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.action
         case .feltMeadow: FeltMeadowColors.action
         case .nightGarden: NightGardenColors.action
+        case .sakuraStream: SakuraStreamColors.action
         case .christmasKeepsakes: ChristmasKeepsakesColors.action
         case .paperBlossoms: PaperBlossomsColors.action
         }
@@ -1461,6 +1614,7 @@ extension SurroundTheme {
         case .frostPine: actionTint?.opacity(0.86)
         case .feltMeadow: actionTint?.opacity(0.86)
         case .nightGarden: actionTint?.opacity(0.86)
+        case .sakuraStream: actionTint?.opacity(0.86)
         case .christmasKeepsakes: actionTint?.opacity(0.86)
         case .paperBlossoms: actionTint?.opacity(0.86)
         case .rakedGarden: actionTint?.opacity(0.88)
@@ -1476,6 +1630,7 @@ extension SurroundTheme {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
             flowingInkSelection
         case .nightGarden: NightGardenColors.selection
+        case .sakuraStream: SakuraStreamColors.selection
         case .christmasKeepsakes: ChristmasKeepsakesColors.selection
         case .paperBlossoms: PaperBlossomsColors.selection
         default: Color(uiColor: .systemIndigo)
@@ -1494,6 +1649,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.chatBubble
         case .feltMeadow: FeltMeadowColors.chatBubble
         case .nightGarden: NightGardenColors.chatBubble
+        case .sakuraStream: SakuraStreamColors.chatBubble
         case .christmasKeepsakes: ChristmasKeepsakesColors.chatBubble
         case .paperBlossoms: PaperBlossomsColors.chatBubble
         }
@@ -1516,6 +1672,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.selection
         case .feltMeadow: FeltMeadowColors.selection
         case .nightGarden: NightGardenColors.selection
+        case .sakuraStream: SakuraStreamColors.selection
         case .christmasKeepsakes: ChristmasKeepsakesColors.selection
         case .paperBlossoms: PaperBlossomsColors.selection
         }
@@ -1534,6 +1691,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.conditional
         case .feltMeadow: FeltMeadowColors.conditional
         case .nightGarden: NightGardenColors.conditional
+        case .sakuraStream: SakuraStreamColors.conditional
         case .christmasKeepsakes: ChristmasKeepsakesColors.conditional
         case .paperBlossoms: PaperBlossomsColors.conditional
         }
@@ -1552,6 +1710,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.keyline
         case .feltMeadow: FeltMeadowColors.keyline
         case .nightGarden: NightGardenColors.keyline
+        case .sakuraStream: SakuraStreamColors.keyline
         case .christmasKeepsakes: ChristmasKeepsakesColors.keyline
         case .paperBlossoms: PaperBlossomsColors.keyline
         }
@@ -1569,6 +1728,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.treeGuide.opacity(0.24)
         case .feltMeadow: FeltMeadowColors.treeGuide.opacity(0.24)
         case .nightGarden: NightGardenColors.treeGuide.opacity(0.24)
+        case .sakuraStream: SakuraStreamColors.treeGuide.opacity(0.24)
         case .christmasKeepsakes: ChristmasKeepsakesColors.treeGuide.opacity(0.24)
         case .paperBlossoms: PaperBlossomsColors.treeGuide.opacity(0.24)
         }
@@ -1586,6 +1746,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.selection
         case .feltMeadow: FeltMeadowColors.selection
         case .nightGarden: NightGardenColors.selection
+        case .sakuraStream: SakuraStreamColors.selection
         case .christmasKeepsakes: ChristmasKeepsakesColors.selection
         case .paperBlossoms: PaperBlossomsColors.selection
         }
@@ -1599,7 +1760,7 @@ extension SurroundTheme {
             nil
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xB7A4FF).opacity(0.85)
-        case .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms: nil
+        case .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream: nil
         }
     }
 
@@ -1615,6 +1776,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.conditional
         case .feltMeadow: FeltMeadowColors.conditional
         case .nightGarden: NightGardenColors.conditional
+        case .sakuraStream: SakuraStreamColors.conditional
         case .christmasKeepsakes: ChristmasKeepsakesColors.conditional
         case .paperBlossoms: PaperBlossomsColors.conditional
         }
@@ -1632,6 +1794,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.idle
         case .feltMeadow: FeltMeadowColors.idle
         case .nightGarden: NightGardenColors.idle
+        case .sakuraStream: SakuraStreamColors.idle
         case .christmasKeepsakes: ChristmasKeepsakesColors.idle
         case .paperBlossoms: PaperBlossomsColors.idle
         }
@@ -1708,6 +1871,13 @@ extension SurroundTheme {
             }
             return [.init(color: NightGardenColors.whiteSurfaceTop, location: 0),
                     .init(color: NightGardenColors.whiteSurfaceBottom, location: 1)]
+        case .sakuraStream:
+            if color == .black {
+                return [.init(color: SakuraStreamColors.blackSurfaceTop, location: 0),
+                        .init(color: SakuraStreamColors.blackSurfaceBottom, location: 1)]
+            }
+            return [.init(color: SakuraStreamColors.whiteSurfaceTop, location: 0),
+                    .init(color: SakuraStreamColors.whiteSurfaceBottom, location: 1)]
         case .christmasKeepsakes:
             if color == .black {
                 return [.init(color: ChristmasKeepsakesColors.blackSurfaceTop, location: 0),
@@ -1737,6 +1907,7 @@ extension SurroundTheme {
         case .frostPine: color == .black ? FrostPineColors.blackSolid : FrostPineColors.whiteGlass
         case .feltMeadow: color == .black ? FeltMeadowColors.blackSolid : FeltMeadowColors.whiteGlass
         case .nightGarden: color == .black ? NightGardenColors.blackSolid : NightGardenColors.whiteGlass
+        case .sakuraStream: color == .black ? SakuraStreamColors.blackSolid : SakuraStreamColors.whiteGlass
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.blackSolid : ChristmasKeepsakesColors.whiteGlass
         case .paperBlossoms: color == .black ? PaperBlossomsColors.blackSolid : PaperBlossomsColors.whiteGlass
         }
@@ -1753,6 +1924,7 @@ extension SurroundTheme {
         case .frostPine: color == .black ? FrostPineColors.cream : FrostPineColors.whiteForeground
         case .feltMeadow: color == .black ? FeltMeadowColors.cream : FeltMeadowColors.whiteForeground
         case .nightGarden: color == .black ? NightGardenColors.cream : NightGardenColors.whiteForeground
+        case .sakuraStream: color == .black ? SakuraStreamColors.cream : SakuraStreamColors.whiteForeground
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.cream : ChristmasKeepsakesColors.whiteForeground
         case .paperBlossoms: color == .black ? PaperBlossomsColors.cream : PaperBlossomsColors.whiteForeground
         }
@@ -1772,6 +1944,7 @@ extension SurroundTheme {
         case .frostPine: color == .black ? FrostPineColors.blackAccent : FrostPineColors.whiteAccent
         case .feltMeadow: color == .black ? FeltMeadowColors.blackAccent : FeltMeadowColors.whiteAccent
         case .nightGarden: color == .black ? NightGardenColors.blackAccent : NightGardenColors.whiteAccent
+        case .sakuraStream: color == .black ? SakuraStreamColors.blackAccent : SakuraStreamColors.whiteAccent
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.blackAccent : ChristmasKeepsakesColors.whiteAccent
         case .paperBlossoms: color == .black ? PaperBlossomsColors.blackAccent : PaperBlossomsColors.whiteAccent
         }
@@ -1781,7 +1954,7 @@ extension SurroundTheme {
     /// Pale night clocks need deeper red; dark clocks use brighter coral.
     func clockSuddenDeathAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark, color == .white { return Color(themeHex: 0x7D293B) }
-        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms { return Color(themeHex: color == .white ? 0x7D293B : 0xFFB5AF) }
+        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream { return Color(themeHex: color == .white ? 0x7D293B : 0xFFB5AF) }
         if self == .feltMeadow {
             return Color(themeHex: color == .white ? 0x7D2D2D : 0xFFADA1)
         }
@@ -1801,7 +1974,7 @@ extension SurroundTheme {
     /// The warning badge uses a solid pigment beneath its white text.
     func clockSuddenDeathBadge(scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark { return Color(themeHex: 0x8B3449) }
-        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms { return Color(themeHex: 0x8B3449) }
+        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream { return Color(themeHex: 0x8B3449) }
         if self == .frostPine { return Color(themeHex: 0x913748) }
         if self == .feltMeadow { return Color(themeHex: 0x8B3434) }
         if self == .surroundStudio, scheme == .dark {
@@ -1813,7 +1986,7 @@ extension SurroundTheme {
     /// Scoring acceptance remains green, with a deeper pigment on night ivory.
     func clockAgreementAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark, color == .white { return Color(themeHex: 0x284B31) }
-        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms { return Color(themeHex: color == .white ? 0x284B31 : 0xBDDEA9) }
+        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream { return Color(themeHex: color == .white ? 0x284B31 : 0xBDDEA9) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xBCE7B8 : 0x254C30)
         }
@@ -1830,7 +2003,7 @@ extension SurroundTheme {
     /// The auto-resign countdown and disconnected label share an amber accent.
     func clockDisconnectedAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark, color == .white { return Color(themeHex: 0x633D15) }
-        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
+        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xF2D09C : 0x603814)
         }
@@ -1849,7 +2022,7 @@ extension SurroundTheme {
         if isFlowingInk, scheme == .dark {
             return Color(themeHex: color == .black ? 0xE8C891 : 0x6B431C)
         }
-        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
+        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xF2D09C : 0x603814)
         }
@@ -1865,7 +2038,7 @@ extension SurroundTheme {
     /// The full undo badge needs its own darker amber beneath white text.
     func clockUndoBadge(scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark { return Color(themeHex: 0x795022) }
-        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms { return Color(themeHex: 0x79501F) }
+        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream { return Color(themeHex: 0x79501F) }
         if self == .frostPine { return Color(themeHex: 0x795022) }
         if self == .feltMeadow { return Color(themeHex: 0x73511E) }
         if self == .surroundStudio, scheme == .dark {
@@ -1891,6 +2064,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.turnOutline
         case .feltMeadow: FeltMeadowColors.turnOutline
         case .nightGarden: NightGardenColors.turnOutline
+        case .sakuraStream: SakuraStreamColors.turnOutline
         case .christmasKeepsakes: ChristmasKeepsakesColors.turnOutline
         case .paperBlossoms: PaperBlossomsColors.turnOutline
         }
@@ -1908,6 +2082,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.turnGlow
         case .feltMeadow: FeltMeadowColors.turnGlow
         case .nightGarden: NightGardenColors.turnGlow
+        case .sakuraStream: SakuraStreamColors.turnGlow
         case .christmasKeepsakes: ChristmasKeepsakesColors.turnGlow
         case .paperBlossoms: PaperBlossomsColors.turnGlow
         }
@@ -1927,6 +2102,7 @@ extension SurroundTheme {
         case .frostPine: FrostPineColors.action
         case .feltMeadow: FeltMeadowColors.action
         case .nightGarden: NightGardenColors.action
+        case .sakuraStream: SakuraStreamColors.action
         case .christmasKeepsakes: ChristmasKeepsakesColors.action
         case .paperBlossoms: PaperBlossomsColors.action
         }
@@ -1964,6 +2140,10 @@ extension SurroundTheme {
             color == .black
                 ? [NightGardenColors.blackSurfaceTop, NightGardenColors.blackSurfaceBottom]
                 : [NightGardenColors.whiteSurfaceTop, NightGardenColors.whiteSurfaceBottom]
+        case .sakuraStream:
+            color == .black
+                ? [SakuraStreamColors.blackSurfaceTop, SakuraStreamColors.blackSurfaceBottom]
+                : [SakuraStreamColors.whiteSurfaceTop, SakuraStreamColors.whiteSurfaceBottom]
         case .christmasKeepsakes:
             color == .black
                 ? [ChristmasKeepsakesColors.blackSurfaceTop, ChristmasKeepsakesColors.blackSurfaceBottom]
@@ -2001,6 +2181,10 @@ extension SurroundTheme {
             color == .black
                 ? NightGardenColors.blackBorder.opacity(0.3)
                 : NightGardenColors.whiteBorder.opacity(0.35)
+        case .sakuraStream:
+            color == .black
+                ? SakuraStreamColors.blackBorder.opacity(0.3)
+                : SakuraStreamColors.whiteBorder.opacity(0.35)
         case .christmasKeepsakes:
             color == .black
                 ? ChristmasKeepsakesColors.blackBorder.opacity(0.3)
@@ -2023,6 +2207,7 @@ extension SurroundTheme {
         case .frostPine: color == .black ? FrostPineColors.cream : FrostPineColors.whiteForeground
         case .feltMeadow: color == .black ? FeltMeadowColors.cream : FeltMeadowColors.whiteForeground
         case .nightGarden: color == .black ? NightGardenColors.cream : NightGardenColors.whiteForeground
+        case .sakuraStream: color == .black ? SakuraStreamColors.cream : SakuraStreamColors.whiteForeground
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.cream : ChristmasKeepsakesColors.whiteForeground
         case .paperBlossoms: color == .black ? PaperBlossomsColors.cream : PaperBlossomsColors.whiteForeground
         }
@@ -2046,6 +2231,8 @@ extension SurroundTheme {
             color == .black ? FeltMeadowColors.blackSecondary : FeltMeadowColors.whiteSecondary
         case .nightGarden:
             color == .black ? NightGardenColors.blackSecondary : NightGardenColors.whiteSecondary
+        case .sakuraStream:
+            color == .black ? SakuraStreamColors.blackSecondary : SakuraStreamColors.whiteSecondary
         case .christmasKeepsakes:
             color == .black ? ChristmasKeepsakesColors.blackSecondary : ChristmasKeepsakesColors.whiteSecondary
         case .paperBlossoms:
@@ -2119,6 +2306,21 @@ extension SurroundTheme {
             }
             return darkSurface ? NightGardenColors.darkOrdinary : NightGardenColors.lightOrdinary
         }
+        if self == .sakuraStream {
+            if player.isOGSModerator || player.isOGSAdmin {
+                return darkSurface ? SakuraStreamColors.darkModerator : SakuraStreamColors.lightModerator
+            }
+            if player.isOGSProfessional {
+                return darkSurface ? SakuraStreamColors.darkProfessional : SakuraStreamColors.lightProfessional
+            }
+            if player.isOGSSupporter {
+                return darkSurface ? SakuraStreamColors.darkSupporter : SakuraStreamColors.lightSupporter
+            }
+            if player.isBot == true || player.uiClass?.contains("bot") == true {
+                return identitySecondary(color)
+            }
+            return darkSurface ? SakuraStreamColors.darkOrdinary : SakuraStreamColors.lightOrdinary
+        }
         if self == .christmasKeepsakes {
             if player.isOGSModerator || player.isOGSAdmin {
                 return darkSurface ? ChristmasKeepsakesColors.darkModerator : ChristmasKeepsakesColors.lightModerator
@@ -2182,6 +2384,7 @@ extension SurroundTheme {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
             flowingInkSelection
         case .nightGarden: NightGardenColors.conditional
+        case .sakuraStream: SakuraStreamColors.conditional
         case .christmasKeepsakes: ChristmasKeepsakesColors.conditional
         case .paperBlossoms: PaperBlossomsColors.selection
         default: actionTint ?? .accentColor
@@ -2824,7 +3027,7 @@ private struct GameDetailThemeModifier: ViewModifier {
             .environment(\.boardAppearance, theme.board(for: theme.colorScheme ?? systemColorScheme))
             .environment(\.colorScheme, theme.colorScheme ?? systemColorScheme)
             .foregroundColor(theme.usesLightSceneSurfaces ? theme.foreground : nil)
-            .modifier(GameDetailLegacyTint(color: (theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms) ? theme.foreground : .accentColor))
+            .modifier(GameDetailLegacyTint(color: (theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream) ? theme.foreground : .accentColor))
             .toolbarColorScheme(theme.colorScheme, for: .navigationBar, .bottomBar)
             .background(WindowInterfaceStyle(colorScheme: ownsWindow ? theme.colorScheme : nil))
     }
@@ -2935,6 +3138,140 @@ private enum WindowStyleRequests {
         } else {
             entries[key] = nil
             window.overrideUserInterfaceStyle = entry.original
+        }
+    }
+}
+
+/// Accessibility backing for Sakura glass. It is used only when transparency
+/// is reduced or contrast is increased, never underneath native Liquid Glass.
+struct SakuraStreamSolidControlSurface: View {
+    let color: StoneColor
+    let cornerRadius: CGFloat
+    let scheme: ColorScheme
+    let contrast: ColorSchemeContrast
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius)
+        shape.fill(SurroundTheme.sakuraStream.clockSolidSurface(color))
+            .overlay {
+                shape.strokeBorder(SurroundTheme.sakuraStream.clockForeground(color, scheme: scheme)
+                    .opacity(contrast == .increased ? 0.7 : 0.5),
+                    lineWidth: contrast == .increased ? 2 : 1)
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Sparse, engraved blossom fragments on the glass's perimeter, with an
+/// optional blossom in the caller-confirmed empty full-clock header pocket.
+struct SakuraStreamGlassEtching: View {
+    enum Role { case clock, player }
+
+    let color: StoneColor
+    let cornerRadius: CGFloat
+    let role: Role
+    var compact = false
+    /// Caller confirms a full Black header with no role/komi in this pocket.
+    var spareClockCorner = false
+    var mirrored = false
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    var body: some View {
+        SakuraStreamGlassEtchDrawing(color: color, cornerRadius: cornerRadius, role: role,
+                                    compact: compact, spareClockCorner: spareClockCorner, mirrored: mirrored,
+                                    scheme: scheme, reduceTransparency: reduceTransparency, contrast: contrast)
+    }
+}
+
+/// Explicit appearance inputs keep the drawing testable without overriding
+/// SwiftUI's read-only accessibility environment values.
+struct SakuraStreamGlassEtchDrawing: View {
+    let color: StoneColor
+    let cornerRadius: CGFloat
+    let role: SakuraStreamGlassEtching.Role
+    var compact = false
+    var spareClockCorner = false
+    var mirrored = false
+    let scheme: ColorScheme
+    let reduceTransparency: Bool
+    let contrast: ColorSchemeContrast
+
+    var body: some View {
+        Canvas { context, size in
+            guard !compact, !reduceTransparency, contrast != .increased,
+                  size.width >= (role == .clock ? 140 : 120),
+                  size.height >= (role == .clock ? 80 : 48) else { return }
+            let rect = CGRect(origin: .zero, size: size)
+            // Clock metadata has a 4 pt vertical reserve; row chips have
+            // only 4 pt padding. Antialiasing also remains outside that area.
+            let band: CGFloat = role == .clock ? 3 : 2.5
+            let outer = RoundedRectangle(cornerRadius: cornerRadius)
+                .path(in: rect.insetBy(dx: 0.75, dy: 0.75))
+            var perimeter = Path(rect)
+            perimeter.addRect(rect.insetBy(dx: band, dy: band))
+            var edge = context
+            edge.clip(to: outer)
+            edge.clip(to: perimeter, style: FillStyle(eoFill: true))
+
+            var blossoms = Path()
+            blossoms.addPath(Self.blossom(center: CGPoint(x: cornerRadius - 2, y: cornerRadius - 3),
+                                         radius: role == .clock ? 10 : 8))
+            blossoms.addPath(Self.blossom(center: CGPoint(x: size.width - cornerRadius + 2,
+                                                         y: size.height - cornerRadius + 3),
+                                         radius: role == .clock ? 7 : 6))
+            if color == .white {
+                blossoms = blossoms.applying(CGAffineTransform(a: -1, b: 0, c: 0, d: 1,
+                                                               tx: size.width, ty: 0))
+            }
+            etch(blossoms, in: edge)
+            if role == .clock && color == .black && spareClockCorner {
+                // This 23 pt pocket is independently reserved by the full
+                // clock layout, above the digits and opposite the status.
+                let pocket = CGRect(x: mirrored ? size.width - 23 : 0, y: 0, width: 23, height: 23)
+                var corner = context
+                corner.clip(to: RoundedRectangle(cornerRadius: cornerRadius).path(in: rect))
+                corner.clip(to: Path(pocket))
+                etch(Self.blossom(center: CGPoint(x: mirrored ? size.width - 13 : 13, y: 12),
+                                  radius: 8.5), in: corner)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func etch(_ path: Path, in context: GraphicsContext) {
+        let stroke = StrokeStyle(lineWidth: 0.6, lineCap: .round, lineJoin: .round)
+        var recess = context
+        recess.translateBy(x: 0, y: 0.35)
+        recess.stroke(path, with: .color(.black.opacity(color == .black ? 0.14 : 0.10)), style: stroke)
+        context.stroke(path, with: .color(
+            SurroundTheme.sakuraStream.clockForeground(color, scheme: scheme)
+                .opacity(color == .black ? 0.14 : 0.12)), style: stroke)
+    }
+
+    private static func blossom(center: CGPoint, radius: CGFloat) -> Path {
+        // Broad rounded petals with the small cleft at each cherry-blossom
+        // tip. Every endpoint and control point stays inside the same radius.
+        Path { path in
+            for petal in 0..<5 {
+                let axis = CGFloat(petal) * 2 * .pi / 5 - .pi / 2
+                func point(_ degrees: CGFloat, _ distance: CGFloat) -> CGPoint {
+                    let angle = axis + degrees * .pi / 180
+                    return CGPoint(x: center.x + cos(angle) * radius * distance,
+                                   y: center.y + sin(angle) * radius * distance)
+                }
+                if petal == 0 { path.move(to: point(-36, 0.44)) }
+                path.addCurve(to: point(-12, 1),
+                              control1: point(-34, 0.74), control2: point(-26, 1))
+                path.addQuadCurve(to: point(0, 0.84), control: point(-5, 1))
+                path.addQuadCurve(to: point(12, 1), control: point(5, 1))
+                path.addCurve(to: point(36, 0.44),
+                              control1: point(26, 1), control2: point(34, 0.74))
+            }
+            path.closeSubpath()
         }
     }
 }
@@ -3329,7 +3666,7 @@ struct GameDetailSecondaryText: ViewModifier {
     @Environment(\.surroundTheme) private var theme
 
     @ViewBuilder func body(content: Content) -> some View {
-        if theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms {
+        if theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream {
             content.foregroundStyle(theme.detailSecondaryForeground)
         } else {
             content.foregroundStyle(.secondary)
@@ -3362,7 +3699,7 @@ struct ThemeStatusBarContrast: View {
         return switch theme {
         case .nightGarden: 0.8
         case .flowingInk, .flowingInkJade: 0.85
-        case .rakedGarden, .frostPine, .surroundStudio, .paperBlossoms: 0.55
+        case .rakedGarden, .frostPine, .surroundStudio, .paperBlossoms, .sakuraStream: 0.55
         default: 0
         }
     }
@@ -3491,7 +3828,122 @@ struct GameDetailBackdrop: View {
             PaperBlossomsScene(scheme: colorScheme)
         case .frostPine:
             FrostPineScene(scheme: colorScheme)
+        case .sakuraStream:
+            SakuraStreamScene(scheme: colorScheme)
         }
+    }
+}
+
+/// One overhead photograph fills the viewport without stretching its flowers
+/// or water. The shoreline stays near the top in portrait and the leading
+/// edge in landscape; panel, board and keyboard state never enter the crop.
+struct SakuraStreamSceneLayout: Equatable {
+    enum Composition: CaseIterable {
+        case portrait, landscape
+
+        var sourceSize: CGSize {
+            self == .portrait ? CGSize(width: 1024, height: 1536) : CGSize(width: 1536, height: 1024)
+        }
+
+        var assetName: String {
+            self == .portrait ? "SakuraStreamScenePortrait" : "SakuraStreamSceneLandscape"
+        }
+
+        // Anchor a shoreline landmark to the same viewport fraction.
+        // Aspect-fill then crops excess water rather than enlarging its band
+        // in squarer windows. Center the other axis to retain blossom clusters.
+        var cropAnchor: CGPoint {
+            self == .portrait ? CGPoint(x: 0.5, y: 0.21) : CGPoint(x: 0.18, y: 0.5)
+        }
+    }
+
+    let size: CGSize
+    let composition: Composition
+    let imageFrame: CGRect
+
+    init(size: CGSize) {
+        let width = size.width.isFinite ? max(0, size.width) : 0
+        let height = size.height.isFinite ? max(0, size.height) : 0
+        self.size = CGSize(width: width, height: height)
+        composition = width > height ? .landscape : .portrait
+        let source = composition.sourceSize
+        guard width > 0, height > 0 else {
+            imageFrame = .zero
+            return
+        }
+        let scale = max(width / source.width, height / source.height)
+        let imageSize = CGSize(width: source.width * scale, height: source.height * scale)
+        let anchor = composition.cropAnchor
+        imageFrame = CGRect(x: (width - imageSize.width) * anchor.x,
+                            y: (height - imageSize.height) * anchor.y,
+                            width: imageSize.width, height: imageSize.height)
+    }
+}
+
+private final class SakuraStreamSceneAssets {
+    private init() {}
+    private static let bundle = Bundle(for: SakuraStreamSceneAssets.self)
+    static let portrait = UIImage(named: "SakuraStreamScenePortrait", in: bundle, compatibleWith: nil)
+    static let landscape = UIImage(named: "SakuraStreamSceneLandscape", in: bundle, compatibleWith: nil)
+}
+
+private struct SakuraStreamScene: View {
+    let scheme: ColorScheme
+
+    var body: some View {
+        GeometryReader { geometry in
+            SakuraStreamSceneContent(size: geometry.size, scheme: scheme).equatable()
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct SakuraStreamSceneContent: View, Equatable {
+    let size: CGSize
+    let scheme: ColorScheme
+
+    private var usesLegacyChrome: Bool {
+        if #available(iOS 26.0, *) { return false }
+        return true
+    }
+
+    var body: some View {
+        let layout = SakuraStreamSceneLayout(size: size)
+        let chrome = Color(themeHex: scheme == .dark ? 0x261D23 : 0xF1E7DD)
+        ZStack {
+            chrome
+            if let image = layout.composition == .portrait
+                ? SakuraStreamSceneAssets.portrait : SakuraStreamSceneAssets.landscape {
+                Image(uiImage: image)
+                    .resizable()
+                    .frame(width: layout.imageFrame.width, height: layout.imageFrame.height)
+                    .saturation(scheme == .dark ? 0.65 : 1)
+                    .colorMultiply(scheme == .dark ? Color(themeHex: 0x786B79) : .white)
+                    .position(x: layout.imageFrame.midX, y: layout.imageFrame.midY)
+            }
+            // Modern navigation owns its edge effect. Older systems need
+            // local pigment beneath bare toolbar labels and the title.
+            if usesLegacyChrome {
+                VStack(spacing: 0) {
+                    LinearGradient(stops: [
+                        .init(color: chrome.opacity(0.92), location: 0),
+                        .init(color: chrome.opacity(0.92), location: 0.62),
+                        .init(color: .clear, location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(92, layout.size.height * 0.2))
+                    Spacer(minLength: 0)
+                    LinearGradient(stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: chrome.opacity(0.78), location: 0.55),
+                        .init(color: chrome.opacity(0.94), location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(76, layout.size.height * 0.2))
+                }
+            }
+        }
+        .frame(width: layout.size.width, height: layout.size.height)
+        .clipped()
     }
 }
 
@@ -4036,6 +4488,265 @@ private struct SurroundStudioSceneContent: View, Equatable {
     }
 }
 
+/// One placement drives the opaque background canopy and its board projection.
+/// No game/board/panel state enters this viewport-only layout.
+struct SakuraStreamCanopyLayout: Equatable {
+    let size: CGSize
+    let canopy: CGRect
+    let leftCanopy: CGRect
+    let leftShadowOffset: CGSize
+    let rightShadowOffset: CGSize
+    let blurRadius: CGFloat
+    let topClearHeight: CGFloat
+    let topFadeHeight: CGFloat
+
+    init(size: CGSize) {
+        let width = size.width.isFinite ? max(0, size.width) : 0
+        let height = size.height.isFinite ? max(0, size.height) : 0
+        self.size = CGSize(width: width, height: height)
+        let shortSide = min(width, height)
+        let side = min(480, shortSide * 0.92)
+        canopy = side > 0
+            ? CGRect(x: width - side * (width > height ? 0.95 : 0.75),
+                     y: width > height ? shortSide * 0.03 : height * 0.14,
+                     width: side, height: side) : .zero
+        let leftSide = min(520, shortSide * 1.04)
+        leftCanopy = width > height && leftSide > 0
+            ? CGRect(x: -leftSide * 0.20, y: shortSide * 0.02,
+                     width: leftSide, height: leftSide) : .zero
+        // The boughs stay at the viewport edges; their longer cast reaches the
+        // controls and playing surface without following any panel or board.
+        leftShadowOffset = CGSize(width: min(360, width * 0.30), height: shortSide * 0.10)
+        rightShadowOffset = CGSize(width: 2, height: shortSide * 0.08)
+        blurRadius = min(5, shortSide * 0.009)
+        topClearHeight = min(76, height * 0.18)
+        topFadeHeight = topClearHeight + min(48, shortSide * 0.12)
+    }
+}
+
+/// Select a single visible detailed slab. Actual cell size is independently
+/// checked so stale/default metadata can never decorate a compact board.
+struct SakuraStreamBoardCanopyLayout: Equatable {
+    let board: BoardSceneShadowRegion?
+    let cornerExtent: CGFloat
+    let tipBand: CGFloat
+
+    init(size: CGSize, boards: [BoardSceneShadowRegion]) {
+        let viewport = CGRect(origin: .zero, size: SakuraStreamCanopyLayout(size: size).size)
+        board = boards.filter { region in
+            let rect = region.bounds
+            return region.isDetailed && region.cellSize.isFinite
+                && usesDetailedStoneRendering(at: region.cellSize)
+                && [rect.minX, rect.minY, rect.width, rect.height].allSatisfy(\.isFinite)
+                && rect.width > 0 && rect.height > 0 && rect.intersects(viewport)
+        }.max { $0.bounds.width * $0.bounds.height < $1.bounds.width * $1.bounds.height }
+        cornerExtent = board.map { min(160, min($0.bounds.width, $0.bounds.height) * 0.38) } ?? 0
+        tipBand = board.map { min(20, $0.cellSize) } ?? 0
+    }
+}
+
+/// The alpha mask is applied after blurring the static art. Everything beyond
+/// the selected board, including clocks/panels and other boards, stays clear.
+struct SakuraStreamBoardCanopyMask: View, Equatable {
+    enum Layer { case shadow, tips }
+    let boards: [BoardSceneShadowRegion]
+    let layer: Layer
+    var isEnabled = true
+
+    var body: some View {
+        Canvas { context, size in
+            let layout = SakuraStreamBoardCanopyLayout(size: size, boards: boards)
+            guard isEnabled, let board = layout.board else { return }
+            let rect = board.bounds
+            let radius = board.cornerRadius.isFinite ? max(0, board.cornerRadius) : 0
+            let shape = RoundedRectangle(cornerRadius: radius, style: .circular).path(in: rect)
+            context.clip(to: shape)
+            let corner = CGPoint(x: rect.maxX, y: rect.minY)
+            // Bound the painted bands before destination-in compositing. The
+            // rounded slab's antialiased edge must not survive outside the fade.
+            context.clip(to: Path(ellipseIn: CGRect(
+                x: corner.x - layout.cornerExtent, y: corner.y - layout.cornerExtent,
+                width: layout.cornerExtent * 2, height: layout.cornerExtent * 2)))
+            // Exclude other boards before painting. Erasing afterwards through
+            // the fade's antialiased clip can leave partially erased pixels.
+            for other in boards where other != board {
+                let rect = other.bounds
+                guard [rect.minX, rect.minY, rect.width, rect.height].allSatisfy(\.isFinite),
+                      rect.width > 0, rect.height > 0 else { continue }
+                let radius = other.cornerRadius.isFinite ? max(0, other.cornerRadius) : 0
+                var outside = Path(CGRect(origin: .zero, size: size))
+                outside.addPath(RoundedRectangle(cornerRadius: radius, style: .circular).path(in: rect))
+                context.clip(to: outside, style: FillStyle(eoFill: true))
+            }
+            let fade = GraphicsContext.Shading.radialGradient(
+                Gradient(stops: [.init(color: .white, location: 0),
+                                 .init(color: .white.opacity(0.65), location: 0.35),
+                                 .init(color: .clear, location: 1)]),
+                center: corner, startRadius: 0, endRadius: layout.cornerExtent)
+            if layer == .tips {
+                let top = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: layout.tipBand)
+                let right = CGRect(x: rect.maxX - layout.tipBand, y: rect.minY,
+                                   width: layout.tipBand, height: rect.height)
+                context.fill(Path(top), with: .linearGradient(Gradient(colors: [.white, .clear]),
+                    startPoint: CGPoint(x: 0, y: top.minY), endPoint: CGPoint(x: 0, y: top.maxY)))
+                context.fill(Path(right), with: .linearGradient(Gradient(colors: [.clear, .white]),
+                    startPoint: CGPoint(x: right.minX, y: 0), endPoint: CGPoint(x: right.maxX, y: 0)))
+                context.blendMode = .destinationIn
+            }
+            context.fill(shape, with: fade)
+        }
+        .transaction { $0.animation = nil }
+    }
+}
+
+/// Shadows may cross controls and the main board, but never a compact board or
+/// a secondary preview. Clip holes before painting so their interiors are clear.
+struct SakuraStreamSceneCanopyMask: View, Equatable {
+    let boards: [BoardSceneShadowRegion]
+    var isEnabled = true
+
+    var body: some View {
+        Canvas { context, size in
+            guard isEnabled else { return }
+            let layout = SakuraStreamCanopyLayout(size: size)
+            let main = SakuraStreamBoardCanopyLayout(size: size, boards: boards).board
+            let viewport = CGRect(origin: .zero, size: layout.size)
+            for region in boards {
+                if let main, region == main { continue }
+                let rect = region.bounds
+                guard [rect.minX, rect.minY, rect.width, rect.height].allSatisfy(\.isFinite),
+                      rect.width > 0, rect.height > 0 else { continue }
+                let radius = region.cornerRadius.isFinite ? max(0, region.cornerRadius) : 0
+                var outside = Path(viewport)
+                outside.addPath(RoundedRectangle(cornerRadius: radius, style: .circular).path(in: rect))
+                context.clip(to: outside, style: FillStyle(eoFill: true))
+            }
+            context.fill(Path(viewport), with: .linearGradient(
+                Gradient(colors: [.clear, .white]),
+                startPoint: CGPoint(x: 0, y: layout.topClearHeight),
+                endPoint: CGPoint(x: 0, y: layout.topFadeHeight)))
+        }
+        .transaction { $0.animation = nil }
+    }
+}
+
+private final class SakuraStreamCanopyAssets {
+    private init() {}
+    private static let bundle = Bundle(for: SakuraStreamCanopyAssets.self)
+    static let canopy = UIImage(named: "SakuraStreamCanopy", in: bundle, compatibleWith: nil)
+    static let leftCanopy = UIImage(named: "SakuraStreamCanopyLeft", in: bundle, compatibleWith: nil)
+}
+
+/// Cached art shares one viewport frame; projected casts add only static offsets.
+private struct SakuraStreamCanopyImage: View, Equatable {
+    let size: CGSize
+    let scheme: ColorScheme
+    var silhouette = false
+    var isLeft = false
+    var isEnabled = true
+
+    var body: some View {
+        let layout = SakuraStreamCanopyLayout(size: size)
+        let frame = isLeft ? layout.leftCanopy : layout.canopy
+        if let canopy = isLeft ? SakuraStreamCanopyAssets.leftCanopy : SakuraStreamCanopyAssets.canopy {
+            Image(uiImage: canopy)
+                .renderingMode(silhouette ? .template : .original)
+                .resizable()
+                .foregroundStyle(Color(themeHex: scheme == .dark ? 0x151322 : 0x43313B))
+                .colorMultiply(silhouette ? .white : (scheme == .dark ? Color(themeHex: 0x8F829F) : .white))
+                // Keep each image mounted while its visibility changes.
+                .opacity(isEnabled && !frame.isEmpty ? 1 : 0)
+                .frame(width: frame.width, height: frame.height)
+                .position(x: frame.midX, y: frame.midY)
+                .frame(width: layout.size.width, height: layout.size.height)
+        }
+    }
+}
+
+private struct SakuraStreamCanopyBehind: View, Equatable {
+    let size: CGSize
+    let scheme: ColorScheme
+
+    var body: some View {
+        let layout = SakuraStreamCanopyLayout(size: size)
+        ZStack {
+            SakuraStreamCanopyImage(size: size, scheme: scheme)
+            SakuraStreamCanopyImage(size: size, scheme: scheme, isLeft: true)
+        }
+        .shadow(color: Color(themeHex: 0x332632).opacity(scheme == .dark ? 0.16 : 0.20),
+                radius: layout.blurRadius, x: 2, y: 4)
+        .clipped()
+    }
+}
+
+private struct SakuraStreamCanopyForeground: View {
+    let size: CGSize
+    let scheme: ColorScheme
+    let boards: [BoardSceneShadowRegion]
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    var body: some View {
+        SakuraStreamCanopyProjection(size: size, scheme: scheme, boards: boards,
+                                     reduceTransparency: reduceTransparency, contrast: contrast)
+    }
+}
+
+/// Composite the two silhouettes before applying opacity: overlapping casts
+/// remain at most 11%, rather than adding two dark patches over UI lettering.
+struct SakuraStreamCanopyShadowProjection: View {
+    let size: CGSize
+    let scheme: ColorScheme
+    let boards: [BoardSceneShadowRegion]
+    let isEnabled: Bool
+
+    var body: some View {
+        let layout = SakuraStreamCanopyLayout(size: size)
+        ZStack {
+            SakuraStreamCanopyImage(size: size, scheme: scheme, silhouette: true, isEnabled: isEnabled)
+                .offset(x: layout.rightShadowOffset.width, y: layout.rightShadowOffset.height)
+            SakuraStreamCanopyImage(size: size, scheme: scheme, silhouette: true, isLeft: true, isEnabled: isEnabled)
+                .offset(x: layout.leftShadowOffset.width, y: layout.leftShadowOffset.height)
+        }
+        .compositingGroup()
+        .blur(radius: layout.blurRadius)
+        .mask(SakuraStreamSceneCanopyMask(boards: boards, isEnabled: isEnabled))
+        .clipped()
+        .opacity(0.11)
+        .transaction { $0.animation = nil }
+    }
+}
+
+/// Explicit accessibility inputs support native rendering checks while the
+/// foreground wrapper continues to read the real system preferences.
+struct SakuraStreamCanopyProjection: View {
+    let size: CGSize
+    let scheme: ColorScheme
+    let boards: [BoardSceneShadowRegion]
+    let reduceTransparency: Bool
+    let contrast: ColorSchemeContrast
+
+    var allowsProjection: Bool {
+        !reduceTransparency && contrast != .increased
+    }
+
+    var body: some View {
+        let enabled = allowsProjection
+        let tipsEnabled = enabled && SakuraStreamBoardCanopyLayout(size: size, boards: boards).board != nil
+        ZStack {
+            SakuraStreamCanopyShadowProjection(size: size, scheme: scheme, boards: boards, isEnabled: enabled)
+            SakuraStreamCanopyImage(size: size, scheme: scheme, isEnabled: tipsEnabled)
+                .mask(SakuraStreamBoardCanopyMask(boards: boards, layer: .tips, isEnabled: tipsEnabled))
+                .opacity(0.20)
+        }
+        .compositingGroup()
+        .clipped()
+        // Keep the image/mask layers mounted at the 14 pt boundary. No resize
+        // animation may blend decoration into the compact board's solid colors.
+        .transaction { $0.animation = nil }
+    }
+}
+
 /// Canopies follow the viewport behind the game, so clocks and panels cover
 /// the leaves in every layout, including folded displays.
 struct GameDetailSceneFoliage: View {
@@ -4049,6 +4760,10 @@ struct GameDetailSceneFoliage: View {
                 GeometryReader { geometry in
                     RakedGardenFoliageContent(size: geometry.size, scheme: colorScheme,
                                                  hasTopEdgeClocks: hasTopEdgeClocks).equatable()
+                }
+            } else if theme == .sakuraStream {
+                GeometryReader { geometry in
+                    SakuraStreamCanopyBehind(size: geometry.size, scheme: colorScheme).equatable()
                 }
             } else if theme == .surroundStudio {
                 GeometryReader { geometry in
@@ -4073,6 +4788,10 @@ struct GameDetailSceneForeground: View {
             if theme == .rakedGarden {
                 GeometryReader { geometry in
                     RakedGardenMapleShadow(size: geometry.size, scheme: colorScheme).equatable()
+                }
+            } else if theme == .sakuraStream {
+                GeometryReader { geometry in
+                    SakuraStreamCanopyForeground(size: geometry.size, scheme: colorScheme, boards: shadowExclusions)
                 }
             } else if theme == .frostPine {
                 GeometryReader { geometry in

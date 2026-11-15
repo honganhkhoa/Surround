@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "SakuraStreamBoard.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

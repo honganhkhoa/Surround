@@ -102,7 +102,7 @@ private struct GameControlGlass<Surface: Shape>: ViewModifier {
             } else {
                 // Scene decorations can pass beneath More. Give its ink
                 // a stable surface that follows the current appearance.
-                content.glassEffect((theme == .nightGarden || theme == .christmasKeepsakes
+                content.glassEffect((theme == .nightGarden || theme == .christmasKeepsakes || theme == .sakuraStream
                     ? Glass.regular.tint(theme.panel.opacity(0.9)) : .clear)
                     .interactive(interactive), in: shape)
             }
@@ -215,7 +215,7 @@ struct GameControlRow: View {
 
     private var moreForeground: Color {
         if theme.isFlowingInk || theme == .paperBlossoms { return theme.homeActionForeground }
-        guard theme == .nightGarden || theme == .christmasKeepsakes else {
+        guard theme == .nightGarden || theme == .christmasKeepsakes || theme == .sakuraStream else {
             return theme == .feltMeadow ? theme.foreground : .accentColor
         }
         // Glass can choose its own content appearance over the scene. Keep

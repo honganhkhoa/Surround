@@ -641,6 +641,36 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                                appearance: .dark)
     }
 
+    func testSakuraStreamThemeOrientations() {
+        auditThemeOrientations(theme: "sakuraStream", title: "Sakura Stream",
+                               suffix: "-sakura-stream", appearance: .light)
+    }
+
+    func testSakuraStreamThemePanels() {
+        auditThemePanels(theme: "sakuraStream", title: "Sakura Stream",
+                         suffix: "-sakura-stream", appearance: .light)
+    }
+
+    func testSakuraStreamNightThemePanels() {
+        auditThemePanels(theme: "sakuraStream", title: "Sakura Stream in Dark Mode",
+                         suffix: "-sakura-stream-night", appearance: .dark)
+    }
+
+    func testSakuraStreamThemeNarrowWindow() {
+        auditNarrowNativeWindowArtboard(theme: "sakuraStream", suffix: "-sakura-stream",
+                                       appearance: .light)
+    }
+
+    func testSakuraStreamThemeTallWindow() {
+        auditNarrowNativeWindowArtboard(theme: "sakuraStream", suffix: "-sakura-stream-tall",
+                                       appearance: .light, requestedSize: CGSize(width: 375, height: 1000))
+    }
+
+    func testSakuraStreamThemePanelTransitions() {
+        auditThemePanelTransitions(theme: "sakuraStream", title: "Sakura Stream",
+                                   suffix: "-sakura-stream")
+    }
+
     func testPaperBlossomsThemeOrientations() {
         auditThemeOrientations(theme: "paperBlossoms", title: "Paper Blossoms",
                                suffix: "-paper-blossoms", appearance: .light)
@@ -1590,7 +1620,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                                                  requestedSize: CGSize = CGSize(width: 375, height: 548)) {
         let app = launchGame(artboard: 84, portrait: true, theme: theme, appearance: appearance)
         defer {
-            if theme?.hasPrefix("flowingInk") == true || theme == "paperBlossoms" {
+            if theme?.hasPrefix("flowingInk") == true || theme == "paperBlossoms" || theme == "sakuraStream" {
                 restoreFullWindow(in: app)
                 app.terminate()
             }
@@ -1614,19 +1644,75 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
             return difference / 2 + (difference > 0 ? 8 : -8)
         }
         let tallWindow = requestedSize.height > before.height * 0.75
+        var heightResponses: [(gesture: CGFloat, change: CGFloat, pinned: Bool)] = []
+        func recordHeightResponse(_ gesture: CGFloat, from before: CGRect, to after: CGRect) {
+            guard gesture != 0 else { return }
+            let pinned = before.minY <= 40
+            guard pinned == (after.minY <= 40) else {
+                heightResponses.removeAll()
+                return
+            }
+            if let last = heightResponses.last,
+               last.pinned != pinned || (last.gesture > 0) != (gesture > 0) {
+                heightResponses.removeAll()
+            }
+            heightResponses.append((gesture, after.height - before.height, pinned))
+            heightResponses = Array(heightResponses.suffix(2))
+        }
         for _ in 0..<(tallWindow ? 10 : 6) {
             let current = window.frame
             guard abs(current.width - requestedSize.width) > 1 || abs(current.height - requestedSize.height) > 1 else { break }
             let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
                 .withOffset(CGVector(dx: -3, dy: -3))
-            // A tall window stays pinned below the status bar, so only its
-            // lower edge can move. The centered-window half correction then
-            // under-shoots; use the full measured correction for that axis.
+            // Growing a tall window pinned below the status bar moves only
+            // its lower edge. Shrinking can release that pin and move both
+            // edges, so it still needs the centered-window half correction.
             let heightCorrection = resizeDelta(requestedSize.height - current.height)
-                * (tallWindow && current.minY <= 40 ? 2 : 1)
+                * (tallWindow && current.minY <= 40 && requestedSize.height > current.height ? 2 : 1)
             corner.press(forDuration: 0.8, thenDragTo: corner.withOffset(
                 CGVector(dx: resizeDelta(requestedSize.width - current.width), dy: heightCorrection)))
             Thread.sleep(forTimeInterval: 0.8)
+            let settled = window.frame
+            recordHeightResponse(heightCorrection, from: current, to: settled)
+            print("[NativeWindowResize] requested=\(requestedSize) before=\(current) after=\(settled)")
+        }
+        // Close to the status-bar pin, the native drag activation distance
+        // can consume most of a small correction. Reuse the measured gesture
+        // response instead of adding more fixed compensation or relaxing the
+        // requested size. This fallback is bounded and only for tall windows.
+        for _ in 0..<(tallWindow ? 6 : 0) {
+            let current = window.frame
+            let remaining = requestedSize.height - current.height
+            guard abs(remaining) > 1, abs(current.width - requestedSize.width) <= 1 else { break }
+            let pinned = current.minY <= 40
+            if let last = heightResponses.last,
+               last.pinned != pinned || (last.gesture > 0) != (remaining > 0) {
+                heightResponses.removeAll()
+            }
+            var correction = resizeDelta(remaining) * (pinned && remaining > 0 ? 2 : 1)
+            if let last = heightResponses.last {
+                var gain: CGFloat = 1
+                if heightResponses.count == 2 {
+                    let earlier = heightResponses[0]
+                    let gestureChange = last.gesture - earlier.gesture
+                    let sizeChange = last.change - earlier.change
+                    if abs(gestureChange) >= 0.5 && abs(sizeChange) >= 0.5 {
+                        gain = min(2, max(0.25, sizeChange / gestureChange))
+                    }
+                }
+                let predicted = last.gesture + (remaining - last.change) / gain
+                if (predicted > 0) == (remaining > 0) {
+                    let limit = min(80, abs(last.gesture) * 2)
+                    correction = (remaining > 0 ? 1 : -1) * min(abs(predicted), limit)
+                }
+            }
+            let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
+                .withOffset(CGVector(dx: -3, dy: -3))
+            corner.press(forDuration: 0.8, thenDragTo: corner.withOffset(CGVector(dx: 0, dy: correction)))
+            Thread.sleep(forTimeInterval: 0.8)
+            let settled = window.frame
+            recordHeightResponse(correction, from: current, to: settled)
+            print("[NativeWindowResizeCalibration] requested=\(requestedSize) gesture=\(correction) before=\(current) after=\(settled)")
         }
         let after = window.frame
         capture(84, "Native iPad window, \(requestedSize)", in: app,

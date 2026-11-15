@@ -78,7 +78,7 @@ final class StonePlacementSoundPlayer: ObservableObject {
     /// Folded paper shares the soft felt bank; visual presentations need not
     /// duplicate audio assets merely to preserve their material character.
     private static func soundTheme(for theme: SurroundTheme) -> SurroundTheme {
-        if theme.isFlowingInk { return .standard }
+        if theme.isFlowingInk || theme == .sakuraStream { return .standard }
         return theme == .paperBlossoms ? .feltMeadow : theme
     }
 

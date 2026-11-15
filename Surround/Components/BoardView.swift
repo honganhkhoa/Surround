@@ -1838,7 +1838,8 @@ struct BoardView: View {
                 // reserved for its soft shadow in the surrounding scene.
                 Color.clear
                     .frame(width: geometry.size.width, height: geometry.size.height + depthGeometry.thickness)
-                    .modifier(BoardSceneShadowExclusion(cornerRadius: faceRadius))
+                    .modifier(BoardSceneShadowExclusion(cornerRadius: faceRadius,
+                                                        isDetailed: detailed, cellSize: cellSize))
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }

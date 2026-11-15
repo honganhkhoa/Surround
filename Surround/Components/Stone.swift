@@ -7,16 +7,20 @@
 
 import SwiftUI
 
-/// Opted-in scenes keep their cast shadows off every board and its stones.
-/// Bounds are resolved by the scene without feeding geometry back into layout.
+/// Opted-in scenes resolve board bounds without feeding geometry into layout.
+/// Frost excludes every slab; Sakura decorates only the largest detailed slab.
 struct BoardSceneShadowRegion: Equatable {
     var bounds: CGRect
     var cornerRadius: CGFloat = 0
+    var isDetailed = true
+    var cellSize: CGFloat = 0
 }
 
 struct BoardSceneShadowAnchor {
     let bounds: Anchor<CGRect>
     let cornerRadius: CGFloat
+    var isDetailed = true
+    var cellSize: CGFloat = 0
 }
 
 struct BoardSceneShadowExclusionKey: PreferenceKey {
@@ -41,10 +45,13 @@ extension EnvironmentValues {
 struct BoardSceneShadowExclusion: ViewModifier {
     @Environment(\.excludesBoardsFromSceneShadows) private var enabled
     var cornerRadius: CGFloat = 0
+    var isDetailed = true
+    var cellSize: CGFloat = 0
 
     func body(content: Content) -> some View {
         content.anchorPreference(key: BoardSceneShadowExclusionKey.self, value: .bounds) {
-            enabled ? [BoardSceneShadowAnchor(bounds: $0, cornerRadius: cornerRadius)] : []
+            enabled ? [BoardSceneShadowAnchor(bounds: $0, cornerRadius: cornerRadius,
+                                             isDetailed: isDetailed, cellSize: cellSize)] : []
         }
     }
 }

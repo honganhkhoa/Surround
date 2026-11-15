@@ -416,6 +416,15 @@ private struct GameDetailClockCard: View {
         style == .inline || (style == .compact && !spaciousCompact)
             || columnCard || narrowFullCard || narrowCompactCard
     }
+    private var compactSakuraControl: Bool {
+        style != .full || columnCard || narrowFullCard || narrowCompactCard
+    }
+    private var hasSakuraEtchCorner: Bool {
+        // Static etching uses only Black's empty full header corner. Komi,
+        // role labels and accessibility text keep their original reservations.
+        color == .black && style == .full && !columnCard && !narrowFullCard && !showsRoleName
+            && cardWidth >= 160 && !dynamicTypeSize.isAccessibilitySize
+    }
     private var leadingContentPadding: CGFloat {
         spaciousCompact ? 14 : (style == .full ? (columnCard ? 10 : 12) : 8)
     }
@@ -452,7 +461,7 @@ private struct GameDetailClockCard: View {
         if state.reconnecting {
             // Reconnecting has replaced the undo label; its badge pigment
             // is too dark as text on night slate or charcoal felt clocks.
-            return theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || (theme == .surroundStudio && colorScheme == .dark)
+            return theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || (theme == .surroundStudio && colorScheme == .dark)
                 ? foreground : badgeBackground
         }
         return theme.clockUndoAccent(color, scheme: colorScheme)
@@ -483,11 +492,19 @@ private struct GameDetailClockCard: View {
                             }
                         }
                 }
+                .overlay {
+                    if theme == .sakuraStream && showsThemeGlass {
+                        SakuraStreamGlassEtching(color: color, cornerRadius: clockCornerRadius,
+                                                 role: .clock, compact: compactSakuraControl,
+                                                 spareClockCorner: hasSakuraEtchCorner, mirrored: mirrored)
+                    }
+                }
                 .overlay { clockOutline }
                 .modifier(GameDetailClearGlass(shape: shape,
                                                enabled: !theme.isFlowingInk && theme != .feltMeadow
                                                    && theme != .paperBlossoms && theme != .christmasKeepsakes && theme != .frostPine
                                                    && theme != .nightGarden
+                                                   && (theme != .sakuraStream || style != .inline)
                                                    && !reduceTransparency
                                                    && (!theme.usesLightSceneSurfaces || contrast != .increased),
                                                tint: showsThemeGlass ? theme.clockGlassTint(color) : nil))
@@ -636,6 +653,9 @@ private struct GameDetailClockCard: View {
             NightGardenPaneSurface(color: color, role: .clock, compact: compactNightGardenPane)
         } else if showsThemeGlass {
             Color.clear
+        } else if theme == .sakuraStream && (reduceTransparency || contrast == .increased) {
+            SakuraStreamSolidControlSurface(color: color, cornerRadius: clockCornerRadius,
+                                           scheme: colorScheme, contrast: contrast)
         } else if reduceTransparency || contrast == .increased {
             shape.fill(theme.clockSolidSurface(color))
         } else {
@@ -1225,6 +1245,7 @@ struct GameDetailPlayerIdentity: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.surroundTheme) private var theme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Setting(.hidesRank) private var hidesRank: Bool
     @State private var showsTeam = false
@@ -1314,6 +1335,9 @@ struct GameDetailPlayerIdentity: View {
             } else if theme == .nightGarden {
                 NightGardenPaneSurface(color: color, role: .player,
                                        compact: navigationHeader || compactHeader || avatarOnly || vertical)
+            } else if theme == .sakuraStream && (reduceTransparency || contrast == .increased) {
+                SakuraStreamSolidControlSurface(color: color, cornerRadius: chipCornerRadius,
+                                               scheme: colorScheme, contrast: contrast)
             } else if !showsThemeGlass {
                 let translucentScene = theme.usesLightSceneSurfaces && !navigationHeader
                     && !reduceTransparency && contrast != .increased
@@ -1329,6 +1353,12 @@ struct GameDetailPlayerIdentity: View {
                         RoundedRectangle(cornerRadius: chipCornerRadius)
                             .strokeBorder(theme.identityChipBorder(color), lineWidth: 1)
                     }
+            }
+        }
+        .overlay {
+            if theme == .sakuraStream && showsThemeGlass {
+                SakuraStreamGlassEtching(color: color, cornerRadius: chipCornerRadius, role: .player,
+                                         compact: compactHeader || avatarOnly || compactColumn)
             }
         }
         // The avatar and name are the chip's buttons; the glass itself

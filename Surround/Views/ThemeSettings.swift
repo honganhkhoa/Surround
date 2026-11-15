@@ -47,19 +47,23 @@ struct ThemeLivePreview: View {
                     GameDetailBackdrop().frame(width: side, height: side)
                 } else {
                     GameDetailBackdrop()
+                        .overlay {
+                            if theme == .sakuraStream { GameDetailSceneFoliage() }
+                        }
                 }
                 BoardView(boardPosition: Self.position)
                     .environment(\.excludesBoardsFromSceneShadows,
-                                 theme == .frostPine)
+                                 theme == .frostPine || theme == .sakuraStream)
                     .frame(width: boardSide, height: boardSide)
                     .offset(x: side * 0.22, y: side * 0.22)
             }
             .frame(width: side, height: side, alignment: .topLeading)
             .overlayPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
-                if theme == .frostPine {
+                if theme == .frostPine || theme == .sakuraStream {
                     GeometryReader { scene in
                         GameDetailSceneForeground(shadowExclusions: anchors.map {
-                            BoardSceneShadowRegion(bounds: scene[$0.bounds], cornerRadius: $0.cornerRadius)
+                            BoardSceneShadowRegion(bounds: scene[$0.bounds], cornerRadius: $0.cornerRadius,
+                                                   isDetailed: $0.isDetailed, cellSize: $0.cellSize)
                         })
                     }
                 }
