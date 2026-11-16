@@ -4790,12 +4790,12 @@ class OGSService: ObservableObject {
                 ).validate().responseJSON { response in
                     switch response.result {
                     case .success:
-                        if let data = response.value as? [String: Any] {
-                            if let newGameId = data["game"] as? Int {
-                                promise(.success(newGameId))
-                            }
-                        }
-                        promise(.failure(OGSServiceError.invalidJSON))
+                        // The reply may name the game, as an id or as an
+                        // object, or name nothing: an empty object, or a 204.
+                        // The seek graph's challenge already names the game
+                        // it starts, which is what the web client opens.
+                        let reply = response.value as? [String: Any]
+                        promise(.success(reply.flatMap(Self.gameID(inChallengeResponse:)) ?? challenge.game.id))
                     case .failure(let error):
                         promise(.failure(error))
                     }

@@ -258,6 +258,7 @@ final class OGSServiceEventTests: XCTestCase {
     override func tearDown() {
         QuickMatchStatsURLProtocol.reset()
         ChallengePostURLProtocol.body = ""
+        ChallengePostURLProtocol.statusCode = 200
         if let preferenceSuite {
             UserDefaults.standard.removePersistentDomain(forName: preferenceSuite)
         }
@@ -6081,9 +6082,11 @@ final class OGSServiceEventTests: XCTestCase {
         }
     }
 
-    /// Answers every request with `body`, for the challenge POST.
+    /// Answers every request with `body` and `statusCode`, for the
+    /// challenge POSTs.
     private final class ChallengePostURLProtocol: URLProtocol {
         static var body = ""
+        static var statusCode = 200
 
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -6091,7 +6094,7 @@ final class OGSServiceEventTests: XCTestCase {
         override func startLoading() {
             let response = HTTPURLResponse(
                 url: request.url!,
-                statusCode: 200,
+                statusCode: Self.statusCode,
                 httpVersion: "HTTP/1.1",
                 headerFields: ["Content-Type": "application/json"]
             )!
@@ -6435,6 +6438,39 @@ final class OGSServiceEventTests: XCTestCase {
         }
         XCTAssertNil(OGSService.gameID(inChallengeResponse: ["game": "1079"]))
         XCTAssertNil(OGSService.gameID(inChallengeResponse: [:]))
+    }
+
+    func testStartingRengoTakesTheGameFromTheReplyOrElseFromTheChallenge() throws {
+        var challenge = OGSChallengeSampleData.sampleRengoChallenge
+        challenge.game.id = 1_080
+        let replies: [(status: Int, body: String, game: Int)] = [
+            (200, #"{"game":1079}"#, 1_079),
+            (200, #"{"game":{"id":1079}}"#, 1_079),
+            (200, "{}", 1_080),
+            (200, #"{"status":"ok"}"#, 1_080),
+            (204, "", 1_080),
+        ]
+        for reply in replies {
+            ChallengePostURLProtocol.statusCode = reply.status
+            ChallengePostURLProtocol.body = reply.body
+            let service = makeService(socket: FakeWebsocket(), urlProtocolClass: ChallengePostURLProtocol.self)
+            service.ogsUIConfig = try makeUIConfig(jwt: "jwt", userID: 1)
+
+            let finished = expectation(description: "Rengo game started")
+            var outcome: Result<Int, Error>?
+            let request = service.startRengoGame(challenge: challenge).sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        outcome = .failure(error)
+                    }
+                    finished.fulfill()
+                },
+                receiveValue: { outcome = .success($0) }
+            )
+            wait(for: [finished], timeout: 2)
+            XCTAssertEqual(try outcome?.get(), reply.game, "\(reply.status) \(reply.body)")
+            request.cancel()
+        }
     }
 
     // MARK: - Activity's waiting times
