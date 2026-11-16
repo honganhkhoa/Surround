@@ -4,10 +4,11 @@
 //
 //  The user's own open challenges and Rengo challenges as the seek graph last
 //  listed them while the socket was connected. Closing the socket clears the
-//  service's own copies, which Home's count and the keepalive rely on, so
-//  Activity reads this copy instead while the socket is down and its rows
-//  stay as last known. One per window, held by NavigationService. Main thread
-//  by convention, like its owner.
+//  service's own copies, which Home's count and the keepalive rely on, and
+//  reconnecting clears them again until the seek graph lists, so Activity
+//  reads this copy instead until then and its rows stay as last known. One
+//  per window, held by NavigationService. Main thread by convention, like
+//  its owner.
 //
 
 import Combine
@@ -22,16 +23,20 @@ final class ActivityLastKnown: ObservableObject {
         var hostingRengoChallengeById: [Int: OGSSeekgraphChallenge] = [:]
     }
 
-    /// The latest rows the service listed while connected.
+    /// The latest rows the service listed while connected: the seek graph's
+    /// latest listing, or what the service held when a grace ended.
     @Published private(set) var copy = OpenChallenges()
     /// After a reconnect the service lists nothing until the seek graph's
     /// first update, a round trip later, or never while nothing subscribes
     /// to it. Until that update, or for at most `reconnectGrace`, the copy
     /// stands in, so the rows don't blink out as the socket comes back.
+    /// Either way the copy then takes what the service lists, so a later
+    /// drop doesn't bring back a challenge that went while offline.
     @Published private(set) var awaitsUpdate = false
     static let reconnectGrace: TimeInterval = 10
 
     private let scheduler: OGSWebsocketScheduling
+    private weak var ogs: OGSService?
     private var subscriptions = Set<AnyCancellable>()
     private var grace: Cancellable?
 
@@ -42,17 +47,22 @@ final class ActivityLastKnown: ObservableObject {
     /// Follows the window's service. The copy starts from what the service
     /// lists now, whatever its connection, since that is the best known.
     func attach(ogs: OGSService) {
+        self.ogs = ogs
         subscriptions = []
         update(Self.listed(by: ogs))
         if !Self.isConnected(ogs), !awaitsUpdate { awaitsUpdate = true }
-        Publishers.CombineLatest3(
+        // Only the seek graph's listing counts. The service also empties
+        // these rows when the socket closes, and again before it asks the
+        // seek graph after a reconnect, and neither says they went.
+        Publishers.CombineLatest4(
             ogs.$openChallengeSentById,
             ogs.$participatingRengoChallengeById,
-            ogs.$hostingRengoChallengeById
+            ogs.$hostingRengoChallengeById,
+            ogs.$seekGraphHasListed
         )
         .dropFirst()
-        .sink { [weak self, weak ogs] sent, participating, hosting in
-            guard let self, let ogs, Self.isConnected(ogs) else { return }
+        .sink { [weak self, weak ogs] sent, participating, hosting, hasListed in
+            guard let self, let ogs, hasListed, Self.isConnected(ogs) else { return }
             update(OpenChallenges(
                 openChallengeSentById: sent,
                 participatingRengoChallengeById: participating,
@@ -69,7 +79,7 @@ final class ActivityLastKnown: ObservableObject {
                     // The rows may already be back; if not, wait for them.
                     guard awaitsUpdate, grace == nil else { return }
                     grace = scheduler.schedule(after: Self.reconnectGrace) { [weak self] in
-                        self?.endGrace()
+                        self?.graceEnded()
                     }
                 } else {
                     grace?.cancel()
@@ -96,6 +106,15 @@ final class ActivityLastKnown: ObservableObject {
         grace?.cancel()
         grace = nil
         if awaitsUpdate { awaitsUpdate = false }
+    }
+
+    /// No listing came in time. Activity now lists what the service lists,
+    /// and while connected the copy takes it too.
+    private func graceEnded() {
+        if let ogs, Self.isConnected(ogs) {
+            update(Self.listed(by: ogs))
+        }
+        endGrace()
     }
 
     /// Connected, with authentication sent. The service learns of a closed

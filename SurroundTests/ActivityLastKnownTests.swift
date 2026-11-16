@@ -3,9 +3,10 @@
 //  SurroundTests
 //
 //  Activity's copy of the user's own open challenges and Rengo challenges,
-//  through a real OGSService and a fake socket: the copy outlives
-//  `surround/socketClosed`, which clears the service's own rows, and the
-//  next seek graph update replaces it.
+//  through a real OGSService and a fake socket that opens in production's
+//  main-queue order: the copy outlives `surround/socketClosed` and the
+//  reconnect, which both clear the service's own rows, and the next seek
+//  graph listing replaces it.
 //
 
 import Alamofire
@@ -35,14 +36,20 @@ final class ActivityLastKnownTests: XCTestCase {
             resultCallback?(nil, nil)
         }
 
-        /// The transport opens, then authentication is sent.
+        /// As OGSWebsocket opens a transport, on the main queue: the status
+        /// goes first, which the service hears a main-queue turn later, then
+        /// `surround/socketOpened`. Authentication is queued on the main
+        /// queue after both, so the service already says connected when it
+        /// hears `surround/socketAuthenticated`.
         func open() {
-            opened = true
             status = .connected
             onStatusChanged?()
+            opened = true
+            DispatchQueue.main.async { [self] in
+                authenticated = true
+                deliver(name: "surround/socketAuthenticated")
+            }
             deliver(name: "surround/socketOpened")
-            authenticated = true
-            deliver(name: "surround/socketAuthenticated")
         }
 
         /// As OGSWebsocket drops a connection: the flags go first, then the
@@ -245,6 +252,34 @@ final class ActivityLastKnownTests: XCTestCase {
         XCTAssertFalse(lastKnown.awaitsUpdate)
         XCTAssertEqual(lastKnown.openChallenges(live: service), ActivityLastKnown.OpenChallenges(),
                        "With no update in time, Activity lists what the service lists.")
+        XCTAssertEqual(lastKnown.copy, ActivityLastKnown.OpenChallenges(),
+                       "The copy takes it too, so the next drop doesn't bring the challenge back.")
+    }
+
+    func testAListingWithoutTheUsersChallengesEmptiesTheCopy() {
+        let (service, socket) = connectedService()
+        let scheduler = GraceScheduler()
+        let lastKnown = ActivityLastKnown(scheduler: scheduler)
+        lastKnown.attach(ogs: service)
+        socket.deliver(name: "seekgraph/global", data: [seekGraphChallenge(74, challengerID: 1)])
+        XCTAssertEqual(keys(lastKnown.copy.openChallengeSentById), [74])
+
+        socket.drop()
+        drainMainQueue()
+        socket.open()
+        drainMainQueue()
+        XCTAssertTrue(lastKnown.awaitsUpdate)
+        // The challenge was accepted or expired while the socket was down:
+        // the listing holds only another player's plain challenge.
+        socket.deliver(name: "seekgraph/global", data: [seekGraphChallenge(75, challengerID: 2)])
+        XCTAssertFalse(lastKnown.awaitsUpdate, "The listing ends the grace at once.")
+        XCTAssertEqual(lastKnown.openChallenges(live: service), ActivityLastKnown.OpenChallenges())
+
+        socket.drop()
+        drainMainQueue()
+        XCTAssertEqual(lastKnown.copy, ActivityLastKnown.OpenChallenges(),
+                       "The challenge that went while offline doesn't come back.")
+        XCTAssertEqual(lastKnown.openChallenges(live: service), ActivityLastKnown.OpenChallenges())
     }
 
     func testTheSeekGraphsFirstUpdateAfterReconnectingEndsTheGrace() {

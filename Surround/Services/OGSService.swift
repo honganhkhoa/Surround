@@ -4959,6 +4959,12 @@ class OGSService: ObservableObject {
     private var seekGraphConnected = false
     private var seekGraphAwaitingInitialSnapshot = false
     private var seekGraphReconnectRequiresSnapshot = false
+    /// Whether the seek graph has sent its listing since the current
+    /// `seek_graph/connect`. The service empties its seek graph rows when
+    /// the socket closes and again before it reconnects to the seek graph,
+    /// so until this is true an empty row says nothing about the user's
+    /// challenges.
+    @Published private(set) var seekGraphHasListed = false
     
     func subscribeToSeekGraph() {
         seekGraphSubscriberCount += 1
@@ -5035,6 +5041,9 @@ class OGSService: ObservableObject {
             if seekGraphAwaitingInitialSnapshot {
                 seekGraphAwaitingInitialSnapshot = false
                 seekGraphReconnectRequiresSnapshot = false
+                // Before the reconcile, which may disconnect a seek graph
+                // that nothing needs any more.
+                seekGraphHasListed = true
                 reconcileSeekGraphSubscription()
             }
             // The seek graph is the only source of openChallengeSentById, so
@@ -5102,7 +5111,10 @@ class OGSService: ObservableObject {
         seekGraphConnected = true
     }
 
+    /// Empties the seek graph's rows, which then say nothing until the seek
+    /// graph lists again.
     private func clearSeekGraphSnapshot() {
+        if seekGraphHasListed { seekGraphHasListed = false }
         openChallengeById.removeAll()
         eligibleOpenChallengeById.removeAll()
         openChallengeSentById.removeAll()
