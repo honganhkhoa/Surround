@@ -373,7 +373,8 @@ final class ActivityListModelTests: XCTestCase {
         XCTAssertNil(started["a"], "A game was found: no withdraw result.")
         XCTAssertEqual(started["b"], entries["b"])
 
-        XCTAssertEqual(Withdrawal.apply(.notFoundAfterReconciliation(uuid: "b"), to: entries)["b"]?.state, .failed)
+        XCTAssertNil(Withdrawal.apply(.notFoundAfterReconciliation(uuid: "b"), to: entries)["b"],
+                     "OGS no longer had the search after a reconnect, and the service dropped it.")
         XCTAssertEqual(Withdrawal.apply(.entry(uuid: "a"), to: entries), entries, "OGS listing it again changes nothing.")
     }
 
@@ -382,7 +383,8 @@ final class ActivityListModelTests: XCTestCase {
         XCTAssertEqual(Withdrawal.apply(.cancelled(uuid: "a", removedCount: 1), to: failed)["a"]?.state,
                        .succeeded(.withdrawn))
         XCTAssertNil(Withdrawal.apply(.started(uuid: "a", gameID: nil, requestedLocally: false), to: failed)["a"])
-        XCTAssertEqual(Withdrawal.apply(.notFoundAfterReconciliation(uuid: "a"), to: failed), failed)
+        XCTAssertNil(Withdrawal.apply(.notFoundAfterReconciliation(uuid: "a"), to: failed)["a"],
+                     "Nothing could settle a Retry for a search that has gone.")
 
         let withdrawn: [String: Withdrawal.Entry] = ["a": .init(uuid: "a", state: .succeeded(.withdrawn))]
         XCTAssertEqual(Withdrawal.apply(.started(uuid: "a", gameID: 1, requestedLocally: true), to: withdrawn), withdrawn)

@@ -591,9 +591,11 @@ enum ActivityQuickMatchWithdrawal {
     /// What one lifecycle event does to the withdraws it names. A cancel
     /// withdraws them; OGS's cancel without a uuid ends every search. A game
     /// that started from the search removes its withdraw with no outcome,
-    /// since the game lists or opens instead. A search OGS didn't confirm
-    /// after a reconnect fails. A failed withdraw still takes a late cancel
-    /// or start; one that succeeded is settled.
+    /// since the game lists or opens instead. So does a search OGS no longer
+    /// had after a reconnect, which the service has already dropped, as New
+    /// game drops it: no later event could settle a Retry. A failed withdraw
+    /// still takes a late cancel, a start or that loss; one that succeeded
+    /// is settled.
     static func apply<ID: Hashable>(
         _ event: OGSAutomatchLifecycleEvent.Kind,
         to entries: [ID: Entry]
@@ -606,7 +608,7 @@ enum ActivityQuickMatchWithdrawal {
             case .started(let uuid, _, _) where uuid == entry.uuid:
                 result[id] = nil
             case .notFoundAfterReconciliation(let uuid) where uuid == entry.uuid:
-                result[id]?.state = .failed
+                result[id] = nil
             default:
                 break
             }

@@ -85,6 +85,8 @@ final class ActivityResultsTests: XCTestCase {
         private(set) var startReplies = [PassthroughSubject<Int, Error>]()
         /// What the socket's cancel answers.
         var socketSends = true
+        /// The user's games, by id.
+        var activeGameIDs = Set<Int>()
         let lifecycle = PassthroughSubject<OGSAutomatchLifecycleEvent, Never>()
 
         var client: ActivityResults.Client {
@@ -109,6 +111,7 @@ final class ActivityResultsTests: XCTestCase {
                     self.started.append(challenge.id)
                     return Self.reply(in: &self.startReplies)
                 },
+                hasActiveGame: { [unowned self] in self.activeGameIDs.contains($0) },
                 automatchLifecycleEvents: lifecycle.eraseToAnyPublisher()
             )
         }
@@ -167,21 +170,25 @@ final class ActivityResultsTests: XCTestCase {
         return store
     }
 
+    /// Each challenge's game is its id plus 1000.
     private func received(_ id: Int) -> OGSDirectChallenge {
         var challenge = OGSChallengeSampleData.sampleChallenge
         challenge.id = id
+        challenge.game.id = id + 1_000
         return challenge
     }
 
     private func openChallenge(_ id: Int) -> OGSSeekgraphChallenge {
         var challenge = OGSChallengeSampleData.sampleOpenChallenge
         challenge.id = id
+        challenge.game.id = id + 1_000
         return challenge
     }
 
     private func rengo(_ id: Int) -> OGSSeekgraphChallenge {
         var challenge = OGSChallengeSampleData.sampleRengoChallenge
         challenge.id = id
+        challenge.game.id = id + 1_000
         return challenge
     }
 
@@ -329,7 +336,7 @@ final class ActivityResultsTests: XCTestCase {
 
     func testANotFoundOnARejectRetryCountsAsSuccess() {
         reject(13)
-        fail(client.withdrawReplies.last)
+        fail(client.withdrawReplies.last, URLError(.timedOut))
         XCTAssertEqual(state("challenge-13"), .failed)
         XCTAssertTrue(store.hiddenIDs.isEmpty)
         scheduler.turn()
@@ -337,7 +344,8 @@ final class ActivityResultsTests: XCTestCase {
 
         store.retry(itemID: "challenge-13")
         fail(client.withdrawReplies.last, notFound)
-        XCTAssertEqual(state("challenge-13"), .succeeded(.rejected), "The first try went through.")
+        XCTAssertEqual(state("challenge-13"), .succeeded(.rejected),
+                       "The first try timed out, so it may have gone through.")
         XCTAssertEqual(store.hiddenIDs, ["challenge-13"])
         scheduler.turn()
         XCTAssertEqual(navigator.spoken, ["Couldn’t reject", "Rejected"])
@@ -357,18 +365,72 @@ final class ActivityResultsTests: XCTestCase {
         XCTAssertEqual(navigator.announcements, [result("waiting-open-14", .withdraw, "Withdrawn")])
     }
 
-    func testANotFoundIsAFailureUntilARetry() {
+    func testANotFoundIsAFailureUnlessAnEarlierTryMayHaveGoneThrough() {
         withdraw(15)
         fail(client.withdrawReplies.last, notFound)
         XCTAssertEqual(state("waiting-open-15"), .failed, "On the first try, a missing challenge may have been accepted.")
         store.retry(itemID: "waiting-open-15")
         XCTAssertEqual(client.withdrawnOrDeclined, [15, 15])
-        fail(client.withdrawReplies.last)
+        fail(client.withdrawReplies.last, URLError(.timedOut))
         XCTAssertEqual(state("waiting-open-15"), .failed)
         store.retry(itemID: "waiting-open-15")
         fail(client.withdrawReplies.last, notFound)
-        XCTAssertEqual(state("waiting-open-15"), .succeeded(.withdrawn))
-        XCTAssertEqual(store.hiddenIDs, ["waiting-open-15"])
+        XCTAssertEqual(state("waiting-open-15"), .failed,
+                       "The first try already found it gone, so no later try withdrew it.")
+        XCTAssertTrue(store.hiddenIDs.isEmpty)
+
+        withdraw(32)
+        fail(client.withdrawReplies.last, URLError(.notConnectedToInternet))
+        store.retry(itemID: "waiting-open-32")
+        fail(client.withdrawReplies.last, notFound)
+        XCTAssertEqual(state("waiting-open-32"), .failed, "The first try never left the device.")
+
+        withdraw(33)
+        fail(client.withdrawReplies.last, URLError(.cannotConnectToHost))
+        store.retry(itemID: "waiting-open-33")
+        fail(client.withdrawReplies.last, AFError.sessionTaskFailed(error: URLError(.networkConnectionLost)))
+        store.retry(itemID: "waiting-open-33")
+        fail(client.withdrawReplies.last, notFound)
+        XCTAssertEqual(state("waiting-open-33"), .succeeded(.withdrawn),
+                       "The second try lost its connection, so it may have gone through.")
+        XCTAssertEqual(store.hiddenIDs, ["waiting-open-33"])
+    }
+
+    func testALeaveThatFindsTheRengoGoneTwiceIsNotLeft() {
+        leave(16)
+        fail(client.leaveReplies.last, notFound)
+        store.retry(itemID: "waiting-rengo-16")
+        fail(client.leaveReplies.last, notFound)
+        XCTAssertEqual(state("waiting-rengo-16"), .failed, "The Rengo had gone before the user left it.")
+        scheduler.turn()
+        XCTAssertEqual(navigator.spoken, ["Couldn’t leave", "Couldn’t leave"])
+    }
+
+    func testANotFoundForAChallengeWhoseGameTheUserPlaysSaysGameStarted() {
+        withdraw(34)
+        fail(client.withdrawReplies.last, URLError(.timedOut))
+        XCTAssertEqual(state("waiting-open-34"), .failed)
+        // Someone accepted it meanwhile.
+        client.activeGameIDs = [1_034]
+        store.retry(itemID: "waiting-open-34")
+        fail(client.withdrawReplies.last, notFound)
+        XCTAssertEqual(state("waiting-open-34"), .succeeded(.gameStarted(gameID: 1_034)))
+        XCTAssertEqual(store.hiddenIDs, ["waiting-open-34"])
+        scheduler.turn()
+        XCTAssertEqual(navigator.spoken, ["Couldn’t withdraw", "Game started"])
+
+        // On a first try too, and for a reject or a leave.
+        client.activeGameIDs.formUnion([1_035, 1_036])
+        reject(35)
+        fail(client.withdrawReplies.last, notFound)
+        XCTAssertEqual(state("challenge-35"), .succeeded(.gameStarted(gameID: 1_035)),
+                       "The user accepted it elsewhere.")
+        leave(36)
+        fail(client.leaveReplies.last, notFound)
+        XCTAssertEqual(state("waiting-rengo-36"), .succeeded(.gameStarted(gameID: 1_036)), "Its host started it.")
+        leave(37)
+        fail(client.leaveReplies.last, URLError(.timedOut))
+        XCTAssertEqual(state("waiting-rengo-37"), .failed, "Only a 404 says the item has gone.")
     }
 
     func testLeavingRengoSaysLeftOrCouldntLeave() {
@@ -447,13 +509,22 @@ final class ActivityResultsTests: XCTestCase {
         XCTAssertTrue(navigator.events.isEmpty)
     }
 
-    func testASearchOGSDidNotConfirmAfterAReconnectCouldntBeWithdrawn() {
+    func testASearchOGSNoLongerHadAfterAReconnectTakesItsWithdrawWithIt() {
         withdrawSearch("d")
         lifecycle(.notFoundAfterReconciliation(uuid: "d"))
-        XCTAssertEqual(state("waiting-quick-match-d"), .failed)
+        XCTAssertNil(store.entries["waiting-quick-match-d"], "The search has gone, as in New game: nothing to retry.")
         XCTAssertTrue(scheduler.pendingDelays.isEmpty)
         scheduler.turn()
-        XCTAssertEqual(navigator.spoken, ["Couldn’t withdraw"])
+        XCTAssertTrue(navigator.events.isEmpty)
+
+        // A withdraw that had already failed goes too.
+        withdrawSearch("i")
+        clock.now = 1_008
+        scheduler.advance()
+        XCTAssertEqual(state("waiting-quick-match-i"), .failed)
+        lifecycle(.notFoundAfterReconciliation(uuid: "i"))
+        XCTAssertNil(store.entries["waiting-quick-match-i"], "No Retry is left for a search OGS no longer has.")
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty)
     }
 
     func testAnUnconfirmedQuickMatchWithdrawFailsAfterEightSeconds() {

@@ -34,6 +34,8 @@ final class ActivityResults: ObservableObject {
         var cancelAutomatch: (OGSAutomatchEntry) -> Bool
         var leaveRengo: (OGSSeekgraphChallenge) -> AnyPublisher<Void, Error>
         var startRengo: (OGSSeekgraphChallenge) -> AnyPublisher<Int, Error>
+        /// Whether the game with this id is among the user's games.
+        var hasActiveGame: (Int) -> Bool
         var automatchLifecycleEvents: AnyPublisher<OGSAutomatchLifecycleEvent, Never>
 
         static func live(_ ogs: OGSService) -> Client {
@@ -43,6 +45,7 @@ final class ActivityResults: ObservableObject {
                 cancelAutomatch: { ogs.cancelAutomatch(entry: $0) },
                 leaveRengo: { ogs.leaveRengoChallenge(challenge: $0) },
                 startRengo: { ogs.startRengoGame(challenge: $0) },
+                hasActiveGame: { ogs.activeGames[$0] != nil },
                 automatchLifecycleEvents: ogs.automatchLifecycleEvents.eraseToAnyPublisher()
             )
         }
@@ -106,6 +109,28 @@ final class ActivityResults: ObservableObject {
             case .withdrawAutomatch: false
             }
         }
+
+        /// The game OGS made with the challenge, which starts if the
+        /// challenge is accepted; nil for a request that has none.
+        var gameID: Int? {
+            switch self {
+            case .reject(let challenge), .withdraw(let challenge):
+                (challenge as? OGSDirectChallenge)?.game.id ?? (challenge as? OGSSeekgraphChallenge)?.game.id
+            case .leave(let challenge):
+                challenge.game.id
+            case .accept, .withdrawAutomatch, .start:
+                nil
+            }
+        }
+    }
+
+    /// What a row's earlier tries came to, which tells what a Retry's "not
+    /// found" means.
+    private struct Tries {
+        /// A try found the item already gone.
+        var foundGone = false
+        /// A try failed after it may have reached OGS and gone through.
+        var mayHaveGoneThrough = false
     }
 
     /// One try at a request.
@@ -114,7 +139,8 @@ final class ActivityResults: ObservableObject {
         let session: UUID
         let itemID: String
         let request: Request
-        let isRetry: Bool
+        /// The row's tries before this one: none, unless it is a Retry.
+        let earlier: Tries
     }
 
     /// A row's latest attempt in one session.
@@ -122,6 +148,8 @@ final class ActivityResults: ObservableObject {
         var entry: Entry
         var request: Request
         var attemptID: Int
+        /// Its tries so far, the latest included once it fails.
+        var tries: Tries
     }
 
     /// A Quick Match withdraw that OGS hasn't confirmed.
@@ -135,7 +163,8 @@ final class ActivityResults: ObservableObject {
         /// A live game: the list closes and the game opens.
         case opensGame(Int)
         case failed
-        /// A game started from the search being withdrawn: no outcome.
+        /// The search being withdrawn went with no outcome: a game started
+        /// from it, or OGS no longer had it after a reconnect.
         case removed
     }
 
@@ -318,14 +347,17 @@ final class ActivityResults: ObservableObject {
         section: ActivitySection, after: String?, isRetry: Bool = false
     ) {
         lastAttemptID += 1
-        let attempt = Attempt(id: lastAttemptID, session: session, itemID: itemID, request: request, isRetry: isRetry)
+        let earlier = isRetry ? records[session]?[itemID]?.tries ?? Tries() : Tries()
+        let attempt = Attempt(id: lastAttemptID, session: session, itemID: itemID, request: request,
+                              earlier: earlier)
         let time = now()
         if records[session] != nil {
             records[session]?[itemID] = Record(
                 entry: Entry(action: request.action, state: .pending(since: time), display: display,
                              section: section, after: after),
                 request: request,
-                attemptID: attempt.id
+                attemptID: attempt.id,
+                tries: earlier
             )
             // A Retry takes over from the failed withdraw it repeats.
             quickMatchWithdraws = quickMatchWithdraws.filter {
@@ -344,11 +376,11 @@ final class ActivityResults: ObservableObject {
             }
         case .reject(let challenge):
             subscribe(to: client.withdrawOrDecline(challenge), for: attempt) { [weak self] result in
-                self?.resolve(attempt, Self.resolution(result, outcome: .rejected, isRetry: isRetry))
+                self?.resolveRemoval(attempt, result, outcome: .rejected)
             }
         case .withdraw(let challenge):
             subscribe(to: client.withdrawOrDecline(challenge), for: attempt) { [weak self] result in
-                self?.resolve(attempt, Self.resolution(result, outcome: .withdrawn, isRetry: isRetry))
+                self?.resolveRemoval(attempt, result, outcome: .withdrawn)
             }
         case .withdrawAutomatch(let entry):
             let withdrawal = ActivityQuickMatchWithdrawal.start(
@@ -361,7 +393,7 @@ final class ActivityResults: ObservableObject {
             scheduleDeadline()
         case .leave(let challenge):
             subscribe(to: client.leaveRengo(challenge), for: attempt) { [weak self] result in
-                self?.resolve(attempt, Self.resolution(result, outcome: .left, isRetry: isRetry))
+                self?.resolveRemoval(attempt, result, outcome: .left)
             }
         case .start(let challenge, let isLive):
             subscribe(to: client.startRengo(challenge), for: attempt) { [weak self] result in
@@ -405,18 +437,47 @@ final class ActivityResults: ObservableObject {
         }
     }
 
-    private static func resolution(_ result: Result<Void, Error>, outcome: ActivityOutcome, isRetry: Bool) -> Resolution {
-        switch result {
-        case .success:
-            return .succeeded(outcome)
-        case .failure(let error):
-            // On a Retry, "not found" means an earlier try went through.
-            return isRetry && isNotFound(error) ? .succeeded(outcome) : .failed
+    /// What a reject, withdraw or leave came to. "Not found" says the item
+    /// has gone: into a game, when the user now plays the game OGS made for
+    /// it; or by an earlier try, when one may have gone through and no try
+    /// had found it gone already. Anything else is a failure, kept on the
+    /// row for a Retry to read.
+    private func resolveRemoval(_ attempt: Attempt, _ result: Result<Void, Error>, outcome: ActivityOutcome) {
+        guard case .failure(let error) = result else {
+            resolve(attempt, .succeeded(outcome))
+            return
         }
+        if Self.isNotFound(error) {
+            if let gameID = attempt.request.gameID, client?.hasActiveGame(gameID) == true {
+                resolve(attempt, .succeeded(.gameStarted(gameID: gameID)))
+                return
+            }
+            if attempt.earlier.mayHaveGoneThrough, !attempt.earlier.foundGone {
+                resolve(attempt, .succeeded(outcome))
+                return
+            }
+        }
+        if records[attempt.session]?[attempt.itemID]?.attemptID == attempt.id {
+            var tries = attempt.earlier
+            tries.foundGone = tries.foundGone || Self.isNotFound(error)
+            tries.mayHaveGoneThrough = tries.mayHaveGoneThrough || Self.mayHaveGoneThrough(error)
+            records[attempt.session]?[attempt.itemID]?.tries = tries
+        }
+        resolve(attempt, .failed)
     }
 
     private static func isNotFound(_ error: Error) -> Bool {
         (error as? AFError)?.responseCode == 404
+    }
+
+    /// The request timed out or lost its connection, so it may have reached
+    /// OGS and gone through, losing only its reply. One that never left the
+    /// device, offline or unable to connect, didn't.
+    private static func mayHaveGoneThrough(_ error: Error) -> Bool {
+        guard let code = ((error as? URLError) ?? ((error as? AFError)?.underlyingError as? URLError))?.code else {
+            return false
+        }
+        return code == .timedOut || code == .networkConnectionLost
     }
 
     // MARK: Quick Match
