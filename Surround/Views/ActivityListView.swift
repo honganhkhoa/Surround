@@ -577,6 +577,7 @@ private struct ActivityListContent: View {
         return ActivityWaitingRow(
             itemID: itemID, content: content, density: density, withdrawsInPlace: withdrawsInPlace,
             withdrawLabel: ActivityRowContents.withdrawLabel(content, hasElapsedTime: hasElapsedTime),
+            hasElapsedTime: hasElapsedTime,
             open: opensCard ? { push(itemID) } : nil,
             actionState: actionState(for: itemID), entry: results.entries[itemID],
             focus: $voiceOverFocus,

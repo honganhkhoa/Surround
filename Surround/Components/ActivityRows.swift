@@ -8,9 +8,9 @@
 //  user acted on it. Each row is one VoiceOver element whose label reads it
 //  as a sentence; its buttons stay separate elements with full labels, and
 //  a result takes VoiceOver focus from the button that acted. At
-//  accessibility sizes a row drops its second line before any action label
-//  shortens. Also the hook through which the challenge and Quick Match cards
-//  act inside Activity.
+//  accessibility sizes a row's lines wrap, and its trailing view and actions
+//  go under its words. Also the hook through which the challenge and Quick
+//  Match cards act inside Activity.
 //
 
 import SwiftUI
@@ -169,6 +169,16 @@ struct ActivityRowContent {
     var spoken: String {
         let name = [title, rank].compactMap { $0 }.joined(separator: " ")
         return ([name] + details + moreDetails).joined(separator: ", ")
+    }
+
+    /// The row as VoiceOver reads it, for a row whose last detail is a time
+    /// that changes each second: the label keeps the rest, so it holds
+    /// still, and the time is the value.
+    func spoken(lastDetailTicks: Bool) -> (label: String, value: String) {
+        guard lastDetailTicks, let time = details.last else { return (spoken, "") }
+        var steady = self
+        steady.details.removeLast()
+        return (steady.spoken, time)
     }
 }
 
@@ -337,10 +347,10 @@ struct ActivityRowTile: View {
     }
 }
 
-/// Line one, then line two (and a challenge's line three), which drop at
-/// accessibility sizes so no action label shortens. At those sizes nothing
-/// shares line one with a name it would break inside a word: a rank that
-/// doesn't fit beside the name goes under it, and so does the trailing view.
+/// Line one, then line two (and a challenge's line three). At accessibility
+/// sizes lines two and three wrap in full, and nothing shares line one with
+/// a name it would break inside a word: a rank that doesn't fit beside the
+/// name goes under it, and so does the trailing view.
 struct ActivityRowLines<Trailing: View>: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let content: ActivityRowContent
@@ -359,22 +369,22 @@ struct ActivityRowLines<Trailing: View>: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 trailing()
             }
-            if !dynamicTypeSize.isAccessibilitySize {
-                if !content.details.isEmpty {
-                    Text(verbatim: content.detail)
-                        .font(.footnote.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                if showsMoreDetails, !content.moreDetails.isEmpty {
-                    Text(verbatim: content.moreDetails.joined(separator: " · "))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+            if !content.details.isEmpty {
+                Text(verbatim: content.detail)
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(detailLineLimit)
+            }
+            if showsMoreDetails, !content.moreDetails.isEmpty {
+                Text(verbatim: content.moreDetails.joined(separator: " · "))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(detailLineLimit)
             }
         }
     }
+
+    private var detailLineLimit: Int? { dynamicTypeSize.isAccessibilitySize ? nil : 1 }
 
     @ViewBuilder private var nameAndRank: some View {
         let name = Text(verbatim: content.title)
@@ -568,23 +578,29 @@ struct ActivityLiveGameRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Text(verbatim: spoken(content, facts: facts)))
+        .accessibilityLabel(Text(verbatim: content.spoken))
+        .accessibilityValue(Text(verbatim: clockValue(facts)))
+        .accessibilityAddTraits(
+            facts.userColor.map { facts.clock($0).running } == true ? .updatesFrequently : []
+        )
         .accessibilityIdentifier(ID.activityRow(itemID))
     }
 
-    /// The row, then the user's clock, as Home's row reads it.
-    private func spoken(_ content: ActivityRowContent, facts: HomeGameFacts) -> String {
-        var sentence = content.spoken
+    /// The user's clock, as Home's row reads it, then Low on time: the row's
+    /// value, which changes each second while the user's clock runs, so the
+    /// label holds still.
+    private func clockValue(_ facts: HomeGameFacts) -> String {
+        var parts = [String]()
         if facts.userColor != nil {
-            sentence += ". \(String(localized: "You")): \(facts.chipTime(facts.bottomColor))"
+            parts.append("\(String(localized: "You")): \(facts.chipTime(facts.bottomColor))")
         }
         if isLowOnTime {
-            sentence += ". " + String(
+            parts.append(String(
                 localized: "Low on time",
                 comment: "Homeview - VoiceOver: under 12 hours left on the user's running clock"
-            )
+            ))
         }
-        return sentence
+        return parts.joined(separator: ". ")
     }
 }
 
@@ -743,6 +759,9 @@ struct ActivityWaitingRow: View {
     let withdrawsInPlace: Bool
     /// The VoiceOver label of Withdraw.
     let withdrawLabel: String
+    /// The last detail is how long the row has waited, which changes each
+    /// second: VoiceOver reads it as the row's value.
+    let hasElapsedTime: Bool
     /// Pushes the row's card; nil for a row without one.
     let open: (() -> Void)?
     let actionState: ActivityRowActionState
@@ -787,15 +806,20 @@ struct ActivityWaitingRow: View {
         }
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .contentShape(Rectangle())
+        let spoken = content.spoken(lastDetailTicks: hasElapsedTime)
         if let open {
             Button(action: open) { lines }
                 .buttonStyle(.plain)
-                .accessibilityLabel(Text(verbatim: content.spoken))
+                .accessibilityLabel(Text(verbatim: spoken.label))
+                .accessibilityValue(Text(verbatim: spoken.value))
+                .accessibilityAddTraits(hasElapsedTime ? .updatesFrequently : [])
                 .accessibilityIdentifier(ID.activityRow(itemID))
         } else {
             lines
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text(verbatim: content.spoken))
+                .accessibilityLabel(Text(verbatim: spoken.label))
+                .accessibilityValue(Text(verbatim: spoken.value))
+                .accessibilityAddTraits(hasElapsedTime ? .updatesFrequently : [])
                 .accessibilityIdentifier(ID.activityRow(itemID))
         }
     }

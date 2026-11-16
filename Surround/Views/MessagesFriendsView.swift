@@ -95,7 +95,7 @@ struct MessagesRequestRow: View {
                         Text(verbatim: invitation.fromUser.username)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(invitation.fromUser.uiColor)
-                            .lineLimit(1)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
                         HStack(spacing: 3) {
                             Text(verbatim: invitation.fromUser.formattedRank)
                             if let created = invitation.created {
