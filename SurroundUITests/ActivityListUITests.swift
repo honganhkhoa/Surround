@@ -25,6 +25,7 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
 
     private let baseGameID = SurroundUITestContract.fixtureGameID
     private let reconnecting = "Reconnecting…"
+    private let cantReachOGS = "Can’t reach OGS"
     private var liveSearch: String { "waiting-quick-match-\(FixtureID.liveQuickMatchUUID)" }
     private var correspondenceSearch: String { "waiting-quick-match-\(FixtureID.correspondenceQuickMatchUUID)" }
 
@@ -203,7 +204,8 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         let conversationRow = revealInList(query(ID.activityRow("conversation-915100"), in: app), in: app)
         tap(conversationRow, description: "Open tenuki_tom's conversation", in: app)
         let conversation = element("messages.conversation", in: app)
-        XCTAssertTrue(waitForLabel(reconnecting, of: element(ID.activityConversationStatus, in: app)),
+        // A slow runner can reach the conversation after the 30 s.
+        XCTAssertTrue(waitForLabel(in: [reconnecting, cantReachOGS], of: element(ID.activityConversationStatus, in: app)),
                       "The conversation shows the list's offline line")
         let field = element(ID.privateMessageComposer, in: app, matching: .textField)
         let send = app.buttons["Send message"].firstMatch
@@ -214,7 +216,7 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         keepScreenshot("Activity offline – a conversation's composer off", in: app)
         backToList(leaving: conversation, in: app)
         let status = element(ID.activityStatus, in: app)
-        XCTAssertTrue([reconnecting, "Can’t reach OGS"].contains(status.label),
+        XCTAssertTrue([reconnecting, cantReachOGS].contains(status.label),
                       "Back in the list, its own line still shows: \(status.label)")
 
         // Read where they are: a control scrolled out of view still says
@@ -226,7 +228,7 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
             XCTAssertTrue(waitUntilDisabled(button), "Offline, \(name) is off")
             XCTAssertEqual(button.value as? String, reconnecting, "Offline, \(name) reads Reconnecting…")
         }
-        if status.label == "Can’t reach OGS" {
+        if status.label == cantReachOGS {
             XCTAssertTrue(query(ID.activityStatusRetry, in: app).exists, "Can’t reach OGS offers Retry")
             revealListTop(status, in: app)
             keepScreenshot("Activity offline – Can’t reach OGS with Retry", in: app)
@@ -484,6 +486,12 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == true AND label == %@", label), object: element)
         return waitWithFinalCheck(for: [expectation], timeout: timeout ?? stateSettleTimeout) == .completed
+    }
+
+    private func waitForLabel(in labels: [String], of element: XCUIElement) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true AND label IN %@", labels), object: element)
+        return waitWithFinalCheck(for: [expectation], timeout: stateSettleTimeout) == .completed
     }
 
     private func waitForAbsence(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
