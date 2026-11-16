@@ -26470,7 +26470,7 @@
         "ms" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tidak dapat menarik balik"
+            "value" : "Tidak dapat menarik diri"
           }
         },
         "pt-BR" : {
@@ -71441,7 +71441,7 @@
         "ms" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tarik balik %@"
+            "value" : "Tarik diri daripada %@"
           }
         },
         "pt-BR" : {
@@ -71770,7 +71770,7 @@
         "ms" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Menarik balik…"
+            "value" : "Menarik diri…"
           }
         },
         "pt-BR" : {
@@ -71853,7 +71853,7 @@
         "ms" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ditarik balik"
+            "value" : "Telah menarik diri"
           }
         },
         "pt-BR" : {
