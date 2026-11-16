@@ -788,8 +788,7 @@ extension NavigationService {
         let place = activityPlaces.place(in: main.rootView)
         let style = ActivityPresentationStyle.style(
             horizontalSizeClass: horizontalSizeClass == .regular ? .regular : .compact,
-            place: place,
-            crossesDivision: false
+            place: place
         )
         main.activity = ActivityRequest(source: source, focus: focus, style: style, anchor: anchor, place: place)
     }

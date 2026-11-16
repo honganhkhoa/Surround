@@ -28,21 +28,13 @@ enum ActivityPresentationStyle: Equatable {
     }
 
     /// In a game the list is always a popover, so the game stays in view.
-    /// Elsewhere a compact width gets the sheet, and so does a window whose
-    /// division would split a popover, such as a Duo's hinge; a regular width
-    /// gets a popover.
-    static func style(
-        horizontalSizeClass: SizeClass,
-        place: ActivityModel.Place,
-        crossesDivision: Bool
-    ) -> ActivityPresentationStyle {
+    /// Elsewhere a compact width gets the sheet, and a regular width gets a
+    /// popover.
+    static func style(horizontalSizeClass: SizeClass, place: ActivityModel.Place) -> ActivityPresentationStyle {
         if place.gameID != nil {
             return .popover
         }
-        if horizontalSizeClass == .compact || crossesDivision {
-            return .sheet
-        }
-        return .popover
+        return horizontalSizeClass == .compact ? .sheet : .popover
     }
 }
 
@@ -91,6 +83,18 @@ struct ActivityRequest: Identifiable, Equatable {
     var place: ActivityModel.Place
 
     var id: UUID { sessionID }
+
+    /// `anchor` moved inside a container of `size`, keeping its size where
+    /// it fits. A popover's anchor stays as it was once its opener goes, so
+    /// after the window narrows or turns it could lie outside the window.
+    static func anchor(_ anchor: CGRect, inside size: CGSize) -> CGRect {
+        guard size.width > 0, size.height > 0 else { return anchor }
+        let width = min(anchor.width, size.width)
+        let height = min(anchor.height, size.height)
+        return CGRect(x: min(max(anchor.minX, 0), size.width - width),
+                      y: min(max(anchor.minY, 0), size.height - height),
+                      width: width, height: height)
+    }
 
     init(
         sessionID: UUID = UUID(),

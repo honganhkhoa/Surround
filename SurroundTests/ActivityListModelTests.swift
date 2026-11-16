@@ -172,18 +172,30 @@ final class ActivityListModelTests: XCTestCase {
     func testAGameAlwaysUsesAPopoverAndCompactRootsUseTheSheet() {
         let game = ActivityModel.Place.game(id: 26268404, isOwnGame: true, isLive: true, isOver: false)
         let home = ActivityModel.Place.root(isMessagesTab: false)
-        func style(_ sizeClass: ActivityPresentationStyle.SizeClass, _ place: ActivityModel.Place,
-                   crosses: Bool = false) -> ActivityPresentationStyle {
-            .style(horizontalSizeClass: sizeClass, place: place, crossesDivision: crosses)
+        func style(_ sizeClass: ActivityPresentationStyle.SizeClass,
+                   _ place: ActivityModel.Place) -> ActivityPresentationStyle {
+            .style(horizontalSizeClass: sizeClass, place: place)
         }
         XCTAssertEqual(style(.compact, game), .popover)
         XCTAssertEqual(style(.regular, game), .popover)
-        XCTAssertEqual(style(.regular, game, crosses: true), .popover, "A game keeps its popover across a division.")
         XCTAssertEqual(style(.compact, home), .sheet)
         XCTAssertEqual(style(.regular, home), .popover)
-        XCTAssertEqual(style(.regular, home, crosses: true), .sheet, "A popover that would cross a hinge becomes the sheet.")
         XCTAssertEqual(style(.compact, .conversation), .sheet)
         XCTAssertEqual(style(.regular, .conversation), .popover)
+    }
+
+    func testAPopoversAnchorStaysInsideItsWindow() {
+        let window = CGSize(width: 800, height: 600)
+        let pill = CGRect(x: 100, y: 60, width: 120, height: 44)
+        XCTAssertEqual(ActivityRequest.anchor(pill, inside: window), pill, "An anchor inside stays.")
+        XCTAssertEqual(ActivityRequest.anchor(pill.offsetBy(dx: 900, dy: 700), inside: window),
+                       CGRect(x: 680, y: 556, width: 120, height: 44),
+                       "After the window narrows, the opener's old frame moves back inside, keeping its size.")
+        XCTAssertEqual(ActivityRequest.anchor(pill.offsetBy(dx: -300, dy: -100), inside: window),
+                       CGRect(x: 0, y: 0, width: 120, height: 44))
+        XCTAssertEqual(ActivityRequest.anchor(CGRect(x: 0, y: 500, width: 900, height: 200), inside: window),
+                       CGRect(x: 0, y: 400, width: 800, height: 200), "A frame wider than the window takes its width.")
+        XCTAssertEqual(ActivityRequest.anchor(pill, inside: .zero), pill, "Before layout there is nothing to fit.")
     }
 
     func testARequestIsItsSession() {

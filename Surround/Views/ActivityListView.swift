@@ -981,9 +981,11 @@ struct ActivityPopoverPresenter: View {
         GeometryReader { proxy in
             let shown = current ?? latest
             // The anchor is in the window's global space, which this
-            // overlay's own frame need not start at.
+            // overlay's own frame need not start at. One whose opener went
+            // stays where it was, so it is kept inside the overlay.
             let origin = proxy.frame(in: .global).origin
-            let anchor = (shown?.anchor ?? .zero).offsetBy(dx: -origin.x, dy: -origin.y)
+            let anchor = ActivityRequest.anchor(
+                (shown?.anchor ?? .zero).offsetBy(dx: -origin.x, dy: -origin.y), inside: proxy.size)
             Color.clear
                 .frame(width: anchor.width, height: anchor.height)
                 .allowsHitTesting(false)
