@@ -622,30 +622,33 @@ struct ChallengeCell: View {
                         VStack(alignment: .trailing) {
                             Text(verbatim: challenged.usernameAndRank)
                             if challenged.id == ogs.user?.id {
-                                HStack {
-                                    Button(action: { reject(challenge) }) {
-                                        Text("Reject")
-                                            .bold()
-                                            .foregroundColor(.red)
+                                if isRequesting {
+                                    ProgressView()
+                                        .activityCardPending(activityCellActions)
+                                } else {
+                                    HStack {
+                                        Button(action: { reject(challenge) }) {
+                                            Text("Reject")
+                                                .bold()
+                                                .foregroundColor(.red)
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .contentShape(RoundedRectangle(cornerRadius: 10))
+                                        .hoverEffect(.highlight)
+                                        .activityCardAction(activityCellActions, .reject)
+                                        Button(action: { accept(challenge) }) {
+                                            Text("Accept")
+                                                .bold()
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .contentShape(RoundedRectangle(cornerRadius: 10))
+                                        .hoverEffect(.highlight)
+                                        .activityCardAction(activityCellActions, .accept)
                                     }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .contentShape(RoundedRectangle(cornerRadius: 10))
-                                    .hoverEffect(.highlight)
-                                    .activityCardAction(activityCellActions, .reject)
-                                    Button(action: { accept(challenge) }) {
-                                        Text("Accept")
-                                            .bold()
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .contentShape(RoundedRectangle(cornerRadius: 10))
-                                    .hoverEffect(.highlight)
-                                    .activityCardAction(activityCellActions, .accept)
+                                    .offset(x: 10)
                                 }
-                                .offset(x: 10)
-                                // Only Activity's request waits here; the cell's own sends at once.
-                                .disabled(activityCellActions?.isPending == true)
                             }
                         }
                         if SurroundUITestContract.isCapturingAppStoreScreenshots
