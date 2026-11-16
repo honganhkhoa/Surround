@@ -273,6 +273,15 @@ enum ResolvedRowOrder {
         return order
     }
 
+    /// The resolved rows that still stand once the source lists `live`. An
+    /// item leaves its source when the user acts on it, before its row
+    /// resolves, so an item listed again is a new one, such as a fresh
+    /// friend request from the same player: its old row gives way to it.
+    static func standing<ID: Hashable, Row>(_ resolved: [ID: Row], live: [ID]) -> [ID: Row] {
+        let listed = Set(live)
+        return resolved.filter { !listed.contains($0.key) }
+    }
+
     /// Following `after` through the resolved ids comes back to `id`.
     private static func leadsBackToItself<ID: Hashable>(_ id: ID, in afterByID: [ID: ID?]) -> Bool {
         var visited = Set<ID>()

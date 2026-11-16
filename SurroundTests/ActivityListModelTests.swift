@@ -455,4 +455,14 @@ final class ActivityListModelTests: XCTestCase {
         XCTAssertEqual(Order.merge(live: [Int](), resolved: [(id: 1, after: 2), (id: 2, after: 1)]), [1, 2],
                        "Rows pointing at each other all show.")
     }
+
+    func testAnItemListedAgainReplacesItsResolvedRow() {
+        typealias Order = ResolvedRowOrder
+        let results = [912_001: "Rejected quietly.", 912_002: "You and SilverHeron are friends"]
+        XCTAssertEqual(Order.standing(results, live: [912_003]), results, "Results stay beside other requests.")
+        XCTAssertEqual(Order.standing(results, live: [912_001, 912_003]), [912_002: "You and SilverHeron are friends"],
+                       "A fresh request from a player whose earlier one has a result shows as a request.")
+        XCTAssertEqual(Order.merge(live: [912_001], resolved: [(id: 912_001, after: nil)]), [912_001],
+                       "It keeps the request's place.")
+    }
 }

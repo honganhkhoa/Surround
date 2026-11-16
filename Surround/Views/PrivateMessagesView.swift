@@ -16,7 +16,8 @@ struct PrivateMessagesView: View {
     @State private var friendsExpanded = false
     @State private var inboxPosition = ScrollPosition(idType: String.self, edge: .top)
     /// Friend requests accepted or rejected here, by player id. Each keeps
-    /// its row, showing the result, until the inbox goes off screen.
+    /// its row, showing the result, until the inbox goes off screen or the
+    /// player sends a new request.
     @State private var requestResults: [Int: MessagesRequestResult] = [:]
     /// Requests acted on here whose confirmation hasn't come yet.
     @State private var actingRequests: [Int: RequestPlace] = [:]
@@ -179,6 +180,7 @@ struct PrivateMessagesView: View {
             clearRequestResults()
         }
         .onReceive(ogs.$friendshipNotice.compactMap { $0 }) { keepRequestResult($0) }
+        .onChange(of: ogs.friendInvitations.map(\.id)) { _, ids in dropSupersededResults(listing: ids) }
     }
 
     /// A request accepted or rejected here keeps its row, showing what came
@@ -204,6 +206,15 @@ struct PrivateMessagesView: View {
     private func clearRequestResults() {
         if !requestResults.isEmpty { requestResults = [:] }
         if !actingRequests.isEmpty { actingRequests = [:] }
+    }
+
+    /// Accepting or rejecting takes a request out of the service's list
+    /// before its result is kept, so a listed request whose player has a
+    /// result here is a new one. Its old result goes, and the request shows
+    /// with its Accept and Reject.
+    private func dropSupersededResults(listing ids: [Int]) {
+        let standing = ResolvedRowOrder.standing(requestResults, live: ids)
+        if standing.count != requestResults.count { requestResults = standing }
     }
 
     /// The live requests in the service's order, with each resolved one back
@@ -372,10 +383,12 @@ struct PrivateMessagesView: View {
                                              uniquingKeysWith: { first, _ in first })
                 VStack(spacing: 0) {
                     ForEach(ids, id: \.self) { id in
-                        if let result = requestResults[id] {
-                            MessagesResolvedRequestRow(result: result, focus: $requestFocus)
-                        } else if let invitation = invitations[id] {
+                        // A listed request is newer than any result for its
+                        // player, which goes once the inbox sees it.
+                        if let invitation = invitations[id] {
                             MessagesRequestRow(invitation: invitation, hooks: requestHooks(for: id, in: ids))
+                        } else if let result = requestResults[id] {
+                            MessagesResolvedRequestRow(result: result, focus: $requestFocus)
                         }
                         if id != ids.last {
                             Divider().padding(.leading, 56)
