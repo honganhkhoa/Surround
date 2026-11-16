@@ -99,7 +99,9 @@ enum ActivityModel {
         /// time. The caller drops a game once the user opens it.
         var startedGames: [Int: TimeInterval] = [:]
         /// Read conversations with no message since then don't count as
-        /// this session's recent ones.
+        /// this session's recent ones. The app passes 0: every read
+        /// conversation counts, as the saved peers Messages lists, so
+        /// Nothing waiting shows only to someone without any.
         var sessionStart: TimeInterval = 0
         var now: TimeInterval = 0
         var place: Place = .root(isMessagesTab: false)
@@ -458,7 +460,7 @@ extension ActivityModel.Input {
     ///     first seen, keyed by `ActivityModel.Waiting.id`; unseen ones count
     ///     as seen now.
     ///   - sessionStart: The start of this app session, for recent
-    ///     conversations.
+    ///     conversations. The app passes 0, so every read one counts.
     ///   - openChallenges: The user's own open and Rengo challenges, when
     ///     they come from elsewhere than the service, such as the window's
     ///     last-known copy while the socket is down. Nil reads the service's.

@@ -31,16 +31,16 @@ enum ActivityFixtures {
     struct Seed: Equatable {
         var startedGames: [Int: TimeInterval] = [:]
         var firstSeen: [String: TimeInterval] = [:]   // keyed by ActivityModel.Waiting.id
-        var sessionStart: TimeInterval = 0
         var challengeNotificationTimes: [Int: TimeInterval] = [:]
         var gameEndTimes: [Int: TimeInterval] = [:]
         var rematchSourceGameIDs: [Int: Int] = [:]    // sent challenge → the game whose Rematch made it
     }
 
+    /// As the app's input, every read conversation counts as recent.
     static func input(_ ogs: OGSService, place: ActivityModel.Place, seed: Seed,
                       clock: Clock) -> ActivityModel.Input {
         ActivityModel.Input(ogs: ogs, place: place, startedGames: seed.startedGames,
-                            firstSeen: seed.firstSeen, sessionStart: seed.sessionStart, now: clock.now)
+                            firstSeen: seed.firstSeen, sessionStart: 0, now: clock.now)
     }
 
     // MARK: Launch arguments
@@ -261,7 +261,7 @@ enum ActivityFixtures {
             self.clock = clock
             self.user = user
             self.template = template
-            seed = Seed(sessionStart: clock.ago(3_600))
+            seed = Seed()
             for player in Cast.all { self.state.cachedUsersById[player.id] = player }
         }
 
@@ -407,8 +407,9 @@ enum ActivityFixtures {
             seed.firstSeen["rengo-\(challenge.id)"] = clock.ago(600)
         }
 
-        /// Two unread, then two read: MossLantern in this session and
-        /// CedarWave 25 h ago, before it (`ActivityFixtures.finish` reads them).
+        /// Two unread, then two read: MossLantern 40 min ago and CedarWave
+        /// 25 h ago, before the app launched, which the list shows too, as
+        /// the app does (`ActivityFixtures.finish` reads them).
         mutating func conversations() {
             message(from: Cast.tenukiTom, "gg! Rematch tomorrow?", ago: 120)
             message(from: Cast.quietPine, "Thanks for the review of our last game", ago: 1_500)

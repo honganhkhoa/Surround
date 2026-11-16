@@ -46,16 +46,17 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         keepScreenshot(isPhone ? "Activity sheet from Home's card" : "Activity popover from Home's card", in: app)
 
         let sections = ["liveGames", "challengesReceived", "waiting", "correspondence", "messages"]
+        // The last is CedarWave's, read and from before the launch: the app
+        // lists every read conversation, as Messages does.
         let rows = ["game-\(FixtureID.harborMistGameID)", "game-\(baseGameID)", "challenge-\(FixtureID.usualChallengeID)",
                     correspondenceSearch, "waiting-open-\(FixtureID.openChallengeID)", liveSearch,
-                    "correspondence-games", "conversation-915100", "conversation-851006", "conversation-916001"]
+                    "correspondence-games", "conversation-915100", "conversation-851006", "conversation-916001",
+                    "conversation-851001"]
         let frames = settledFrames(sections.map(ID.activitySection) + rows.map { ID.activityRow($0) }, in: app)
         assertTopToBottom(sections.map(ID.activitySection), in: frames, "Sections follow the design's order")
         assertTopToBottom(rows.map { ID.activityRow($0) }, in: frames, "Rows follow the model's order")
-        XCTAssertFalse(query(ID.activityRow("conversation-851001"), in: app).exists,
-                       "The conversation read before the session starts isn't listed")
-        revealInList(query(ID.activityRow("conversation-916001"), in: app), in: app)
-        keepScreenshot("Activity's last section: three conversations and All messages", in: app)
+        revealInList(query(ID.activityRow("conversation-851001"), in: app), in: app)
+        keepScreenshot("Activity's last section: four conversations and All messages", in: app)
     }
 
     func testNothingWaitingSaysSo() {

@@ -136,7 +136,8 @@ final class ActivityFixturesTests: XCTestCase {
         let started = "game-91004002", removal = "game-91004003"
         let q1 = "waiting-quick-match-\(ID.liveQuickMatchUUID)"
         let q2 = "waiting-quick-match-\(ID.correspondenceQuickMatchUUID)"
-        let talks = ["conversation-915100", "conversation-851006", "conversation-916001"]
+        // Read conversations from before the launch count too, as in the app.
+        let talks = ["conversation-915100", "conversation-851006", "conversation-916001", "conversation-851001"]
         switch state {
         case .nothingWaiting:
             return Expectation(lead: "no bar", list: [], baseIsLive: false, inGame: "base +0")

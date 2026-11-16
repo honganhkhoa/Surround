@@ -275,7 +275,7 @@ case "$phase" in
     mkdir -p TestResults
     select_main_tests
 
-    echo "Running the main iPad UI suite without profile, Messages, composer, or continuity tests."
+    echo "Running the main iPad UI suite without profile, Messages, Activity, composer, or continuity tests."
     xcodebuild test-without-building \
       "${common_arguments[@]}" \
       "${selection_arguments[@]}" \
