@@ -294,6 +294,7 @@ class NavigationService: ObservableObject {
         case route(AppRoute)
         case gameOpen(AppRoute, closesNewGame: Bool)
         case activeGame(Game)
+        case messagesInbox
     }
     /// The latest link, widget or notification tap this window received,
     /// with its app-wide ticket.
@@ -323,6 +324,7 @@ class NavigationService: ObservableObject {
         case .route(let route): handle(route: route)
         case .gameOpen(let route, let closesNewGame): requestGameOpen(route, closesNewGame: closesNewGame)
         case .activeGame(let game): goToActiveGame(game: game)
+        case .messagesInbox: openMessagesInbox()
         case nil: break
         }
     }
@@ -467,6 +469,11 @@ class NavigationService: ObservableObject {
         if holdsInternal(.gameOpen(route, closesNewGame: closesNewGame)) { return }
         #endif
         guard let ogsGameID = route.ogsGameID else { return }
+        #if MAIN_APP || TESTING
+        // The game opens in the window, so the Activity list over it goes
+        // with the open, and waits with it while the window is covered.
+        if main.activity != nil { main.activity = nil }
+        #endif
         if closesNewGame { home.showingNewGameView = false }
 
         main.rootView = route.rootView
@@ -535,6 +542,18 @@ class NavigationService: ObservableObject {
         main.rootView = .home
         home.activeGameShowsCarousel = true
         home.activeGame = game
+    }
+
+    /// Shows Messages' inbox, for Activity's All messages. The window's
+    /// sheets, New game and the Activity list close, and every stack pops,
+    /// Messages' own too, so the inbox is on top; Home keeps its game, as it
+    /// does when a game opens there. Waits while the window is covered.
+    func openMessagesInbox() {
+        #if MAIN_APP || TESTING
+        if holdsInternal(.messagesInbox) { return }
+        #endif
+        dismissTrackedNavigation(preservingActiveGameIn: .home)
+        main.rootView = .privateMessages
     }
 }
 
@@ -867,6 +886,7 @@ extension OGSFriendshipAction {
 /// What a window's Activity results ask of it. Announcing is
 /// AppAnnouncer+System.swift's `announce(_:)`, so this is app-only.
 extension NavigationService: ActivityNavigating {
+    /// Closes the window's Activity list, for the list's own rows.
     func closeActivity() {
         onCloseActivity?()
     }

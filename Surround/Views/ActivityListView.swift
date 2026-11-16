@@ -618,8 +618,8 @@ private struct ActivityListContent: View {
         navigation.present(.activityItem(itemID))
     }
 
-    /// Every navigating action closes the list first. In New game's stack,
-    /// closing New game closes the list.
+    /// Opening a game closes the list first. In New game's stack, closing
+    /// New game closes the list.
     private func closeList() {
         if placement != .route {
             nav.closeActivity()
@@ -636,10 +636,9 @@ private struct ActivityListContent: View {
         nav.openGame(gameID, closesNewGame: true)
     }
 
+    /// The inbox's route closes the list, and New game in its stack.
     private func openAllMessages() {
-        closeList()
-        nav.home.showingNewGameView = false
-        nav.main.rootView = .privateMessages
+        nav.openMessagesInbox()
     }
 }
 

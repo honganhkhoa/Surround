@@ -482,10 +482,12 @@ struct ChallengeCell: View {
                 let newGameId = value.0
                 self.ogsRequestCancellable?.cancel()
                 self.ogsRequestCancellable = nil
-                // A live game opens. A correspondence game leaves the user
-                // where they are; its row goes when the overview drops the
-                // challenge.
-                guard ActivityModel.isRealtime(
+                // An open challenge's game opens, live or correspondence: the
+                // user took it while looking for a game. Of a challenge sent
+                // to the user, a live game opens, and a correspondence game
+                // leaves the user where they are; its row goes when the
+                // overview drops the challenge.
+                guard challenge.challenged == nil || ActivityModel.isRealtime(
                     challenge.game.timeControl, width: challenge.game.width, height: challenge.game.height
                 ) else { return }
                 withAnimation {

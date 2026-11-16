@@ -17,9 +17,8 @@ import Foundation
 
 /// What the results store asks of its window.
 protocol ActivityNavigating: AnyObject {
-    /// Closes the window's Activity list.
-    func closeActivity()
-    /// Opens a game. `closesNewGame` closes New game with it.
+    /// Opens a game, which closes the window's Activity list with it.
+    /// `closesNewGame` closes New game too.
     func openGame(_ gameID: Int, closesNewGame: Bool)
     /// Speaks once per app, on behalf of this window.
     func announce(_ announcement: AppAnnouncement)
@@ -160,7 +159,7 @@ final class ActivityResults: ObservableObject {
 
     private enum Resolution {
         case succeeded(ActivityOutcome)
-        /// A live game: the list closes and the game opens.
+        /// A live game: the game opens, and the list closes with it.
         case opensGame(Int)
         case failed
         /// The search being withdrawn went with no outcome: a game started
@@ -546,8 +545,8 @@ final class ActivityResults: ObservableObject {
                 hiddenIDs.insert(itemID)
             }
             // The user's own action, so the game opens even after the list
-            // closed; the open itself says what happened.
-            navigator?.closeActivity()
+            // closed; the open itself says what happened. The list closes
+            // with the open, so while the window is covered both wait.
             navigator?.openGame(gameID, closesNewGame: true)
         case .succeeded(let outcome):
             // The announcement waits before the result publishes, so a row

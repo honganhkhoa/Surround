@@ -127,7 +127,6 @@ final class ActivityResultsTests: XCTestCase {
 
     private final class FakeNavigator: ActivityNavigating {
         enum Event: Equatable {
-            case close
             case open(Int, closesNewGame: Bool)
             case announce(AppAnnouncement)
         }
@@ -143,7 +142,6 @@ final class ActivityResultsTests: XCTestCase {
 
         var spoken: [String] { announcements.compactMap(\.speech) }
 
-        func closeActivity() { events.append(.close) }
         func openGame(_ gameID: Int, closesNewGame: Bool) { events.append(.open(gameID, closesNewGame: closesNewGame)) }
         func announce(_ announcement: AppAnnouncement) { events.append(.announce(announcement)) }
     }
@@ -261,7 +259,7 @@ final class ActivityResultsTests: XCTestCase {
 
     // MARK: Accept
 
-    func testALiveAcceptClosesTheListThenOpensTheGame() {
+    func testALiveAcceptOpensTheGame() {
         accept(7, live: true)
         XCTAssertEqual(client.accepted, [7])
         XCTAssertEqual(store.entries["challenge-7"], ActivityResults.Entry(
@@ -270,10 +268,11 @@ final class ActivityResultsTests: XCTestCase {
         ))
 
         succeed(client.acceptReplies.last, with: 901)
-        XCTAssertEqual(navigator.events, [.close, .open(901, closesNewGame: true)])
+        XCTAssertEqual(navigator.events, [.open(901, closesNewGame: true)],
+                       "The open closes the list with it, so both wait while the window is covered.")
         XCTAssertEqual(state("challenge-7"), .succeeded(.gameStarted(gameID: 901)))
         scheduler.turn()
-        XCTAssertEqual(navigator.events, [.close, .open(901, closesNewGame: true)], "The game opening says it all.")
+        XCTAssertEqual(navigator.events, [.open(901, closesNewGame: true)], "The game opening says it all.")
         XCTAssertEqual(store.hiddenIDs, ["challenge-7"], "No list offers the accepted challenge again.")
     }
 
@@ -455,7 +454,7 @@ final class ActivityResultsTests: XCTestCase {
     func testStartingRengoFollowsTheAcceptRule() {
         start(17, live: true)
         succeed(client.startReplies.last, with: 917)
-        XCTAssertEqual(navigator.events, [.close, .open(917, closesNewGame: true)])
+        XCTAssertEqual(navigator.events, [.open(917, closesNewGame: true)])
 
         start(18, live: false)
         succeed(client.startReplies.last, with: 918)
@@ -610,7 +609,7 @@ final class ActivityResultsTests: XCTestCase {
         accept(23, live: true)
         store.end(session: session)
         succeed(client.acceptReplies.last, with: 923)
-        XCTAssertEqual(navigator.events, [.close, .open(923, closesNewGame: true)], "It is the user's own action.")
+        XCTAssertEqual(navigator.events, [.open(923, closesNewGame: true)], "It is the user's own action.")
         XCTAssertTrue(store.entries.isEmpty)
     }
 

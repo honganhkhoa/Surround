@@ -434,6 +434,22 @@ final class AppRouteTests: XCTestCase {
     }
 
     @MainActor
+    func testAGameOpenClosesTheActivityListOverIt() throws {
+        let navigation = NavigationService()
+        navigation.openActivity(source: .challengePill, anchor: CGRect(x: 10, y: 20, width: 44, height: 44),
+                                horizontalSizeClass: .regular)
+        navigation.home.showingNewGameView = true
+        XCTAssertNotNil(navigation.main.activity)
+
+        // A challenge accepted on Home finished while the list was open.
+        navigation.requestGameOpen(try XCTUnwrap(AppRoute(rootView: .home, ogsGameID: 42)))
+
+        XCTAssertNil(navigation.main.activity, "The game opens in the window, so the list over it closes.")
+        XCTAssertTrue(navigation.home.showingNewGameView, "New game closes only when the open asks.")
+        XCTAssertEqual(navigation.pendingGameOpen?.ogsGameID, 42)
+    }
+
+    @MainActor
     func testRepeatedGameRouteCreatesUniqueRetryToken() throws {
         let navigation = NavigationService()
         let route = try XCTUnwrap(
@@ -640,6 +656,7 @@ final class AppRouteTests: XCTestCase {
         XCTAssertFalse(navigation.handle(appURL: URL(string: "surround://home/0")!))
         navigation.handle(route: try route(.home, game: 43))
         navigation.requestGameOpen(try route(.home, game: 44), closesNewGame: true)
+        navigation.openMessagesInbox()
         navigation.goToActiveGame(game: makeGame(45))
 
         XCTAssertEqual(navigation.main.rootView, .publicGames)
@@ -748,16 +765,21 @@ final class AppRouteTests: XCTestCase {
         let resets = countResets(of: navigation)
         navigation.main.rootView = .publicGames
         navigation.home.showingNewGameView = true
+        let activity = ActivityRequest(source: .challengePill, style: .popover,
+                                       anchor: CGRect(x: 10, y: 20, width: 44, height: 44))
+        navigation.main.activity = activity
 
         // An open challenge's accept, still in flight when the cover rose.
         navigation.requestGameOpen(try route(.home, game: 71), closesNewGame: true)
         XCTAssertTrue(navigation.home.showingNewGameView, "New game stays open under the cover.")
+        XCTAssertEqual(navigation.main.activity, activity, "So does the Activity list.")
         XCTAssertEqual(navigation.main.rootView, .publicGames)
         XCTAssertNil(navigation.pendingGameOpen)
 
         cover.isRaised = false
         navigation.replayHeldNavigation()
         XCTAssertFalse(navigation.home.showingNewGameView)
+        XCTAssertNil(navigation.main.activity, "The list closes with the open it waited for.")
         XCTAssertEqual(navigation.main.rootView, .home)
         XCTAssertEqual(navigation.pendingGameOpen?.ogsGameID, 71)
         XCTAssertEqual(resets.value, 0, "As when unheld, the accept resets nothing else.")
@@ -778,6 +800,43 @@ final class AppRouteTests: XCTestCase {
         XCTAssertEqual(navigation.main.rootView, .home)
         XCTAssertNil(navigation.pendingGameOpen)
         XCTAssertEqual(resets.value, 1, "Only the window's latest internal open ran.")
+    }
+
+    @MainActor
+    func testAllMessagesShowsTheInboxOnTopAndHomeKeepsItsGame() throws {
+        let cover = Cover(isRaised: false)
+        let navigation = window(store: SuperchatStore(preferences: nil), cover: cover)
+        let homeGame = makeGame(46)
+        navigation.home.activeGame = homeGame
+        navigation.publicGames.activeGame = makeGame(47)
+        navigation.home.showingNewGameView = true
+        navigation.main.rootView = .publicGames
+        navigation.main.activity = ActivityRequest(source: .messagesButton, style: .popover,
+                                                   anchor: CGRect(x: 10, y: 20, width: 44, height: 44))
+        let resets = countResets(of: navigation)
+
+        navigation.openMessagesInbox()
+
+        XCTAssertEqual(navigation.main.rootView, .privateMessages)
+        XCTAssertNil(navigation.main.activity, "The list closes.")
+        XCTAssertFalse(navigation.home.showingNewGameView, "So does New game.")
+        XCTAssertEqual(resets.value, 1, "Every stack pops, Messages' own too, so the inbox is on top.")
+        XCTAssertEqual(navigation.preservingActiveGameOnReset, .home)
+        XCTAssertTrue(navigation.home.activeGame === homeGame, "Home keeps its game, as when a game opens there.")
+        XCTAssertNil(navigation.publicGames.activeGame)
+
+        // Under the cover it waits, then replays the same way.
+        navigation.main.rootView = .settings
+        cover.isRaised = true
+        let publishes = Count(navigation.objectWillChange)
+        navigation.openMessagesInbox()
+        XCTAssertEqual(navigation.main.rootView, .settings)
+        XCTAssertEqual(publishes.value, 0, "Holding publishes nothing.")
+        cover.isRaised = false
+        navigation.replayHeldNavigation()
+        XCTAssertEqual(navigation.main.rootView, .privateMessages)
+        XCTAssertEqual(resets.value, 2)
+        XCTAssertTrue(navigation.home.activeGame === homeGame)
     }
 
     @MainActor
