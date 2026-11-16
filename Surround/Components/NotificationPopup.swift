@@ -7,45 +7,19 @@
 
 import SwiftUI
 
-private func friendshipMessage(for action: OGSFriendshipAction) -> String {
-    switch action {
-    case .send: return String(localized: "Sent friend request")
-    case .accept: return String(localized: "Friend request accepted")
-    case .reject: return String(localized: "Friend request rejected")
-    case .remove: return String(localized: "Removed friend")
-    }
-}
-
-/// Each navigation stack draws the shared notice above its own content,
-/// including stacks presented in sheets. The root popup owns its expiry.
-struct FriendshipNoticeBanner: View {
-    @EnvironmentObject private var ogs: OGSService
-
-    var body: some View {
-        if let notice = ogs.friendshipNotice {
-            Text(verbatim: friendshipMessage(for: notice.action))
-                .bold()
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(Color(.systemIndigo), in: RoundedRectangle(cornerRadius: 10))
-                .padding(16)
-                .allowsHitTesting(false)
-        }
-    }
-}
-
 /// Message access in the global notice row, on every screen including Game
-/// Detail, until the game gets a design of its own for it.
+/// Detail, until the game gets a design of its own for it. It opens the
+/// window's Activity list at Messages.
 struct PrivateMessageNotificationButton: View {
     @EnvironmentObject private var ogs: OGSService
-    @EnvironmentObject private var nav: NavigationService
 
+    /// While connected, off the Messages tab, with unread conversations.
+    /// The list it opened hangs off the window's presenter, so it stays open
+    /// when the button goes.
     static func isVisible(ogs: OGSService, nav: NavigationService) -> Bool {
-        guard ogs.socketStatus == .connected else { return false }
-        if nav.showingPrivateChatView { return true }
-        if nav.main.rootView == .privateMessages { return false }
-        return ogs.privateMessagesUnreadCount > 0
+        ogs.socketStatus == .connected
+            && nav.main.rootView != .privateMessages
+            && ogs.privateMessagesUnreadCount > 0
     }
 
     private var messageLabel: some View {
@@ -64,9 +38,7 @@ struct PrivateMessageNotificationButton: View {
     }
 
     var body: some View {
-        Button {
-            nav.showingPrivateChatView.toggle()
-        } label: {
+        ActivityOpenerButton(source: .messagesButton, focus: .messages) {
             messageLabel.labelStyle(.iconOnly)
                 .padding()
                 .foregroundStyle(.white)
@@ -74,7 +46,7 @@ struct PrivateMessageNotificationButton: View {
         }
         .accessibilityLabel(Text("Messages"))
         .accessibilityValue(Text(verbatim: String(ogs.privateMessagesUnreadCount)))
-        .accessibilityIdentifier("global.privateMessages")
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.messagesButton)
     }
 }
 
@@ -116,9 +88,11 @@ struct NotificationPopupVisibility {
 struct NotificationPopup: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
-    @Environment(\.colorScheme) private var colorScheme
-    
-    @State private var friendshipNotice: OGSFriendshipNotice?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// Where the live pill is, for the Activity list it opens when several
+    /// live games wait.
+    @State private var livePillFrame = ActivityOpenerFrame()
+
     /// When a banner already on screen starts to fade in after the socket
     /// leaves `.connected` (2 s, so a short blip shows nothing). One mounted
     /// while offline is opaque at once and has none.
@@ -184,8 +158,14 @@ struct NotificationPopup: View {
         nav.liveGamesNeedingNotice(among: ogs.liveGames)
     }
 
+    /// One live game elsewhere opens at once. Several open Activity, whose
+    /// Live games section lists them most urgent first.
     func goToLiveGames() {
-        if let game = liveGamesElsewhere.first {
+        let games = liveGamesElsewhere
+        if games.count > 1 {
+            nav.openActivity(source: .livePill, focus: .top, anchor: livePillFrame.value,
+                             horizontalSizeClass: horizontalSizeClass)
+        } else if let game = games.first {
             nav.goToActiveGame(game: game)
         }
     }
@@ -206,11 +186,12 @@ struct NotificationPopup: View {
             .background(Color(.systemTeal))
             .cornerRadius(10)
         }
+        .activityOpenerFrame(livePillFrame, source: .livePill)
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.liveGameBanner)
     }
     
     var waitingGamesPopup: some View {
-        Button(action: { nav.main.showWaitingGames = true }) {
+        ActivityOpenerButton(source: .waitingPill) {
             HStack(spacing: 0) {
                 VStack {
                     Text("Waiting...").bold().foregroundColor(.white)
@@ -224,10 +205,11 @@ struct NotificationPopup: View {
             .background(Color(.systemIndigo))
             .cornerRadius(10)
         }
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.waitingBanner)
     }
-    
+
     var challengeReceivedPopup: some View {
-        Button(action: { nav.main.showWaitingGames = true }) {
+        ActivityOpenerButton(source: .challengePill) {
             VStack {
                 Text("Challenge received!").bold().foregroundColor(.white)
                 Text("Tap to view").font(.subheadline).foregroundColor(.white)
@@ -237,52 +219,25 @@ struct NotificationPopup: View {
             .background(Color(.systemIndigo))
             .cornerRadius(10)
         }
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.challengeBanner)
     }
-    
-    func closeChatWindow() {
-        nav.showingPrivateChatView = false
-    }
-    
+
     var body: some View {
         let visibility = NotificationPopupVisibility(ogs: ogs, nav: nav)
         ZStack(alignment: .top) {
-            // The panel shows only while connected, and so does the layer
-            // that closes it: offline it would swallow taps on an empty window.
-            if nav.showingPrivateChatView && ogs.socketStatus == .connected {
-                Color.white
-                    .opacity(0.01)
-                    .contentShape(Rectangle())
-                    .onTapGesture { closeChatWindow() }
-            }
             if ogs.socketStatus == .connected {
-                VStack {
-                    HStack {
-                        // Game Detail owns connection status, but its active
-                        // picker does not replace cross-speed live/challenge notices.
-                        if visibility.showsLiveGames {
-                            liveGamesPopup
-                        } else if visibility.showsWaitingGames {
-                            waitingGamesPopup
-                        } else if visibility.showsChallenge {
-                            challengeReceivedPopup
-                        }
-                        if visibility.showsPrivateMessages {
-                            PrivateMessageNotificationButton()
-                        }
+                HStack {
+                    // Game Detail owns connection status, but its active
+                    // picker does not replace cross-speed live/challenge notices.
+                    if visibility.showsLiveGames {
+                        liveGamesPopup
+                    } else if visibility.showsWaitingGames {
+                        waitingGamesPopup
+                    } else if visibility.showsChallenge {
+                        challengeReceivedPopup
                     }
-                    if nav.showingPrivateChatView {
-                        ZStack {
-                            PrivateMessageNotificationView()
-                                .accessibilityElement(children: .contain)
-                                .accessibilityIdentifier("global.privateMessagesPanel")
-                                .frame(maxWidth: 540)
-                                .background(
-                                    Color(colorScheme == .dark ? .systemGray6 : .systemBackground)
-                                        .shadow(radius: 2)
-                                )
-                                .padding(.horizontal)
-                                .padding(.bottom)
-                        }
+                    if visibility.showsPrivateMessages {
+                        PrivateMessageNotificationButton()
                     }
                 }
             }
@@ -304,36 +259,16 @@ struct NotificationPopup: View {
         .onDisappear {
             if nav.connectionBannerVisible { nav.connectionBannerVisible = false }
         }
-        .onReceive(ogs.$friendshipNotice) { notice in
-            friendshipNotice = notice
-            if let notice {
-                nav.announce(.init(.friendshipResult(notice.id), audience: .anyWindow, speech: friendshipMessage(for: notice.action)))
-            }
-        }
-        .task(id: friendshipNotice?.id) {
-            guard let noticeID = friendshipNotice?.id else { return }
-            do { try await Task.sleep(for: .seconds(3)) }
-            catch { return }
-            ogs.dismissFriendshipNotice(id: noticeID)
-        }
-        .onReceive(ogs.$user) { user in
-            // The popup previously lost its local state on sign-out. Keep the
-            // shared presenter closed when that account lifetime ends.
-            if user == nil { nav.showingPrivateChatView = false }
-        }
-        .appReviewPresentationBlocked(nav.showingPrivateChatView)
     }
 }
 
 #if DEBUG
 private func notificationPopupPreview(
     ogs: OGSService,
-    showingPrivateChatView: Bool = false,
     showsNavigationBackground: Bool = true
 ) -> some View {
     let nav = NavigationService()
     nav.main.rootView = .publicGames
-    nav.showingPrivateChatView = showingPrivateChatView
     return ZStack(alignment: .top) {
         if showsNavigationBackground {
             NavigationView {
@@ -352,24 +287,22 @@ private func notificationPopupPreview(
     .environmentObject(nav)
 }
 
-#Preview("Waiting game and conversations — Dark") {
+#Preview("Waiting game and Messages — Dark") {
     notificationPopupPreview(
         ogs: OGSService.previewInstance(
             user: OGSUser(username: "hakhoa", id: 765826),
             openChallengesSent: [OGSChallengeSampleData.sampleOpenChallenge]
-        ),
-        showingPrivateChatView: true
+        )
     )
     .colorScheme(.dark)
 }
 
-#Preview("Live games and conversations") {
+#Preview("Live games and Messages") {
     notificationPopupPreview(
         ogs: OGSService.previewInstance(
             user: OGSUser(username: "hakhoa", id: 765826),
             activeGames: [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2]
-        ),
-        showingPrivateChatView: true
+        )
     )
 }
 

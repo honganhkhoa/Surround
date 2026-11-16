@@ -454,11 +454,43 @@ final class OGSFriendshipTests: XCTestCase {
         XCTAssertEqual(service.friendship(for: 42), .requestReceived)
         XCTAssertEqual(service.friendInvitations.map(\.fromUser.id), [42])
         XCTAssertFalse(service.friendshipActionPlayerIDs.contains(42))
+        XCTAssertNil(service.friendshipNotice, "A failure confirms nothing.")
 
         try waitForResult(service.performFriendshipAction(.accept, user: makeUser(id: 42))).get()
         XCTAssertEqual(service.friendship(for: 42), .friends)
         XCTAssertTrue(service.friends.contains { $0.id == 42 })
         XCTAssertTrue(service.friendInvitations.isEmpty)
+        XCTAssertEqual(service.friendshipNotice?.user.id, 42)
+    }
+
+    func testTheNoticeNamesTheOtherPlayerAndComesAfterTheActionFinishes() throws {
+        FriendshipURLProtocol.configure { request in
+            if request.request.httpMethod == "POST" {
+                request.respond(statusCode: 204)
+            } else {
+                request.respondToListRequest(friends: true)
+            }
+        }
+        let service = try makeService(friendship: .requestReceived)
+        var events = [String]()
+        service.$friendshipNotice.compactMap { $0 }
+            .sink { notice in
+                events.append("notice \(notice.action) \(notice.user.id) \(notice.user.username)")
+            }
+            .store(in: &cancellables)
+        let finished = expectation(description: "accept finished")
+        service.performFriendshipAction(.accept, user: try makeUser(id: 42))
+            .sink(receiveCompletion: { completion in
+                if case .failure(let error) = completion { XCTFail("\(error)") }
+                // The invitation has already gone; the row that showed it
+                // keeps its result from here.
+                events.append("finished, invitations \(service.friendInvitations.count)")
+                finished.fulfill()
+            }, receiveValue: { events.append("value") })
+            .store(in: &cancellables)
+        wait(for: [finished], timeout: 5)
+        XCTAssertEqual(events, ["value", "finished, invitations 0", "notice accept 42 opponent"],
+                       "The notice comes after the action's own subscribers have its result.")
     }
 
     func testDuplicateMutationIsRejectedWhileFirstRequestIsInFlight() throws {

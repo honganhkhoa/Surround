@@ -536,7 +536,7 @@ private struct CompatibilityScreenshotRootView: View {
             }
         case .waitingGames:
             AppNavigationStack {
-                WaitingGamesView()
+                ActivityRouteList()
             }
         case .preferredSettings:
             AppNavigationStack {

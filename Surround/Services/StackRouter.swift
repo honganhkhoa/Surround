@@ -17,6 +17,9 @@ enum StackRoute: Hashable {
     case opponentPicker(UUID)
     case messagesConversation(Int)
     case conversation(Int)
+    /// A challenge or search from the Activity list, by its item id
+    /// (`ActivityModel.Item.id`), shown as its full card.
+    case activityItem(String)
 }
 
 extension StackRoute {
@@ -58,54 +61,10 @@ final class RootOpponentSelection {
     }
 }
 
-/// Retained by the conversation's account/peer owner, without publishing scroll
-/// updates through the navigation or inbox hierarchy.
-final class PrivateMessageScrollBookmark {
-    var messageKey: String?
-    var isAtEndOfChat = true
-
-    /// Visibility callbacks do not promise transcript order. Retain the middle
-    /// visible message in chronological order, rather than a lazy layout's
-    /// estimated leading target or a content offset tied to one width.
-    func rememberVisibleMessages(_ visibleKeys: [String], orderedKeys: [String]) {
-        guard !isAtEndOfChat else { return }
-        let visible = Set(visibleKeys)
-        let orderedVisible = orderedKeys.filter { visible.contains($0) }
-        guard !orderedVisible.isEmpty else { return }
-        messageKey = orderedVisible[orderedVisible.count / 2]
-    }
-}
-
 /// One instance belongs to one navigation stack, including each presented sheet.
+/// Conversation drafts belong to the window (ConversationDraftStore), so no
+/// route change here can drop one.
 final class StackRouter: ObservableObject {
-    private struct ConversationDraftKey: Hashable {
-        let accountID: Int
-        let peerID: Int
-    }
-    @Published private var conversationDrafts: [ConversationDraftKey: String] = [:]
-    private var conversationScrollBookmarks: [ConversationDraftKey: PrivateMessageScrollBookmark] = [:]
-
-    /// Draft lifetime is independent of the compact or detail navigation path.
-    func conversationDraft(for peerID: Int, accountID: Int?) -> Binding<String> {
-        guard let accountID else { return .constant("") }
-        let key = ConversationDraftKey(accountID: accountID, peerID: peerID)
-        return Binding(
-            get: { self.conversationDrafts[key, default: ""] },
-            set: { self.conversationDrafts[key] = $0 }
-        )
-    }
-
-    /// Scroll bookmarks share the draft's account/peer lifetime, but scrolling
-    /// never publishes a navigation or inbox update.
-    func conversationScrollBookmark(for peerID: Int, accountID: Int?) -> PrivateMessageScrollBookmark {
-        guard let accountID else { return PrivateMessageScrollBookmark() }
-        let key = ConversationDraftKey(accountID: accountID, peerID: peerID)
-        if let bookmark = conversationScrollBookmarks[key] { return bookmark }
-        let bookmark = PrivateMessageScrollBookmark()
-        conversationScrollBookmarks[key] = bookmark
-        return bookmark
-    }
-
     /// Compact presentation of Messages' selected root peer. Generic Profile
     /// conversations keep their own route, including when they share this peer.
     func presentMessagesConversation(_ user: OGSUser) {
@@ -213,10 +172,22 @@ final class StackRouter: ObservableObject {
         else { present(route) }
     }
 
+    /// Set by a stack whose games open outside it, as Activity's own stack
+    /// does: a game opened from a profile there closes the list and opens
+    /// in the window instead of being pushed.
+    var gameOpenOverride: ((Int) -> Void)?
+    /// The connection status of the Activity list in this stack. The cards
+    /// the list pushes dim their actions by it, as its rows do.
+    weak var activityConnection: ConnectionStatusSource?
+
     /// Opening a game already below the profile returns to that same screen,
     /// retaining its analysis, chat draft and connection owner.
     func openGame(_ game: Game, using navigation: NavigationService) {
         guard let gameID = game.ogsID, gameID > 0 else { return }
+        if let gameOpenOverride {
+            gameOpenOverride(gameID)
+            return
+        }
         if returnToExistingGame(gameID: gameID, using: navigation) { return }
         games[gameID] = game
         present(.game(gameID))
@@ -226,6 +197,10 @@ final class StackRouter: ObservableObject {
     /// retain their connection owner; an uncached destination loads REST detail.
     func openGame(gameID: Int, using navigation: NavigationService, service: OGSService) {
         guard gameID > 0 else { return }
+        if let gameOpenOverride {
+            gameOpenOverride(gameID)
+            return
+        }
         if returnToExistingGame(gameID: gameID, using: navigation) { return }
         if let game = service.knownProfileGame(gameID: gameID)
             ?? service.cachedOverviewGame(gameID: gameID) {
@@ -755,6 +730,20 @@ extension EnvironmentValues {
     }
 }
 
+private struct ActivityConnectionKey: EnvironmentKey {
+    static let defaultValue: ConnectionStatusSource? = nil
+}
+
+extension EnvironmentValues {
+    /// In a stack with an Activity list, the list's connection status, so a
+    /// conversation it pushes goes offline with it. Nil in every other
+    /// stack, Messages' own included.
+    var activityConnection: ConnectionStatusSource? {
+        get { self[ActivityConnectionKey.self] }
+        set { self[ActivityConnectionKey.self] = newValue }
+    }
+}
+
 private struct OwningTabRootKey: EnvironmentKey {
     static let defaultValue: RootView? = nil
 }
@@ -825,9 +814,6 @@ struct AppNavigationStack<Content: View>: View {
                 }
         }
         .modifier(GameDetailLegacyTint(color: legacyGameDetailTint))
-        .overlay(alignment: .bottom) {
-            if navigation.isActive { FriendshipNoticeBanner() }
-        }
         .environmentObject(navigation)
         .environment(\.hasGlobalNotificationOverlay, rootView != nil)
         // Presented stacks reset it: a sheet or popover inherits its
@@ -884,7 +870,7 @@ struct AppNavigationStack<Content: View>: View {
         case .publicGame:
             GameDetailView(currentGame: $nav.publicGames.activeGame)
         case .waitingGames:
-            WaitingGamesView()
+            ActivityRouteList()
         case .game(let gameID):
             StackGameDestination(gameID: gameID)
         case .playerHistory(let playerID, let opponentID):
@@ -907,6 +893,7 @@ struct AppNavigationStack<Content: View>: View {
         case .messagesConversation(let playerID), .conversation(let playerID):
             if let user = navigation.users[playerID] {
                 MessagesConversationView(peer: user)
+                    .environment(\.activityConnection, navigation.activityConnection)
             }
         case .challenge(let id):
             if let draft = navigation.drafts[id] {
@@ -922,6 +909,8 @@ struct AppNavigationStack<Content: View>: View {
                     .navigationTitle("Select your opponent ")
                     .navigationBarTitleDisplayMode(.inline)
             }
+        case .activityItem(let itemID):
+            ActivityItemCard(itemID: itemID)
         }
     }
 }

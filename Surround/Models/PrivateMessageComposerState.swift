@@ -4,9 +4,10 @@
 //
 //  What a private conversation's composer allows (in-app notices):
 //  when its field and Send are on, and when they read "Reconnecting…". The
-//  moderator superchat cover's composer turns off while offline. Messages
-//  never sets `isOffline`, so its composer keeps today's rule. Pure, so
-//  every combination is unit-tested; PrivateMessageComposer applies it.
+//  moderator superchat cover's composer, and a conversation pushed inside
+//  the Activity list, turn off while offline. Messages' own tab never sets
+//  `isOffline`, so its composer keeps today's rule. Pure, so every
+//  combination is unit-tested; PrivateMessageComposer applies it.
 //
 
 /// What a conversation's composer allows. Pure, so SurroundTests can check

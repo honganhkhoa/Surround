@@ -343,6 +343,8 @@ enum SurroundUITestContract {
         static let correspondenceChallengeID = 95_003, rematchChallengeID = 95_004
         static let openChallengeID = 95_101, sentChallengeID = 95_201, rematchSentChallengeID = 95_202
         static let rengoChallengeID = 95_301
+        /// The game an accepted challenge starts under `--surround-activity-actions`.
+        static func acceptedGameID(_ challengeID: Int) -> Int { challengeID + 900_000 }
         static let liveQuickMatchUUID = "a1c7f100-0000-4000-8000-000000000001"
         static let correspondenceQuickMatchUUID = "a1c7f100-0000-4000-8000-000000000002"
         static let moderatorID = 916_002
@@ -731,6 +733,33 @@ enum SurroundUITestContract {
         do { return try NoticesHostProbe.parse(ProcessInfo.processInfo.arguments) }
         catch { preconditionFailure("Invalid notices host probe flags: \(error)") }
     }()
+
+    /// The launch's Activity opener, read once. A malformed flag, or one
+    /// without a UI-testing Activity state, stops the launch.
+    static let activityOpen: ActivityOpen? = {
+        let open: ActivityOpen?
+        do { open = try parseActivityOpen(ProcessInfo.processInfo.arguments) }
+        catch { preconditionFailure("\(error)") }
+        guard let open else { return nil }
+        guard ActivityFixtures.selected != nil else {
+            preconditionFailure("\(activityOpenLaunchArgument) needs \(launchArgument) with \(activityStateLaunchArgument).")
+        }
+        return open
+    }()
+
+    /// The launch's answers to Accept, Reject and Withdraw, read once. A
+    /// malformed flag, or one without a UI-testing Activity state, stops the
+    /// launch.
+    static let activityActions: ActivityActions? = {
+        let actions: ActivityActions?
+        do { actions = try parseActivityActions(ProcessInfo.processInfo.arguments) }
+        catch { preconditionFailure("\(error)") }
+        guard let actions else { return nil }
+        guard ActivityFixtures.selected != nil else {
+            preconditionFailure("\(activityActionsLaunchArgument) needs \(launchArgument) with \(activityStateLaunchArgument).")
+        }
+        return actions
+    }()
     #else
     static let isEnabled = false
     static let isCapturingAppStoreScreenshots = false
@@ -841,6 +870,16 @@ enum SurroundUITestContract {
         static func friendRequestRetry(_ playerID: Int) -> String {
             "friend-request.retry.\(playerID)"
         }
+
+        /// The result an accepted or rejected request shows in its inbox row.
+        static func friendRequestResult(_ playerID: Int) -> String {
+            "friend-request.result.\(playerID)"
+        }
+
+        /// View profile, under an accepted request's result.
+        static func friendRequestViewProfile(_ playerID: Int) -> String {
+            "friend-request.view-profile.\(playerID)"
+        }
         static let profileSettingsEntry = "profile.entry.settings"
         static let profileEdit = "profile.edit"
         static let profileShare = "profile.share"
@@ -862,6 +901,31 @@ enum SurroundUITestContract {
         static let messagesSuperchatEnded = "messages.superchatEnded"
         static func superchatCoverModerator(_ id: Int) -> String { "superchat.cover.moderator.\(id)" }
         static func superchatCoverLiveGame(_ id: Int) -> String { "superchat.cover.liveGame.\(id)" }
+
+        /// The Activity list (ActivityListView.swift). Rows and their
+        /// controls take the item's id as a string, such as "challenge-95001"
+        /// or "waiting-open-95101": this file also builds into the widget.
+        static let activityList = "activity.list"
+        static let activityEmpty = "activity.empty"
+        static let activityAllMessages = "activity.allMessages"
+        static let activityDone = "activity.done"
+        /// "Reconnecting…", or "Can’t reach OGS" with its Retry.
+        static let activityStatus = "activity.status"
+        static let activityStatusRetry = "activity.status.retry"
+        /// The same line above the composer of a conversation the list pushed.
+        static let activityConversationStatus = "activity.conversation.status"
+        static let activityConversationStatusRetry = "activity.conversation.status.retry"
+        enum ActivityRowControl: String {
+            case accept, reject, view, withdraw, openGame, retry
+        }
+        /// `liveGames`, `challengesReceived`, `waiting`, `correspondence` or `messages`.
+        static func activitySection(_ name: String) -> String { "activity.section.\(name)" }
+        static func activityRow(_ itemID: String) -> String { "activity.row.\(itemID)" }
+        static func activityRow(_ itemID: String, _ control: ActivityRowControl) -> String {
+            "activity.row.\(itemID).\(control.rawValue)"
+        }
+        /// A row's result or failure line, which replaces its actions.
+        static func activityRowResult(_ itemID: String) -> String { "activity.row.\(itemID).result" }
 
         static let profileRengoMenuPrefix = "profile.menu.rengo."
         static let profileActiveGames = "profile.active-games"
@@ -1032,7 +1096,17 @@ enum SurroundUITestContract {
             "home.section.\(id)"
         }
         static let newGameClose = "newGame.close"
+        /// New game's pending Rengo link, which opens Activity in its stack.
+        static let newGameRengoWaiting = "newGame.rengoWaiting"
+        /// Home's Searching card, which opens Activity.
+        static let homeSearching = "home.searching"
         static let liveGameBanner = "notification.liveGame"
+        /// The waiting and challenge pills, which open Activity.
+        static let waitingBanner = "notification.waiting"
+        static let challengeBanner = "notification.challenge"
+        /// The Messages button beside the pills, with the unread count as its
+        /// value. It opens Activity at Messages.
+        static let messagesButton = "global.privateMessages"
         static let connectionBanner = "notification.connection"
         static let homePreferredSettings = "home.preferredSettings"
         static let homePreferredSettingsEdit = "home.preferredSettings.edit"
@@ -1319,6 +1393,87 @@ extension SurroundUITestContract {
     /// passes TEST_RUNNER_SURROUND_UI_NOTICES_HOST_PROBE), split on whitespace.
     static func noticesHostProbeArguments(_ environment: [String: String]) -> [String] {
         (environment["SURROUND_UI_NOTICES_HOST_PROBE"] ?? "").split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+
+    /// Opens the Activity list once at launch, over the offline root:
+    /// `--surround-activity-open sheet`, or `game-popover`, which opens game
+    /// 26268404 and then the game's popover. It needs an Activity state
+    /// (`--surround-activity-state`).
+    static let activityOpenLaunchArgument = "--surround-activity-open"
+
+    enum ActivityOpen: String, CaseIterable {
+        case sheet
+        case gamePopover = "game-popover"
+    }
+
+    enum ActivityOpenError: Error, Equatable, CustomStringConvertible {
+        case missingValue, unknownValue(String), needsActivityState
+
+        var description: String {
+            switch self {
+            case .missingValue:
+                "\(activityOpenLaunchArgument) needs a value: "
+                    + ActivityOpen.allCases.map(\.rawValue).joined(separator: ", ")
+            case .unknownValue(let raw):
+                "Unknown \(activityOpenLaunchArgument) value '\(raw)'. Use one of: "
+                    + ActivityOpen.allCases.map(\.rawValue).joined(separator: ", ")
+            case .needsActivityState:
+                "\(activityOpenLaunchArgument) needs \(activityStateLaunchArgument)."
+            }
+        }
+    }
+
+    /// Nil without `--surround-activity-open`. A missing or unknown value,
+    /// or no Activity state, throws.
+    static func parseActivityOpen(_ arguments: [String]) throws -> ActivityOpen? {
+        guard let index = arguments.firstIndex(of: activityOpenLaunchArgument) else { return nil }
+        guard arguments.indices.contains(index + 1) else { throw ActivityOpenError.missingValue }
+        let raw = arguments[index + 1]
+        guard let open = ActivityOpen(rawValue: raw) else { throw ActivityOpenError.unknownValue(raw) }
+        guard arguments.contains(activityStateLaunchArgument) else { throw ActivityOpenError.needsActivityState }
+        return open
+    }
+
+    /// The offline service answers Accept, Reject and Withdraw itself, 0.35 s
+    /// after each is sent, where it would fail at once: `--surround-activity-actions
+    /// succeed`, or `fail-once`, where each challenge's first action fails and
+    /// later ones succeed. An accepted challenge starts an active game
+    /// (`ActivityFixtureID.acceptedGameID`); a rejected or withdrawn one leaves
+    /// its list. A Quick Match withdraw still goes to the socket, which never
+    /// confirms it. It needs an Activity state (`--surround-activity-state`).
+    static let activityActionsLaunchArgument = "--surround-activity-actions"
+
+    enum ActivityActions: String, CaseIterable {
+        case succeed
+        case failOnce = "fail-once"
+    }
+
+    enum ActivityActionsError: Error, Equatable, CustomStringConvertible {
+        case missingValue, unknownValue(String), needsActivityState
+
+        var description: String {
+            switch self {
+            case .missingValue:
+                "\(activityActionsLaunchArgument) needs a value: "
+                    + ActivityActions.allCases.map(\.rawValue).joined(separator: ", ")
+            case .unknownValue(let raw):
+                "Unknown \(activityActionsLaunchArgument) value '\(raw)'. Use one of: "
+                    + ActivityActions.allCases.map(\.rawValue).joined(separator: ", ")
+            case .needsActivityState:
+                "\(activityActionsLaunchArgument) needs \(activityStateLaunchArgument)."
+            }
+        }
+    }
+
+    /// Nil without `--surround-activity-actions`. A missing or unknown value,
+    /// or no Activity state, throws.
+    static func parseActivityActions(_ arguments: [String]) throws -> ActivityActions? {
+        guard let index = arguments.firstIndex(of: activityActionsLaunchArgument) else { return nil }
+        guard arguments.indices.contains(index + 1) else { throw ActivityActionsError.missingValue }
+        let raw = arguments[index + 1]
+        guard let actions = ActivityActions(rawValue: raw) else { throw ActivityActionsError.unknownValue(raw) }
+        guard arguments.contains(activityStateLaunchArgument) else { throw ActivityActionsError.needsActivityState }
+        return actions
     }
 }
 #endif

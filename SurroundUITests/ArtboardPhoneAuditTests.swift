@@ -147,7 +147,7 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         Black clock state: \(blackClock.exists ? String(describing: blackClock.value) : "absent")
         White clock state: \(whiteClock.exists ? String(describing: whiteClock.value) : "absent")
         Latest chat bubble: \(latest.exists ? String(describing: latest.frame) : "absent")
-        Global message overlay: \(app.buttons["global.privateMessages"].exists)
+        Global message overlay: \(app.buttons[ID.messagesButton].exists)
         Keyboard visible: \(app.keyboards.firstMatch.exists)
         Keyboard frame: \(app.keyboards.firstMatch.exists ? String(describing: app.keyboards.firstMatch.frame) : "absent")
         Software keyboard onscreen: \(keyboardIsOnscreen(in: app))
@@ -1768,7 +1768,7 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         // Messages use the app's notice row, which shows only for unread
         // messages (SurroundUITests covers it over Game Detail); this fixture
         // has none, so the toolbar is drawn without it.
-        XCTAssertFalse(app.buttons["global.privateMessages"].exists,
+        XCTAssertFalse(app.buttons[ID.messagesButton].exists,
                        "The design review fixture starts without private messages")
         keepScreenshot("game-settings-toolbar-without-message-badge", in: app)
         tap(ID.gameOptions, in: app, matching: .button)
