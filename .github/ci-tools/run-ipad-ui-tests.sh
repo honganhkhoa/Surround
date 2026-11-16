@@ -74,13 +74,13 @@ readonly messages_test_case="${test_target}/${messages_test_class}"
 readonly continuity_test_class="GameContinuityUITests"
 readonly continuity_test_source="SurroundUITests/${continuity_test_class}.swift"
 readonly continuity_test_case="${test_target}/${continuity_test_class}"
-# CI runs main in three parts (see below). Besides their share of the
-# SurroundUITests class, parts 2 and 3 run these whole classes, so that the
-# three parts take similar time; main's other classes stay in part 1.
+# CI runs main in three parts (see below). Besides its share of the
+# SurroundUITests class, part 2 runs these whole classes, so that the three
+# parts take similar time; main's other classes stay in part 1. Part 3 runs
+# only its share of SurroundUITests: that share holds the own-game navigation
+# journey, which takes 10 to 12 minutes on a hosted iPad.
 readonly main_part_classes=(
   LocalizationUITests:2
-  ThemePickerUITests:3
-  ThemedScreensUITests:3
 )
 readonly keyboard_preflight_test_name="testKeyboardPreflightSupportsComposerInput"
 
