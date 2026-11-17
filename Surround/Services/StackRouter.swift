@@ -995,8 +995,12 @@ private struct StackDestinationBinding: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: isPresented, initial: true) { _, presented in
-                if presented { navigation.present(route) }
+            // Acts on the binding's value, not the one the change carries.
+            // The initial action runs again whenever this view reappears, as
+            // on Back, and on iOS 18 it can carry the value from before
+            // Back cleared the binding, which would push the route again.
+            .onChange(of: isPresented, initial: true) {
+                if isPresented { navigation.present(route) }
                 else { navigation.remove(route) }
             }
             .onChange(of: navigation.path) { oldPath, newPath in
