@@ -109,8 +109,7 @@ struct HomeView: View {
 
     func showGameDetail(game: Game, showsCarousel: Bool = true) {
         print("Opening game \(game)")
-        nav.home.activeGameShowsCarousel = showsCarousel
-        nav.home.activeGame = game
+        nav.showHomeGame(game, showsCarousel: showsCarousel)
     }
 
     /// Reloads the most recent finished games.

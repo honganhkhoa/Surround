@@ -193,6 +193,50 @@ final class AppRouteTests: XCTestCase {
     }
 
     @MainActor
+    func testAGamePickedOnHomeTakesThePlaceOfAnOpenOnItsWay() throws {
+        let navigation = NavigationService()
+        let picked = Game(
+            width: 19,
+            height: 19,
+            blackName: "Picked Black",
+            whiteName: "Picked White",
+            gameId: .OGS(41)
+        )
+        navigation.requestGameOpen(
+            try XCTUnwrap(AppRoute(rootView: .home, ogsGameID: 99))
+        )
+        XCTAssertNotNil(navigation.pendingGameOpen)
+
+        navigation.showHomeGame(picked, showsCarousel: false)
+
+        XCTAssertNil(navigation.pendingGameOpen,
+                     "The open on its way must not replace the picked game when it arrives.")
+        XCTAssertTrue(navigation.home.activeGame === picked)
+        XCTAssertFalse(navigation.home.activeGameShowsCarousel)
+    }
+
+    @MainActor
+    func testAGamePickedOnHomeKeepsAnOpenOnItsWayToPublicGames() throws {
+        let navigation = NavigationService()
+        let picked = Game(
+            width: 19,
+            height: 19,
+            blackName: "Picked Black",
+            whiteName: "Picked White",
+            gameId: .OGS(41)
+        )
+        navigation.requestGameOpen(
+            try XCTUnwrap(AppRoute(rootView: .publicGames, ogsGameID: 99))
+        )
+
+        navigation.showHomeGame(picked)
+
+        XCTAssertEqual(navigation.pendingGameOpen?.rootView, .publicGames)
+        XCTAssertEqual(navigation.pendingGameOpen?.ogsGameID, 99)
+        XCTAssertTrue(navigation.home.activeGame === picked)
+    }
+
+    @MainActor
     func testActiveGameTapReturnsHomeFromEveryOtherSection() throws {
         let liveGame = Game(
             width: 9,
