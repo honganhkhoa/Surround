@@ -3076,11 +3076,59 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                       "The link's game takes the place of the game that was showing.")
         keepScreenshot("The link's game in place of the row's", in: app)
 
-        // iOS 18 titles Back with the previous page instead of identifying it.
+        tapBackFromGame(to: "Active games", in: app)
+        element(id.screenHome, in: app)
+        XCTAssertTrue(pollUntil(timeout: 10) { !gameDetail(secondGameID).exists },
+                      "Back closes the link's game.")
+        XCTAssertFalse(pollUntil(timeout: 3) { gameDetail(firstGameID).exists || gameDetail(secondGameID).exists },
+                       "No game opens again after Back.")
+        #endif
+    }
+
+    func testALinkReplacesTheGameOpenedFromPublicGames() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("iOS only: it hands a link over through the iOS system; on the Mac, links are checked by hand.")
+        #else
+        let app = launchApp()
+        let id = SurroundUITestContract.AccessibilityID.self
+        // Public games resolves a link from the user's games too, so the
+        // user's own game stands in for a second public game.
+        let linkedGameID = SurroundUITestContract.fixtureGameID
+        func gameDetail(_ gameID: Int) -> XCUIElement {
+            app.descendants(matching: .any).matching(identifier: id.gameDetail(gameID)).firstMatch
+        }
+
+        selectMainNavigation(id.navigationPublicGames, in: app)
+        element(id.screenPublicGames, in: app)
+        let prefix = String(id.publicGame(0).dropLast())   // publicGame(_:) ends with the game's id
+        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "Public games lists the fixture's public game.")
+        let publicGameID = try XCTUnwrap(Int(card.identifier.dropFirst(prefix.count)))
+        tap(card, description: "Open the public game", in: app)
+        element(id.gameDetail(publicGameID), in: app)
+
+        XCUIDevice.shared.system.open(URL(string: "surround://publicGames/\(linkedGameID)")!)
+        element(id.gameDetail(linkedGameID), in: app)
+        XCTAssertTrue(pollUntil(timeout: 10) { !gameDetail(publicGameID).exists },
+                      "The link's game takes the place of the public game that was showing.")
+        keepScreenshot("The link's game in place of the public game", in: app)
+
+        tapBackFromGame(to: "Public live games", in: app)
+        element(id.screenPublicGames, in: app)
+        XCTAssertTrue(pollUntil(timeout: 10) { !gameDetail(linkedGameID).exists },
+                      "Back closes the link's game.")
+        XCTAssertFalse(pollUntil(timeout: 3) { gameDetail(publicGameID).exists || gameDetail(linkedGameID).exists },
+                       "No game opens again after Back.")
+        #endif
+    }
+
+    /// Taps the one visible Back of a game's page. iOS 18 titles Back with
+    /// the page below instead of identifying it.
+    private func tapBackFromGame(to previousTitle: String, in app: XCUIApplication) {
         let identifiedBacks = app.buttons.matching(identifier: "BackButton")
         let titledBacks = app.navigationBars.buttons.matching(NSPredicate(
             format: "identifier != %@ AND (label == %@ OR label == %@)",
-            id.gameActiveGamesButton, "Active games", "Back"
+            SurroundUITestContract.AccessibilityID.gameActiveGamesButton, previousTitle, "Back"
         ))
         var back: XCUIElement?
         XCTAssertTrue(pollUntil(timeout: 10) {
@@ -3089,15 +3137,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             back = identified.count == 1 ? identified[0]
                 : identified.isEmpty && titled.count == 1 ? titled[0] : nil
             return back != nil
-        }, "The link's game has one visible Back.")
+        }, "The game has one visible Back.")
         guard let back else { return }
-        tap(back, description: "Back to Home", in: app)
-        element(id.screenHome, in: app)
-        XCTAssertTrue(pollUntil(timeout: 10) { !gameDetail(secondGameID).exists },
-                      "Back closes the link's game.")
-        XCTAssertFalse(pollUntil(timeout: 3) { gameDetail(firstGameID).exists || gameDetail(secondGameID).exists },
-                       "No game opens again after Back.")
-        #endif
+        tap(back, description: "Back to \(previousTitle)", in: app)
     }
 
     func testHomeHistoryRetryRecoversAndKeepsNavigationAvailable() {
