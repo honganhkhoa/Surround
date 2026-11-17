@@ -56,6 +56,14 @@ final class GameControlStateTests: XCTestCase {
         }
     }
 
+    private final class HapticsRecorder: MoveCommitHaptics {
+        var events: [String] = []
+
+        func prepare() { events.append("prepare") }
+        func playCommit() { events.append("commit") }
+        func playRefusal() { events.append("refusal") }
+    }
+
     /// Counts what a board's stone sounds would play.
     private final class SoundCounter {
         var plays = 0
@@ -884,17 +892,20 @@ final class GameControlStateTests: XCTestCase {
         let sounds = SoundCounter()
         let observation = observeStoneSounds(of: game, counter: sounds)
         defer { observation.forEach { $0.cancel() } }
-        let state = GameControlState()
+        let haptics = HapticsRecorder()
+        let state = GameControlState(haptics: haptics)
 
         XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
         XCTAssertEqual(socket.moves.count, 1)
         XCTAssertEqual(sounds.plays, 1, "The stone sounds as it is sent, not a round trip later")
+        XCTAssertEqual(haptics.events, ["commit"], "One impact with the click")
 
         let gameID = try XCTUnwrap(game.ogsID)
         socket.deliver("game/\(gameID)/move", ["move_number": 1, "move": [2, 1, 1_000]] as [String: Any])
         XCTAssertEqual(game.currentPosition.lastMove, .placeStone(1, 2))
         XCTAssertEqual(sounds.plays, 1, "OGS's echo plays nothing again")
         XCTAssertEqual(sounds.schedules, 0)
+        XCTAssertEqual(haptics.events, ["commit"], "Nor does it play a haptic")
     }
 
     @MainActor
@@ -912,13 +923,15 @@ final class GameControlStateTests: XCTestCase {
             },
         ]
         defer { observation.forEach { $0.cancel() } }
-        let state = GameControlState()
+        let haptics = HapticsRecorder()
+        let state = GameControlState(haptics: haptics)
 
         XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
         try XCTUnwrap(socket.moveCallbacks.first)(nil, ["error": "refused"])
         drainMainQueue()
         XCTAssertFalse(state.isBusy)
         XCTAssertEqual(events, ["committed", "withdrawn"])
+        XCTAssertEqual(haptics.events, ["commit", "refusal"], "The impact already played, so an error follows")
 
         // Even the same stone, arriving later as a move, sounds again.
         let gameID = try XCTUnwrap(game.ogsID)
@@ -932,7 +945,8 @@ final class GameControlStateTests: XCTestCase {
         var commits = 0
         let observation = game.moveCommits.sink { _ in commits += 1 }
         defer { observation.cancel() }
-        let state = GameControlState()
+        let haptics = HapticsRecorder()
+        let state = GameControlState(haptics: haptics)
 
         XCTAssertTrue(state.submitMove(.pass, game: game, using: service, reviewCoordinator: nil) {})
         XCTAssertEqual(commits, 0, "A pass stays silent")
@@ -945,6 +959,7 @@ final class GameControlStateTests: XCTestCase {
         drainMainQueue()
         XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
         XCTAssertEqual(commits, 0, "A socket that is down fails the move with not_sent")
+        XCTAssertTrue(haptics.events.isEmpty, "No impact without a commit, and no error after one")
 
         socket.status = .connected
         socket.onStatusChanged?()
@@ -953,10 +968,11 @@ final class GameControlStateTests: XCTestCase {
         var emptyGameCommits = 0
         let emptyObservation = emptyGame.moveCommits.sink { _ in emptyGameCommits += 1 }
         defer { emptyObservation.cancel() }
-        let emptyGameState = GameControlState()
+        let emptyGameState = GameControlState(haptics: haptics)
         XCTAssertTrue(emptyGameState.submitMove(.placeStone(1, 2), game: emptyGame, using: service, reviewCoordinator: nil) {})
         drainMainQueue()
         XCTAssertEqual(emptyGameCommits, 0, "A game without data fails before anything is sent")
+        XCTAssertTrue(haptics.events.isEmpty)
     }
 
     @MainActor
@@ -968,7 +984,8 @@ final class GameControlStateTests: XCTestCase {
             game.moveCommits.sink { if case .withdrawn = $0 { withdrawals += 1 } },
         ]
         defer { observation.forEach { $0.cancel() } }
-        let state = GameControlState()
+        let haptics = HapticsRecorder()
+        let state = GameControlState(haptics: haptics)
 
         XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
         // OGS takes the move and echoes it, then the socket drops before its answer.
@@ -978,6 +995,7 @@ final class GameControlStateTests: XCTestCase {
         drainMainQueue()
         XCTAssertFalse(state.isBusy)
         XCTAssertEqual(withdrawals, 0)
+        XCTAssertEqual(haptics.events, ["commit"], "No error for a stone on the board")
         XCTAssertEqual(sounds.plays, 1)
     }
 
@@ -990,13 +1008,15 @@ final class GameControlStateTests: XCTestCase {
             game.moveCommits.sink { if case .withdrawn = $0 { withdrawals += 1 } },
         ]
         defer { observation.forEach { $0.cancel() } }
-        let state = GameControlState()
+        let haptics = HapticsRecorder()
+        let state = GameControlState(haptics: haptics)
 
         XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
         try XCTUnwrap(socket.moveCallbacks.first)(nil, ["timeout": "No WebSocket response received within 30 seconds"])
         drainMainQueue()
         XCTAssertFalse(state.isBusy, "The controls are free again")
         XCTAssertEqual(withdrawals, 0, "OGS may have taken the move")
+        XCTAssertEqual(haptics.events, ["commit"])
 
         let gameID = try XCTUnwrap(game.ogsID)
         socket.deliver("game/\(gameID)/move", ["move_number": 1, "move": [2, 1, 1_000]] as [String: Any])
@@ -1025,7 +1045,7 @@ final class GameControlStateTests: XCTestCase {
                 },
             ]
         defer { observation.forEach { $0.cancel() } }
-        let state = GameControlState()
+        let state = GameControlState(haptics: HapticsRecorder())
 
         XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
         XCTAssertEqual(otherEvents, ["elsewhere"])
@@ -1048,7 +1068,7 @@ final class GameControlStateTests: XCTestCase {
             if case .withdrawn = commit { otherEvents.append("withdrawn") }
         }
         defer { observation.cancel() }
-        let state = GameControlState()
+        let state = GameControlState(haptics: HapticsRecorder())
 
         XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
         try XCTUnwrap(socket.moveCallbacks.first)(nil, ["move": "illegal move"])
@@ -1105,7 +1125,7 @@ final class GameControlStateTests: XCTestCase {
             },
         ]
         defer { observation.forEach { $0.cancel() } }
-        let state = GameControlState()
+        let state = GameControlState(haptics: HapticsRecorder())
 
         XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
         // This window turns to another game. Its move has still gone to OGS.
@@ -1116,6 +1136,17 @@ final class GameControlStateTests: XCTestCase {
         let gameID = try XCTUnwrap(game.ogsID)
         socket.deliver("game/\(gameID)/move", ["move_number": 1, "move": [2, 1, 1_000]] as [String: Any])
         XCTAssertEqual(sounds.plays, 1, "So it plays nothing again there")
+    }
+
+    func testPendingStoneOnlyReadiesTheCommitImpact() {
+        let haptics = HapticsRecorder()
+        let touch = BoardTouchHaptics(haptics: haptics)
+        touch.touchBegan()
+        touch.touchEnded(placingPendingStone: true)
+        XCTAssertEqual(haptics.events, ["prepare", "prepare"], "A pending stone is a preview, not a success")
+        touch.touchBegan()
+        touch.touchEnded(placingPendingStone: false)
+        XCTAssertEqual(haptics.events, ["prepare", "prepare", "prepare"])
     }
 
     /// A board's wiring of its stone sounds, as in SingleGameView.

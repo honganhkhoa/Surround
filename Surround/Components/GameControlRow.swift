@@ -127,6 +127,8 @@ private struct GameMainActionStyle: ButtonStyle {
     var horizontal: Bool
     var alignsToBottom: Bool
     var columnRow = false
+    /// Submit move's press-down readies the impact its release commits.
+    var preparesCommitHaptics = false
     // The button's own state: Pass, Submit move and Accept while actions are
     // blocked or the socket is down. The sending spinner is not a button.
     @Environment(\.isEnabled) private var isEnabled
@@ -152,6 +154,11 @@ private struct GameMainActionStyle: ButtonStyle {
             .contentShape(Capsule())
             .modifier(GameControlGlass(shape: Capsule(), prominent: true, disabled: !isEnabled))
             .opacity(configuration.isPressed ? 0.7 : 1)
+            .onChange(of: configuration.isPressed) { _, isPressed in
+                if isPressed && preparesCommitHaptics {
+                    SystemMoveCommitHaptics.shared.prepare()
+                }
+            }
             // The reserved layout slot keeps More stationary. Only the painted
             // pill hugs its actual label, even when a longer possible action
             // needs a taller slot. Zen keeps their bottom edge beside the board;
@@ -516,7 +523,8 @@ struct GameControlRow: View {
                     lineLimit: columnRow ? 2 : (horizontal ? (wrapsMainAction ? nil : 1) : 2),
                     horizontal: horizontal || columnRow,
                     alignsToBottom: alignsControlsToBottom,
-                    columnRow: columnRow
+                    columnRow: columnRow,
+                    preparesCommitHaptics: pendingMove.wrappedValue != nil
                 ))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             // Keep Menu's semantic host separate from the adjacent action.

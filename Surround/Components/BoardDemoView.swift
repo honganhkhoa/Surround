@@ -48,10 +48,14 @@ struct BoardDemoView: View {
     
     func submitMove(move: Move) {
         simulatingRequest = true
-        // As in a game, the stone sounds as it is submitted, and the move
-        // applied after the simulated request below plays nothing again.
+        // As in a game, the stone sounds and its impact plays as it is
+        // submitted, and the move applied after the simulated request below
+        // plays nothing again.
         let requestID = UUID()
         let committed = game.commitMove(move, from: game.currentPosition, id: requestID)
+        if committed != nil {
+            SystemMoveCommitHaptics.shared.playCommit()
+        }
         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .milliseconds(300))) {
             do {
                 try game.makeMove(move: move)

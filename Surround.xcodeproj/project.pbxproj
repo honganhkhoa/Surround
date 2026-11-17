@@ -82,6 +82,8 @@
 		AB0A00062026110900000006 /* AppAnnouncer+System.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0A00072026110900000007 /* AppAnnouncer+System.swift */; };
 		517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
+		5FEB00012026111700000001 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
+		5FEB00032026111700000003 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
 		517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00052026102700000005 /* StonePlacementSoundTests.swift */; };
 		54BD24A1EC3F40B58CDBDCDF /* GameDetailDuoArtboardAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ED8268715BD49398AD409E1 /* GameDetailDuoArtboardAuditTests.swift */; };
 		60852AEE87C44A5CBEB515EA /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
@@ -642,6 +644,7 @@
 		AB0A00052026110900000005 /* AppAnnouncerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAnnouncerTests.swift; sourceTree = "<group>"; };
 		AB0A00072026110900000007 /* AppAnnouncer+System.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppAnnouncer+System.swift"; sourceTree = "<group>"; };
 		517D00022026102700000002 /* StonePlacementSoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundPlayer.swift; sourceTree = "<group>"; };
+		5FEB00022026111700000002 /* MoveCommitHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveCommitHaptics.swift; sourceTree = "<group>"; };
 		517D00052026102700000005 /* StonePlacementSoundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundTests.swift; sourceTree = "<group>"; };
 		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
 		655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesNavigationUITests.swift; sourceTree = "<group>"; };
@@ -1312,6 +1315,7 @@
 				AB0A00022026110900000002 /* AppAnnouncer.swift */,
 				AB0A00072026110900000007 /* AppAnnouncer+System.swift */,
 				517D00022026102700000002 /* StonePlacementSoundPlayer.swift */,
+				5FEB00022026111700000002 /* MoveCommitHaptics.swift */,
 				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
 				BCFA1151000000000000000E /* SeekGraphSendHold.swift */,
 				686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */,
@@ -1805,6 +1809,7 @@
 				AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */,
 				AE3000013A00000000000001 /* PlatformServices.swift in Sources */,
 				517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */,
+				5FEB00012026111700000001 /* MoveCommitHaptics.swift in Sources */,
 				AC7100012026110900000001 /* ActivityModel.swift in Sources */,
 				5C3E00052026111200000005 /* ActivityListModel.swift in Sources */,
 				ACA1D0012026110900000001 /* ActivityPlaceRegistry.swift in Sources */,
@@ -1958,6 +1963,7 @@
 				D4DC30082E14495596DF728D /* GameDetailInteractionTests.swift in Sources */,
 				96BD71A30B7D334BB8E64426 /* SurroundThemeTests.swift in Sources */,
 				517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */,
+				5FEB00032026111700000003 /* MoveCommitHaptics.swift in Sources */,
 				517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */,
 				AC7100032026110900000003 /* ActivityModel.swift in Sources */,
 				5C3E00062026111200000006 /* ActivityListModel.swift in Sources */,

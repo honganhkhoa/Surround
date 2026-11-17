@@ -304,6 +304,7 @@ struct Goban: View {
                     if self.selectionFeedbackGenerator == nil && self.hapticsFeedbback {
                         self.selectionFeedbackGenerator = SystemPlatformServices.shared
                             .makeSelectionFeedbackGenerator()
+                        BoardTouchHaptics().touchBegan()
                     }
                     #endif
                     _ = selectPoint(nil)
@@ -332,8 +333,8 @@ struct Goban: View {
                     highlightedColumn = -1
                     hoveredPoint.wrappedValue = nil
                     #if MAIN_APP
-                    if didSelectPoint && self.hapticsFeedbback {
-                        SystemPlatformServices.shared.playNotificationFeedback(.success)
+                    if self.hapticsFeedbback {
+                        BoardTouchHaptics().touchEnded(placingPendingStone: didSelectPoint)
                     }
                     self.selectionFeedbackGenerator = nil
                     #endif
@@ -1550,10 +1551,8 @@ private struct BoardMarkupEditingOverlay: View {
                     }
                     .onEnded { _ in
                         #if MAIN_APP
-                        if !visitedPoints.isEmpty && hapticsFeedback {
-                            SystemPlatformServices.shared
-                                .playNotificationFeedback(.success)
-                        }
+                        // Each point already ticked. A routine stroke ends
+                        // without a success pattern, as a stone does.
                         selectionFeedbackGenerator = nil
                         #endif
                         visitedPoints.removeAll()

@@ -330,6 +330,9 @@ struct SingleGameView: View {
                             self.analyticsPosition = newPosition
                             analyticsPendingMove = nil
                             analyticsPendingPosition = nil
+                            // Analysis moves stay silent; the stone still
+                            // lands with the commit's impact.
+                            SystemMoveCommitHaptics.shared.playCommit()
                         }
                     }
                 }

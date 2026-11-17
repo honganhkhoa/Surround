@@ -81,13 +81,15 @@ final class GameControlState: ObservableObject {
     private var scoringRecovery: ScoringRecovery?
     private var scoringRecoveryObservation: AnyCancellable?
     private let scoringDeadline: () -> AnyPublisher<Void, Never>
+    private let haptics: MoveCommitHaptics
 
     init(scoringDeadline: @escaping () -> AnyPublisher<Void, Never> = {
         Just(())
             .delay(for: .seconds(15), scheduler: DispatchQueue.main)
             .eraseToAnyPublisher()
-    }) {
+    }, haptics: MoveCommitHaptics? = nil) {
         self.scoringDeadline = scoringDeadline
+        self.haptics = haptics ?? SystemMoveCommitHaptics.shared
     }
 
     deinit {
@@ -192,10 +194,11 @@ final class GameControlState: ObservableObject {
     /// The one path for Submit, auto-submit and a confirmed pass. Once the
     /// request goes out on a connected socket, a stone placement is
     /// committed under the request's own ID: boards in every window play it
-    /// at once and skip OGS's echo of it. A refusal withdraws just this
-    /// commit everywhere, even after this screen has moved on. An answer
-    /// lost with the connection or never received does not, since OGS may
-    /// have taken the move: the board settles it. Passes are not committed.
+    /// at once and skip OGS's echo of it, and one impact plays with its
+    /// click. A refusal plays an error here and withdraws just this commit
+    /// everywhere, even after this screen has moved on. An answer lost with
+    /// the connection or never received does neither, since OGS may have
+    /// taken the move: the board settles it. Passes are sent without either.
     /// Returns whether the request was sent.
     @discardableResult
     func submitMove(
@@ -211,6 +214,7 @@ final class GameControlState: ObservableObject {
         var reviewSubmission: AppReviewSubmission?
         var answer: AnyPublisher<Void, Error>?
         var committed = false
+        let haptics = self.haptics
         let requestID = UUID()
 
         let sent = performRequest(
@@ -248,11 +252,16 @@ final class GameControlState: ObservableObject {
                 }
                 onConfirmed()
             },
-            receiveFailure: { _ in
+            receiveFailure: { error in
                 if let reviewSubmission {
                     reviewCoordinator?.finishMove(
                         reviewSubmission, succeeded: false
                     )
+                }
+                // The optimistic impact already played for a refused stone.
+                if committed, Self.wasRefused(error, move: move, moveNumber: expectedMoveNumber,
+                                              from: submittedPosition, in: game) {
+                    haptics.playRefusal()
                 }
             },
             onCancel: {
@@ -266,6 +275,9 @@ final class GameControlState: ObservableObject {
         // without data before sending. Commit only what can go out.
         guard sent, let answer, ogs.socketStatus == .connected, game.gameData != nil else { return sent }
         committed = game.commitMove(move, from: submittedPosition, id: requestID) != nil
+        if committed {
+            haptics.playCommit()
+        }
         Self.whenRefused(answer, move: move, moveNumber: expectedMoveNumber,
                          from: submittedPosition, in: game) {
             if committed {
