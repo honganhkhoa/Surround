@@ -47,9 +47,6 @@ struct ThemeLivePreview: View {
                     GameDetailBackdrop().frame(width: side, height: side)
                 } else {
                     GameDetailBackdrop()
-                        .overlay {
-                            if theme == .sakuraStream { GameDetailSceneFoliage() }
-                        }
                 }
                 BoardView(boardPosition: Self.position)
                     .environment(\.excludesBoardsFromSceneShadows,

@@ -120,6 +120,50 @@ final class ThemedScreensUITests: SurroundJourneyUITestCase {
         #endif
     }
 
+    #if DEBUG
+    func testSakuraStreamWholeAppScreensShowCanopies() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("Covered on iPhone and iPad; Mac shares the iPad layout.")
+        #else
+        let device = XCUIDevice.shared
+        let original = device.appearance
+        addTeardownBlock { device.appearance = original }
+        device.appearance = .light
+
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.homeFinishedOnlyLaunchArgument,
+            SurroundUITestContract.themeLaunchArgument, "sakuraStream",
+        ], orientation: .portrait)
+        element(ID.screenHome, in: app)
+        if UIDevice.current.userInterfaceIdiom == .pad { restoreFullSizeWindow(in: app) }
+        keepScreenshot("Home – sakuraStream", in: app)
+
+        let viewAll = elementAfterScrolling(ID.homeHistoryViewAll, in: app, matching: .button)
+        tap(viewAll, description: "Open the full game history", in: app)
+        element(ID.screenGameHistory, in: app)
+        element(ID.homeHistoryGame(SurroundUITestContract.homeFinishedOnlyHistoryGameID), in: app)
+        keepScreenshot("Game history – sakuraStream", in: app)
+
+        selectMainNavigation(ID.navigationPublicGames, in: app)
+        element(ID.screenPublicGames, in: app)
+        let game = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "publicGames.game.")).firstMatch
+        XCTAssertTrue(game.waitForExistence(timeout: 10), "sakuraStream: Public games lists the fixture game")
+        keepScreenshot("Public games – sakuraStream", in: app)
+        app.terminate()
+
+        let settingsApp = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument, "settings",
+            SurroundUITestContract.themeLaunchArgument, "sakuraStream",
+        ], orientation: .portrait)
+        element(ID.screenSettings, in: settingsApp)
+        keepScreenshot("Settings – sakuraStream", in: settingsApp)
+        settingsApp.terminate()
+        #endif
+    }
+    #endif
+
     /// A dark-only theme on the whole app turns every screen dark, here
     /// Messages, which does not wear themes yet. With Games only, Messages
     /// keeps the system's Light Mode.

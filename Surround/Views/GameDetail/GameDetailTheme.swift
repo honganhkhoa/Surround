@@ -3922,6 +3922,10 @@ private struct SakuraStreamSceneContent: View, Equatable {
                     .colorMultiply(scheme == .dark ? Color(themeHex: 0x786B79) : .white)
                     .position(x: layout.imageFrame.midX, y: layout.imageFrame.midY)
             }
+            // Keep the matched sakura canopies in the shared scene backdrop so
+            // Home, Public games, Game history, Settings, picker previews, and
+            // Game Detail all wear the same riverside canopy ring.
+            SakuraStreamCanopyBehind(size: layout.size, scheme: scheme).equatable()
             // Modern navigation owns its edge effect. Older systems need
             // local pigment beneath bare toolbar labels and the title.
             if usesLegacyChrome {
@@ -4488,39 +4492,155 @@ private struct SurroundStudioSceneContent: View, Equatable {
     }
 }
 
-/// One placement drives the opaque background canopy and its board projection.
-/// No game/board/panel state enters this viewport-only layout.
+/// One placement drives all four matched tall-tree sakura boughs and their
+/// parallel upper-left sunlight cast across both the riverside ground/water
+/// plane and raised UI controls + main detailed ceramic board.
+/// No game, board, or panel state enters this viewport-only layout.
 struct SakuraStreamCanopyLayout: Equatable {
     let size: CGSize
     let canopy: CGRect
     let leftCanopy: CGRect
-    let leftShadowOffset: CGSize
-    let rightShadowOffset: CGSize
+    let bottomLeftCanopy: CGRect
+    let bottomRightCanopy: CGRect
+    let leftGroundShadowCanopy: CGRect
+    let rightGroundShadowCanopy: CGRect
+    let bottomLeftGroundShadowCanopy: CGRect
+    let bottomRightGroundShadowCanopy: CGRect
+    let leftShadowCanopy: CGRect
+    let rightShadowCanopy: CGRect
+    let bottomLeftShadowCanopy: CGRect
+    let bottomRightShadowCanopy: CGRect
+    let leftShadowFeather: CGFloat
+    let shadowEdgeFeather: CGFloat
+    let groundBlurRadius: CGFloat
     let blurRadius: CGFloat
     let topClearHeight: CGFloat
     let topFadeHeight: CGFloat
+    let bottomFadeHeight: CGFloat
 
     init(size: CGSize) {
         let width = size.width.isFinite ? max(0, size.width) : 0
         let height = size.height.isFinite ? max(0, size.height) : 0
         self.size = CGSize(width: width, height: height)
         let shortSide = min(width, height)
-        let side = min(480, shortSide * 0.92)
-        canopy = side > 0
-            ? CGRect(x: width - side * (width > height ? 0.95 : 0.75),
-                     y: width > height ? shortSide * 0.03 : height * 0.14,
-                     width: side, height: side) : .zero
-        let leftSide = min(520, shortSide * 1.04)
-        leftCanopy = width > height && leftSide > 0
-            ? CGRect(x: -leftSide * 0.20, y: shortSide * 0.02,
-                     width: leftSide, height: leftSide) : .zero
-        // The boughs stay at the viewport edges; their longer cast reaches the
-        // controls and playing surface without following any panel or board.
-        leftShadowOffset = CGSize(width: min(360, width * 0.30), height: shortSide * 0.10)
-        rightShadowOffset = CGSize(width: 2, height: shortSide * 0.08)
-        blurRadius = min(5, shortSide * 0.009)
-        topClearHeight = min(76, height * 0.18)
-        topFadeHeight = topClearHeight + min(48, shortSide * 0.12)
+        let longSide = max(width, height)
+        guard shortSide > 0 else {
+            canopy = .zero
+            leftCanopy = .zero
+            bottomLeftCanopy = .zero
+            bottomRightCanopy = .zero
+            leftGroundShadowCanopy = .zero
+            rightGroundShadowCanopy = .zero
+            bottomLeftGroundShadowCanopy = .zero
+            bottomRightGroundShadowCanopy = .zero
+            leftShadowCanopy = .zero
+            rightShadowCanopy = .zero
+            bottomLeftShadowCanopy = .zero
+            bottomRightShadowCanopy = .zero
+            leftShadowFeather = 0
+            shadowEdgeFeather = 0
+            groundBlurRadius = 0
+            blurRadius = 0
+            topClearHeight = 0
+            topFadeHeight = 0
+            bottomFadeHeight = 0
+            return
+        }
+        let wide = min(1, max(0, (width / max(1, height) - 0.80) / 0.90))
+        // Cap side <= 430 pt (~305 pt on Phone, 430 pt on iPad) so 1024x1024 native
+        // sprites always downsample (>1.1x supersampled on @3x Phone and @2x iPad).
+        let side = min(430, max(shortSide * 0.68, min(shortSide * 0.76, longSide * 0.35)))
+        leftCanopy = CGRect(
+            x: -side * (0.16 - 0.08 * wide),
+            y: -side * (0.09 + 0.075 * wide),
+            width: side,
+            height: side
+        )
+        canopy = CGRect(
+            x: width - side * (0.84 + 0.02 * wide),
+            y: -side * (0.09 + 0.14 * wide),
+            width: side,
+            height: side
+        )
+        bottomLeftCanopy = CGRect(
+            x: -side * (0.06 + 0.02 * wide),
+            y: height - side * (0.95 - 0.03 * wide),
+            width: side,
+            height: side
+        )
+        bottomRightCanopy = CGRect(
+            x: width - side * (0.94 - 0.03 * wide),
+            y: height - side * (0.95 - 0.03 * wide),
+            width: side,
+            height: side
+        )
+
+        // Elevated ~4.5 m riverside sakura boughs cast a softer far-displaced
+        // solar penumbra onto the stream/sand below and a slightly tighter,
+        // crisper parallax shadow across raised clocks, panels, and ceramic slab.
+        groundBlurRadius = min(6.5, max(4.0, shortSide * 0.0125))
+        blurRadius = min(4.5, max(2.8, shortSide * 0.0085))
+        topClearHeight = min(44, height * 0.06)
+        topFadeHeight = topClearHeight + min(42, shortSide * 0.09)
+        bottomFadeHeight = min(64, height * 0.09)
+
+        let sunDX = side * (0.40 + 0.16 * wide)
+        let sunDY = side * (0.56 - 0.24 * wide)
+        let groundSide = side * (1.34 + 0.06 * wide)
+        leftGroundShadowCanopy = CGRect(
+            x: leftCanopy.minX + sunDX,
+            y: leftCanopy.minY + sunDY,
+            width: groundSide,
+            height: groundSide
+        )
+        rightGroundShadowCanopy = CGRect(
+            x: canopy.minX + sunDX,
+            y: canopy.minY + sunDY,
+            width: groundSide,
+            height: groundSide
+        )
+        bottomLeftGroundShadowCanopy = CGRect(
+            x: bottomLeftCanopy.minX + sunDX,
+            y: bottomLeftCanopy.minY + sunDY * 0.40,
+            width: groundSide,
+            height: groundSide
+        )
+        bottomRightGroundShadowCanopy = CGRect(
+            x: bottomRightCanopy.minX + sunDX,
+            y: bottomRightCanopy.minY + sunDY * 0.40,
+            width: groundSide,
+            height: groundSide
+        )
+
+        let fgDX = sunDX * 0.88
+        let fgDY = sunDY * 0.88
+        let fgSide = side * (1.30 + 0.08 * wide)
+        leftShadowCanopy = CGRect(
+            x: leftCanopy.minX + fgDX,
+            y: leftCanopy.minY + fgDY,
+            width: fgSide,
+            height: fgSide
+        )
+        rightShadowCanopy = CGRect(
+            x: canopy.minX + fgDX,
+            y: canopy.minY + fgDY,
+            width: fgSide,
+            height: fgSide
+        )
+        bottomLeftShadowCanopy = CGRect(
+            x: bottomLeftCanopy.minX + fgDX,
+            y: bottomLeftCanopy.minY + fgDY * 0.40,
+            width: fgSide,
+            height: fgSide
+        )
+        bottomRightShadowCanopy = CGRect(
+            x: bottomRightCanopy.minX + fgDX,
+            y: bottomRightCanopy.minY + fgDY * 0.40,
+            width: fgSide,
+            height: fgSide
+        )
+        leftShadowFeather = 0.22
+        shadowEdgeFeather = 0.22
     }
 }
 
@@ -4528,8 +4648,6 @@ struct SakuraStreamCanopyLayout: Equatable {
 /// checked so stale/default metadata can never decorate a compact board.
 struct SakuraStreamBoardCanopyLayout: Equatable {
     let board: BoardSceneShadowRegion?
-    let cornerExtent: CGFloat
-    let tipBand: CGFloat
 
     init(size: CGSize, boards: [BoardSceneShadowRegion]) {
         let viewport = CGRect(origin: .zero, size: SakuraStreamCanopyLayout(size: size).size)
@@ -4540,68 +4658,12 @@ struct SakuraStreamBoardCanopyLayout: Equatable {
                 && [rect.minX, rect.minY, rect.width, rect.height].allSatisfy(\.isFinite)
                 && rect.width > 0 && rect.height > 0 && rect.intersects(viewport)
         }.max { $0.bounds.width * $0.bounds.height < $1.bounds.width * $1.bounds.height }
-        cornerExtent = board.map { min(160, min($0.bounds.width, $0.bounds.height) * 0.38) } ?? 0
-        tipBand = board.map { min(20, $0.cellSize) } ?? 0
     }
 }
 
-/// The alpha mask is applied after blurring the static art. Everything beyond
-/// the selected board, including clocks/panels and other boards, stays clear.
+/// The foreground shadow mask fades gently at top/bottom screen bars while
+/// punching clean exclusions around compact (< 14 pt) and secondary preview boards.
 struct SakuraStreamBoardCanopyMask: View, Equatable {
-    enum Layer { case shadow, tips }
-    let boards: [BoardSceneShadowRegion]
-    let layer: Layer
-    var isEnabled = true
-
-    var body: some View {
-        Canvas { context, size in
-            let layout = SakuraStreamBoardCanopyLayout(size: size, boards: boards)
-            guard isEnabled, let board = layout.board else { return }
-            let rect = board.bounds
-            let radius = board.cornerRadius.isFinite ? max(0, board.cornerRadius) : 0
-            let shape = RoundedRectangle(cornerRadius: radius, style: .circular).path(in: rect)
-            context.clip(to: shape)
-            let corner = CGPoint(x: rect.maxX, y: rect.minY)
-            // Bound the painted bands before destination-in compositing. The
-            // rounded slab's antialiased edge must not survive outside the fade.
-            context.clip(to: Path(ellipseIn: CGRect(
-                x: corner.x - layout.cornerExtent, y: corner.y - layout.cornerExtent,
-                width: layout.cornerExtent * 2, height: layout.cornerExtent * 2)))
-            // Exclude other boards before painting. Erasing afterwards through
-            // the fade's antialiased clip can leave partially erased pixels.
-            for other in boards where other != board {
-                let rect = other.bounds
-                guard [rect.minX, rect.minY, rect.width, rect.height].allSatisfy(\.isFinite),
-                      rect.width > 0, rect.height > 0 else { continue }
-                let radius = other.cornerRadius.isFinite ? max(0, other.cornerRadius) : 0
-                var outside = Path(CGRect(origin: .zero, size: size))
-                outside.addPath(RoundedRectangle(cornerRadius: radius, style: .circular).path(in: rect))
-                context.clip(to: outside, style: FillStyle(eoFill: true))
-            }
-            let fade = GraphicsContext.Shading.radialGradient(
-                Gradient(stops: [.init(color: .white, location: 0),
-                                 .init(color: .white.opacity(0.65), location: 0.35),
-                                 .init(color: .clear, location: 1)]),
-                center: corner, startRadius: 0, endRadius: layout.cornerExtent)
-            if layer == .tips {
-                let top = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: layout.tipBand)
-                let right = CGRect(x: rect.maxX - layout.tipBand, y: rect.minY,
-                                   width: layout.tipBand, height: rect.height)
-                context.fill(Path(top), with: .linearGradient(Gradient(colors: [.white, .clear]),
-                    startPoint: CGPoint(x: 0, y: top.minY), endPoint: CGPoint(x: 0, y: top.maxY)))
-                context.fill(Path(right), with: .linearGradient(Gradient(colors: [.clear, .white]),
-                    startPoint: CGPoint(x: right.minX, y: 0), endPoint: CGPoint(x: right.maxX, y: 0)))
-                context.blendMode = .destinationIn
-            }
-            context.fill(shape, with: fade)
-        }
-        .transaction { $0.animation = nil }
-    }
-}
-
-/// Shadows may cross controls and the main board, but never a compact board or
-/// a secondary preview. Clip holes before painting so their interiors are clear.
-struct SakuraStreamSceneCanopyMask: View, Equatable {
     let boards: [BoardSceneShadowRegion]
     var isEnabled = true
 
@@ -4611,6 +4673,9 @@ struct SakuraStreamSceneCanopyMask: View, Equatable {
             let layout = SakuraStreamCanopyLayout(size: size)
             let main = SakuraStreamBoardCanopyLayout(size: size, boards: boards).board
             let viewport = CGRect(origin: .zero, size: layout.size)
+            guard viewport.width > 0, viewport.height > 0 else { return }
+            // Exclude compact and secondary preview boards before painting so
+            // their interiors and antialiased edges retain exact zero alpha.
             for region in boards {
                 if let main, region == main { continue }
                 let rect = region.bounds
@@ -4621,60 +4686,141 @@ struct SakuraStreamSceneCanopyMask: View, Equatable {
                 outside.addPath(RoundedRectangle(cornerRadius: radius, style: .circular).path(in: rect))
                 context.clip(to: outside, style: FillStyle(eoFill: true))
             }
-            context.fill(Path(viewport), with: .linearGradient(
-                Gradient(colors: [.clear, .white]),
-                startPoint: CGPoint(x: 0, y: layout.topClearHeight),
-                endPoint: CGPoint(x: 0, y: layout.topFadeHeight)))
+            let h = max(1, viewport.height)
+            let topClear = min(1, max(0, layout.topClearHeight / h))
+            let topFull = min(1, max(topClear + 0.001, layout.topFadeHeight / h))
+            let bottomFull = max(topFull + 0.001, min(1, (h - layout.bottomFadeHeight) / h))
+            let verticalFade = GraphicsContext.Shading.linearGradient(
+                Gradient(stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .clear, location: topClear),
+                    .init(color: .white, location: topFull),
+                    .init(color: .white, location: bottomFull),
+                    .init(color: .clear, location: 1)
+                ]),
+                startPoint: CGPoint(x: 0, y: 0),
+                endPoint: CGPoint(x: 0, y: viewport.height)
+            )
+            context.fill(Path(viewport), with: verticalFade)
         }
         .transaction { $0.animation = nil }
     }
 }
 
 private final class SakuraStreamCanopyAssets {
+    enum Corner: Equatable, CaseIterable {
+        case topLeft, topRight, bottomLeft, bottomRight
+    }
+
     private init() {}
     private static let bundle = Bundle(for: SakuraStreamCanopyAssets.self)
     static let canopy = UIImage(named: "SakuraStreamCanopy", in: bundle, compatibleWith: nil)
     static let leftCanopy = UIImage(named: "SakuraStreamCanopyLeft", in: bundle, compatibleWith: nil)
-}
+    static let bottomLeftCanopy = UIImage(named: "SakuraStreamCanopyBottomLeft", in: bundle, compatibleWith: nil)
+    static let bottomRightCanopy = UIImage(named: "SakuraStreamCanopyBottomRight", in: bundle, compatibleWith: nil)
 
-/// Cached art shares one viewport frame; projected casts add only static offsets.
-private struct SakuraStreamCanopyImage: View, Equatable {
-    let size: CGSize
-    let scheme: ColorScheme
-    var silhouette = false
-    var isLeft = false
-    var isEnabled = true
-
-    var body: some View {
-        let layout = SakuraStreamCanopyLayout(size: size)
-        let frame = isLeft ? layout.leftCanopy : layout.canopy
-        if let canopy = isLeft ? SakuraStreamCanopyAssets.leftCanopy : SakuraStreamCanopyAssets.canopy {
-            Image(uiImage: canopy)
-                .renderingMode(silhouette ? .template : .original)
-                .resizable()
-                .foregroundStyle(Color(themeHex: scheme == .dark ? 0x151322 : 0x43313B))
-                .colorMultiply(silhouette ? .white : (scheme == .dark ? Color(themeHex: 0x8F829F) : .white))
-                // Keep each image mounted while its visibility changes.
-                .opacity(isEnabled && !frame.isEmpty ? 1 : 0)
-                .frame(width: frame.width, height: frame.height)
-                .position(x: frame.midX, y: frame.midY)
-                .frame(width: layout.size.width, height: layout.size.height)
+    static func image(for corner: Corner) -> UIImage? {
+        switch corner {
+        case .topLeft: leftCanopy
+        case .topRight: canopy
+        case .bottomLeft: bottomLeftCanopy
+        case .bottomRight: bottomRightCanopy
         }
     }
 }
 
-private struct SakuraStreamCanopyBehind: View, Equatable {
+/// Cached matched botanical sprites share one viewport coordinate space and
+/// match the riverside scene's evening desaturation in Dark Mode.
+private struct SakuraStreamCanopyImage: View, Equatable {
+    let viewportSize: CGSize
+    let frame: CGRect
+    let scheme: ColorScheme
+    var silhouette = false
+    var corner: SakuraStreamCanopyAssets.Corner = .topRight
+    var leadingFeather: CGFloat = 0
+    var topFeather: CGFloat = 0
+    var isEnabled = true
+
+    var body: some View {
+        if let canopy = SakuraStreamCanopyAssets.image(for: corner) {
+            Image(uiImage: canopy)
+                .renderingMode(silhouette ? .template : .original)
+                .resizable()
+                .foregroundStyle(Color(themeHex: scheme == .dark ? 0x0B0710 : 0x2A1822))
+                .saturation(silhouette ? 1 : (scheme == .dark ? 0.65 : 1))
+                .colorMultiply(silhouette ? .white : (scheme == .dark ? Color(themeHex: 0x827488) : .white))
+                .mask {
+                    LinearGradient(
+                        stops: [
+                            .init(color: silhouette && leadingFeather > 0 ? .clear : .white, location: 0),
+                            .init(color: .white, location: max(0.001, min(0.999, leadingFeather))),
+                            .init(color: .white, location: 1)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                }
+                .mask {
+                    LinearGradient(
+                        stops: [
+                            .init(color: silhouette && topFeather > 0 ? .clear : .white, location: 0),
+                            .init(color: .white, location: max(0.001, min(0.999, topFeather))),
+                            .init(color: .white, location: 1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+                // Keep each image mounted while its visibility changes.
+                .opacity(isEnabled && !frame.isEmpty ? 1 : 0)
+                .frame(width: frame.width, height: frame.height)
+                .position(x: frame.midX, y: frame.midY)
+                .frame(width: viewportSize.width, height: viewportSize.height)
+        }
+    }
+}
+
+struct SakuraStreamCanopyBehind: View, Equatable {
     let size: CGSize
     let scheme: ColorScheme
 
     var body: some View {
         let layout = SakuraStreamCanopyLayout(size: size)
         ZStack {
-            SakuraStreamCanopyImage(size: size, scheme: scheme)
-            SakuraStreamCanopyImage(size: size, scheme: scheme, isLeft: true)
+            // Far-displaced solar penumbra on the riverside ground/water plane
+            // (with zero contact shadow directly under the blossoms) establishes
+            // 4-5 m tall-tree height across both Game Detail and whole-app screens.
+            ZStack {
+                SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.rightGroundShadowCanopy,
+                                        scheme: scheme, silhouette: true, corner: .topRight,
+                                        topFeather: layout.shadowEdgeFeather)
+                SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.leftGroundShadowCanopy,
+                                        scheme: scheme, silhouette: true, corner: .topLeft,
+                                        leadingFeather: layout.shadowEdgeFeather,
+                                        topFeather: layout.shadowEdgeFeather)
+                SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomRightGroundShadowCanopy,
+                                        scheme: scheme, silhouette: true, corner: .bottomRight)
+                SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomLeftGroundShadowCanopy,
+                                        scheme: scheme, silhouette: true, corner: .bottomLeft,
+                                        leadingFeather: layout.shadowEdgeFeather)
+            }
+            .compositingGroup()
+            .blur(radius: layout.groundBlurRadius)
+            .opacity(scheme == .dark ? 0.17 : 0.20)
+
+            ZStack {
+                SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.canopy,
+                                        scheme: scheme, corner: .topRight)
+                SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.leftCanopy,
+                                        scheme: scheme, corner: .topLeft)
+                SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomRightCanopy,
+                                        scheme: scheme, corner: .bottomRight)
+                SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomLeftCanopy,
+                                        scheme: scheme, corner: .bottomLeft)
+            }
+            .compositingGroup()
         }
-        .shadow(color: Color(themeHex: 0x332632).opacity(scheme == .dark ? 0.16 : 0.20),
-                radius: layout.blurRadius, x: 2, y: 4)
+        .frame(width: layout.size.width, height: layout.size.height)
         .clipped()
     }
 }
@@ -4692,27 +4838,38 @@ private struct SakuraStreamCanopyForeground: View {
     }
 }
 
-/// Composite the two silhouettes before applying opacity: overlapping casts
-/// remain at most 11%, rather than adding two dark patches over UI lettering.
+/// Composite overhead silhouettes before blurring so overlapping casts never
+/// double-darken UI lettering or stones, while compact and secondary preview
+/// boards stay completely untouched.
 struct SakuraStreamCanopyShadowProjection: View {
     let size: CGSize
     let scheme: ColorScheme
     let boards: [BoardSceneShadowRegion]
     let isEnabled: Bool
 
+    static func opacity(for scheme: ColorScheme) -> Double {
+        scheme == .dark ? 0.13 : 0.155
+    }
+
     var body: some View {
         let layout = SakuraStreamCanopyLayout(size: size)
         ZStack {
-            SakuraStreamCanopyImage(size: size, scheme: scheme, silhouette: true, isEnabled: isEnabled)
-                .offset(x: layout.rightShadowOffset.width, y: layout.rightShadowOffset.height)
-            SakuraStreamCanopyImage(size: size, scheme: scheme, silhouette: true, isLeft: true, isEnabled: isEnabled)
-                .offset(x: layout.leftShadowOffset.width, y: layout.leftShadowOffset.height)
+            SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.rightShadowCanopy,
+                                    scheme: scheme, silhouette: true, corner: .topRight,
+                                    topFeather: layout.shadowEdgeFeather, isEnabled: isEnabled)
+            SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.leftShadowCanopy,
+                                    scheme: scheme, silhouette: true, corner: .topLeft,
+                                    leadingFeather: layout.leftShadowFeather,
+                                    topFeather: layout.shadowEdgeFeather, isEnabled: isEnabled)
+            SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomLeftShadowCanopy,
+                                    scheme: scheme, silhouette: true, corner: .bottomLeft,
+                                    leadingFeather: layout.shadowEdgeFeather, isEnabled: isEnabled)
         }
         .compositingGroup()
         .blur(radius: layout.blurRadius)
-        .mask(SakuraStreamSceneCanopyMask(boards: boards, isEnabled: isEnabled))
+        .mask(SakuraStreamBoardCanopyMask(boards: boards, isEnabled: isEnabled))
         .clipped()
-        .opacity(0.11)
+        .opacity(isEnabled ? Self.opacity(for: scheme) : 0)
         .transaction { $0.animation = nil }
     }
 }
@@ -4731,19 +4888,11 @@ struct SakuraStreamCanopyProjection: View {
     }
 
     var body: some View {
-        let enabled = allowsProjection
-        let tipsEnabled = enabled && SakuraStreamBoardCanopyLayout(size: size, boards: boards).board != nil
-        ZStack {
-            SakuraStreamCanopyShadowProjection(size: size, scheme: scheme, boards: boards, isEnabled: enabled)
-            SakuraStreamCanopyImage(size: size, scheme: scheme, isEnabled: tipsEnabled)
-                .mask(SakuraStreamBoardCanopyMask(boards: boards, layer: .tips, isEnabled: tipsEnabled))
-                .opacity(0.20)
-        }
-        .compositingGroup()
-        .clipped()
-        // Keep the image/mask layers mounted at the 14 pt boundary. No resize
-        // animation may blend decoration into the compact board's solid colors.
-        .transaction { $0.animation = nil }
+        SakuraStreamCanopyShadowProjection(size: size, scheme: scheme, boards: boards,
+                                           isEnabled: allowsProjection)
+            // Keep the image/mask layers mounted at the 14 pt boundary. No resize
+            // animation may blend decoration into the compact board's solid colors.
+            .transaction { $0.animation = nil }
     }
 }
 
@@ -4760,10 +4909,6 @@ struct GameDetailSceneFoliage: View {
                 GeometryReader { geometry in
                     RakedGardenFoliageContent(size: geometry.size, scheme: colorScheme,
                                                  hasTopEdgeClocks: hasTopEdgeClocks).equatable()
-                }
-            } else if theme == .sakuraStream {
-                GeometryReader { geometry in
-                    SakuraStreamCanopyBehind(size: geometry.size, scheme: colorScheme).equatable()
                 }
             } else if theme == .surroundStudio {
                 GeometryReader { geometry in
