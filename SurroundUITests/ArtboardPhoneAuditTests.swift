@@ -1286,10 +1286,7 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         let zenControl = element(ID.gameZenControl, in: app, matching: .button)
         XCTAssertTrue(waitUntilHittable(zenControl, timeout: 10), "Zen shows the live game on your move")
         keepScreenshot("zen-control-in-correspondence-zen", in: app)
-        // Until the app's notices leave games, the live-game pill can lie
-        // over the middle of the bar, but not over the control's trailing
-        // quarter.
-        activate(zenControl, at: CGVector(dx: 0.875, dy: 0.5))
+        activate(zenControl, at: CGVector(dx: 0.5, dy: 0.5))
 
         element(ID.gameDetail(SurroundUITestContract.fixtureGameID), in: app)
         XCTAssertFalse(app.buttons[ID.gameZenExit].exists,

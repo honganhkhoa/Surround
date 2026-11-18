@@ -22,6 +22,7 @@ struct SurroundApp: App {
 
     init() {
         #if DEBUG && MAIN_APP
+        MainThreadWatchdog.startIfRequested()
         if SurroundUITestContract
             .isClearingAppStoreScreenshotWidgetFixture
         {

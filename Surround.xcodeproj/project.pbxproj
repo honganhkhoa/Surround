@@ -39,6 +39,7 @@
 		5C4E00052026111400000005 /* GameControlModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00042026111400000004 /* GameControlModelTests.swift */; };
 		5C4E00312026111400000031 /* GameControlChipFitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00302026111400000030 /* GameControlChipFitTests.swift */; };
 		5C4E00072026111400000007 /* GameControlSwitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00062026111400000006 /* GameControlSwitchTests.swift */; };
+		5C4E00532026111400000053 /* GameControlDriverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00522026111400000052 /* GameControlDriverTests.swift */; };
 		5C4E00092026111400000009 /* GameOverCardRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00082026111400000008 /* GameOverCardRuleTests.swift */; };
 		5C4E000B202611140000000B /* GameConnectionPlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E000A202611140000000A /* GameConnectionPlacementTests.swift */; };
 		ACA1D0012026110900000001 /* ActivityPlaceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */; };
@@ -56,6 +57,7 @@
 		5C0E00032026110900000003 /* SceneCoverPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00042026110900000004 /* SceneCoverPolicy.swift */; };
 		5C0E00052026110900000005 /* SceneCoverPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E00042026110900000004 /* SceneCoverPolicy.swift */; };
 		5C2E00102026111100000010 /* SuperchatDebugCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E000F202611110000000F /* SuperchatDebugCommands.swift */; };
+		5C4E00512026111400000051 /* MainThreadWatchdog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00502026111400000050 /* MainThreadWatchdog.swift */; };
 		5C2E00122026111100000012 /* SuperchatCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00112026111100000011 /* SuperchatCover.swift */; };
 		5C2E00012026111100000001 /* SceneCoverPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00022026111100000002 /* SceneCoverPolicyTests.swift */; };
 		5C2E00092026111100000009 /* SuperchatStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00082026111100000008 /* SuperchatStoreTests.swift */; };
@@ -622,6 +624,7 @@
 		5C4E00042026111400000004 /* GameControlModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlModelTests.swift; sourceTree = "<group>"; };
 		5C4E00302026111400000030 /* GameControlChipFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlChipFitTests.swift; sourceTree = "<group>"; };
 		5C4E00062026111400000006 /* GameControlSwitchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlSwitchTests.swift; sourceTree = "<group>"; };
+		5C4E00522026111400000052 /* GameControlDriverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlDriverTests.swift; sourceTree = "<group>"; };
 		5C4E00082026111400000008 /* GameOverCardRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameOverCardRuleTests.swift; sourceTree = "<group>"; };
 		5C4E000A202611140000000A /* GameConnectionPlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameConnectionPlacementTests.swift; sourceTree = "<group>"; };
 		ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPlaceRegistry.swift; sourceTree = "<group>"; };
@@ -635,6 +638,7 @@
 		5C0E00022026110900000002 /* SceneCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCover.swift; sourceTree = "<group>"; };
 		5C0E00042026110900000004 /* SceneCoverPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCoverPolicy.swift; sourceTree = "<group>"; };
 		5C2E000F202611110000000F /* SuperchatDebugCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperchatDebugCommands.swift; sourceTree = "<group>"; };
+		5C4E00502026111400000050 /* MainThreadWatchdog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainThreadWatchdog.swift; sourceTree = "<group>"; };
 		5C2E00112026111100000011 /* SuperchatCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperchatCover.swift; sourceTree = "<group>"; };
 		5C2E00022026111100000002 /* SceneCoverPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCoverPolicyTests.swift; sourceTree = "<group>"; };
 		5C2E00082026111100000008 /* SuperchatStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperchatStoreTests.swift; sourceTree = "<group>"; };
@@ -998,6 +1002,7 @@
 				C5A7000B202611090000000B /* ConnectionStatusProbe.swift */,
 				AE3100053A00000000000005 /* SurroundUITestOfflineServices.swift */,
 				5C2E000F202611110000000F /* SuperchatDebugCommands.swift */,
+				5C4E00502026111400000050 /* MainThreadWatchdog.swift */,
 			);
 			path = UITesting;
 			sourceTree = "<group>";
@@ -1091,6 +1096,7 @@
 				5C4E00042026111400000004 /* GameControlModelTests.swift */,
 				5C4E00302026111400000030 /* GameControlChipFitTests.swift */,
 				5C4E00062026111400000006 /* GameControlSwitchTests.swift */,
+				5C4E00522026111400000052 /* GameControlDriverTests.swift */,
 				5C4E00082026111400000008 /* GameOverCardRuleTests.swift */,
 				5C4E000A202611140000000A /* GameConnectionPlacementTests.swift */,
 				ACA1D0052026110900000005 /* ActivityPlaceRegistryTests.swift */,
@@ -1842,6 +1848,7 @@
 				5C0E00012026110900000001 /* SceneCover.swift in Sources */,
 				5C0E00032026110900000003 /* SceneCoverPolicy.swift in Sources */,
 				5C2E00102026111100000010 /* SuperchatDebugCommands.swift in Sources */,
+				5C4E00512026111400000051 /* MainThreadWatchdog.swift in Sources */,
 				5C2E00122026111100000012 /* SuperchatCover.swift in Sources */,
 				C5A700022026110900000002 /* ConnectionStatusModel.swift in Sources */,
 				5C2E000B202611110000000B /* PrivateMessageComposerState.swift in Sources */,
@@ -1997,6 +2004,7 @@
 				5C4E00052026111400000005 /* GameControlModelTests.swift in Sources */,
 				5C4E00312026111400000031 /* GameControlChipFitTests.swift in Sources */,
 				5C4E00072026111400000007 /* GameControlSwitchTests.swift in Sources */,
+				5C4E00532026111400000053 /* GameControlDriverTests.swift in Sources */,
 				5C4E00092026111400000009 /* GameOverCardRuleTests.swift in Sources */,
 				5C4E000B202611140000000B /* GameConnectionPlacementTests.swift in Sources */,
 				ACA1D0032026110900000003 /* ActivityPlaceRegistry.swift in Sources */,

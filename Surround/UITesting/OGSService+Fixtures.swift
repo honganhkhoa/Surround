@@ -2245,6 +2245,17 @@ extension OGSService {
                 let historyGame = Game(ogsGame: historyData)
                 historyGame.ogsRawData = [:]
                 state.finishedGamesSnapshot = [historyGame]
+
+                if SurroundUITestContract.ticksFixtureClocks {
+                    // Its clock last moved years ago and would read 0:00.
+                    startTurnAtLaunch(fixtureGame, seconds: 1_800)
+                }
+                if SurroundUITestContract.gameControlDrivers.addsConditionalMovesGame {
+                    let game = liveBannerConditionalMovesGame(from: fixtureGame, user: fixtureUser)
+                    state.activeGames[SurroundUITestContract.conditionalMovesFixtureGameID] = game
+                    let opponent = AppStoreScreenshotProfileData.cobaltFoxOpening.blackPlayer
+                    state.cachedUsersById[opponent.id] = opponent
+                }
             }
 
             if SurroundUITestContract.simulatesWidgetDeepLinkRouting {
@@ -3896,6 +3907,84 @@ extension OGSService {
 
         return makeService(from: state)
     }
+
+    /// Both players of `game` have `seconds` left, and the player to move
+    /// starts the turn now, so the clock counts down from the launch.
+    private static func startTurnAtLaunch(_ game: Game, seconds: TimeInterval) {
+        guard var clock = game.clock else { return }
+        let now = Date().timeIntervalSince1970 * 1_000
+        clock.blackTime = ThinkingTime(thinkingTime: seconds, thinkingTimeLeft: seconds)
+        clock.whiteTime = ThinkingTime(thinkingTime: seconds, thinkingTimeLeft: seconds)
+        clock.lastMoveTime = now
+        clock.expiration = now + seconds * 1_000
+        clock.timeUntilExpiration = seconds
+        game.clock = clock
+    }
+
+    /// The capture fixture's conditional-moves game as the live-banner
+    /// fixture's user plays it: White, waiting on a correspondence clock for
+    /// Black's reply after move 60, with the capture's three branches.
+    private static func liveBannerConditionalMovesGame(from template: Game, user: OGSUser) -> Game {
+        let opening = AppStoreScreenshotProfileData.cobaltFoxOpening
+        guard var data = template.gameData else {
+            preconditionFailure("The live-banner fixture must contain game data.")
+        }
+        let opponent = opening.blackPlayer
+        data.gameId = opening.id
+        data.players = OGSGame.Players(black: opponent, white: user)
+        data.blackPlayerId = opponent.id
+        data.whitePlayerId = user.id
+        data.playerPool = nil
+        data.handicap = opening.handicap
+        data.komi = opening.komi
+        data.rules = opening.rules
+        data.initialPlayer = .black
+        data.initialState = OGSGame.InitialState(black: "", white: "")
+        data.moves = opening.moves
+        data.phase = .play
+        data.outcome = nil
+        data.winner = nil
+        data.removed = nil
+        data.score = nil
+        data.pauseControl = nil
+        data.undoRequested = nil
+        data.timeControl = TimeControlSystem.Fischer(
+            initialTime: 3 * 86_400, timeIncrement: 86_400, maxTime: 7 * 86_400
+        ).timeControlObject
+        let now = Date().timeIntervalSince1970 * 1_000
+        let blackLeft: TimeInterval = 66_360   // 18h 26m, as the capture's
+        data.clock.blackPlayerId = opponent.id
+        data.clock.whitePlayerId = user.id
+        data.clock.currentPlayerColor = .black
+        data.clock.currentPlayerId = opponent.id
+        data.clock.blackTime = ThinkingTime(thinkingTime: blackLeft, thinkingTimeLeft: blackLeft)
+        data.clock.whiteTime = ThinkingTime(thinkingTime: 184_080, thinkingTimeLeft: 184_080)
+        data.clock.lastMoveTime = now
+        data.clock.expiration = now + blackLeft * 1_000
+        data.clock.timeUntilExpiration = blackLeft
+        data.clock.pausedTime = nil
+        data.clock.pauseControl = nil
+        data.clock.started = true
+        let game = Game(ogsGame: data)
+        game.ogsRawData = [:]
+        let plan = try! ConditionalMovePlan(
+            gameID: opening.id, ownerID: user.id,
+            rootMoveNumber: SurroundUITestContract.conditionalMovesFixtureRootMoveNumber,
+            paths: [
+                [.pass, .placeStone(11, 11)],
+                [.placeStone(9, 9), .placeStone(9, 10), .placeStone(8, 9), .placeStone(8, 10)],
+                [.placeStone(9, 9), .placeStone(9, 10), .placeStone(10, 9), .placeStone(10, 10)],
+            ]
+        )
+        precondition(
+            game.currentPosition.lastMoveNumber == SurroundUITestContract.conditionalMovesFixtureRootMoveNumber
+                && game.setConditionalMovePlan(plan, expectedOwnerID: user.id)
+                && game.conditionalMoveBranches.count == 3,
+            "The live-banner conditional-moves game must wait at its root with three branches."
+        )
+        return game
+    }
+
     /// Performance runs: every fixture game's clock moves as OGSService's 1 s
     /// timer moves a connected game's, the timer the offline service turns off.
     private enum FixtureClockTicker {
@@ -4021,5 +4110,62 @@ extension OGSService {
     }
 
     #endif
+}
+#endif
+
+#if DEBUG && MAIN_APP
+/// `--surround-game-control-cycle`: in the live-banner fixture, game
+/// 26268404, the challenges the user received and the socket of every
+/// window's service step to the next `GameControlCycleState` each time a
+/// Game Detail screen leaves, or opens. Game Detail tells the driver;
+/// nothing is posted, so devices run it as simulators do.
+enum GameControlCycleDriver {
+    private typealias State = SurroundUITestContract.GameControlCycleState
+    private static let log = Logger(subsystem: "com.honganhkhoa.Surround", category: "GameControlCycle")
+    /// The state the windows show, the launch's first.
+    private static var state = State.chip
+    /// The Game Detail screens whose content has come on screen, until
+    /// each screen leaves.
+    private static var screensShown = Set<UUID>()
+
+    /// A screen's content came on screen: a step when the screen has just
+    /// opened, not when its content comes back while the screen stays.
+    static func screenAppeared(_ screen: UUID) {
+        guard screensShown.insert(screen).inserted else { return }
+        step(on: .onAppear)
+    }
+
+    static func screenLeft(_ screen: UUID) {
+        screensShown.remove(screen)
+        step(on: .onDisappear)
+    }
+
+    private static func step(on event: SurroundUITestContract.GameControlCycle) {
+        guard SurroundUITestContract.gameControlDrivers.cycle == event else { return }
+        state = state.next
+        let services = SuperchatDebugCommands.registeredServices
+        for service in services {
+            apply(state, to: service)
+        }
+        log.notice("GAME-CONTROL-CYCLE \(String(describing: state), privacy: .public) services=\(services.count, privacy: .public)")
+    }
+
+    /// The whole state, whatever the service showed before. The socket
+    /// comes back before the turn changes, and goes down after it, so a
+    /// clock the outage freezes is the user's turn.
+    private static func apply(_ state: State, to service: OGSService) {
+        if !state.isSocketDown {
+            service.setSocketStatusForUITests(.connected)
+        }
+        service.setTurnForUITests(gameID: SurroundUITestContract.fixtureGameID, userToMove: state.isUserToMove)
+        if state.hasReceivedChallenge, let user = service.user {
+            service.receiveChallengeForUITests(ActivityFixtures.usualChallenge(to: user))
+        } else {
+            service.removeReceivedChallengeForUITests(id: SurroundUITestContract.ActivityFixtureID.usualChallengeID)
+        }
+        if state.isSocketDown {
+            service.setSocketStatusForUITests(.reconnecting)
+        }
+    }
 }
 #endif

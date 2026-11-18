@@ -36,7 +36,11 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
     /// English unless a manual fit run sets SURROUND_UI_LANGUAGE (Xcode
     /// forwards TEST_RUNNER_SURROUND_UI_LANGUAGE), for example `de` or `ja`.
     var languageLaunchArguments: [String] {
-        let language = ProcessInfo.processInfo.environment["SURROUND_UI_LANGUAGE"] ?? "en"
+        languageLaunchArguments(for: ProcessInfo.processInfo.environment["SURROUND_UI_LANGUAGE"] ?? "en")
+    }
+
+    /// The app's language and its region's locale, for example `fr` with fr_FR.
+    func languageLaunchArguments(for language: String) -> [String] {
         let locales = ["en": "en_US", "de": "de_DE", "es": "es_ES", "fr": "fr_FR", "id": "id_ID",
                        "ja": "ja_JP", "ko": "ko_KR", "ms": "ms_MY", "pt-BR": "pt_BR", "pt-PT": "pt_PT",
                        "th": "th_TH", "vi": "vi_VN", "zh-Hans": "zh_CN", "zh-Hant": "zh_TW"]
@@ -44,10 +48,13 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
                 "-AppleLocale", locales[language] ?? language.replacingOccurrences(of: "-", with: "_")]
     }
 
+    /// - Parameter language: A journey's own language, such as `fr`, in place
+    ///   of English or SURROUND_UI_LANGUAGE's.
     func launchApp(
         additionalLaunchArguments: [String] = [],
         launchEnvironment: [String: String] = [:],
-        orientation: UIDeviceOrientation = .landscapeLeft
+        orientation: UIDeviceOrientation = .landscapeLeft,
+        language: String? = nil
     ) -> XCUIApplication {
         #if !targetEnvironment(macCatalyst)
         XCUIDevice.shared.orientation = orientation
@@ -55,7 +62,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
 
         let app = XCUIApplication()
         app.launchEnvironment = launchEnvironment
-        app.launchArguments = languageLaunchArguments + [
+        app.launchArguments = (language.map { languageLaunchArguments(for: $0) } ?? languageLaunchArguments) + [
             SurroundUITestContract.launchArgument,
         ] + additionalLaunchArguments
         #if DEBUG
@@ -80,6 +87,16 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
     /// center. The runner shares the simulator's notify server, so every
     /// offline window's service in the app hears it.
     func post(_ command: SurroundUITestContract.SuperchatCommand) {
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName(command.rawValue as CFString), nil, nil, true
+        )
+    }
+
+    /// Posts a Debug connection command the same way: every offline
+    /// window's socket goes down, as a lost connection takes it, or comes
+    /// back.
+    func post(_ command: SurroundUITestContract.ConnectionCommand) {
         CFNotificationCenterPostNotification(
             CFNotificationCenterGetDarwinNotifyCenter(),
             CFNotificationName(command.rawValue as CFString), nil, nil, true
@@ -803,6 +820,41 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         return candidate
     }
 
+    /// Resizes the real iPad window with its native grabber, as the
+    /// narrow-window artboard audit does: never an injected viewport.
+    func resizeWindow(to size: CGSize, in app: XCUIApplication) -> CGRect {
+        let window = app.windows.firstMatch
+        let grabber = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
+            .withOffset(CGVector(dx: -3, dy: -3))
+        grabber.press(forDuration: 0.8, thenDragTo: window.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: size.width, dy: size.height)))
+        Thread.sleep(forTimeInterval: 1.5)
+        // Floating windows resize about their center: halve each correction.
+        func delta(_ difference: CGFloat) -> CGFloat {
+            abs(difference) > 1 ? difference / 2 + (difference > 0 ? 8 : -8) : 0
+        }
+        for _ in 0..<6 {
+            let current = window.frame
+            guard abs(current.width - size.width) > 1 || abs(current.height - size.height) > 1 else { break }
+            let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
+                .withOffset(CGVector(dx: -3, dy: -3))
+            corner.press(forDuration: 0.8, thenDragTo: corner.withOffset(
+                CGVector(dx: delta(size.width - current.width), dy: delta(size.height - current.height))))
+            Thread.sleep(forTimeInterval: 0.8)
+        }
+        return window.frame
+    }
+
+    /// The app's window where the screen has it, the space every element's
+    /// frame is in. In a resized iPad window the application's frame keeps
+    /// the window's size at the screen's origin, so checks that something is
+    /// on screen measure this.
+    func windowFrame(in app: XCUIApplication) -> CGRect {
+        let window = app.windows.firstMatch
+        let frame = window.exists ? window.frame : .null
+        return frame.isNull || frame.isEmpty ? app.frame : frame
+    }
+
     /// iPadOS remembers a resized window across launches. Each case needs the
     /// full screen, so restore it with the system's double tap on the window's
     /// top edge, away from Home's live-game banner at the top center.
@@ -854,16 +906,16 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             control.click()
             #else
             XCTAssertTrue(pollUntil(timeout: 10) {
-                control.exists && !control.frame.isEmpty && app.frame.contains(control.frame)
+                control.exists && !control.frame.isEmpty && windowFrame(in: app).contains(control.frame)
             }, "Expected the in-game control on screen", file: file, line: line)
-            holdGameControl(control, at: gameControlHoldOffset(control, in: app))
+            holdGameControl(control)
             if !popover.waitForExistence(timeout: 5) {
                 let retry = XCTAttachment(string: "The first hold opened no popover; held again.\n"
                                           + control.debugDescription)
                 retry.name = "Game control hold retried"
                 retry.lifetime = .keepAlways
                 add(retry)
-                holdGameControl(control, at: gameControlHoldOffset(control, in: app))
+                holdGameControl(control)
             }
             #endif
         } else {
@@ -883,26 +935,12 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         return popover
     }
 
-    /// A one-second press on the control. iOS 27 can leave the hidden tab
-    /// bar's accessibility frame over a bottom-bar item, so the press goes
-    /// to the item's freshly resolved frame instead of waiting for it to be
-    /// hittable.
-    func holdGameControl(_ control: XCUIElement, at offset: CGVector = CGVector(dx: 0.5, dy: 0.5)) {
-        control.coordinate(withNormalizedOffset: offset).press(forDuration: 1.0)
-    }
-
-    /// Where a press on the control lands. Until NotificationPopup leaves
-    /// games, its live pill can lie over the middle of the control in a
-    /// phone's landscape bar, as iOS 18 draws it, but not over the control's
-    /// trailing quarter.
-    func gameControlHoldOffset(_ control: XCUIElement, in app: XCUIApplication) -> CGVector {
-        #if targetEnvironment(macCatalyst)
-        return CGVector(dx: 0.5, dy: 0.5)
-        #else
-        let landscapePhoneBar = UIDevice.current.userInterfaceIdiom == .phone
-            && app.frame.width > app.frame.height && control.frame.midY < app.frame.midY
-        return CGVector(dx: landscapePhoneBar ? 0.875 : 0.5, dy: 0.5)
-        #endif
+    /// A one-second press on the control's centre. iOS 27 can leave the
+    /// hidden tab bar's accessibility frame over a bottom-bar item, so the
+    /// press goes to the item's freshly resolved frame instead of waiting
+    /// for it to be hittable.
+    func holdGameControl(_ control: XCUIElement) {
+        control.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 1.0)
     }
 
     /// Closes a popover the way a person does: with a tap outside it.

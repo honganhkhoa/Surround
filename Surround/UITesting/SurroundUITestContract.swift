@@ -99,9 +99,6 @@ enum SurroundUITestContract {
     /// Starts the isolated preferences suite with Home in this layout:
     /// `--surround-ui-home-display-mode compact` or `full`.
     static let homeDisplayModeLaunchArgument = "--surround-ui-home-display-mode"
-    /// Ticks every fixture game's clock each second, as OGSService's timer
-    /// does for connected games, so performance runs see live clocks.
-    static let fixtureClockTicksLaunchArgument = "--surround-fixture-clock-ticks"
     /// Caps Home's Appearance popover at this many points, as a short screen
     /// or window does: `--surround-ui-appearance-popover-height 360`.
     static let appearancePopoverHeightLaunchArgument = "--surround-ui-appearance-popover-height"
@@ -315,8 +312,10 @@ enum SurroundUITestContract {
 
     enum ActivityFixtureState: String, CaseIterable {
         case nothingWaiting = "nothing-waiting", liveYourMove = "live-your-move"
-        case liveTheirMove = "live-their-move", lowTime = "low-time", stoneRemoval = "stone-removal"
-        case gameStarted = "game-started", challengeReceived = "challenge-received"
+        case liveTheirMove = "live-their-move", lowTime = "low-time", lowTimeCrossing = "low-time-crossing"
+        case stoneRemoval = "stone-removal"
+        case gameStarted = "game-started", gameStartedCorrespondence = "game-started-correspondence"
+        case challengeReceived = "challenge-received"
         case unusualChallenge = "unusual-challenge", searching, waiting
         case correspondenceYourMove = "correspondence-your-move", nothingLeads = "nothing-leads"
         case several, superchat, rematchOffered = "rematch-offered", rematchBothAsked = "rematch-both-asked"
@@ -368,6 +367,18 @@ enum SurroundUITestContract {
     /// `start@0,end@30,start@60`: the commands at those seconds after launch,
     /// for runs that can't post Darwin notifications (a device, the Mac).
     static let superchatDebugScriptLaunchArgument = "--surround-superchat-debug-script"
+    /// Darwin notifications that take every offline window's socket down,
+    /// as a lost connection does, and bring it back.
+    enum ConnectionCommand: String, CaseIterable {
+        case drop = "com.honganhkhoa.Surround.debug.connection.drop"
+        case restore = "com.honganhkhoa.Surround.debug.connection.restore"
+    }
+    /// Ticks every fixture game's clock each second, as OGSService's timer
+    /// does for connected games, so performance runs see live clocks. With
+    /// the live-banner fixture it first gives both players of game 26268404
+    /// 30 minutes from the launch, so its clock counts down instead of
+    /// standing at 0:00.
+    static let fixtureClockTicksLaunchArgument = "--surround-fixture-clock-ticks"
     #endif
 
     #if DEBUG && MAIN_APP
@@ -411,6 +422,13 @@ enum SurroundUITestContract {
     static var ticksFixtureClocks: Bool {
         isEnabled && ProcessInfo.processInfo.arguments.contains(fixtureClockTicksLaunchArgument)
     }
+
+    /// The launch's in-game control drivers, read once. A malformed flag, or
+    /// one without the launch it needs, stops the launch.
+    static let gameControlDrivers: GameControlDrivers = {
+        do { return try GameControlDrivers.parse(ProcessInfo.processInfo.arguments) }
+        catch { preconditionFailure("\(error)") }
+    }()
 
     /// Comma-separated audit variants, usable with either offline capture route.
     static var gameDetailPlayers: Set<String> {
@@ -1486,6 +1504,158 @@ extension SurroundUITestContract {
         guard let actions = ActivityActions(rawValue: raw) else { throw ActivityActionsError.unknownValue(raw) }
         guard arguments.contains(activityStateLaunchArgument) else { throw ActivityActionsError.needsActivityState }
         return actions
+    }
+
+    // MARK: The in-game control's drivers
+
+    /// `--surround-game-control-cycle on-disappear` or `on-appear`, with the
+    /// live-banner fixture: game 26268404, the challenges the user received
+    /// and the socket step through `GameControlCycleState`, one state each
+    /// time a Game Detail leaves the screen, or each time one comes on
+    /// screen. The cycle moves by itself, so no command is posted.
+    static let gameControlCycleLaunchArgument = "--surround-game-control-cycle"
+
+    /// `--surround-forum-224-control <low>,<high>`: version 2.4's compact
+    /// bottom bar, whose own geometry decided whether it showed and which
+    /// froze own games on devices, brought back on purpose to show that a
+    /// device can still freeze (`OwnGameFreezeControl`).
+    static let forum224ControlLaunchArgument = "--surround-forum-224-control"
+
+    /// Logs every main-queue gap of 250 ms or more (MainThreadWatchdog.swift),
+    /// in any Debug run.
+    static let mainThreadWatchdogLaunchArgument = "--surround-main-thread-watchdog"
+
+    /// Adds the capture fixture's conditional-moves game to the live-banner
+    /// fixture: a correspondence game on the opponent's move with three
+    /// conditional branches, so its bar shows three modes beside the control.
+    static let liveGameBannerConditionalMovesLaunchArgument = "--surround-live-game-banner-conditional-moves"
+
+    enum GameControlCycle: String, CaseIterable {
+        case onDisappear = "on-disappear"
+        case onAppear = "on-appear"
+    }
+
+    /// The cycle's states, in order, starting from the launch's own.
+    enum GameControlCycleState: Int, CaseIterable {
+        /// Game 26268404 on the user's move, so another game's control
+        /// shows it as the chip.
+        case chip
+        /// 26268404 on the opponent's move.
+        case base
+        /// The opponent's move, and a live challenge received.
+        case dot
+        /// The user's move, with the socket reconnecting.
+        case outage
+
+        var next: GameControlCycleState {
+            GameControlCycleState(rawValue: (rawValue + 1) % Self.allCases.count) ?? .chip
+        }
+
+        var isUserToMove: Bool { self == .chip || self == .outage }
+        var hasReceivedChallenge: Bool { self == .dot }
+        var isSocketDown: Bool { self == .outage }
+    }
+
+    /// Version 2.4's rule for its compact bottom bar, kept to reproduce the
+    /// freeze it caused. The item measures the height its game layout has
+    /// spare. Hidden in the last pass, it shows once `low` is spare; shown,
+    /// it stays while any height is spare. The last pass is only what
+    /// `onChange` records after a layout, and that never runs inside the
+    /// synchronous layout of the tab bar's animated hide. So when the hide
+    /// leaves between `low` and `high` spare without the item, where `high`
+    /// is `low` plus the height the item's bar takes, each pass inside the
+    /// hide shows the bar, which takes the room it needed, and the next pass
+    /// hides it again, and the layout never ends.
+    struct OwnGameFreezeControl: Equatable {
+        var low: Double
+        var high: Double
+
+        func shows(spare: Double, wasShown: Bool) -> Bool {
+            spare >= (wasShown ? 0 : low)
+        }
+
+        /// Whether a hide that starts hidden and leaves `spare` without the
+        /// item loops, with `high - low` as the bar's height.
+        func loops(withSpareWithoutItem spare: Double) -> Bool {
+            spare >= low && spare < high
+        }
+    }
+
+    /// The launch's in-game control drivers.
+    struct GameControlDrivers: Equatable {
+        var cycle: GameControlCycle?
+        var freezeControl: OwnGameFreezeControl?
+        var addsConditionalMovesGame = false
+        var runsMainThreadWatchdog = false
+
+        enum ParseError: Error, Equatable, CustomStringConvertible {
+            case missingValue(flag: String)
+            case invalidValue(flag: String, value: String)
+            case needs(flag: String, launch: String)
+
+            var description: String {
+                switch self {
+                case .missingValue(let flag): "\(flag) needs a value: \(GameControlDrivers.usage(of: flag))."
+                case .invalidValue(let flag, let value):
+                    "Invalid \(flag) value '\(value)'. Use \(GameControlDrivers.usage(of: flag))."
+                case .needs(let flag, let launch): "\(flag) needs \(launch)."
+                }
+            }
+        }
+
+        fileprivate static func usage(of flag: String) -> String {
+            flag == forum224ControlLaunchArgument
+                ? "<low>,<high> in points, such as 70,122, from 0 and with low below high"
+                : GameControlCycle.allCases.map(\.rawValue).joined(separator: " or ")
+        }
+
+        /// No driver without its flags. A flag with a missing or malformed
+        /// value, or without the launch it needs, throws: the live-banner
+        /// fixture for the cycle and the conditional-moves game, a UI-testing
+        /// launch for those and for the freeze control. The first occurrence
+        /// of a flag wins.
+        static func parse(_ arguments: [String]) throws -> GameControlDrivers {
+            typealias C = SurroundUITestContract
+            func value(after flag: String) throws -> String? {
+                guard let index = arguments.firstIndex(of: flag) else { return nil }
+                guard arguments.indices.contains(index + 1) else { throw ParseError.missingValue(flag: flag) }
+                return arguments[index + 1]
+            }
+            let testing = arguments.contains(C.launchArgument)
+            let liveBanner = testing && arguments.contains(C.liveGameBannerNavigationLaunchArgument)
+            let liveBannerLaunch = "\(C.launchArgument) with \(C.liveGameBannerNavigationLaunchArgument)"
+            var drivers = GameControlDrivers()
+            drivers.runsMainThreadWatchdog = arguments.contains(C.mainThreadWatchdogLaunchArgument)
+            if let raw = try value(after: C.gameControlCycleLaunchArgument) {
+                guard let cycle = GameControlCycle(rawValue: raw) else {
+                    throw ParseError.invalidValue(flag: C.gameControlCycleLaunchArgument, value: raw)
+                }
+                guard liveBanner else {
+                    throw ParseError.needs(flag: C.gameControlCycleLaunchArgument, launch: liveBannerLaunch)
+                }
+                drivers.cycle = cycle
+            }
+            if arguments.contains(C.liveGameBannerConditionalMovesLaunchArgument) {
+                guard liveBanner else {
+                    throw ParseError.needs(flag: C.liveGameBannerConditionalMovesLaunchArgument,
+                                           launch: liveBannerLaunch)
+                }
+                drivers.addsConditionalMovesGame = true
+            }
+            if let raw = try value(after: C.forum224ControlLaunchArgument) {
+                let parts = raw.split(separator: ",", omittingEmptySubsequences: false)
+                    .map { Double($0.trimmingCharacters(in: .whitespaces)) }
+                guard parts.count == 2, let low = parts[0], let high = parts[1],
+                      low.isFinite, high.isFinite, low >= 0, low < high else {
+                    throw ParseError.invalidValue(flag: C.forum224ControlLaunchArgument, value: raw)
+                }
+                guard testing else {
+                    throw ParseError.needs(flag: C.forum224ControlLaunchArgument, launch: C.launchArgument)
+                }
+                drivers.freezeControl = OwnGameFreezeControl(low: low, high: high)
+            }
+            return drivers
+        }
     }
 }
 #endif

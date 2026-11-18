@@ -755,10 +755,14 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
+        // iOS 18 names Back after the page it returns to, here Activity.
+        // The in-game control's inbox shares that label, so it never counts.
         let back = app.navigationBars.buttons
             .matching(NSPredicate(
-                format: "identifier == %@ OR label == %@ OR label == %@",
-                "BackButton", "Activity", "Back"
+                format: "identifier == %@ OR (identifier != %@ AND (label == %@ OR label == %@))",
+                "BackButton",
+                SurroundUITestContract.AccessibilityID.gameActiveGamesButton,
+                "Activity", "Back"
             ))
             .firstMatch
         XCTAssertTrue(

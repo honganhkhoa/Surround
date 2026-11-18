@@ -161,7 +161,7 @@ final class ActivityFixturesTests: XCTestCase {
             return Expectation(lead: harbor, list: [harbor, base], baseIsLive: true, inGame: chip)
         case .liveTheirMove:
             return Expectation(lead: harbor, list: [harbor], baseIsLive: false, inGame: "base +0")
-        case .lowTime:
+        case .lowTime, .lowTimeCrossing:
             return Expectation(lead: harbor, list: [harbor, base], lowTime: [ID.harborMistGameID],
                                baseIsLive: true, inGame: chip)
         case .stoneRemoval:
@@ -169,6 +169,9 @@ final class ActivityFixturesTests: XCTestCase {
                                inGame: "chip game-91004003 +0")
         case .gameStarted:
             return Expectation(lead: "started \(started)", list: [base, started], baseIsLive: true,
+                               inGame: "started \(started) +0")
+        case .gameStartedCorrespondence:
+            return Expectation(lead: "started \(started)", list: [started], baseIsLive: false,
                                inGame: "started \(started) +0")
         case .challengeReceived:
             return Expectation(lead: "challenge-95001", list: [base, "challenge-95001"], baseIsLive: true,
@@ -268,6 +271,57 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertEqual(game.clock?.whiteTime.periodTimeLeft, 8)
         XCTAssertTrue(GameDetailClockState(game: game, color: .white).suddenDeath)
         XCTAssertEqual(game.timeUntilTimeout(for: .white), 8)
+    }
+
+    /// `low-time-crossing` starts HarborMist's last period at 0:12, so on a
+    /// running clock it falls through the haptic's 10 s two seconds after
+    /// launch. `low-time`'s 0:08 is already below it.
+    func testLowTimeCrossingFallsThroughTenSecondsTwoSecondsIn() throws {
+        let (ogs, _) = try service(.lowTimeCrossing)
+        let game = try XCTUnwrap(ogs.activeGames[ID.harborMistGameID])
+        let user = try XCTUnwrap(ogs.user)
+        let system = try XCTUnwrap(game.gameData?.timeControl.system)
+        XCTAssertEqual(game.clock?.whiteTime.periodsLeft, 1)
+        XCTAssertTrue(GameDetailClockState(game: game, color: .white).suddenDeath)
+        let watcher = LowTimeHapticWatcher()
+        func fallen(after seconds: TimeInterval) -> [Int] {
+            game.clock?.calculateTimeLeft(with: system, pauseControl: game.pauseControl,
+                                          now: (clock.reference + seconds) * 1_000)
+            let live = ogs.liveGames.compactMap { ActivityModel.LiveGame(game: $0, userID: user.id) }
+            return watcher.record(live, accountID: user.id, isConnected: true)
+        }
+        XCTAssertEqual(fallen(after: 0), [])
+        XCTAssertEqual(game.timeUntilTimeout(for: .white), 12)
+        XCTAssertEqual(fallen(after: 1), [])
+        XCTAssertEqual(fallen(after: 2), [ID.harborMistGameID], "At 10 s left it falls.")
+        XCTAssertEqual(game.timeUntilTimeout(for: .white), 10)
+    }
+
+    /// `game-started-correspondence`: a live game started 5 s ago while
+    /// 26268404 is a correspondence game, so the control there shows it.
+    func testAGameStartsWhileYouPlayCorrespondence() throws {
+        let (ogs, seed) = try service(.gameStartedCorrespondence)
+        XCTAssertEqual(seed.startedGames, [ID.startedGameID: clock.ago(5)])
+        let base = try XCTUnwrap(ogs.activeGames[baseID])
+        XCTAssertEqual(base.gameData?.timeControl.speed, .correspondence)
+        XCTAssertEqual(ogs.liveGames.compactMap(\.ogsID), [ID.startedGameID])
+    }
+
+    /// MapleRidge has accepted the removal and the user hasn't, so the game
+    /// offers Accept, by GameControlRow's rule.
+    func testStoneRemovalWaitsForTheUsersAcceptance() throws {
+        let (ogs, _) = try service(.stoneRemoval)
+        let game = try XCTUnwrap(ogs.activeGames[ID.stoneRemovalGameID])
+        let user = try XCTUnwrap(ogs.user)
+        XCTAssertEqual(game.gamePhase, .stoneRemoval)
+        XCTAssertTrue(game.isUserPlaying)
+        XCTAssertEqual(game.userStoneColor, .white)
+        let removed = try XCTUnwrap(game.currentPosition.removedStones, "Scoring found the stones to remove: none.")
+        XCTAssertEqual(game.removedStonesAccepted[.black], removed, "MapleRidge accepted them.")
+        XCTAssertNil(game.removedStonesAccepted[.white], "The user hasn't.")
+        XCTAssertNotEqual(game.removedStonesAccepted[.white], game.currentPosition.removedStones,
+                          "So Accept shows.")
+        XCTAssertTrue(game.requiresUserAction(forPlayerWithId: user.id))
     }
 
     func testTheStartedLeadEndsAfterThirtySeconds() throws {
@@ -502,7 +556,9 @@ final class ActivityFixturesTests: XCTestCase {
                                   "end@2,start@4"])?.state, .superchat)
         XCTAssertEqual(try parse([state, "several", clockFlag, "frozen"]), Fixtures.Launch(state: .several, clock: clock))
         for selected in State.allCases {
-            XCTAssertEqual(try parse([state, selected.rawValue])?.state, selected)
+            // The crossing state needs its clock to run and tick.
+            let needs = selected == .lowTimeCrossing ? [clockFlag, "running", ticks] : []
+            XCTAssertEqual(try parse([state, selected.rawValue] + needs)?.state, selected)
         }
 
         XCTAssertEqual(failure([state, "x"]), .unknownState("x"))
@@ -523,6 +579,16 @@ final class ActivityFixturesTests: XCTestCase {
         let running = Fixtures.Clock(reference: clock.reference, isFrozen: false)
         XCTAssertEqual(try parse([state, "several", clockFlag, "running", ticks]),
                        Fixtures.Launch(state: .several, clock: running))
+
+        // HarborMist's clock falls through 10 s only while it runs and ticks.
+        let crossing = State.lowTimeCrossing.rawValue
+        let crossingNeeds = Fixtures.LaunchError.stateNeeds(crossing, "\(clockFlag) running and \(ticks)")
+        XCTAssertEqual(failure([state, crossing]), crossingNeeds)
+        XCTAssertEqual(failure([state, crossing, clockFlag, "running"]), crossingNeeds)
+        XCTAssertEqual(failure([state, crossing, ticks]), .cannotCombine(ticks), "A frozen clock can't tick.")
+        XCTAssertTrue(crossingNeeds.description.contains(crossing) && crossingNeeds.description.contains(ticks))
+        XCTAssertEqual(try parse([state, crossing, clockFlag, "running", ticks]),
+                       Fixtures.Launch(state: .lowTimeCrossing, clock: running))
     }
 
     func testTheActivityOpenerNeedsAStateAndAKnownStyle() throws {

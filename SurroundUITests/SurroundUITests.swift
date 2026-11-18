@@ -2316,33 +2316,107 @@ final class SurroundUITests: SurroundJourneyUITestCase {
     }
 
     /// Regression for the own-game layout freeze fixed in 8f18885. Keep the
-    /// real navigation shell mounted while repeatedly hiding/showing its tab
-    /// bar and changing the selected game through Active games.
+    /// real navigation shell mounted while its tab bar hides and shows again
+    /// and again: open an own game, switch games through the in-game
+    /// control's popover, open the live game and a finished one. Debug
+    /// drivers keep the live game's clock ticking and step the control's
+    /// state as each screen closes, or opens, so every hide meets every form
+    /// of the control and its absence.
     func testOwnGameNavigationAndSwitchingRemainResponsive() throws {
         #if targetEnvironment(macCatalyst)
         throw XCTSkip("This regression exercises native iOS tab-bar layout.")
+        #elseif !DEBUG
+        throw XCTSkip("This regression needs the Debug fixture drivers.")
         #else
-        let configuredCycles = ProcessInfo.processInfo.environment[
-            "SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES"
-        ] ?? "20"
+        typealias Contract = SurroundUITestContract
+        let environment = ProcessInfo.processInfo.environment
+        let configuredCycles = environment["SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES"] ?? "20"
         guard let cycles = Int(configuredCycles), (2...100).contains(cycles) else {
             XCTFail("SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES must be an integer from 2 through 100.")
             return
         }
-        let app = launchApp(additionalLaunchArguments: [
-            SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
-        ], orientation: .portrait)
+        // The control's state steps as each game's screen closes, or with
+        // SURROUND_UI_GAME_CONTROL_CYCLE=on-appear as each one opens, inside
+        // the tab bar's hide.
+        guard let step = Contract.GameControlCycle(
+            rawValue: environment["SURROUND_UI_GAME_CONTROL_CYCLE"] ?? Contract.GameControlCycle.onDisappear.rawValue
+        ) else {
+            XCTFail("SURROUND_UI_GAME_CONTROL_CYCLE must be on-disappear or on-appear.")
+            return
+        }
+        var arguments = [
+            Contract.liveGameBannerNavigationLaunchArgument,
+            Contract.fixtureClockTicksLaunchArgument,
+            Contract.gameControlCycleLaunchArgument, step.rawValue,
+        ]
+        // SURROUND_UI_MAIN_THREAD_WATCHDOG=1 logs every main-queue gap of
+        // 250 ms or more (MainThreadWatchdog.swift).
+        if environment["SURROUND_UI_MAIN_THREAD_WATCHDOG"] == "1" {
+            arguments.append(Contract.mainThreadWatchdogLaunchArgument)
+        }
+        // SURROUND_UI_FORUM_224_CONTROL=<low>,<high> brings back version
+        // 2.4's bottom bar, which should freeze the app inside a hide.
+        if let band = environment["SURROUND_UI_FORUM_224_CONTROL"] {
+            let flags = [Contract.launchArgument, Contract.forum224ControlLaunchArgument, band]
+            guard (try? Contract.GameControlDrivers.parse(flags))?.freezeControl != nil else {
+                XCTFail("SURROUND_UI_FORUM_224_CONTROL must be <low>,<high> in points, such as 70,122.")
+                return
+            }
+            arguments += [Contract.forum224ControlLaunchArgument, band]
+        }
+        // SURROUND_UI_OWN_GAME_NAVIGATION_WINDOW=375x548 runs every cycle in
+        // an iPad window of that size, set by its resize grabber.
+        var windowSize: CGSize?
+        if let requested = environment["SURROUND_UI_OWN_GAME_NAVIGATION_WINDOW"] {
+            let sides = requested.split(separator: "x", omittingEmptySubsequences: false).map { Double($0) }
+            guard sides.count == 2, let width = sides[0], let height = sides[1], width > 0, height > 0 else {
+                XCTFail("SURROUND_UI_OWN_GAME_NAVIGATION_WINDOW must be WIDTHxHEIGHT in points, such as 375x548.")
+                return
+            }
+            guard UIDevice.current.userInterfaceIdiom == .pad else {
+                XCTFail("SURROUND_UI_OWN_GAME_NAVIGATION_WINDOW needs an iPad, whose windows resize.")
+                return
+            }
+            windowSize = CGSize(width: width, height: height)
+        }
+        let app = launchApp(additionalLaunchArguments: arguments, orientation: .portrait)
         defer { XCUIDevice.shared.orientation = .portrait }
-        let id = SurroundUITestContract.AccessibilityID.self
-        let gameIDs = SurroundUITestContract.liveBannerCorrespondenceGameIDs
+        if let windowSize {
+            // iPadOS keeps a window's size across launches: give it back.
+            addTeardownBlock { [weak self] in
+                if app.state == .runningForeground { self?.restoreFullSizeWindow(in: app) }
+            }
+            element(Contract.AccessibilityID.screenHome, in: app)
+            let window = resizeWindow(to: windowSize, in: app)
+            XCTAssertEqual(window.width, windowSize.width, accuracy: 1, "The window reaches the requested width.")
+            XCTAssertEqual(window.height, windowSize.height, accuracy: 1, "The window reaches the requested height.")
+            FileHandle.standardOutput.write(Data(
+                "[OwnGameFreezeRegression] window=\(window) application=\(app.frame)\n".utf8))
+        } else if UIDevice.current.userInterfaceIdiom == .pad {
+            // iPadOS 27 can open the app in a floating window, whose edges
+            // take a drag near them as a resize: every cycle runs full size.
+            element(Contract.AccessibilityID.screenHome, in: app)
+            restoreFullSizeWindow(in: app)
+        }
+        let id = Contract.AccessibilityID.self
+        let gameIDs = Contract.liveBannerCorrespondenceGameIDs
+        let liveGameID = Contract.fixtureGameID
+        let historyGameID = Contract.liveBannerHistoryGameID
         let popover = app.descendants(matching: .any)
             .matching(identifier: id.gameActiveGamesPopover).firstMatch
         let board = app.descendants(matching: .any)
             .matching(identifier: id.gameBoard).firstMatch
+        let firstState = app.descendants(matching: .any)
+            .matching(identifier: id.gameControlFirstState).firstMatch
+        let control = app.buttons.matching(identifier: id.gameActiveGamesButton).firstMatch
+        // The control's state as the screens see it. The cycle starts at
+        // the chip and steps as each game's screen closes, or opens.
+        typealias CycleState = Contract.GameControlCycleState
+        var cycleState = CycleState.chip
 
         func checkpoint(_ phase: String, cycle: Int) {
             let message = "[OwnGameFreezeRegression] cycle=\(cycle)/\(cycles) phase=\(phase) "
-                + "orientation=\(XCUIDevice.shared.orientation.rawValue) "
+                + "orientation=\(XCUIDevice.shared.orientation.rawValue) state=\(cycleState) "
                 + "uptime=\(ProcessInfo.processInfo.systemUptime)\n"
             FileHandle.standardOutput.write(Data(message.utf8))
         }
@@ -2360,12 +2434,18 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             return satisfied
         }
 
-        func tapReady(_ target: XCUIElement, description: String) {
+        /// Taps the target once it exists and is hittable: at `point` when
+        /// one is given, else wherever XCTest aims an element tap.
+        func tapReady(_ target: XCUIElement, description: String, at point: XCUICoordinate? = nil) {
             guard requireWithEvidence(target.waitForExistence(timeout: 10),
                                       "Expected \(description)."),
                   requireWithEvidence(waitUntilHittable(target, timeout: 10),
                                       "Expected responsive \(description) within ten seconds.") else { return }
-            target.tap()
+            if let point {
+                point.tap()
+            } else {
+                target.tap()
+            }
         }
 
         func homeViewport() -> CGRect {
@@ -2373,41 +2453,71 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             // including native bars. Its contained screen.home node exposes
             // the actual clipped content frame; intersect the wrappers so a
             // landscape drag stays inside that visible scroll viewport.
-            app.descendants(matching: .any).matching(identifier: id.screenHome)
+            let window = windowFrame(in: app)
+            let content = app.descendants(matching: .any).matching(identifier: id.screenHome)
                 .allElementsBoundByIndex.map(\.frame)
-                .filter { !$0.isEmpty && $0.intersects(app.frame) }
-                .reduce(app.frame) { $0.intersection($1) }
+                .filter { !$0.isEmpty && $0.intersects(window) }
+                .reduce(window) { $0.intersection($1) }
                 .insetBy(dx: 8, dy: 8)
+            // Root screens keep the app's notices over the top of Home, lower
+            // on iOS 18: a drag that starts on one doesn't move Home, and a
+            // tap opens it. The viewport starts below them.
+            let notices = app.descendants(matching: .any).matching(NSPredicate(
+                format: "identifier IN %@",
+                [id.liveGameBanner, id.waitingBanner, id.challengeBanner, id.connectionBanner, id.messagesButton]
+            )).allElementsBoundByIndex.map(\.frame)
+                .filter { !$0.isEmpty && $0.intersects(content) && $0.midY < content.midY }
+            guard let bottom = notices.map(\.maxY).max(), bottom + 8 < content.maxY else { return content }
+            return CGRect(x: content.minX, y: max(content.minY, bottom + 8), width: content.width,
+                          height: content.maxY - max(content.minY, bottom + 8))
         }
 
-        func openOwnGameFromHome(_ gameID: Int) {
+        /// Taps one of Home's buttons once a bounded drag of Home's own
+        /// content has brought its centre clear of both bars. A button not
+        /// in the tree yet lies off screen, above for games and below for the
+        /// history list's button, and Home drags toward it.
+        func tapOnHome(_ identifier: String, description: String, liesAbove: Bool) {
             let home = app.scrollViews.matching(identifier: id.screenHome).firstMatch
             guard requireWithEvidence(home.waitForExistence(timeout: 10),
                                       "Expected Home's scroll view.") else { return }
-            let games = home.buttons.matching(identifier: id.homeGame(gameID))
-            for attempt in 0...4 {
+            let matches = home.buttons.matching(identifier: identifier)
+            // A drag that carries the button past the viewport is followed
+            // by shorter ones the other way, so the search settles.
+            var damping: CGFloat = 1
+            var draggedUp: Bool?
+            for attempt in 0...8 {
                 // Resolve again after every rotation/scroll. Existence alone
                 // also matches cards clipped below the landscape tab bar.
-                let game = games.firstMatch
+                let target = matches.firstMatch
                 let viewport = homeViewport()
                 guard requireWithEvidence(!viewport.isEmpty && !viewport.isNull,
                                           "Expected Home's visible content viewport.") else { return }
-                if game.exists {
-                    let frame = game.frame
+                if target.exists {
+                    let frame = target.frame
                     let tapPoint = CGPoint(x: frame.midX, y: frame.midY)
-                    // Element taps land at the center. A partially clipped
-                    // board remains usable when that center is clear of both
-                    // bars. Requiring the whole thumbnail to fit caused
-                    // unnecessary reverse drags after native scrolling.
-                    if viewport.contains(tapPoint) && game.isHittable {
-                        tapReady(game, description: "own correspondence game \(gameID)")
+                    // A partially clipped board remains usable when its
+                    // center is clear of both bars. Requiring the whole
+                    // thumbnail to fit caused unnecessary reverse drags after
+                    // native scrolling. Tap that center by position. An
+                    // element tap aims at the middle of the part inside the
+                    // window instead, and on an iPad in landscape XCTest
+                    // sends that point unrotated when the board crosses the
+                    // window's edge, so the touch lands elsewhere, such as on
+                    // the sidebar.
+                    if viewport.contains(tapPoint) && target.isHittable {
+                        let center = home.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+                            dx: tapPoint.x - home.frame.minX, dy: tapPoint.y - home.frame.minY
+                        ))
+                        tapReady(target, description: description, at: center)
                         return
                     }
                 }
-                guard attempt < 4 else { break }
-                let before = game.exists ? game.frame : nil
-                let delta = before.map { $0.midY - viewport.midY } ?? viewport.height
-                let distance = min(abs(delta), viewport.height * 0.6)
+                guard attempt < 8 else { break }
+                let before = target.exists ? target.frame : nil
+                let delta = before.map { $0.midY - viewport.midY } ?? (liesAbove ? -viewport.height : viewport.height)
+                if let draggedUp, draggedUp != (delta >= 0) { damping /= 2 }
+                draggedUp = delta >= 0
+                let distance = max(40, min(abs(delta), viewport.height * (before == nil ? 0.8 : 0.6)) * damping)
                 let startY = delta >= 0 ? viewport.maxY : viewport.minY
                 let endY = startY + (delta >= 0 ? -distance : distance)
                 let origin = home.coordinate(withNormalizedOffset: .zero)
@@ -2417,14 +2527,18 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 let end = origin.withOffset(CGVector(
                     dx: viewport.midX - home.frame.minX, dy: endY - home.frame.minY
                 ))
+                // Slowly, and held before lifting, so Home stops where the
+                // drag ends instead of carrying on.
                 start.press(forDuration: 0.05, thenDragTo: end,
-                            withVelocity: .default, thenHoldForDuration: 0.1)
+                            withVelocity: .slow, thenHoldForDuration: 0.3)
+                // A drag that moves nothing it has found is a frozen Home.
+                guard let before else { continue }
                 guard requireWithEvidence(pollUntil(timeout: 10) {
-                    let refreshed = games.firstMatch
+                    let refreshed = matches.firstMatch
                     return refreshed.exists && refreshed.frame != before
-                }, "The scoped Home drag must move the requested game within ten seconds.") else { return }
+                }, "The scoped Home drag must move \(description) within ten seconds.") else { return }
             }
-            requireWithEvidence(false, "Expected a visible, responsive Home game \(gameID) after scoped scrolling.")
+            requireWithEvidence(false, "Expected visible, responsive \(description) after scoped scrolling.")
         }
 
         func waitForGame(_ gameID: Int) {
@@ -2434,8 +2548,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                           "The selected game must have an unobstructed board.")
         }
 
-        // The control is the chip for the live game on your move: a touch and
-        // hold opens its popover, whose picker switches in place.
+        // The control is the chip for the live game on your move, or base:
+        // a touch and hold opens its popover, whose picker switches in place.
         func openActiveGames() {
             openGameControlPopover(in: app)
             XCTAssertTrue(popover.waitForExistence(timeout: 10),
@@ -2446,10 +2560,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         // through xcodebuild): after half the cycles, the moderator cover rises
         // over the open game and lowers again; the remaining navigation must
         // stay responsive. Without it the journey is unchanged.
-        let raisesCoverMidway = ProcessInfo.processInfo.environment["SURROUND_UI_SUPERCHAT_MIDWAY"] == "1"
+        let raisesCoverMidway = environment["SURROUND_UI_SUPERCHAT_MIDWAY"] == "1"
 
         func raiseAndLowerTheCover() {
-            #if DEBUG
             let cover = app.descendants(matching: .any).matching(identifier: id.superchatCover).firstMatch
             guard requireWithEvidence(waitUntilHittable(board, timeout: 10),
                                       "The board must be usable before the cover rises.") else { return }
@@ -2463,14 +2576,16 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                      description: "the cover's Done")
             requireWithEvidence(pollUntil(timeout: 10) { !cover.exists },
                                 "Done must lower the cover within ten seconds.")
-            #endif
         }
 
-        func returnHome() {
+        /// The screen's one visible Back, which iOS 18 names after the
+        /// screen it returns to. The control's base form shares Home's
+        /// title as its label, so it never counts.
+        func tapBack(to title: String, description: String) {
             let identifiedBacks = app.buttons.matching(identifier: "BackButton")
             let navigationBacks = app.navigationBars.buttons.matching(NSPredicate(
                 format: "identifier != %@ AND (label == %@ OR label == %@)",
-                id.gameActiveGamesButton, "Active games", "Back"
+                id.gameActiveGamesButton, title, "Back"
             ))
             var visibleBack: XCUIElement?
             XCTAssertTrue(pollUntil(timeout: 10) {
@@ -2478,27 +2593,97 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 if identified.count == 1 {
                     visibleBack = identified[0]
                 } else if identified.isEmpty {
-                    // iOS 18 exposes the destination title on Back. Scope
-                    // that fallback to the navigation bar and exclude the
-                    // distinct Active games toolbar action with the same label.
                     let titled = navigationBacks.allElementsBoundByIndex.filter { $0.isHittable }
                     visibleBack = titled.count == 1 ? titled[0] : nil
                 } else {
                     visibleBack = nil
                 }
                 return visibleBack != nil
-            }, "Expected the selected game's unique visible Back control.")
+            }, "Expected the screen's unique visible Back control.")
             guard let visibleBack else { return }
-            tapReady(visibleBack, description: "Back to Home")
-            element(id.screenHome, in: app)
+            tapReady(visibleBack, description: description)
+        }
+
+        func leaves(_ gameID: Int) {
             XCTAssertTrue(pollUntil(timeout: 10) {
-                !app.descendants(matching: .any)
-                    .matching(identifier: id.gameDetail(gameIDs[1])).firstMatch.exists
+                !app.descendants(matching: .any).matching(identifier: id.gameDetail(gameID)).firstMatch.exists
             }, "Back must leave Game Detail, not merely dismiss a popover.")
         }
 
+        func returnHome(from gameID: Int) {
+            tapBack(to: "Active games", description: "Back to Home")
+            element(id.screenHome, in: app)
+            leaves(gameID)
+        }
+
+        func stepOnClose() {
+            if step == .onDisappear { cycleState = cycleState.next }
+        }
+
+        /// What each screen's control first draws in each state: Home's
+        /// correspondence games have the picker, the live game is the one
+        /// the chip shows elsewhere, and Game history's finished game has
+        /// no picker, so with nothing waiting it has no control.
+        func expectedFirstState(in gameID: Int, meeting state: CycleState) -> String {
+            let chip = "chip game-\(liveGameID) +0"
+            switch (gameID, state) {
+            case (liveGameID, .dot): return "dot"
+            case (liveGameID, _): return "base +0"
+            case (historyGameID, .base): return "none"
+            case (historyGameID, .dot): return "inbox 1"
+            case (_, .base): return "base +0"
+            case (_, .dot): return "base +1"
+            case (_, .chip), (_, .outage): return chip
+            }
+        }
+
+        func checkFirstState(in gameID: Int, meeting state: CycleState, cycle: Int) {
+            let expected = expectedFirstState(in: gameID, meeting: state)
+            requireWithEvidence(pollUntil(timeout: 10) { firstState.value as? String == expected },
+                                "Cycle \(cycle): game \(gameID) in the \(state) state first draws \(expected), "
+                                    + "not \(String(describing: firstState.value)).")
+        }
+
+        /// In the chip state the chip's countdown, which its label speaks,
+        /// moves between two reads. In the outage the screens show a frozen
+        /// clock, so it isn't read there.
+        func checkTheChipTicks(in gameID: Int, cycle: Int) {
+            guard cycleState == .chip, gameID != liveGameID else { return }
+            guard requireWithEvidence(control.waitForExistence(timeout: 10),
+                                      "Cycle \(cycle): expected the chip in game \(gameID).") else { return }
+            let before = control.label
+            Thread.sleep(forTimeInterval: 2)
+            let after = control.label
+            requireWithEvidence(after != before, "Cycle \(cycle): the chip's countdown ticks: '\(before)', then '\(after)'.")
+        }
+
+        /// Opens a game as `navigate` does, a hide, and checks the state the
+        /// open met. Two seconds into an outage the status shows, so an
+        /// open that meets one waits on Home first: the opened screen has
+        /// the status from its first frame, during its hide.
+        func openGame(_ gameID: Int, cycle: Int, by navigate: () -> Void) {
+            let met = cycleState
+            if met == .outage { Thread.sleep(forTimeInterval: 3) }
+            navigate()
+            waitForGame(gameID)
+            checkFirstState(in: gameID, meeting: met, cycle: cycle)
+            if step == .onAppear { cycleState = cycleState.next }
+            checkTheChipTicks(in: gameID, cycle: cycle)
+        }
+
+        func openHistoryGame() {
+            tapOnHome(id.homeHistoryViewAll, description: "Home's history list", liesAbove: false)
+            let history = app.descendants(matching: .any).matching(identifier: id.screenGameHistory).firstMatch
+            guard requireWithEvidence(history.waitForExistence(timeout: 10),
+                                      "Game history must open within ten seconds.") else { return }
+            // Home keeps its own row for the game behind the pushed list.
+            tapReady(history.descendants(matching: .any).matching(identifier: id.homeHistoryGame(historyGameID))
+                        .firstMatch, description: "the finished game in Game history")
+        }
+
         for cycle in 1...cycles {
-            if cycle == cycles / 2 + 1 {
+            // A resized iPad window keeps its shape when the device turns.
+            if windowSize == nil, cycle == cycles / 2 + 1 {
                 XCUIDevice.shared.orientation = .landscapeLeft
                 var previousViewport: CGRect?
                 requireWithEvidence(pollUntil(timeout: 10) {
@@ -2512,8 +2697,10 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             }
             XCTContext.runActivity(named: "Own-game navigation cycle \(cycle) of \(cycles)") { _ in
                 checkpoint("open-own-game", cycle: cycle)
-                openOwnGameFromHome(gameIDs[0])
-                waitForGame(gameIDs[0])
+                openGame(gameIDs[0], cycle: cycle) {
+                    tapOnHome(id.homeGame(gameIDs[0]), description: "own correspondence game \(gameIDs[0])",
+                              liesAbove: true)
+                }
 
                 if raisesCoverMidway && cycle == cycles / 2 + 1 {
                     checkpoint("superchat-midway", cycle: cycle)
@@ -2527,27 +2714,44 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 ).firstMatch
                 tapReady(secondGame, description: "second own correspondence game")
                 waitForGame(gameIDs[1])
-
-                checkpoint("dismiss-current-game", cycle: cycle)
-                openActiveGames()
-                let selectedGame = popover.buttons.matching(
-                    identifier: id.gameActiveGamesEntry(gameIDs[1])
-                ).firstMatch
-                XCTAssertTrue(selectedGame.waitForExistence(timeout: 10))
-                XCTAssertTrue(selectedGame.isSelected)
-                tapReady(selectedGame, description: "current game entry")
-                waitForGame(gameIDs[1])
+                // A switch in place draws the state the screen shows now.
+                checkFirstState(in: gameIDs[1], meeting: cycleState, cycle: cycle)
 
                 // A new navigation action must still work after the popover
                 // disappears. A screenshot or the visible board is not enough.
                 checkpoint("return-home", cycle: cycle)
-                returnHome()
+                returnHome(from: gameIDs[1])
+                stepOnClose()
+
+                checkpoint("open-live-game", cycle: cycle)
+                openGame(liveGameID, cycle: cycle) {
+                    tapOnHome(id.homeGame(liveGameID), description: "the live game \(liveGameID)", liesAbove: true)
+                }
+                checkpoint("return-from-live-game", cycle: cycle)
+                returnHome(from: liveGameID)
+                stepOnClose()
+
+                checkpoint("open-history-game", cycle: cycle)
+                openGame(historyGameID, cycle: cycle, by: openHistoryGame)
+                checkpoint("return-to-game-history", cycle: cycle)
+                tapBack(to: "Game history", description: "Back to Game history")
+                element(id.screenGameHistory, in: app)
+                leaves(historyGameID)
+                stepOnClose()
+                checkpoint("return-home-from-game-history", cycle: cycle)
+                tapBack(to: "Active games", description: "Back to Home from Game history")
+                element(id.screenHome, in: app)
+                XCTAssertTrue(pollUntil(timeout: 10) {
+                    !app.descendants(matching: .any).matching(identifier: id.screenGameHistory).firstMatch.exists
+                }, "Back must leave Game history.")
                 checkpoint("complete", cycle: cycle)
             }
         }
-        openOwnGameFromHome(gameIDs[1])
-        waitForGame(gameIDs[1])
-        returnHome()
+        openGame(gameIDs[1], cycle: cycles + 1) {
+            tapOnHome(id.homeGame(gameIDs[1]), description: "own correspondence game \(gameIDs[1])",
+                      liesAbove: true)
+        }
+        returnHome(from: gameIDs[1])
         keepScreenshot("Own-game navigation remained responsive after \(cycles) cycles", in: app)
         #endif
     }
@@ -2658,14 +2862,14 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         }
 
         /// The in-game control's chip, or Zen's control beside Exit, shows
-        /// the live game on your move. Pressed at its trailing quarter, as
-        /// the other journeys press the control.
+        /// the live game on your move. Pressed at its centre, as the other
+        /// journeys press the control.
         func openLiveGameFromControl(_ identifier: String, _ description: String) {
             let control = app.buttons.matching(identifier: identifier).firstMatch
             XCTAssertTrue(control.waitForExistence(timeout: 10), description)
             XCTAssertTrue(waitUntilHittable(control, timeout: 10), description)
             XCTAssertFalse(banner.exists, "A game shows no live-game banner.")
-            activate(control, at: CGVector(dx: 0.875, dy: 0.5))
+            activate(control, at: CGVector(dx: 0.5, dy: 0.5))
             assertLiveGameOpened()
         }
 
@@ -2803,7 +3007,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         backToHome()
     }
 
-    func testLiveGameBannerRestoresCompactChatBoard() throws {
+    func testTheZenCircleRestoresCompactChatBoard() throws {
         #if targetEnvironment(macCatalyst)
         throw XCTSkip("The compact Chat layout requires an iOS device.")
         #else
@@ -2829,12 +3033,11 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         selectSegment(at: 1, in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker, app: app)
         activateZenControl(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
         element(SurroundUITestContract.AccessibilityID.gameZenExit, in: app)
-        // Zen shows the live game on your move beside Exit. Until the app's
-        // notices leave games, the live-game pill can lie over the middle of
-        // a phone's bar, but not over the control's trailing quarter.
+        // Zen shows the live game on your move beside Exit, in whichever
+        // form the layout gives it.
         let zenControl = element(SurroundUITestContract.AccessibilityID.gameZenControl, in: app, matching: .button)
         XCTAssertTrue(waitUntilHittable(zenControl, timeout: 10), "Zen shows the live game on your move")
-        activate(zenControl, at: CGVector(dx: 0.875, dy: 0.5))
+        activate(zenControl, at: CGVector(dx: 0.5, dy: 0.5))
         element(
             SurroundUITestContract.AccessibilityID.gameDetail(SurroundUITestContract.fixtureGameID),
             in: app

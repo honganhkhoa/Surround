@@ -7,6 +7,9 @@
 
 import SwiftUI
 import Combine
+#if DEBUG && MAIN_APP
+import os
+#endif
 
 struct GameDetailView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -80,6 +83,9 @@ struct GameDetailView: View {
     @EnvironmentObject private var stackRouter: StackRouter
     #if DEBUG && MAIN_APP
     @State private var animationObservationID = UUID()
+    /// This screen, for the in-game control's state cycle, which counts
+    /// screens that open and leave, not their content drawn again.
+    @State private var gameControlCycleScreen = UUID()
     #endif
 
     private func cycleFlowingInkTheme() {
@@ -667,6 +673,16 @@ struct GameDetailView: View {
 
     /// Which of Game Detail's four toolbar arrangements this layout uses.
     private var toolbarArrangement: GameToolbarArrangement {
+        #if DEBUG && MAIN_APP
+        // Version 2.4's bottom bar held one item. With the freeze control
+        // its item is alone in the bar, and everything else goes to the top
+        // bar, as in compact landscape.
+        if ownGameFreezeControlBar != nil { return .compactLandscape }
+        #endif
+        return layoutToolbarArrangement
+    }
+
+    private var layoutToolbarArrangement: GameToolbarArrangement {
         #if os(iOS) && !targetEnvironment(macCatalyst)
         let isCatalyst = false
         #else
@@ -675,6 +691,15 @@ struct GameDetailView: View {
         return GameToolbarArrangement(isVerticalToolbar: isVerticalToolbar, compact: compactLayout,
                                       compactLandscape: compactLandscape, isCatalyst: isCatalyst)
     }
+
+    #if DEBUG && MAIN_APP
+    /// The freeze control's bar, in the bottom bar's arrangement: compact
+    /// portrait.
+    private var ownGameFreezeControlBar: SurroundUITestContract.OwnGameFreezeControl? {
+        guard layoutToolbarArrangement == .bottomBar else { return nil }
+        return SurroundUITestContract.gameControlDrivers.freezeControl
+    }
+    #endif
 
     func updateDetailOfCurrentGameIfNecessary() {
         guard let requestedGame = currentGame, requestedGame.ogsID != nil else {
@@ -854,6 +879,13 @@ struct GameDetailView: View {
     private var measuredContent: some View {
         GeometryReader { geometry in
             content(geometry: geometry)
+                #if DEBUG && MAIN_APP
+                .modifier(OwnGameFreezeControlItem(
+                    control: SurroundUITestContract.gameControlDrivers.freezeControl,
+                    isActive: ownGameFreezeControlBar != nil && !zenMode,
+                    spare: geometry.size.height - min(geometry.size.width, geometry.size.height)
+                ))
+                #endif
                 .background {
                     GameDetailWindowGeometryReader(
                         layoutFrame: geometry.frame(in: .global),
@@ -886,6 +918,9 @@ struct GameDetailView: View {
                     .accessibilityHidden(true)
                 }
         }
+        #if DEBUG && MAIN_APP
+        .modifier(GameControlCycleScreen(id: gameControlCycleScreen))
+        #endif
     }
 
     var body: some View {
@@ -2017,6 +2052,7 @@ private struct GameToolbarLayout: ViewModifier {
                 gameID: game.ogsID, shown: control.slot.isShown ? control.value : nil,
                 recorded: $gameControlFirstState
             ))
+            .modifier(GameControlCycleHook())
             #endif
     }
 }
@@ -2339,6 +2375,105 @@ private struct GameControlFirstStateRecorder: ViewModifier {
                         .allowsHitTesting(false)
                 }
             }
+    }
+}
+
+/// The in-game control's state cycle (`GameControlCycleDriver`) steps when
+/// this Game Detail's screen opens: here, outside the first state's record,
+/// whose first value is the state the screen opened in, and inside the tab
+/// bar's hide, so the step lands in the hide. Its content can leave and come
+/// back while the screen stays, as when Back clears the game on iOS 18, so
+/// the driver counts the screen, from `GameControlCycleScreen`.
+private struct GameControlCycleHook: ViewModifier {
+    @Environment(\.gameControlCycleScreen) private var screen
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if SurroundUITestContract.gameControlDrivers.cycle != nil {
+            content.onAppear {
+                if let screen { GameControlCycleDriver.screenAppeared(screen) }
+            }
+        } else {
+            content
+        }
+    }
+}
+
+/// Game Detail's screen for the state cycle: it names the screen for the
+/// content's hook and steps the cycle when the screen leaves, outside the
+/// content, which can leave and come back while the screen stays.
+private struct GameControlCycleScreen: ViewModifier {
+    let id: UUID
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if SurroundUITestContract.gameControlDrivers.cycle != nil {
+            content
+                .environment(\.gameControlCycleScreen, id)
+                .onDisappear { GameControlCycleDriver.screenLeft(id) }
+        } else {
+            content
+        }
+    }
+}
+
+private struct GameControlCycleScreenKey: EnvironmentKey {
+    static let defaultValue: UUID? = nil
+}
+
+extension EnvironmentValues {
+    fileprivate var gameControlCycleScreen: UUID? {
+        get { self[GameControlCycleScreenKey.self] }
+        set { self[GameControlCycleScreenKey.self] = newValue }
+    }
+}
+
+/// The freeze control (`SurroundUITestContract.OwnGameFreezeControl`):
+/// version 2.4's compact bottom bar, alone in the bar, whose item shows by
+/// the height Game Detail has spare, as its reader measures it, with its
+/// last decision kept by `onChange`. Only its flag brings it.
+private struct OwnGameFreezeControlItem: ViewModifier {
+    let control: SurroundUITestContract.OwnGameFreezeControl?
+    /// Compact portrait outside Zen, where 2.4 had the bar.
+    let isActive: Bool
+    let spare: CGFloat
+    @State private var wasShown = false
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if let control {
+            let shows = isActive && control.shows(spare: Double(spare), wasShown: wasShown)
+            let _ = OwnGameFreezeControlLog.read(spare: spare, wasShown: wasShown, shows: shows,
+                                                 isActive: isActive, control: control)
+            content
+                .toolbar {
+                    if shows {
+                        ToolbarItem(placement: .bottomBar) {
+                            Text(verbatim: "2.4 bar")
+                                .font(.footnote)
+                        }
+                    }
+                }
+                .onChange(of: shows, initial: true) { _, value in wasShown = value }
+        } else {
+            content
+        }
+    }
+}
+
+/// Logs what the freeze control reads, a pass at a time: every new reading
+/// in the first 200 passes, then every thousandth pass, so a layout that
+/// never ends still logs.
+private enum OwnGameFreezeControlLog {
+    private static let log = Logger(subsystem: "com.honganhkhoa.Surround", category: "FreezeControl")
+    private static var passes = 0
+    private static var lastReading: String?
+
+    static func read(spare: CGFloat, wasShown: Bool, shows: Bool, isActive: Bool,
+                     control: SurroundUITestContract.OwnGameFreezeControl) {
+        passes += 1
+        let band = control.loops(withSpareWithoutItem: Double(spare)) ? ", between low and high" : ""
+        let reading = "spare \(String(format: "%.1f", Double(spare))) pt\(band), was shown \(wasShown), shows \(shows)"
+        guard isActive, passes <= 200 ? reading != lastReading : passes.isMultiple(of: 1_000) else { return }
+        lastReading = reading
+        log.notice("FREEZE-CONTROL pass \(passes, privacy: .public): \(reading, privacy: .public); low \(control.low, privacy: .public), high \(control.high, privacy: .public)")
     }
 }
 #endif

@@ -5,7 +5,7 @@ set -euo pipefail
 usage() {
   echo "Usage:" >&2
   echo "  $0 derived-data-path <simulator UDID>" >&2
-  echo "  $0 <build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|activity|composer|continuity> <simulator UDID> <result label>" >&2
+  echo "  $0 <build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|activity|game-control|composer|continuity> <simulator UDID> <result label>" >&2
 }
 
 if (( $# == 0 )); then
@@ -20,14 +20,14 @@ case "$phase" in
       exit 64
     fi
     ;;
-  build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|activity|composer|continuity)
+  build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|activity|game-control|composer|continuity)
     if (( $# != 3 )); then
       usage
       exit 64
     fi
     ;;
   *)
-    echo "Expected phase derived-data-path, build, preflight, main, main-1, main-2, main-3, profile, profile-1, profile-2, profile-3, messages, messages-1, messages-2, activity, composer, or continuity; received: $phase" >&2
+    echo "Expected phase derived-data-path, build, preflight, main, main-1, main-2, main-3, profile, profile-1, profile-2, profile-3, messages, messages-1, messages-2, activity, game-control, composer, or continuity; received: $phase" >&2
     exit 64
     ;;
 esac
@@ -38,10 +38,13 @@ if ! [[ "$simulator_id" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:x
   exit 64
 fi
 
-# The own-game navigation journey takes about 45 seconds a cycle on a hosted
-# iPad, so its default 20 cycles come near the 15-minute test allowance below.
-# Twelve keep it well inside; a caller can still set another count.
-export TEST_RUNNER_SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES="${TEST_RUNNER_SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES:-12}"
+# The own-game navigation journey's cycle opens three games, switches once and
+# goes Back four times. It takes 65 to 80 seconds on a local iPad simulator, and
+# hosted runners take about twice as long, so its default 20 cycles would far
+# outlast the 15-minute test allowance below. In four cycles every open meets
+# each of the in-game control's four states once; a caller can still set
+# another count.
+export TEST_RUNNER_SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES="${TEST_RUNNER_SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES:-4}"
 
 if [[ -n "${RUNNER_TEMP:-}" ]]; then
   derived_data_root="$RUNNER_TEMP"
@@ -78,7 +81,7 @@ readonly continuity_test_case="${test_target}/${continuity_test_class}"
 # SurroundUITests class, part 2 runs these whole classes, so that the three
 # parts take similar time; main's other classes stay in part 1. Part 3 runs
 # only its share of SurroundUITests: that share holds the own-game navigation
-# journey, which takes 10 to 12 minutes on a hosted iPad.
+# journey, which takes about 10 minutes on a hosted iPad at four cycles.
 readonly main_part_classes=(
   LocalizationUITests:2
 )
@@ -90,7 +93,7 @@ readonly keyboard_preflight_test_name="testKeyboardPreflightSupportsComposerInpu
 # Messages and continuity classes have their own phases and time budgets.
 readonly composer_test_names=(
   testCompactChatCanHideAndShowMainBoard
-  testLiveGameBannerRestoresCompactChatBoard
+  testTheZenCircleRestoresCompactChatBoard
   testCompactVariationSharingHidesMainBoardAndShowsComposerPreview
   testVariationSharingDraftSurvivesChatSelection
   testVariationSharingDraftSurvivesAnalyzeNavigation
@@ -113,12 +116,17 @@ readonly activity_test_classes=(
   ActivityListUITests
   ActivityConversationUITests
 )
+# The in-game control's journeys have their own phase too, which main skips.
+# CI runs it in the profile jobs, which finish well before the main jobs.
+readonly game_control_test_classes=(
+  GameControlUITests
+)
 
 # xcodebuild accepts an unknown -only-testing or -skip-testing selector and
 # exits successfully after running zero tests. Keep the isolation manifest tied
 # to its Swift declarations so a rename cannot silently move a composer test
-# into main, leave the profile, Messages, Activity, or continuity phase empty,
-# or move a whole class between main's parts.
+# into main, leave the profile, Messages, Activity, game control, or
+# continuity phase empty, or move a whole class between main's parts.
 classes_and_sources=(
   "${test_class}:${test_source}"
   "${profile_test_class}:${profile_test_source}"
@@ -128,7 +136,8 @@ classes_and_sources=(
 for class_and_part in "${main_part_classes[@]}"; do
   classes_and_sources+=("${class_and_part%%:*}:SurroundUITests/${class_and_part%%:*}.swift")
 done
-for whole_test_class in "${composer_test_classes[@]}" "${activity_test_classes[@]}"; do
+for whole_test_class in "${composer_test_classes[@]}" "${activity_test_classes[@]}" \
+  "${game_control_test_classes[@]}"; do
   classes_and_sources+=("${whole_test_class}:SurroundUITests/${whole_test_class}.swift")
 done
 for class_and_source in "${classes_and_sources[@]}"; do
@@ -169,14 +178,14 @@ for test_name in "$keyboard_preflight_test_name" "${composer_test_names[@]}"; do
   fi
 done
 
-# Each part, and the Activity, composer and continuity phases, run under
-# supervise-ipad-ui-test-part.py. CI gives each part step 50 minutes; at 46 the
-# supervisor interrupts xcodebuild, which then has time to write its result
-# bundle and the supervisor its evidence: at most 1:45 of signal grace and
-# under a minute of bounded collection. The composer and continuity steps get
-# 45 minutes and the Activity step 30, with the same margin. A test that a
-# simulator crash killed, or that failed only because XCTest timed out on a UI
-# query, is rerun once, within the same deadline.
+# Each part, and the Activity, game control, composer and continuity phases,
+# run under supervise-ipad-ui-test-part.py. CI gives each part step 50 minutes;
+# at 46 the supervisor interrupts xcodebuild, which then has time to write its
+# result bundle and the supervisor its evidence: at most 1:45 of signal grace
+# and under a minute of bounded collection. The game control, composer and
+# continuity steps get 45 minutes and the Activity step 30, with the same
+# margin. A test that a simulator crash killed, or that failed only because
+# XCTest timed out on a UI query, is rerun once, within the same deadline.
 readonly part_deadline_seconds=$((46 * 60))
 readonly isolated_phase_deadline_seconds=$((41 * 60))
 readonly activity_phase_deadline_seconds=$((26 * 60))
@@ -217,7 +226,8 @@ select_main_tests() {
   for composer_test_name in "${composer_test_names[@]}"; do
     selection_arguments+=("-skip-testing:${test_case}/${composer_test_name}")
   done
-  for whole_test_class in "${composer_test_classes[@]}" "${activity_test_classes[@]}"; do
+  for whole_test_class in "${composer_test_classes[@]}" "${activity_test_classes[@]}" \
+    "${game_control_test_classes[@]}"; do
     selection_arguments+=("-skip-testing:${test_target}/${whole_test_class}")
   done
 }
@@ -275,7 +285,7 @@ case "$phase" in
     mkdir -p TestResults
     select_main_tests
 
-    echo "Running the main iPad UI suite without profile, Messages, Activity, composer, or continuity tests."
+    echo "Running the main iPad UI suite without profile, Messages, Activity, game control, composer, or continuity tests."
     xcodebuild test-without-building \
       "${common_arguments[@]}" \
       "${selection_arguments[@]}" \
@@ -391,6 +401,19 @@ case "$phase" in
     echo "Running the iPad Activity list and conversation UI tests."
     run_supervised_tests "$activity_phase_deadline_seconds" \
       "TestResults/SurroundUITests-${result_label}-Activity.xcresult" \
+      "${selection_arguments[@]}"
+    ;;
+
+  game-control)
+    mkdir -p TestResults
+    selection_arguments=()
+    for test_class_name in "${game_control_test_classes[@]}"; do
+      selection_arguments+=("-only-testing:${test_target}/${test_class_name}")
+    done
+
+    echo "Running the iPad in-game control UI tests."
+    run_supervised_tests "$isolated_phase_deadline_seconds" \
+      "TestResults/SurroundUITests-${result_label}-GameControl.xcresult" \
       "${selection_arguments[@]}"
     ;;
 

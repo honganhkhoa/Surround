@@ -4,7 +4,8 @@
 //
 //  Debug-only stand-ins for OGS's moderator superchats in offline UI-test
 //  runs: Darwin notifications, a launch-time script and the Superchat
-//  (Debug) menu, which every window's service hears (TESTING.md). Every
+//  (Debug) menu, which every window's service hears (TESTING.md). Two more
+//  Darwin notifications take the sockets down and bring them back. Every
 //  string is verbatim: no localization keys.
 //
 
@@ -52,10 +53,15 @@ enum SuperchatDebugCommands {
         scheduleLaunchScript()
     }
 
+    /// Every live registered service, for the other Debug drivers too.
+    static var registeredServices: [OGSService] {
+        registrations.removeAll { $0.service == nil }
+        return registrations.compactMap(\.service)
+    }
+
     /// Runs one command in every live registered service.
     static func perform(_ command: SurroundUITestContract.SuperchatCommand) {
-        registrations.removeAll { $0.service == nil }
-        let services = registrations.compactMap(\.service)
+        let services = registeredServices
         for service in services {
             switch command {
             case .start, .end, .startSecond, .endSecond:
@@ -74,6 +80,17 @@ enum SuperchatDebugCommands {
         log.notice("SUPERCHAT-DEBUG \(command.scriptName, privacy: .public) services=\(services.count, privacy: .public)")
     }
 
+    /// Every live registered service's socket goes down, as a lost
+    /// connection takes it, which freezes the clocks its games show, or
+    /// comes back.
+    static func perform(_ command: SurroundUITestContract.ConnectionCommand) {
+        let services = registeredServices
+        for service in services {
+            service.setSocketStatusForUITests(command == .drop ? .reconnecting : .connected)
+        }
+        log.notice("CONNECTION-DEBUG \(command.rawValue, privacy: .public) services=\(services.count, privacy: .public)")
+    }
+
     /// One observer per command. Each callback hops to the main queue.
     private static func startDarwinObservers() {
         let center = CFNotificationCenterGetDarwinNotifyCenter()
@@ -84,6 +101,20 @@ enum SuperchatDebugCommands {
                 { _, _, name, _, _ in
                     guard let name,
                           let command = SurroundUITestContract.SuperchatCommand(rawValue: name.rawValue as String)
+                    else { return }
+                    DispatchQueue.main.async {
+                        SuperchatDebugCommands.perform(command)
+                    }
+                },
+                command.rawValue as CFString, nil, .deliverImmediately
+            )
+        }
+        for command in SurroundUITestContract.ConnectionCommand.allCases {
+            CFNotificationCenterAddObserver(
+                center, observer,
+                { _, _, name, _, _ in
+                    guard let name,
+                          let command = SurroundUITestContract.ConnectionCommand(rawValue: name.rawValue as String)
                     else { return }
                     DispatchQueue.main.async {
                         SuperchatDebugCommands.perform(command)
