@@ -5124,6 +5124,57 @@
         }
       }
     },
+    "%@, your move in your live game" : {
+      "comment" : "In-game control, VoiceOver: another of the user's live games is on their move, said without its time. The value is the opponent's name",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, giliran Anda dalam permainan langsung"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, giliran anda dalam permainan langsung"
+          }
+        }
+      }
+    },
+    "%@, your move in your live game, %@ left" : {
+      "comment" : "In-game control, VoiceOver: another of the user's live games is on their move. The first value is the opponent's name, the second the time left on the user's clock there, such as 42 seconds",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, giliran Anda dalam permainan langsung, sisa %2$@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, giliran anda dalam permainan langsung, %2$@ lagi"
+          }
+        }
+      }
+    },
+    "%@, your move in your live game, sudden death, %@ left" : {
+      "comment" : "In-game control, VoiceOver: another of the user's live games is on their move, in its last byo-yomi period. The first value is the opponent's name, the second the time left, such as 8 seconds",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, giliran Anda dalam permainan langsung, periode terakhir, sisa %2$@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, giliran anda dalam permainan langsung, tempoh terakhir, %2$@ lagi"
+          }
+        }
+      }
+    },
     "%@: %@" : {
       "comment" : "Clock system and optional board sizes followed by the Quick Match clock values.",
       "localizations" : {
@@ -7457,6 +7508,100 @@
         }
       }
     },
+    "%lld more in Activity" : {
+      "comment" : "In-game control, VoiceOver: how many other games, challenges and messages wait in Activity besides the game the control shows",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more in Activity"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more in Activity"
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lagi di Aktivitas"
+                }
+              }
+            }
+          }
+        },
+        "ms" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lagi dalam Aktiviti"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld more waiting" : {
+      "comment" : "In-game control, VoiceOver, after a game ends: how many other games, challenges and messages wait besides the opponent's challenge",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more waiting"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more waiting"
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lagi menunggu"
+                }
+              }
+            }
+          }
+        },
+        "ms" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lagi menunggu"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld of %lld stones left" : {
       "localizations" : {
         "de" : {
@@ -9551,6 +9696,53 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "地 %lld 目"
+          }
+        }
+      }
+    },
+    "%lld waiting" : {
+      "comment" : "In-game control, VoiceOver: how many games, challenges and messages wait in Activity",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld waiting"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld waiting"
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld menunggu"
+                }
+              }
+            }
+          }
+        },
+        "ms" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld menunggu"
+                }
+              }
+            }
           }
         }
       }
@@ -20389,6 +20581,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "向 %@ 發起挑戰"
+          }
+        }
+      }
+    },
+    "Challenge from %@" : {
+      "comment" : "In-game control, VoiceOver, after a game ends: the opponent sent the user a challenge. The value is the opponent's name",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tantangan dari %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cabaran daripada %@"
           }
         }
       }
@@ -32234,6 +32443,23 @@
         }
       }
     },
+    "Game started with %@" : {
+      "comment" : "In-game control, VoiceOver: a live game with this opponent started elsewhere. The value is the opponent's name",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permainan melawan %@ dimulai"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permainan dengan %@ bermula"
+          }
+        }
+      }
+    },
     "Game starts automatically when there are **%lld** players." : {
       "localizations" : {
         "de" : {
@@ -40101,6 +40327,23 @@
         }
       }
     },
+    "New activity waiting" : {
+      "comment" : "In-game control, VoiceOver: while the user plays a live game, a challenge or a message waits, shown as a dot without a count",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktivitas baru menunggu"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktiviti baharu menunggu"
+          }
+        }
+      }
+    },
     "New game" : {
       "localizations" : {
         "de" : {
@@ -44333,6 +44576,23 @@
         }
       }
     },
+    "Open Activity" : {
+      "comment" : "In-game control, VoiceOver: an action that opens the popover of the user's other games and Activity, as a touch and hold does",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buka Aktivitas"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buka Aktiviti"
+          }
+        }
+      }
+    },
     "Open audio" : {
       "comment" : "Link label for an audio file authored in a player biography; opens the media in a browser.",
       "localizations" : {
@@ -44908,6 +45168,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在開啟對局…"
+          }
+        }
+      }
+    },
+    "Opens Activity." : {
+      "comment" : "In-game control, VoiceOver hint: a tap opens the popover of the user's other games and Activity",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membuka Aktivitas."
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membuka Aktiviti."
+          }
+        }
+      }
+    },
+    "Opens that game." : {
+      "comment" : "In-game control, VoiceOver hint: a tap opens the live game that just started",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membuka permainan itu."
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membuka permainan itu."
           }
         }
       }
@@ -60337,6 +60631,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在管理員結束這段對話之前，Surround 會保持鎖定。你可以閱讀和回覆。"
+          }
+        }
+      }
+    },
+    "Switches to that game." : {
+      "comment" : "In-game control, VoiceOver hint: a tap shows the other game the control names",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beralih ke permainan itu."
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beralih ke permainan itu."
           }
         }
       }

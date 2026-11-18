@@ -5,7 +5,9 @@
 //  The value Game Detail's Active games slot shows, computed from one input
 //  with no state from before it: a pure value, and a window's first read of
 //  each Activity state. Also the window's width class and shape, which the
-//  control's frames follow.
+//  control's frames follow; what each form draws, its frames and its drop
+//  order; the rail's and the Mac's native states; what a tap and a hold do,
+//  with the press timing; and what VoiceOver says.
 //
 
 import XCTest
@@ -61,14 +63,17 @@ final class GameControlModelTests: XCTestCase {
     private typealias WindowClass = GameControlWindowClass
     private typealias WidthClass = GameControlWindowClass.WidthClass
 
-    func testTheWidthClassChangesAt390Points() {
-        XCTAssertEqual(WidthClass(width: 320), .narrow)
+    func testTheWidthClassesChangeAt375And390Points() {
+        XCTAssertEqual(WidthClass(width: 320), .floor, "Display Zoom's narrowest phone")
+        XCTAssertEqual(WidthClass(width: 374.5), .floor, "Below 375 pt")
         XCTAssertEqual(WidthClass(width: 375), .narrow, "The iPhone SE and the narrowest iPad window")
         XCTAssertEqual(WidthClass(width: 389.5), .narrow, "Below 390 pt")
         XCTAssertEqual(WidthClass(width: 390), .standard, "390 pt itself, as the iPhone 16e")
         XCTAssertEqual(WidthClass(width: 402), .standard)
         XCTAssertEqual(WidthClass(width: 1366), .standard)
-        XCTAssertLessThan(WidthClass.narrow, .standard, "The classes go from narrowest to widest.")
+        XCTAssertEqual(WidthClass.allCases, [.floor, .narrow, .standard], "The classes go from narrowest to widest.")
+        XCTAssertLessThan(WidthClass.floor, .narrow)
+        XCTAssertLessThan(WidthClass.narrow, .standard)
     }
 
     func testEachClassRunsFromItsMinimumToTheNextOne() {
@@ -92,7 +97,7 @@ final class GameControlModelTests: XCTestCase {
         XCTAssertEqual(WindowClass(windowSize: CGSize(width: 874, height: 402)),
                        WindowClass(widthClass: .standard, shape: .landscape))
         XCTAssertEqual(WindowClass(windowSize: CGSize(width: 320, height: 568)),
-                       WindowClass(widthClass: .narrow, shape: .portrait))
+                       WindowClass(widthClass: .floor, shape: .portrait))
         XCTAssertEqual(WindowClass(windowSize: CGSize(width: 568, height: 320)),
                        WindowClass(widthClass: .standard, shape: .landscape), "Turned, the same window is wide enough.")
         XCTAssertEqual(WindowClass(windowSize: CGSize(width: 375, height: 548)),
@@ -109,6 +114,456 @@ final class GameControlModelTests: XCTestCase {
                       "Only a resize across a boundary, or a turn, gives the root a new value to publish.")
         let turned = phones.map { WindowClass(windowSize: CGSize(width: $0.height, height: $0.width)) }
         XCTAssertTrue(turned.allSatisfy { $0 == WindowClass(widthClass: .standard, shape: .landscape) })
+    }
+
+    // MARK: What each form draws
+
+    private typealias Drawing = GameControlDrawing
+    private let standard = GameControlWindowClass(widthClass: .standard, shape: .portrait)
+    private let narrow = GameControlWindowClass(widthClass: .narrow, shape: .portrait)
+    private let floor = GameControlWindowClass(widthClass: .floor, shape: .portrait)
+
+    private func drawing(_ slot: GameControlSlot, _ form: GameControlForm, _ windowClass: GameControlWindowClass? = nil,
+                         modes: Int = 2, allowsPicker: Bool = true, hasCountdown: Bool = true,
+                         suddenDeath: Bool = false) throws -> Drawing {
+        try XCTUnwrap(Drawing(slot, form: form, windowClass: windowClass, modeCount: modes, allowsPicker: allowsPicker,
+                              hasCountdown: hasCountdown, isSuddenDeath: suddenDeath), "\(slot) in \(form)")
+    }
+
+    func testTheBottomBarDrawsEachStatesParts() throws {
+        let chip = try drawing(.chip(gameID: 7, plusN: 3, hasDot: true), .bottomBar, standard)
+        XCTAssertEqual(chip.parts, [.board, .hourglass, .clock, .plusN])
+        XCTAssertEqual(chip.dropOrder, [.hourglass, .plusN, .board], "The hourglass drops first, then +N; the board last.")
+        XCTAssertEqual(chip.plusN, 3)
+        XCTAssertTrue(chip.hasDot, "The dot at the top trailing corner while a challenge or message waits.")
+        XCTAssertFalse(chip.isSuddenDeath)
+
+        let suddenDeath = try drawing(.chip(gameID: 7, plusN: 3, hasDot: false), .bottomBar, standard, suddenDeath: true)
+        XCTAssertEqual(suddenDeath.parts, [.board, .suddenDeathMark, .clock], "The mark in the hourglass's place, and no +N.")
+        XCTAssertEqual(suddenDeath.dropOrder, [.board], "The mark and the clock never drop; the board goes last.")
+        XCTAssertEqual(suddenDeath.plusN, 0)
+        XCTAssertTrue(suddenDeath.isSuddenDeath)
+
+        let noCountdown = try drawing(.chip(gameID: 7, plusN: 3, hasDot: false), .bottomBar, standard, hasCountdown: false)
+        XCTAssertEqual(noCountdown.parts, [.board, .hourglass, .plusN], "The hourglass alone, which stays.")
+        XCTAssertEqual(noCountdown.dropOrder, [.plusN])
+        XCTAssertEqual(try drawing(.chip(gameID: 7, plusN: 0, hasDot: false), .bottomBar).parts,
+                       [.board, .hourglass, .clock], "No capsule at 0.")
+
+        let started = try drawing(.gameStarted(gameID: 8, plusN: 2, hasDot: true), .bottomBar)
+        XCTAssertEqual(started.parts, [.board, .plusN])
+        XCTAssertEqual(started.dropOrder, [.plusN])
+        XCTAssertTrue(started.hasDot)
+        XCTAssertEqual(try drawing(.gameOverCard(challengeID: 9, plusN: 2), .bottomBar).parts, [.tile, .plusN])
+        XCTAssertEqual(try drawing(.base(plusN: 0), .bottomBar).parts, [.icon(.grid)])
+        XCTAssertEqual(try drawing(.base(plusN: 3), .bottomBar).parts, [.icon(.grid), .plusN])
+        XCTAssertEqual(try drawing(.inbox(count: 3), .bottomBar).parts, [.icon(.inbox), .plusN])
+        XCTAssertEqual(try drawing(.inbox(count: 3), .bottomBar).plusN, 3, "The inbox draws its count as +N.")
+        let dot = try drawing(.dot, .bottomBar)
+        XCTAssertEqual(dot.parts, [.icon(.grid)])
+        XCTAssertTrue(dot.hasDot)
+        XCTAssertEqual(try drawing(.dot, .bottomBar, allowsPicker: false).parts, [.icon(.inbox)],
+                       "Where there is no picker, the dot is on the inbox glyph.")
+    }
+
+    func testTopBarsDrawTheChipWithoutItsCount() throws {
+        let chip = try drawing(.chip(gameID: 7, plusN: 3, hasDot: true), .topBar, standard)
+        XCTAssertEqual(chip.parts, [.board, .hourglass, .clock])
+        XCTAssertEqual(chip.dropOrder, [.hourglass, .board], "The hourglass drops first, then the board.")
+        XCTAssertEqual(chip.plusN, 0)
+        XCTAssertFalse(chip.hasDot)
+        let suddenDeath = try drawing(.chip(gameID: 7, plusN: 3, hasDot: false), .topBar, suddenDeath: true)
+        XCTAssertEqual(suddenDeath.parts, [.board, .suddenDeathMark, .clock])
+        XCTAssertEqual(suddenDeath.dropOrder, [.board], "The glyph may push the board out; the clock and the glyph stay.")
+        XCTAssertEqual(try drawing(.chip(gameID: 7, plusN: 0, hasDot: false), .topBar, hasCountdown: false).dropOrder, [])
+        let started = try drawing(.gameStarted(gameID: 8, plusN: 2, hasDot: true), .topBar)
+        XCTAssertEqual(started.parts, [.board], "The mini board alone.")
+        XCTAssertFalse(started.hasDot)
+        XCTAssertEqual(try drawing(.gameOverCard(challengeID: 9, plusN: 2), .topBar).parts, [.tile])
+        XCTAssertEqual(try drawing(.base(plusN: 3), .topBar).parts, [.icon(.grid), .plusN])
+        XCTAssertEqual(try drawing(.inbox(count: 3), .topBar).parts, [.icon(.inbox), .plusN])
+        XCTAssertTrue(try drawing(.dot, .topBar).hasDot)
+        for form in [GameControlForm.rail, .mac] {
+            XCTAssertNil(Drawing(.base(plusN: 3), form: form, windowClass: standard, modeCount: 2, allowsPicker: true),
+                         "\(form) draws the system's item, not a custom view.")
+        }
+    }
+
+    func testEachFormHasFixedFramesPerStateAndWindowClass() throws {
+        let chipStates: [GameControlSlot] = [.chip(gameID: 7, plusN: 3, hasDot: false),
+                                             .gameStarted(gameID: 8, plusN: 3, hasDot: false),
+                                             .gameOverCard(challengeID: 9, plusN: 3)]
+        for slot in chipStates {
+            for modes in [2, 3] {
+                XCTAssertEqual(try drawing(slot, .bottomBar, nil, modes: modes).frame.width, 160, "\(slot): nil gives the full frame")
+                XCTAssertEqual(try drawing(slot, .bottomBar, standard, modes: modes).frame.width, 160, "\(slot)")
+                XCTAssertEqual(try drawing(slot, .bottomBar, floor, modes: modes).frame.width, 44, "\(slot): the floor")
+                for windowClass in [nil, floor, narrow, standard] {
+                    XCTAssertEqual(try drawing(slot, .topBar, windowClass, modes: modes).frame.width, 96, "\(slot)")
+                }
+            }
+            XCTAssertEqual(try drawing(slot, .bottomBar, narrow, modes: 3).frame.width, 120, "\(slot) beside three modes")
+            XCTAssertEqual(try drawing(slot, .bottomBar, narrow, modes: 2).frame.width, 160, "\(slot) beside two modes")
+        }
+        for form in [GameControlForm.bottomBar, .topBar] {
+            XCTAssertEqual(try drawing(.base(plusN: 0), form, standard).frame.width, 44)
+            XCTAssertEqual(try drawing(.base(plusN: 3), form, standard).frame.width, 84)
+            XCTAssertEqual(try drawing(.base(plusN: 3), form, narrow, modes: 3).frame.width, 84)
+            XCTAssertEqual(try drawing(.inbox(count: 3), form, standard).frame.width, 84)
+            XCTAssertEqual(try drawing(.dot, form, standard).frame.width, 44)
+        }
+        XCTAssertEqual(try drawing(.base(plusN: 3), .bottomBar, floor).frame.width, 44)
+        XCTAssertEqual(try drawing(.base(plusN: 3), .topBar, floor).frame.width, 84, "Top bars have no floor.")
+        let heights = Set(try chipStates.map { try drawing($0, .topBar).frame.height })
+        XCTAssertEqual(heights, [44])
+    }
+
+    func testNoFrameDependsOnTheClock() throws {
+        for form in [GameControlForm.bottomBar, .topBar] {
+            for windowClass in [nil, floor, narrow, standard] {
+                for modes in [2, 3] {
+                    let frames = Set(try [(true, false), (true, true), (false, false)].map { countdown, suddenDeath in
+                        try drawing(.chip(gameID: 7, plusN: 3, hasDot: false), form, windowClass, modes: modes,
+                                    hasCountdown: countdown, suddenDeath: suddenDeath).frame.width
+                    })
+                    XCTAssertEqual(frames.count, 1, "\(form) \(String(describing: windowClass)) \(modes): \(frames)")
+                }
+            }
+        }
+    }
+
+    func testTheFloorShowsTheBaseIconAloneWithTheDot() throws {
+        let chip = try drawing(.chip(gameID: 7, plusN: 3, hasDot: true), .bottomBar, floor, modes: 3)
+        XCTAssertEqual(chip.parts, [.icon(.grid)], "Whatever the mode count")
+        XCTAssertEqual(chip.dropOrder, [])
+        XCTAssertEqual(chip.plusN, 0, "No +N; the popover carries the rest.")
+        XCTAssertTrue(chip.hasDot, "The dot where it applies")
+        let suddenDeath = try drawing(.chip(gameID: 7, plusN: 0, hasDot: false), .bottomBar, floor, suddenDeath: true)
+        XCTAssertEqual(suddenDeath.parts, [.icon(.grid)])
+        XCTAssertFalse(suddenDeath.isSuddenDeath, "No chip, so no outline.")
+        XCTAssertFalse(try drawing(.base(plusN: 3), .bottomBar, floor).hasDot)
+        XCTAssertEqual(try drawing(.inbox(count: 3), .bottomBar, floor).parts, [.icon(.inbox)])
+        XCTAssertEqual(try drawing(.dot, .bottomBar, floor, allowsPicker: false).parts, [.icon(.inbox)])
+        XCTAssertTrue(GameControlForm.bottomBar.showsIconAlone(in: floor))
+        XCTAssertFalse(GameControlForm.bottomBar.showsIconAlone(in: narrow))
+        XCTAssertFalse(GameControlForm.bottomBar.showsIconAlone(in: nil))
+        XCTAssertFalse(GameControlForm.topBar.showsIconAlone(in: floor))
+    }
+
+    // MARK: The drop order
+
+    private let unpadded = GameControlChipSpacing(leading: 0, trailing: 0, between: 0, beforeClock: 0)
+
+    private func widths(_ clock: CGFloat, plusN: CGFloat = 30) -> (GameControlPart) -> CGFloat {
+        { part in
+            switch part {
+            case .board, .tile: 28
+            case .icon: 24
+            case .hourglass: 14
+            case .suddenDeathMark: 26
+            case .clock: clock
+            case .plusN: plusN
+            }
+        }
+    }
+
+    func testLowerPartsDropUntilTheRestFits() throws {
+        // Unpadded: the board 28, the hourglass 14 and +N 30, around the clock.
+        let chip = try drawing(.chip(gameID: 7, plusN: 3, hasDot: false), .bottomBar, standard)
+        XCTAssertEqual(chip.fit(spacing: unpadded, width: widths(44)).parts, [.board, .hourglass, .clock, .plusN])
+        XCTAssertEqual(chip.fit(spacing: unpadded, width: widths(100)).parts, [.board, .clock, .plusN],
+                       "172 of 160: the hourglass goes first.")
+        XCTAssertEqual(chip.fit(spacing: unpadded, width: widths(110)).parts, [.board, .clock],
+                       "Then +N, and the hourglass doesn't come back into the room +N leaves.")
+        XCTAssertEqual(chip.fit(spacing: unpadded, width: widths(110)).width, 138)
+        XCTAssertEqual(chip.fit(spacing: unpadded, width: widths(140)).parts, [.clock],
+                       "The board goes last, for a clock wider than any the chip shows.")
+
+        let narrowChip = try drawing(.chip(gameID: 7, plusN: 3, hasDot: false), .bottomBar, narrow, modes: 3)
+        XCTAssertEqual(narrowChip.fit(spacing: unpadded, width: widths(44)).parts, [.board, .hourglass, .clock, .plusN])
+        XCTAssertEqual(narrowChip.fit(spacing: unpadded, width: widths(50)).parts, [.board, .clock, .plusN])
+        XCTAssertEqual(narrowChip.fit(spacing: unpadded, width: widths(70)).parts, [.board, .clock])
+
+        let topChip = try drawing(.chip(gameID: 7, plusN: 3, hasDot: false), .topBar)
+        XCTAssertEqual(topChip.fit(spacing: unpadded, width: widths(54)).parts, [.board, .hourglass, .clock])
+        XCTAssertEqual(topChip.fit(spacing: unpadded, width: widths(60)).parts, [.board, .clock])
+        XCTAssertEqual(topChip.fit(spacing: unpadded, width: widths(70)).parts, [.clock])
+
+        let base = try drawing(.base(plusN: 3), .bottomBar)
+        XCTAssertEqual(base.fit(spacing: unpadded, width: widths(0, plusN: 60)).parts, [.icon(.grid), .plusN], "84 of 84")
+        XCTAssertEqual(base.fit(spacing: unpadded, width: widths(0, plusN: 61)).parts, [.icon(.grid)], "+N gives way.")
+    }
+
+    func testTheClockAndTheMarkNeverDropAndAnOverflowIsReported() throws {
+        let suddenDeath = try drawing(.chip(gameID: 7, plusN: 3, hasDot: false), .bottomBar, narrow, modes: 3,
+                                      suddenDeath: true)
+        let fits = suddenDeath.fit(spacing: unpadded, width: widths(66))
+        XCTAssertEqual(fits.parts, [.board, .suddenDeathMark, .clock], "120 of 120")
+        XCTAssertTrue(fits.fits)
+        let wider = suddenDeath.fit(spacing: unpadded, width: widths(67))
+        XCTAssertEqual(wider.parts, [.suddenDeathMark, .clock], "A clock wider than any in sudden death: the board gives way.")
+        XCTAssertTrue(wider.fits)
+        let topBar = try drawing(.chip(gameID: 7, plusN: 0, hasDot: false), .topBar, suddenDeath: true)
+        let overflows = topBar.fit(spacing: unpadded, width: widths(80))
+        XCTAssertEqual(overflows.parts, [.suddenDeathMark, .clock], "Nothing that never drops goes, and nothing truncates.")
+        XCTAssertFalse(overflows.fits)
+        XCTAssertEqual(overflows.width, 106)
+    }
+
+    func testSpacingJoinsTheClockToItsHourglassOrMark() {
+        let spacing = GameControlChipSpacing(leading: 5, trailing: 5, between: 4, beforeClock: 2)
+        let width = widths(44)
+        XCTAssertEqual(spacing.width(of: [.board, .hourglass, .clock, .plusN], width), 5 + 28 + 4 + 14 + 2 + 44 + 4 + 30 + 5)
+        XCTAssertEqual(spacing.width(of: [.board, .clock], width), 5 + 28 + 4 + 44 + 5)
+        XCTAssertEqual(spacing.width(of: [.suddenDeathMark, .clock], width), 5 + 26 + 2 + 44 + 5)
+        XCTAssertEqual(spacing.width(of: [], width), 0)
+    }
+
+    // MARK: The clock and the mark
+
+    func testTheClockIsDigitsOnly() {
+        let cases: [(TimeInterval, String, String)] = [
+            (42, "00:42", "00:00"), (0, "00:00", "00:00"), (-5, "00:00", "00:00"), (61.9, "01:01", "00:00"),
+            (3599, "59:59", "00:00"), (3600, "1:00:00", "0:00:00"), (5400, "1:30:00", "0:00:00"),
+            (35999, "9:59:59", "0:00:00"), (36000, "10:00:00", "00:00:00"), (45000, "12:30:00", "00:00:00"),
+            (.nan, "00:00", "00:00"), (.infinity, "00:00", "00:00"),
+        ]
+        for (timeLeft, text, sample) in cases {
+            let clock = GameControlClock(timeLeft: timeLeft)
+            XCTAssertEqual(clock.text, text, "\(timeLeft)")
+            XCTAssertEqual(clock.widestSample, sample, "\(timeLeft)")
+            XCTAssertEqual(clock.widestSample.count, clock.text.count)
+        }
+        XCTAssertEqual(GameControlClock(timeLeft: 42.9).seconds, 42, "Truncated, as Home's chip reads it")
+    }
+
+    func testTheMarkIsTheLanguagesTextWhereItFitsItsSlot() {
+        XCTAssertEqual(GameControlSuddenDeathMark(bottomBar: "SD"), .text("SD"))
+        XCTAssertEqual(GameControlSuddenDeathMark(bottomBar: "MS"), .text("MS"))
+        XCTAssertEqual(GameControlSuddenDeathMark(bottomBar: "残1回"), .glyph)
+        XCTAssertEqual(GameControlSuddenDeathMark(bottomBar: "最后一次读秒"), .glyph)
+        XCTAssertEqual(GameControlSuddenDeathMark(bottomBar: ""), .glyph)
+        XCTAssertEqual(GameControlSuddenDeathMark.drawn(in: .topBar), .glyph, "Top bars always draw the glyph.")
+        XCTAssertEqual(GameControlSuddenDeathMark.drawn(in: .bottomBar), .text("SD"), "The app's own SD, in English here")
+    }
+
+    // MARK: The native forms
+
+    func testTheRailAndTheMacFollowTheirPlacement() {
+        XCTAssertEqual(GameControlForm(.bottomBar, isCatalyst: false), .bottomBar)
+        XCTAssertEqual(GameControlForm(.topBar, isCatalyst: false), .topBar)
+        XCTAssertEqual(GameControlForm(.rail, isCatalyst: false), .rail)
+        XCTAssertEqual(GameControlForm(.topBar, isCatalyst: true), .mac, "The Mac is always wide and always native.")
+        XCTAssertEqual([GameControlForm.bottomBar, .topBar, .rail, .mac].map(\.isNative), [false, false, true, true])
+    }
+
+    func testTheNativeItemsShowTheSystemsIconAndCount() {
+        typealias Item = GameControlNativeItem
+        XCTAssertEqual(Item(.chip(gameID: 7, plusN: 2, hasDot: true), allowsPicker: true),
+                       Item(icon: .grid, badge: .count(3)), "The chip's game and +N")
+        XCTAssertEqual(Item(.gameStarted(gameID: 8, plusN: 0, hasDot: false), allowsPicker: true),
+                       Item(icon: .grid, badge: .count(1)))
+        XCTAssertEqual(Item(.gameOverCard(challengeID: 9, plusN: 2), allowsPicker: false),
+                       Item(icon: .grid, badge: .count(3)))
+        XCTAssertEqual(Item(.base(plusN: 0), allowsPicker: true), Item(icon: .grid, badge: .none))
+        XCTAssertEqual(Item(.base(plusN: 3), allowsPicker: true), Item(icon: .grid, badge: .count(3)))
+        XCTAssertEqual(Item(.dot, allowsPicker: true), Item(icon: .grid, badge: .dot), "An empty-text badge: a red dot")
+        XCTAssertEqual(Item(.dot, allowsPicker: false), Item(icon: .inbox, badge: .dot))
+        XCTAssertEqual(Item(.inbox(count: 3), allowsPicker: false), Item(icon: .inbox, badge: .count(3)))
+        XCTAssertNil(Item(nil, allowsPicker: true), "The slot hides.")
+        XCTAssertEqual(Item(nil, allowsPicker: true, keepsPlace: true), Item(icon: .inbox, badge: .none),
+                       "The Duo's wide poses keep the unbadged inbox glyph.")
+        let zen = ActivityModel.gameControl(zenInput(), context: Context(isZen: true)).map(GameControlSlot.init)
+        XCTAssertEqual(zen.flatMap { Item($0, allowsPicker: true) }, Item(icon: .grid, badge: .count(1)),
+                       "In Zen a badge of 1")
+        XCTAssertEqual(GameControlIcon.grid.systemName, "square.grid.2x2")
+        XCTAssertEqual(GameControlIcon.inbox.systemName, "tray")
+    }
+
+    private func zenInput() -> Model.Input {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1), yourMove(2, left: 100), yourMove(3, left: 50)]
+        input.challengesReceived = [Model.Challenge(id: 5, isLive: true)]
+        input.place = .game(id: 1, isOwnGame: true, isLive: true, isOver: false)
+        return input
+    }
+
+    // MARK: Tap, touch and hold
+
+    private typealias Interaction = GameControlInteraction
+
+    func testATapShowsTheChipsGameAndAHoldOpensThePopover() {
+        for form in [GameControlForm.bottomBar, .topBar] {
+            let chip = Interaction(.chip(gameID: 7, plusN: 3, hasDot: true), form: form, windowClass: standard)
+            XCTAssertEqual(chip.tap, .show(gameID: 7), "\(form)")
+            XCTAssertEqual(chip.hold, .openPopover)
+            XCTAssertTrue(chip.offersOpenActivity)
+            let started = Interaction(.gameStarted(gameID: 8, plusN: 0, hasDot: false), form: form)
+            XCTAssertEqual(started.tap, .show(gameID: 8))
+            XCTAssertEqual(started.hold, .openPopover)
+            XCTAssertTrue(started.offersOpenActivity)
+            for slot in [GameControlSlot.gameOverCard(challengeID: 9, plusN: 2), .base(plusN: 3), .dot, .inbox(count: 3)] {
+                let interaction = Interaction(slot, form: form)
+                XCTAssertEqual(interaction.tap, .openPopover, "\(slot)")
+                XCTAssertEqual(interaction.hold, .openPopover, "\(slot)")
+                XCTAssertFalse(interaction.offersOpenActivity, "\(slot): a tap already opens it")
+            }
+        }
+    }
+
+    func testTheNativeItemsAndTheFloorOpenThePopoverOnATap() {
+        for form in [GameControlForm.rail, .mac] {
+            for slot in [GameControlSlot.chip(gameID: 7, plusN: 0, hasDot: false), .gameStarted(gameID: 8, plusN: 0, hasDot: false),
+                         .gameOverCard(challengeID: 9, plusN: 0), .base(plusN: 0), .dot, .inbox(count: 1)] {
+                let interaction = Interaction(slot, form: form)
+                XCTAssertEqual(interaction.tap, .openPopover, "\(form) \(slot)")
+                XCTAssertEqual(interaction.hold, .none, "\(form): a native item takes no hold")
+                XCTAssertFalse(interaction.offersOpenActivity)
+            }
+        }
+        let floorChip = Interaction(.chip(gameID: 7, plusN: 3, hasDot: false), form: .bottomBar, windowClass: floor)
+        XCTAssertEqual(floorChip.tap, .openPopover, "The floor shows no chip, so a tap can't switch to it.")
+        XCTAssertEqual(floorChip.hold, .openPopover)
+        XCTAssertFalse(floorChip.offersOpenActivity)
+    }
+
+    func testInZenATapSwitchesAndNothingElse() {
+        for form in [GameControlForm.topBar, .bottomBar, .rail, .mac] {
+            let zen = Interaction(.chip(gameID: 7, plusN: 0, hasDot: false), form: form, isZen: true)
+            XCTAssertEqual(zen.tap, .show(gameID: 7), "\(form)")
+            XCTAssertEqual(zen.hold, .none, "\(form): no popover in Zen")
+            XCTAssertFalse(zen.offersOpenActivity)
+            XCTAssertEqual(zen.release(after: 0.8, holdFired: false), .none, "\(form)")
+        }
+    }
+
+    func testAReleaseHalfASecondAfterThePressNeverSwitches() {
+        XCTAssertEqual(Interaction.holdDuration, 0.5)
+        let chip = Interaction(.chip(gameID: 7, plusN: 3, hasDot: false), form: .bottomBar)
+        XCTAssertEqual(chip.release(after: 0.1, holdFired: false), .show(gameID: 7), "A tap switches.")
+        XCTAssertEqual(chip.release(after: 0.49, holdFired: false), .show(gameID: 7))
+        XCTAssertEqual(chip.release(after: 0.5, holdFired: false), .openPopover,
+                       "A hold that something else took opens the popover, as a hold would.")
+        XCTAssertEqual(chip.release(after: 3, holdFired: false), .openPopover)
+        XCTAssertEqual(chip.release(after: 1, holdFired: true), .none, "The hold already opened it.")
+        XCTAssertEqual(chip.release(after: 0.3, holdFired: true), .none)
+        let started = Interaction(.gameStarted(gameID: 8, plusN: 0, hasDot: false), form: .topBar)
+        XCTAssertEqual(started.release(after: 0.2, holdFired: false), .show(gameID: 8))
+        XCTAssertEqual(started.release(after: 0.6, holdFired: false), .openPopover)
+        let base = Interaction(.base(plusN: 3), form: .bottomBar)
+        XCTAssertEqual(base.release(after: 0.2, holdFired: false), .openPopover)
+        XCTAssertEqual(base.release(after: 1, holdFired: false), .openPopover)
+        XCTAssertEqual(base.release(after: 1, holdFired: true), .none)
+        for duration in stride(from: 0.5, through: 5, by: 0.25) {
+            for slot in [GameControlSlot.chip(gameID: 7, plusN: 0, hasDot: true), .gameStarted(gameID: 8, plusN: 1, hasDot: false)] {
+                for form in [GameControlForm.bottomBar, .topBar] {
+                    for held in [false, true] {
+                        if case .show = Interaction(slot, form: form).release(after: duration, holdFired: held) {
+                            XCTFail("\(slot) in \(form) switched after \(duration) s")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: VoiceOver
+
+    private typealias Spoken = GameControlAccessibility
+    private let english = Locale(identifier: "en_US")
+
+    func testTheTimeIsSpokenInFullUnits() {
+        XCTAssertEqual(Spoken.spokenDuration(42, locale: english), "42 seconds")
+        XCTAssertEqual(Spoken.spokenDuration(1, locale: english), "1 second")
+        XCTAssertEqual(Spoken.spokenDuration(0, locale: english), "0 seconds")
+        XCTAssertEqual(Spoken.spokenDuration(61.9, locale: english), "1 minute, 1 second", "Truncated as the digits are")
+        XCTAssertEqual(Spoken.spokenDuration(3600, locale: english), "1 hour")
+        XCTAssertEqual(Spoken.spokenDuration(5400, locale: english), "1 hour, 30 minutes")
+        XCTAssertEqual(Spoken.spokenDuration(45000, locale: english), "12 hours, 30 minutes")
+    }
+
+    func testVoiceOverSaysTheDrawnStates() {
+        let chip = Spoken(.chip(gameID: 7, plusN: 3, hasDot: false), form: .bottomBar, name: "HarborMist",
+                          timeLeft: 42, locale: english)
+        XCTAssertEqual(chip, Spoken(label: "HarborMist, your move in your live game, 42 seconds left",
+                                    value: "3 more in Activity", hint: "Switches to that game.",
+                                    updatesFrequently: true, offersOpenActivity: true))
+        XCTAssertEqual(Spoken(.chip(gameID: 7, plusN: 0, hasDot: false), form: .topBar, name: "HarborMist",
+                              timeLeft: 8, isSuddenDeath: true, locale: english).label,
+                       "HarborMist, your move in your live game, sudden death, 8 seconds left")
+        XCTAssertEqual(Spoken(.chip(gameID: 7, plusN: 0, hasDot: true), form: .bottomBar, name: "HarborMist",
+                              timeLeft: 42, locale: english).value, "New activity waiting")
+        XCTAssertEqual(Spoken(.chip(gameID: 7, plusN: 2, hasDot: true), form: .bottomBar, name: "HarborMist",
+                              timeLeft: 42, locale: english).value, "2 more in Activity, New activity waiting")
+        XCTAssertEqual(Spoken(.chip(gameID: 7, plusN: 1, hasDot: false), form: .bottomBar, name: "HarborMist",
+                              timeLeft: 5400, locale: english),
+                       Spoken(label: "HarborMist, your move in your live game, 1 hour, 30 minutes left",
+                              value: "1 more in Activity", hint: "Switches to that game.",
+                              updatesFrequently: true, offersOpenActivity: true))
+        XCTAssertEqual(Spoken(.chip(gameID: 7, plusN: 0, hasDot: false), form: .bottomBar, name: "HarborMist",
+                              locale: english),
+                       Spoken(label: "HarborMist, your move in your live game", value: nil,
+                              hint: "Switches to that game.", updatesFrequently: false, offersOpenActivity: true),
+                       "Without a countdown")
+        XCTAssertEqual(Spoken(.gameStarted(gameID: 8, plusN: 3, hasDot: false), form: .bottomBar, name: "CedarWave",
+                              timeLeft: 42, locale: english),
+                       Spoken(label: "Game started with CedarWave", value: "3 more in Activity", hint: "Opens that game.",
+                              updatesFrequently: false, offersOpenActivity: true))
+        XCTAssertEqual(Spoken(.gameOverCard(challengeID: 9, plusN: 2), form: .bottomBar, name: "OrbitFox", locale: english),
+                       Spoken(label: "Challenge from OrbitFox", value: "2 more waiting", hint: "Opens Activity.",
+                              updatesFrequently: false, offersOpenActivity: false))
+        XCTAssertNil(Spoken(.gameOverCard(challengeID: 9, plusN: 0), form: .topBar, name: "OrbitFox").value)
+        XCTAssertEqual(Spoken(.base(plusN: 3), form: .bottomBar),
+                       Spoken(label: "Active games", value: "3 waiting", hint: nil,
+                              updatesFrequently: false, offersOpenActivity: false))
+        XCTAssertEqual(Spoken(.base(plusN: 0), form: .topBar).label, "Active games",
+                       "The base keeps the label journeys find it by.")
+        XCTAssertNil(Spoken(.base(plusN: 0), form: .topBar).value)
+        XCTAssertEqual(Spoken(.dot, form: .bottomBar),
+                       Spoken(label: "Active games", value: "New activity waiting", hint: nil,
+                              updatesFrequently: false, offersOpenActivity: false))
+        XCTAssertEqual(Spoken(.dot, form: .bottomBar, allowsPicker: false).label, "Activity")
+        XCTAssertEqual(Spoken(.inbox(count: 3), form: .topBar),
+                       Spoken(label: "Activity", value: "3 waiting", hint: nil,
+                              updatesFrequently: false, offersOpenActivity: false))
+        XCTAssertEqual(Spoken(.inbox(count: 1), form: .bottomBar).value, "1 waiting")
+        XCTAssertEqual(Spoken.openActivity, "Open Activity")
+    }
+
+    func testVoiceOverInZenSaysTheChipWithoutAValue() {
+        XCTAssertEqual(Spoken(.chip(gameID: 7, plusN: 0, hasDot: false), form: .topBar, isZen: true,
+                              name: "HarborMist", timeLeft: 42, locale: english),
+                       Spoken(label: "HarborMist, your move in your live game, 42 seconds left", value: nil,
+                              hint: "Switches to that game.", updatesFrequently: true, offersOpenActivity: false))
+        XCTAssertEqual(Spoken(.chip(gameID: 7, plusN: 0, hasDot: false), form: .mac, isZen: true,
+                              name: "HarborMist", timeLeft: 42, locale: english),
+                       Spoken(label: "HarborMist, your move in your live game", value: nil,
+                              hint: "Switches to that game.", updatesFrequently: false, offersOpenActivity: false),
+                       "The Mac's Zen item: no time in a native label")
+    }
+
+    func testTheNativeLabelCarriesTheCountButNoTime() {
+        for form in [GameControlForm.rail, .mac] {
+            let chip = Spoken(.chip(gameID: 7, plusN: 2, hasDot: false), form: form, name: "HarborMist",
+                              timeLeft: 42, locale: english)
+            XCTAssertEqual(chip, Spoken(label: "HarborMist, your move in your live game, 2 more in Activity", value: nil,
+                                        hint: "Opens Activity.", updatesFrequently: false, offersOpenActivity: false))
+            XCTAssertEqual(Spoken(.chip(gameID: 7, plusN: 2, hasDot: false), form: form, name: "HarborMist",
+                                  timeLeft: 41, locale: english), chip, "\(form): a tick never relabels it")
+            XCTAssertEqual(Spoken(.gameStarted(gameID: 8, plusN: 0, hasDot: false), form: form, name: "CedarWave").label,
+                           "Game started with CedarWave")
+            XCTAssertEqual(Spoken(.gameOverCard(challengeID: 9, plusN: 2), form: form, name: "OrbitFox").label,
+                           "Challenge from OrbitFox, 2 more waiting")
+            XCTAssertEqual(Spoken(.base(plusN: 3), form: form).label, "Active games, 3 waiting")
+            XCTAssertEqual(Spoken(.dot, form: form).label, "Active games, New activity waiting")
+            XCTAssertEqual(Spoken(.inbox(count: 3), form: form, allowsPicker: false).label, "Activity, 3 waiting")
+            XCTAssertEqual(Spoken(.base(plusN: 0), form: form).hint, "Opens Activity.")
+        }
+        let floorChip = Spoken(.chip(gameID: 7, plusN: 3, hasDot: true), form: .bottomBar, windowClass: floor,
+                               name: "HarborMist", timeLeft: 42, locale: english)
+        XCTAssertEqual(floorChip, Spoken(label: "HarborMist, your move in your live game, 3 more in Activity, New activity waiting",
+                                         value: nil, hint: "Opens Activity.", updatesFrequently: false,
+                                         offersOpenActivity: false), "The floor shows the icon alone, as the native items do.")
     }
 
     #if DEBUG

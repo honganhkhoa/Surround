@@ -37,6 +37,7 @@
 		5C4E00022026111400000002 /* GameControlModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00012026111400000001 /* GameControlModel.swift */; };
 		5C4E00032026111400000003 /* GameControlModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00012026111400000001 /* GameControlModel.swift */; };
 		5C4E00052026111400000005 /* GameControlModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00042026111400000004 /* GameControlModelTests.swift */; };
+		5C4E00312026111400000031 /* GameControlChipFitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00302026111400000030 /* GameControlChipFitTests.swift */; };
 		5C4E00072026111400000007 /* GameControlSwitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00062026111400000006 /* GameControlSwitchTests.swift */; };
 		5C4E00092026111400000009 /* GameOverCardRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00082026111400000008 /* GameOverCardRuleTests.swift */; };
 		5C4E000B202611140000000B /* GameConnectionPlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E000A202611140000000A /* GameConnectionPlacementTests.swift */; };
@@ -621,6 +622,7 @@
 		5C3E000D202611120000000D /* ActivityListModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityListModelTests.swift; sourceTree = "<group>"; };
 		5C4E00012026111400000001 /* GameControlModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlModel.swift; sourceTree = "<group>"; };
 		5C4E00042026111400000004 /* GameControlModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlModelTests.swift; sourceTree = "<group>"; };
+		5C4E00302026111400000030 /* GameControlChipFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlChipFitTests.swift; sourceTree = "<group>"; };
 		5C4E00062026111400000006 /* GameControlSwitchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlSwitchTests.swift; sourceTree = "<group>"; };
 		5C4E00082026111400000008 /* GameOverCardRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameOverCardRuleTests.swift; sourceTree = "<group>"; };
 		5C4E000A202611140000000A /* GameConnectionPlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameConnectionPlacementTests.swift; sourceTree = "<group>"; };
@@ -1091,6 +1093,7 @@
 				AC7100052026110900000005 /* ActivityModelTests.swift */,
 				5C3E000D202611120000000D /* ActivityListModelTests.swift */,
 				5C4E00042026111400000004 /* GameControlModelTests.swift */,
+				5C4E00302026111400000030 /* GameControlChipFitTests.swift */,
 				5C4E00062026111400000006 /* GameControlSwitchTests.swift */,
 				5C4E00082026111400000008 /* GameOverCardRuleTests.swift */,
 				5C4E000A202611140000000A /* GameConnectionPlacementTests.swift */,
@@ -1997,6 +2000,7 @@
 				AC7100042026110900000004 /* ActivityModelTests.swift in Sources */,
 				5C3E000E202611120000000E /* ActivityListModelTests.swift in Sources */,
 				5C4E00052026111400000005 /* GameControlModelTests.swift in Sources */,
+				5C4E00312026111400000031 /* GameControlChipFitTests.swift in Sources */,
 				5C4E00072026111400000007 /* GameControlSwitchTests.swift in Sources */,
 				5C4E00092026111400000009 /* GameOverCardRuleTests.swift in Sources */,
 				5C4E000B202611140000000B /* GameConnectionPlacementTests.swift in Sources */,
