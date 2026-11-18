@@ -1359,12 +1359,13 @@ enum GameOverCardRule {
 ///   slot; in Chat or Analyze the mark on one clock, never the capsule.
 /// - No clock in play and no title slot: the main action reads
 ///   "Reconnecting…".
-/// - The Mac says it in the window subtitle in every state, and never shows
-///   the capsule.
+/// - The Mac never shows the capsule. Its game toolbar draws no title, so
+///   a window subtitle would not show either: where iOS shows the capsule,
+///   the Mac's main action reads "Reconnecting…" instead.
 ///
 /// A clock in play takes its mark at once from the socket, as the actions
-/// disable; the capsule, the one clock's mark, the relabel and the subtitle
-/// follow the window's connection source.
+/// disable; the capsule, the one clock's mark and the relabel follow the
+/// window's connection source.
 struct GameConnectionPlacement: Equatable {
     /// What Game Detail knows before it draws.
     struct Input: Equatable {
@@ -1415,8 +1416,6 @@ struct GameConnectionPlacement: Equatable {
     /// The capsule in the title slot, in place of the identity or the empty
     /// slot.
     var showsTitleCapsule: Bool
-    /// The Mac's window subtitle.
-    var showsWindowSubtitle: Bool
     var action: Action
 
     init(_ input: Input) {
@@ -1429,14 +1428,26 @@ struct GameConnectionPlacement: Equatable {
         } else {
             clocks = .unchanged
         }
-        showsTitleCapsule = !input.isCatalyst && !input.hasClockInPlay && hasTitleSlot && panel == .playerInfo
-        showsWindowSubtitle = input.isCatalyst
+        let capsuleState = !input.hasClockInPlay && hasTitleSlot && panel == .playerInfo
+        showsTitleCapsule = !input.isCatalyst && capsuleState
         if !input.userPlays {
             action = .none
-        } else if !input.hasClockInPlay && !hasTitleSlot {
+        } else if (!input.hasClockInPlay && !hasTitleSlot) || (input.isCatalyst && capsuleState) {
             action = .relabelled
         } else {
             action = .disabled
+        }
+    }
+}
+
+extension ConnectionStatusModel.Status {
+    /// A game says an outage while it shows, as Reconnecting… or Can’t
+    /// reach OGS, and never "Connected": once the outage ends, its title
+    /// slot, clocks, action and window subtitle are as they were.
+    var showsInGame: Bool {
+        switch self {
+        case .reconnecting, .unreachable: true
+        case .hidden, .connected: false
         }
     }
 }

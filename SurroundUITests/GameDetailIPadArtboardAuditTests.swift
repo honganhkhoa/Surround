@@ -202,8 +202,8 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         setGameChatVisible(visible, in: app)
     }
 
-    private func connectionBanner(in app: XCUIApplication) -> XCUIElement {
-        app.descendants(matching: .any).matching(identifier: ID.connectionBanner).firstMatch
+    private func connectionStatus(in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: ID.gameConnectionStatus).firstMatch
     }
 
     private func clockValues(in app: XCUIApplication) -> [String] {
@@ -212,10 +212,6 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         }.filter { $0.exists && $0.frame.width > 1 }.map { $0.value as? String ?? "" }
     }
 
-    /// v148: with the socket down, stone removal shows the app's banner in
-    /// both orientations (where it lands is logged); in Play the running
-    /// card's Reconnecting… badge stands in for it. Portrait Chat's two title
-    /// chips show only the glow, no label, so the banner returns there.
     /// Nebula & Pearl through the shipping route: its scene, board and dark
     /// window in both orientations, then Home's own appearance after Back.
     func testNebulaPearlThemeOrientations() {
@@ -850,39 +846,47 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         }
     }
 
-    func testConnectionBannerPlacement() {
+    /// With the socket down, stone removal says it in the title slot, as
+    /// the capsule, in both orientations (where it lands is logged), with
+    /// Accept disabled and keeping its name; in Play the running card
+    /// carries the mark and nothing else says it, and so do portrait Chat's
+    /// title chips, the smaller ones as the badge's spinner.
+    func testConnectionStatusPlacement() {
         for portrait in [false, true] {
             let app = launchGame(artboard: portrait ? 14 : 3, portrait: portrait,
                                  clock: "stone-removal", socketDown: true)
             setSidebarCollapsed(true, in: app)
-            let banner = connectionBanner(in: app)
-            XCTAssertTrue(banner.waitForExistence(timeout: 10), "Stone removal shows the app's connection banner")
+            let status = connectionStatus(in: app)
+            XCTAssertTrue(status.waitForExistence(timeout: 10), "Stone removal shows the status in the title slot")
+            XCTAssertTrue(app.navigationBars.allElementsBoundByIndex.contains { $0.frame.contains(status.frame) },
+                          "The status sits inside the bar: \(status.frame)")
             XCTAssertFalse(clockValues(in: app).contains { $0.hasPrefix("Reconnecting…") })
             let accept = app.buttons["Accept"].firstMatch
             if accept.waitForExistence(timeout: 5) {
                 XCTAssertFalse(accept.isEnabled, "Accept is disabled while disconnected")
+                XCTAssertEqual(accept.value as? String, "Reconnecting…", "VoiceOver hears why Accept waits")
             }
-            recordConnectionBannerPlacement(portrait ? "ipad-portrait-stone-removal" : "ipad-landscape-stone-removal",
+            recordConnectionStatusPlacement(portrait ? "ipad-portrait-stone-removal" : "ipad-landscape-stone-removal",
                                             in: app)
             app.terminate()
         }
         let app = launchGame(artboard: 14, portrait: true, socketDown: true)
         setSidebarCollapsed(true, in: app)
-        let banner = connectionBanner(in: app)
+        let status = connectionStatus(in: app)
         XCTAssertTrue(pollUntil(timeout: 10) { self.clockValues(in: app).contains { $0.hasPrefix("Reconnecting…") } },
                       "The running card shows Reconnecting…")
-        Thread.sleep(forTimeInterval: 1)
-        XCTAssertFalse(banner.exists, "Play: only the badge shows")
-        recordConnectionBannerPlacement("ipad-portrait-play-badge", in: app)
+        Thread.sleep(forTimeInterval: 2.5)
+        XCTAssertFalse(status.exists, "Play: only the clock's mark")
+        recordConnectionStatusPlacement("ipad-portrait-play-mark", in: app)
         auditChat(true, in: app)
         dismissSoftwareKeyboardIfNeeded(in: app)
         let chips = app.navigationBars.buttons.matching(NSPredicate(
             format: "identifier == 'game.clock.black' OR identifier == 'game.clock.white'")).allElementsBoundByIndex
-        print("[ConnectionBanner] ipad portrait chat chips \(chips.map { "\($0.identifier) \($0.frame) texts=\($0.staticTexts.allElementsBoundByIndex.map(\.label))" })")
-        let labelled = chips.contains { $0.staticTexts["Reconnecting…"].exists }
-        XCTAssertEqual(banner.waitForExistence(timeout: 5), !labelled,
-                       "The banner shows unless a title chip renders the Reconnecting… label")
-        recordConnectionBannerPlacement("ipad-portrait-chat-chips", in: app)
+        print("[ConnectionStatus] ipad portrait chat chips \(chips.map { "\($0.identifier) \($0.frame) texts=\($0.staticTexts.allElementsBoundByIndex.map(\.label)) spinners=\($0.activityIndicators.count)" })")
+        XCTAssertTrue(chips.contains { ($0.value as? String ?? "").hasPrefix("Reconnecting…") },
+                      "A title chip carries the mark")
+        XCTAssertFalse(status.exists, "Chat: no capsule")
+        recordConnectionStatusPlacement("ipad-portrait-chat-chips", in: app)
     }
 
     /// v148: the header's profile action shares the content's chat hand-off.

@@ -3,13 +3,16 @@
 //  Surround
 //
 //  What a window's root hands every view in the window: the window's one
-//  connection source, which the moderator superchat cover reads instead of
-//  making its own, and the window's width class and shape, which the
-//  in-game control's frames follow. MainView forwards both into its
-//  UIKit-hosted tabs, and the cover's mount passes the source into the
-//  cover's own window. Previews have no root, so both read nil there.
-//  Captures get the window's width class and shape but no source, so a
-//  capture in a narrow window draws the frames a person sees there.
+//  connection source, which Game Detail reads for what a game says while
+//  the connection is down, the in-game control's popover shares, and the
+//  moderator superchat cover reads instead of making its own; and the
+//  window's width class and shape, which the in-game control's frames
+//  follow. MainView forwards both into its UIKit-hosted tabs, and the
+//  cover's mount passes the source into the cover's own window. Previews
+//  have no root, so both read nil there. Captures get the window's width
+//  class and shape, so a capture in a narrow window draws the frames a
+//  person sees there, but no source, except the opt-in captures whose
+//  game's socket is down, which show the game's status as a person sees it.
 //
 
 import SwiftUI
@@ -44,11 +47,20 @@ extension EnvironmentValues {
 /// while the scene isn't in the background, and reports the window's width
 /// class and shape. Apply it around the superchat cover's mount, so the
 /// cover shares the source.
+///
+/// It also speaks for the source, once per app from the window in front:
+/// "Reconnecting to OGS" and "Can’t reach OGS" when an outage first shows,
+/// "Connected" at low priority when one that showed ends. Only while the
+/// selected tab shows a game, which says the same in its title slot, clocks
+/// or action; a root screen's banner still says the socket's own words.
+/// Nothing on the Mac. Activity's lists and the cover never post.
 struct ConnectionStatusHost: ViewModifier {
     @StateObject private var source: ConnectionStatusSource
     @Environment(\.scenePhase) private var scenePhase
+    private let navigation: NavigationService
 
-    init(ogs: OGSService, path: NetworkPathMonitoring) {
+    init(ogs: OGSService, path: NetworkPathMonitoring, navigation: NavigationService) {
+        self.navigation = navigation
         _source = StateObject(wrappedValue: {
             let source = ConnectionStatusSource(ogs: ogs, path: path)
             // On screen from the start; the change handler in `body`
@@ -68,6 +80,13 @@ struct ConnectionStatusHost: ViewModifier {
             .onChange(of: scenePhase, initial: true) { _, phase in
                 source.setVisible(phase != .background)
             }
+            #if !targetEnvironment(macCatalyst)
+            .onReceive(source.announcements) { announcement in
+                let places = navigation.activityPlaces
+                guard places.place(in: navigation.main.rootView).gameID != nil else { return }
+                navigation.announce(announcement.appAnnouncement)
+            }
+            #endif
     }
 }
 

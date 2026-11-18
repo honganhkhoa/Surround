@@ -5,7 +5,9 @@
 //  The window-level "Activity hidden" signal. Game Detail and conversations,
 //  pushed or selected in Messages' side pane, register here, and Activity's
 //  root hosts (the accessory, the custom bar, the iPad and Mac Now sections)
-//  read the settled state. Nothing reads it yet.
+//  will read the settled state. Today NotificationPopup's host reads it, so
+//  the popup leaves a game on top of the selected tab, and so does the
+//  window's connection host, which speaks for a game there.
 //
 
 import Foundation

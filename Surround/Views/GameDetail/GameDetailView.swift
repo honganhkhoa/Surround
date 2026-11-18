@@ -766,6 +766,7 @@ struct GameDetailView: View {
             ?? geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
         let horizontal = windowGeometry.map { $0.windowSize.width > $0.windowSize.height }
             ?? (availableWidth > unoccludedHeight)
+        let connection = windowConnection
 
         return VStack(alignment: .leading, spacing: compact ? nil : 0) {
             // Keep this view in one structural slot as the size class changes,
@@ -785,6 +786,8 @@ struct GameDetailView: View {
                     // its own layouts (ZenDuoBookWide, ZenDuoOpenWide).
                     verticalToolbarPose: isVerticalToolbar
                         || (zenMode && compactLandscape && verticalToolbarOutsideZen),
+                    connection: connection,
+                    restoresChatPanel: restoresChatPanel,
                     attachedKeyboardVisible: effectiveAttachedKeyboardVisible,
                     keyboardOverlap: keyboardOverlap(),
                     interaction: $interaction,
@@ -823,10 +826,29 @@ struct GameDetailView: View {
         guard !hasRestoredChatPanel, contentWidth > 0, currentGame != nil else { return }
         // Restore once for this route, after measuring the actual layout.
         // Resizing and returning from Profile keep the current task intact.
+        let restore = GameDetailChatRestore(hasRestored: false, remembersChat: regularGameChatVisible,
+                                            isCompact: usesCompactLayout(at: contentWidth))
         hasRestoredChatPanel = true
-        if !usesCompactLayout(at: contentWidth), interaction.panel == .playerInfo {
-            interaction.setChatVisible(regularGameChatVisible)
+        if restore.opensChat(from: interaction.panel) {
+            interaction.setChatVisible(true)
         }
+    }
+
+    /// The window's connection source, or one that is never offline where
+    /// no root hosts one (previews, most captures), so nothing shows there.
+    private var windowConnection: ConnectionStatusSource {
+        connectionStatus ?? ConnectionStatusSource.neverOffline
+    }
+
+    /// A remembered Chat panel that opens once Game Detail has measured its
+    /// width, from the size class and the saved setting until then. Where a
+    /// game says its connection status counts it as Chat from the first
+    /// pass, so the title slot never shows the status for the pass before
+    /// Chat opens.
+    private var restoresChatPanel: Bool {
+        GameDetailChatRestore(hasRestored: hasRestoredChatPanel, remembersChat: regularGameChatVisible,
+                              isCompact: compactLayout)
+            .opensChat(from: interaction.panel)
     }
 
     private var measuredContent: some View {
@@ -918,6 +940,7 @@ struct GameDetailView: View {
         }
 
         let toolbarArrangement = self.toolbarArrangement
+        let connection = windowConnection
         #if targetEnvironment(macCatalyst)
         // Keep the document identity in the Mac window title. The game
         // surface itself has no navigation heading; clocks open its details.
@@ -1019,10 +1042,7 @@ struct GameDetailView: View {
         .navigationBarHidden(hidesZenChrome || hidesNavigationBarInDuoWide)
         .navigationBarBackButtonHidden(zenMode)
         .navigationBarTitleDisplayMode(.inline)
-        .modifier(GameDetailNotificationRegistration(
-            game: currentGame, allowsPicker: gameControlSwitch.allowsPicker,
-            contextID: notificationContextID
-        ))
+        .modifier(GameDetailNotificationRegistration(game: currentGame, contextID: notificationContextID))
         .onAppear {
             restoreChatPanelIfNeeded(contentWidth: geometry.size.width)
             updateActiveGameList()
@@ -1096,6 +1116,7 @@ struct GameDetailView: View {
             result.modifier(GameToolbarLayout(
                 game: currentGame,
                 gameControlState: gameControlState,
+                connection: connection,
                 selectedConditionalVariation: $selectedConditionalVariation,
                 interaction: $interaction,
                 showsCompactChatBoard: $showsCompactChatBoard,
@@ -1116,7 +1137,7 @@ struct GameDetailView: View {
                 dismissChatInput: chatSession.dismissInput,
                 enterZenMode: enterZenMode,
                 exitZenMode: exitZenMode,
-                notificationContextID: notificationContextID
+                restoresChatPanel: restoresChatPanel
             ))
             // Games use the whole window; the native sidebar overlays it.
             .appTabBarHidden(true)
@@ -1129,7 +1150,6 @@ struct GameDetailView: View {
                     openProfile(player)
                 }
             })
-            .environment(\.gameDetailNotificationContextID, notificationContextID)
             // A departing screen gives the window back at once, so the
             // screen sliding in already has its own appearance.
             .surroundTheme(SurroundTheme.current(storedID: gameThemeID),
@@ -1148,8 +1168,6 @@ struct GameDetailView: View {
 /// window's Activity hosts that a Game Detail is on top of its tab.
 private struct GameDetailNotificationRegistration: ViewModifier {
     @ObservedObject var game: Game
-    /// The route has the control's picker of same-speed games.
-    let allowsPicker: Bool
     let contextID: UUID
     @EnvironmentObject private var nav: NavigationService
     // Whether the user plays this game follows the signed-in account.
@@ -1157,7 +1175,7 @@ private struct GameDetailNotificationRegistration: ViewModifier {
     @StateObject private var lifetime = ViewLifetime()
 
     private var context: GameDetailNotificationContext {
-        GameDetailNotificationContext(showing: game, allowsPicker: allowsPicker)
+        GameDetailNotificationContext(showing: game)
     }
 
     func body(content: Content) -> some View {
@@ -1317,6 +1335,9 @@ private struct GameToolbarLayout: ViewModifier {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var game: Game
     @ObservedObject var gameControlState: GameControlState
+    /// The window's connection status, for the title slot's capsule and
+    /// the header clocks' mark.
+    @ObservedObject var connection: ConnectionStatusSource
     /// Redraws the in-game control where time alone changes its state.
     @StateObject private var gameControlDeadlines = GameControlDeadlines()
     /// The control's last state, which it keeps while its popover is open
@@ -1356,8 +1377,8 @@ private struct GameToolbarLayout: ViewModifier {
     let dismissChatInput: () -> Void
     let enterZenMode: () -> Void
     let exitZenMode: () -> Void
-    /// Header chips report a rendered Reconnecting… badge for this game.
-    let notificationContextID: UUID
+    /// A remembered Chat panel opens once Game Detail has measured its width.
+    let restoresChatPanel: Bool
 
     private var topLeftPlayerColor: StoneColor {
         game.isUserPlaying ? (game.userStoneColor?.opponentColor() ?? .black) : .black
@@ -1588,11 +1609,35 @@ private struct GameToolbarLayout: ViewModifier {
                                    showsCurrentPlayerOnly: showsCurrentPlayerClockInHeader,
                                    onTapBeforeDetails: headerClockTapBeforeDetails,
                                    blocksGameActions: gameControlState.blocksGameActions,
-                                   showsStatus: !analyzingIsPresented)
+                                   showsStatus: !analyzingIsPresented,
+                                   connection: headerClockConnection)
             .frame(maxWidth: maximumWidth)
-            // Set on the item itself: toolbar content is
-            // hosted apart from the game's content.
-            .environment(\.gameDetailNotificationContextID, notificationContextID)
+    }
+
+    // MARK: Connection status
+
+    /// Where this game says the window's connection is down. Read from
+    /// what this screen has before it draws, never from a rendered badge or
+    /// the layout plan, so a game opened during an outage has its status in
+    /// its place from the first frame. The game's content reads the same.
+    private var connectionPlacement: GameConnectionPlacement {
+        GameConnectionPlacement(GameConnectionPlacement.Input(
+            game: game, panel: interaction.panel, restoresChatPanel: restoresChatPanel,
+            isVerticalToolbar: isVerticalToolbar, isZen: zenMode, isCatalyst: Self.isCatalyst
+        ))
+    }
+
+    private var headerClockConnection: GameDetailClockConnection {
+        GameDetailClockConnection(
+            hasConnected: connection.hasConnected,
+            marksOneClock: connectionPlacement.clocks == .oneClock && connection.status.showsInGame
+        )
+    }
+
+    /// The capsule in the title slot: no clock in play, neither Chat nor
+    /// Analyze open, a title slot, and the window's status showing.
+    private var showsConnectionCapsule: Bool {
+        connectionPlacement.showsTitleCapsule && connection.status.showsInGame
     }
 
     private var headerIdentity: some View {
@@ -1601,18 +1646,23 @@ private struct GameToolbarLayout: ViewModifier {
                                  compactHeader: dynamicTypeSize < .xxxLarge)
     }
 
-    /// The principal slot holds useful clocks or opponent identity only.
-    /// Split from `body` so Xcode 26.2 can type-check the toolbar.
-    private enum PrincipalItem { case clocks, identity, none }
+    /// The principal slot holds useful clocks, the connection status or
+    /// opponent identity only. Split from `body` so Xcode 26.2 can
+    /// type-check the toolbar.
+    private enum PrincipalItem { case clocks, status, identity, none }
 
     private var principalItem: PrincipalItem {
         if showsClocksInHeader && !isVerticalToolbar {
             // A principal title can receive less width than its
             // intrinsic clock. The pair fits its chips to the
             // proposal instead of painting beneath native items.
+            // The status never replaces header clocks: they carry its
+            // mark, and it takes the slot once they have left.
             return .clocks
+        } else if showsConnectionCapsule {
+            return .status
         } else if compact && showsOpponentInHeader && !isVerticalToolbar {
-            return nav.connectionBannerVisible ? .none : .identity
+            return .identity
         }
         return .none
     }
@@ -1642,6 +1692,9 @@ private struct GameToolbarLayout: ViewModifier {
         // type-check nested conditions inside an else-if chain here.
         if principalItem == .clocks {
             ToolbarItem(placement: .principal) { headerClocks }
+        }
+        if principalItem == .status {
+            ToolbarItem(placement: .principal) { GameConnectionStatusCapsule(connection: connection) }
         }
         if principalItem == .identity {
             ToolbarItem(placement: .principal) { headerIdentity }
@@ -1934,10 +1987,9 @@ private struct GameToolbarLayout: ViewModifier {
         let control = gameControlBarState()
         return content
             // SwiftUI also places custom principal content in its title
-            // slot. Remove only an unused slot, preserving clocks, player
-            // identity and the connection banner when they occupy it.
-            .toolbar(removing: isVerticalToolbar
-                     || (principalItem == .none && !nav.connectionBannerVisible) ? .title : nil)
+            // slot. Remove only an unused slot, preserving clocks, the
+            // connection status and player identity when they occupy it.
+            .toolbar(removing: isVerticalToolbar || principalItem == .none ? .title : nil)
             .environment(\.compactGameModesInToolbar, !zenMode)
             // Where Exit is drawn in the content, Zen's circle beside it.
             .environment(\.gameControlZen, control.zenCircle)
@@ -2057,6 +2109,64 @@ private struct GameToolbarChatButton: View {
             .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameDisplayModePicker + ".chat")
         }
         .frame(width: 44, height: 44)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// The window's connection status in the title slot, where no clock is in
+/// play and neither Chat nor Analyze is open: a filled indigo capsule.
+/// Reconnecting…, then Can’t reach OGS once the window's source gives up
+/// waiting (at once with no network), with Retry where both fit and the
+/// words alone where they don't. VoiceOver reads the words as one element,
+/// and Retry as its own button. It never says Connected: the slot goes back
+/// to what it held once the outage ends.
+private struct GameConnectionStatusCapsule: View {
+    @ObservedObject var connection: ConnectionStatusSource
+
+    private static func words(for status: ConnectionStatusModel.Status) -> Text {
+        status.offersRetry
+            ? Text("Can’t reach OGS", comment: "Activity: under the title while the app can't connect to OGS; shown with Retry")
+            : Text("Reconnecting…")
+    }
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            if connection.status.offersRetry {
+                capsule(offersRetry: true)
+            }
+            capsule(offersRetry: false)
+        }
+    }
+
+    private func capsule(offersRetry: Bool) -> some View {
+        HStack(spacing: 8) {
+            Self.words(for: connection.status)
+                .font(.system(size: 15, weight: .bold))
+                .lineLimit(1)
+                .minimumScaleFactor(offersRetry ? 1 : 0.7)
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameConnectionStatus)
+            if offersRetry {
+                Button { connection.retry() } label: {
+                    Text("Retry")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color(.systemIndigo))
+                        .padding(.horizontal, 10)
+                        .frame(height: 24)
+                        .background(.white, in: Capsule())
+                        // The bar's height, beyond the capsule's 32 pt.
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameConnectionStatusRetry)
+            }
+        }
+        .fixedSize(horizontal: offersRetry, vertical: false)
+        .foregroundStyle(.white)
+        .padding(.horizontal, offersRetry ? 4 : 14)
+        .padding(.leading, offersRetry ? 10 : 0)
+        .frame(height: 32)
+        .background(Color(.systemIndigo), in: Capsule())
         .accessibilityElement(children: .contain)
     }
 }

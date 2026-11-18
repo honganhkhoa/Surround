@@ -7,9 +7,13 @@ struct GameDetailClockState {
     let color: StoneColor
     var clockOverride: OGSClock? = nil
     var isConnected = true
-    /// The socket is recovering a connection it had. Before the first one
-    /// (launch, sign-in) the badge reads Connecting…, as the app's banner does.
+    /// The window has connected before, so a lost connection reads
+    /// Reconnecting…. Before its first connection (launch, sign-in) the
+    /// badge reads Connecting….
     var recoversConnection = true
+    /// No clock is in play and the window's connection status shows: this
+    /// is the one clock that says so, in Chat or Analyze.
+    var carriesConnectionStatus = false
 
     var clock: OGSClock? { clockOverride ?? game.clock }
     var isFinished: Bool {
@@ -29,6 +33,19 @@ struct GameDetailClockState {
             && (clock?.currentPlayerColor ?? game.currentPosition.nextToMove) == color
     }
     var reconnecting: Bool { !isConnected && isToMove }
+    /// The clock says the window's connection is down: the to-move clock in
+    /// play, at once from the socket, or the one clock that carries the
+    /// window's status while no clock is in play.
+    var showsConnectionMark: Bool { reconnecting || carriesConnectionStatus }
+
+    /// Reconnecting… once the window has connected, as its connection source
+    /// records, or while the socket recovers a connection it had; Connecting…
+    /// only before the window's first connection. Retry and a returning
+    /// network start a fresh attempt, which the socket calls connecting.
+    static func recoversConnection(hasConnected: Bool, socket: OGSWebsocketStatus) -> Bool {
+        hasConnected || socket == .reconnecting
+    }
+
     var passed: Bool {
         guard !isFinished, !isScoring, case .pass = game.currentPosition.lastMove else { return false }
         return game.currentPosition.nextToMove.opponentColor() == color
@@ -58,11 +75,11 @@ struct GameDetailClockState {
     }
 
     func badgeTitle(narrow: Bool = false) -> String {
-        guard !isFinished, !isScoring else { return "" }
-        if reconnecting {
+        if showsConnectionMark {
             return recoversConnection ? String(localized: "Reconnecting…")
                 : String(localized: "Connecting…", comment: "Clock badge while the app first connects to OGS")
         }
+        guard !isFinished, !isScoring else { return "" }
         if ownsUndoRequest {
             return canAnswerUndo ? String(localized: "Undo?") : String(localized: "Undo asked")
         }

@@ -108,18 +108,13 @@ struct GameDetailNotificationContext: Equatable {
     /// The user's own unfinished live game on screen. The live-game notice
     /// never points at it, and challenge notices wait during live play.
     var ownLiveGame: GameID?
-    /// The in-game control's popover has the picker of the user's other
-    /// live games, so the live-game notice gives way to it.
-    var listsLiveGames = false
     /// An unfinished live game is on screen, played or watched: its window
     /// keeps the display awake until the game ends.
     var showsLiveGameInPlay = false
 }
 
 extension GameDetailNotificationContext {
-    /// - Parameter allowsPicker: The route has the picker of same-speed
-    ///   games: Home's route with its picker allowed (`GameControlSwitch`).
-    init(showing game: Game, allowsPicker: Bool) {
+    init(showing game: Game) {
         let timeControl = game.gameData?.timeControl
         // Like the service's live list, a game without a speed tag counts
         // by its clock.
@@ -128,16 +123,7 @@ extension GameDetailNotificationContext {
         let ended = game.gamePhase == .finished
             || !(game.gameData?.outcome?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         let inPlay = speed?.isRealtime == true && !ended
-        // Routes without the picker (Public games, history and profiles)
-        // keep the notice for the user's other live games, but it never
-        // points at the one on screen.
-        let playing = inPlay && game.isUserPlaying
-        self.init(
-            ownLiveGame: playing ? game.ID : nil,
-            // The picker lists games by their tag only.
-            listsLiveGames: playing && allowsPicker && timeControl?.speed?.isRealtime == true,
-            showsLiveGameInPlay: inPlay
-        )
+        self.init(ownLiveGame: inPlay && game.isUserPlaying ? game.ID : nil, showsLiveGameInPlay: inPlay)
     }
 }
 
@@ -351,13 +337,9 @@ class NavigationService: ObservableObject {
         heldInternalNavigation = nil
     }
     #endif
-    /// The Reconnecting… badges each Game Detail context is rendering. The
-    /// app's connection banner gives way only while a visible game shows one;
-    /// in stone removal, after the game, in Analyze's glow-only chips or a
-    /// chip without its label, the banner explains the disabled controls.
-    @Published private(set) var gameDetailReconnectingBadges: [UUID: Set<UUID>] = [:]
     /// The app's connection banner is on screen, including its "Connected"
-    /// fade-out. On iPhone it sits in the title slot, so the title gives way.
+    /// fade-out. It sits in the title slot of the screen it is over, never a
+    /// game's, so a root screen's themed title gives way.
     @Published var connectionBannerVisible = false
 
     /// A visible Game Detail shows a live game that has not ended, whoever
@@ -385,12 +367,10 @@ class NavigationService: ObservableObject {
         gameDetailNotificationContexts.values.contains { $0.ownLiveGame != nil }
     }
 
-    /// The user's unfinished live games that no visible Game Detail shows or
-    /// lists in its control's picker: the ones the live-game notice offers.
+    /// The user's unfinished live games that no visible Game Detail shows:
+    /// the ones the live-game notice offers.
     func liveGamesNeedingNotice(among liveGames: [Game]) -> [Game] {
-        let contexts = gameDetailNotificationContexts.values
-        guard !contexts.contains(where: \.listsLiveGames) else { return [] }
-        let onScreen = Set(contexts.compactMap(\.ownLiveGame))
+        let onScreen = Set(gameDetailNotificationContexts.values.compactMap(\.ownLiveGame))
         // A `phase` event ends a game before its outcome or the service's
         // list catches up; it must not be offered in that moment.
         return liveGames.filter {
@@ -398,24 +378,10 @@ class NavigationService: ObservableObject {
         }
     }
 
-    var visibleGameDetailShowsReconnectingBadge: Bool {
-        gameDetailReconnectingBadges.contains { context, badges in
-            !badges.isEmpty && gameDetailNotificationContexts[context] != nil
-        }
-    }
-
-    /// Drops a Game Detail's registration and the badges it reported, for a
-    /// Game Detail whose views are gone.
+    /// Drops a Game Detail's registration, for a Game Detail whose views are
+    /// gone.
     func removeGameDetailNotificationContext(_ context: UUID) {
         gameDetailNotificationContexts.removeValue(forKey: context)
-        gameDetailReconnectingBadges.removeValue(forKey: context)
-    }
-
-    func setGameDetailReconnectingBadge(_ badge: UUID, context: UUID, shown: Bool) {
-        var badges = gameDetailReconnectingBadges[context] ?? []
-        let changed = shown ? badges.insert(badge).inserted : badges.remove(badge) != nil
-        guard changed else { return }
-        gameDetailReconnectingBadges[context] = badges.isEmpty ? nil : badges
     }
 
     @Published var home = HomeViewParameters()

@@ -72,7 +72,7 @@ struct MainViewWrapper: View {
             .modifier(SuperchatCoverMount(ogs: ogs, nav: nav, store: .shared))
             // The window's connection source, width class and shape, around
             // the cover's mount so the cover shares the source.
-            .modifier(ConnectionStatusHost(ogs: ogs, path: SystemNetworkPathMonitor.shared))
+            .modifier(ConnectionStatusHost(ogs: ogs, path: SystemNetworkPathMonitor.shared, navigation: nav))
             .environmentObject(ogs)
             .environmentObject(sgs)
             .environmentObject(nav)
@@ -114,8 +114,8 @@ private struct OfflineUITestRootView: View {
         SurroundUITestContract.CompatibilityScene?
     /// Captures keep their own contract: no superchat cover, held navigation
     /// or store, as the fixture factory skips them (OGSService+Fixtures.swift),
-    /// and no window connection source. They do get the window's width class
-    /// and shape (`OfflineWindowHosts`).
+    /// and no window connection source but where the game's socket is down.
+    /// They do get the window's width class and shape (`OfflineWindowHosts`).
     private static var mountsSuperchatCover: Bool {
         !SurroundUITestContract.isCapturingAppStoreScreenshots
             && !SurroundUITestContract.isCapturingCompatibilityScreenshots
@@ -237,7 +237,9 @@ private struct OfflineUITestRootView: View {
 /// source, width class and shape, as the production root has them. Captures
 /// get only the width class and shape, so a capture in a narrow window draws
 /// the frames a person sees there. The store is touched only when mounted,
-/// so captures never create it, and their views read no connection source.
+/// so captures never create it, and their views read no connection source,
+/// but for the opt-in captures whose game's socket is down: those show the
+/// game's connection status as a person sees it, from the window's source.
 private struct OfflineWindowHosts: ViewModifier {
     let isMounted: Bool
     let ogs: OGSService
@@ -248,7 +250,9 @@ private struct OfflineWindowHosts: ViewModifier {
             content
                 .modifier(SuperchatCoverMount(ogs: ogs, nav: nav, store: .shared))
                 // A fixed network path: offline runs never read the device's.
-                .modifier(ConnectionStatusHost(ogs: ogs, path: ConstantNetworkPath.satisfied))
+                .modifier(ConnectionStatusHost(ogs: ogs, path: ConstantNetworkPath.satisfied, navigation: nav))
+        } else if SurroundUITestContract.simulatesGameDetailSocketDown {
+            content.modifier(ConnectionStatusHost(ogs: ogs, path: ConstantNetworkPath.satisfied, navigation: nav))
         } else {
             content.modifier(GameControlWindowClassHost())
         }

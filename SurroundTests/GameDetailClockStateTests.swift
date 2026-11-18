@@ -451,6 +451,56 @@ final class GameDetailClockStateTests: XCTestCase {
         XCTAssertTrue(black.accessibilityValue.contains("Connecting"))
     }
 
+    /// Once the window has connected, a lost connection reads Reconnecting…,
+    /// also while Retry or a returning network makes a fresh attempt, which
+    /// the socket calls connecting. Connecting… is only for the window's
+    /// first connection. The badge never says Can’t reach OGS.
+    func testTheBadgeReadsReconnectingOnceTheWindowHasConnected() throws {
+        let rule = GameDetailClockState.recoversConnection(hasConnected:socket:)
+        XCTAssertTrue(rule(false, .reconnecting), "The socket recovers a connection it had")
+        XCTAssertTrue(rule(true, .connecting), "Retry or a returning network, after the first connection")
+        XCTAssertTrue(rule(true, .disconnected))
+        XCTAssertFalse(rule(false, .connecting), "The window's first connection")
+        XCTAssertFalse(rule(false, .disconnected))
+
+        let game = try game()
+        let snapshot = try XCTUnwrap(game.clock)
+        for (hasConnected, socket, title) in [(true, OGSWebsocketStatus.connecting, "Reconnecting…"),
+                                              (false, .connecting, "Connecting…"),
+                                              (false, .reconnecting, "Reconnecting…")] {
+            let state = GameDetailClockState(game: game, color: .black, clockOverride: snapshot, isConnected: false,
+                                             recoversConnection: rule(hasConnected, socket))
+            XCTAssertEqual(state.badgeTitle(), title, "\(hasConnected) \(socket)")
+            XCTAssertTrue(state.accessibilityValue.hasPrefix(title), state.accessibilityValue)
+            XCTAssertFalse(state.accessibilityValue.contains("Can’t reach OGS"))
+        }
+    }
+
+    /// With no clock in play (stone removal, after the game), the one clock
+    /// that carries the window's status in Chat or Analyze says it in the
+    /// badge's place, which is otherwise empty there, and VoiceOver hears it
+    /// in the clock's value. The other clock says nothing.
+    func testWithNoClockInPlayTheClockThatCarriesTheStatusSaysIt() throws {
+        let game = try game()
+        for phase in [OGSGamePhase.stoneRemoval, .finished] {
+            game.gamePhase = phase
+            let carrying = GameDetailClockState(game: game, color: .white, isConnected: false,
+                                                carriesConnectionStatus: true)
+            let other = GameDetailClockState(game: game, color: .black, isConnected: false)
+            XCTAssertFalse(carrying.reconnecting, "No clock is in play: \(phase)")
+            XCTAssertTrue(carrying.showsConnectionMark)
+            XCTAssertEqual(carrying.badgeTitle(), "Reconnecting…", "\(phase)")
+            XCTAssertTrue(carrying.accessibilityValue.hasPrefix("Reconnecting…"), carrying.accessibilityValue)
+            XCTAssertFalse(other.showsConnectionMark)
+            XCTAssertEqual(other.badgeTitle(), "", "\(phase)")
+            XCTAssertFalse(other.accessibilityValue.contains("Reconnecting"), other.accessibilityValue)
+
+            let firstConnection = GameDetailClockState(game: game, color: .white, isConnected: false,
+                                                       recoversConnection: false, carriesConnectionStatus: true)
+            XCTAssertEqual(firstConnection.badgeTitle(), "Connecting…", "\(phase)")
+        }
+    }
+
     /// OGS sends a disconnection deadline only as an `auto_resign` event, so
     /// the next clock or gamedata payload must keep it until
     /// `clear_auto_resign`. A finished game drops it.
@@ -649,30 +699,10 @@ final class GameDetailClockStateTests: XCTestCase {
             white: PlayerScore(handicap: 0, komi: 6.5, scoringPositions: [], stones: 0, territory: 49, prisoners: 1, total: white))
     }
 
-    /// v148: the app's connection banner gives way only to a Reconnecting…
-    /// badge a visible Game Detail is rendering. A retained, hidden game's
-    /// registration does not count.
-    func testConnectionBannerGivesWayOnlyToAVisibleGamesBadge() {
-        let nav = NavigationService()
-        let context = UUID()
-        let badge = UUID()
-        nav.setGameDetailReconnectingBadge(badge, context: context, shown: true)
-        XCTAssertFalse(nav.visibleGameDetailShowsReconnectingBadge, "A game that is not visible keeps the banner")
-        nav.gameDetailNotificationContexts[context] = GameDetailNotificationContext()
-        XCTAssertTrue(nav.visibleGameDetailShowsReconnectingBadge, "A visible game's badge stands in for the banner")
-        nav.gameDetailNotificationContexts.removeValue(forKey: context)
-        XCTAssertFalse(nav.visibleGameDetailShowsReconnectingBadge)
-        nav.gameDetailNotificationContexts[context] = GameDetailNotificationContext(
-            ownLiveGame: .OGS(1), listsLiveGames: true)
-        nav.setGameDetailReconnectingBadge(badge, context: context, shown: false)
-        XCTAssertFalse(nav.visibleGameDetailShowsReconnectingBadge, "Without a rendered badge the banner shows")
-        XCTAssertTrue(nav.gameDetailReconnectingBadges.isEmpty)
-    }
-
     /// The live-game notice offers only live games that no visible Game Detail
-    /// shows or lists: never the one on screen (a profile route has no
-    /// picker), and nothing while a picker lists them. A finished game on
-    /// screen, even one Home opened, keeps both the notice and challenges.
+    /// shows: never the one on screen, as under the iPad Profile sheet, where
+    /// the notice stays. A finished game on screen, even one Home opened,
+    /// keeps both the notice and challenges.
     func testLiveGameNoticeOffersOnlyGamesNotOnScreen() throws {
         let current = try game()
         var data = try XCTUnwrap(current.gameData)
@@ -695,12 +725,8 @@ final class GameDetailClockStateTests: XCTestCase {
 
         nav.gameDetailNotificationContexts[context] = GameDetailNotificationContext(ownLiveGame: current.ID)
         XCTAssertEqual(nav.liveGamesNeedingNotice(among: liveGames).map(\.ID), [other.ID],
-                       "Without a picker the notice offers the other live game, never this one")
+                       "The notice offers the other live game, never this one")
         XCTAssertTrue(nav.visibleGameDetailPlaysLiveGame)
-
-        nav.gameDetailNotificationContexts[context] = GameDetailNotificationContext(
-            ownLiveGame: current.ID, listsLiveGames: true)
-        XCTAssertTrue(nav.liveGamesNeedingNotice(among: liveGames).isEmpty, "The picker lists them instead")
 
         nav.gameDetailNotificationContexts.removeValue(forKey: context)
         XCTAssertEqual(nav.liveGamesNeedingNotice(among: liveGames).count, 2)
@@ -710,10 +736,9 @@ final class GameDetailClockStateTests: XCTestCase {
     /// has not ended, played or watched, and lets it sleep once the game ends.
     func testWatchedLiveGameKeepsTheWindowAwakeUntilItEnds() throws {
         let live = try game()
-        let context = GameDetailNotificationContext(showing: live, allowsPicker: true)
+        let context = GameDetailNotificationContext(showing: live)
         XCTAssertTrue(context.showsLiveGameInPlay, "A spectated live game in play keeps the display awake")
         XCTAssertNil(context.ownLiveGame, "Watching is not playing")
-        XCTAssertFalse(context.listsLiveGames)
 
         let nav = NavigationService()
         let contextID = UUID()
@@ -721,55 +746,22 @@ final class GameDetailClockStateTests: XCTestCase {
         XCTAssertTrue(nav.visibleGameDetailShowsLiveGameInPlay)
 
         live.gamePhase = .stoneRemoval
-        XCTAssertTrue(GameDetailNotificationContext(showing: live, allowsPicker: true)
+        XCTAssertTrue(GameDetailNotificationContext(showing: live)
             .showsLiveGameInPlay, "Stone removal is still part of the game")
         live.gamePhase = .finished
-        let ended = GameDetailNotificationContext(showing: live, allowsPicker: true)
+        let ended = GameDetailNotificationContext(showing: live)
         XCTAssertFalse(ended.showsLiveGameInPlay, "A finished game lets the display sleep")
         nav.gameDetailNotificationContexts[contextID] = ended
         XCTAssertFalse(nav.visibleGameDetailShowsLiveGameInPlay)
 
         let resigned = try game()
         resigned.gameData?.outcome = "Resignation"
-        XCTAssertFalse(GameDetailNotificationContext(showing: resigned, allowsPicker: true)
+        XCTAssertFalse(GameDetailNotificationContext(showing: resigned)
             .showsLiveGameInPlay, "A result ends the game before its phase does")
 
         let correspondence = try game(.Simple(perMove: 86_400))
-        XCTAssertFalse(GameDetailNotificationContext(showing: correspondence, allowsPicker: true)
+        XCTAssertFalse(GameDetailNotificationContext(showing: correspondence)
             .showsLiveGameInPlay, "A correspondence game never keeps the display awake")
-    }
-
-    /// The live-game notice gives way to the in-game control's picker, which
-    /// only Home's route with the picker allowed has. On Public games, a
-    /// history game or a profile's game the user's own live game lists
-    /// nothing, so the notice still offers the other live games, though
-    /// never the one on screen.
-    func testOnlyHomesRouteWithThePickerListsLiveGames() throws {
-        let live = try game()
-        let blackID = try XCTUnwrap(live.gameData?.players.black.id)
-        let service = OGSService.previewInstance(user: OGSUser(username: "black", id: blackID))
-        live.ogs = service
-        XCTAssertTrue(live.isUserPlaying)
-        let routes: [(route: StackRoute?, allowsCarousel: Bool, lists: Bool)] = [
-            (.homeGame, true, true),
-            (.homeGame, false, false),      // Home's finished games
-            (nil, true, true),              // a stack's root: previews and compatibility scenes
-            (.publicGame, true, false),     // its flag keeps the default
-            (.historyGame, false, false),
-            (.game(41), false, false),      // a profile's game, the iPad Profile sheet's too
-        ]
-        for (route, allowsCarousel, lists) in routes {
-            let allowsPicker = GameControlSwitch(route: route, allowsActiveGamesCarousel: allowsCarousel).allowsPicker
-            let context = GameDetailNotificationContext(showing: live, allowsPicker: allowsPicker)
-            let name = "\(route.map { "\($0)" } ?? "root") \(allowsCarousel)"
-            XCTAssertEqual(context.listsLiveGames, lists, name)
-            XCTAssertEqual(context.ownLiveGame, live.ID, "The notice never points at the game on screen: \(name)")
-        }
-
-        let correspondence = try game(.Simple(perMove: 86_400))
-        correspondence.ogs = service
-        XCTAssertFalse(GameDetailNotificationContext(showing: correspondence, allowsPicker: true).listsLiveGames,
-                       "A correspondence game's picker lists correspondence games.")
     }
 
     /// Only the foreground counts; a finished live game stops counting before
@@ -783,8 +775,7 @@ final class GameDetailClockStateTests: XCTestCase {
         XCTAssertFalse(keepsAwake())
         XCTAssertTrue(keepsAwake(liveGames: [live]))
         XCTAssertTrue(keepsAwake(waiting: 1), "Waiting for a live game to start")
-        nav.gameDetailNotificationContexts[UUID()] = GameDetailNotificationContext(
-            showing: live, allowsPicker: false)
+        nav.gameDetailNotificationContexts[UUID()] = GameDetailNotificationContext(showing: live)
         XCTAssertTrue(keepsAwake(), "Watching a live game in play")
         XCTAssertFalse(keepsAwake(isActive: false, liveGames: [live], waiting: 1))
         live.gamePhase = .finished
@@ -816,7 +807,6 @@ final class GameDetailClockStateTests: XCTestCase {
         let nav = NavigationService()
         let context = UUID()
         nav.gameDetailNotificationContexts[context] = GameDetailNotificationContext(showsLiveGameInPlay: true)
-        nav.setGameDetailReconnectingBadge(UUID(), context: context, shown: true)
         var lifetime: ViewLifetime? = ViewLifetime()
         lifetime?.release = { nav.removeGameDetailNotificationContext(context) }
         XCTAssertTrue(nav.keepsDisplayAwake(isActive: true, liveGames: [], waitingLiveGames: 0))
@@ -827,7 +817,6 @@ final class GameDetailClockStateTests: XCTestCase {
         wait(for: [released], timeout: 1)
         XCTAssertFalse(nav.keepsDisplayAwake(isActive: true, liveGames: [], waitingLiveGames: 0))
         XCTAssertTrue(nav.gameDetailNotificationContexts.isEmpty)
-        XCTAssertTrue(nav.gameDetailReconnectingBadges.isEmpty)
     }
 
     func testWidestCountdownSamplesIncludeTheDayAndHourForm() {

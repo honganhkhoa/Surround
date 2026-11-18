@@ -72,24 +72,27 @@ final class GameConnectionPlacementTests: XCTestCase {
             let placement = Placement(input)
             XCTAssertEqual(placement.clocks, .unchanged, "\(input)")
             XCTAssertFalse(placement.showsTitleCapsule, "\(input)")
-            XCTAssertEqual(placement.action, input.userPlays ? .relabelled : .none, "\(input)")
-            if !input.userPlays && !input.isCatalyst {
-                XCTAssertFalse(placement.showsWindowSubtitle, "A game you watch shows nothing here: \(input)")
-            }
+            XCTAssertEqual(placement.action, input.userPlays ? .relabelled : .none,
+                           "A game you watch shows nothing here: \(input)")
         }
     }
 
-    func testTheMacUsesTheWindowSubtitleInsteadOfTheCapsule() {
-        for input in inputs(clockInPlay: true) + inputs(clockInPlay: false) {
+    /// The Mac's game toolbar draws no title, so neither a capsule nor a
+    /// window subtitle would show: where iOS shows the capsule, the Mac's
+    /// main action reads Reconnecting…. Everywhere else, as on iOS.
+    func testTheMacRelabelsTheActionWhereIOSShowsTheCapsule() {
+        for input in inputs(clockInPlay: true) + inputs(clockInPlay: false) where input.isCatalyst {
             let placement = Placement(input)
-            XCTAssertEqual(placement.showsWindowSubtitle, input.isCatalyst, "Every state on the Mac: \(input)")
-            guard input.isCatalyst else { continue }
             XCTAssertFalse(placement.showsTitleCapsule, "\(input)")
             var iOS = input
             iOS.isCatalyst = false
             let onIOS = Placement(iOS)
             XCTAssertEqual(placement.clocks, onIOS.clocks, "The clocks as on iOS: \(input)")
-            XCTAssertEqual(placement.action, onIOS.action, "The action as on iOS: \(input)")
+            if onIOS.showsTitleCapsule {
+                XCTAssertEqual(placement.action, input.userPlays ? .relabelled : .none, "\(input)")
+            } else {
+                XCTAssertEqual(placement.action, onIOS.action, "The action as on iOS: \(input)")
+            }
         }
     }
 
@@ -107,6 +110,61 @@ final class GameConnectionPlacementTests: XCTestCase {
             }
             XCTAssertEqual(Placement(first), Placement(later), "\(input)")
         }
+    }
+
+    /// Game Detail reopens a remembered Chat panel once it has measured its
+    /// width: only once per route, only at regular width, and only from
+    /// Play. Until then the panel is Play but the restore is pending.
+    func testAChatRestoreIsPendingUntilGameDetailHasMeasuredARegularWidth() {
+        typealias Restore = GameDetailChatRestore
+        let pending = Restore(hasRestored: false, remembersChat: true, isCompact: false)
+        XCTAssertTrue(pending.opensChat(from: .playerInfo))
+        XCTAssertFalse(pending.opensChat(from: .analyze), "A route that opened in Analyze keeps it")
+        XCTAssertFalse(pending.opensChat(from: .chat), "Chat is already open")
+        XCTAssertFalse(Restore(hasRestored: true, remembersChat: true, isCompact: false).opensChat(from: .playerInfo),
+                       "Once per route")
+        XCTAssertFalse(Restore(hasRestored: false, remembersChat: false, isCompact: false).opensChat(from: .playerInfo),
+                       "Chat wasn't open when the user last left a game")
+        XCTAssertFalse(Restore(hasRestored: false, remembersChat: true, isCompact: true).opensChat(from: .playerInfo),
+                       "A compact layout has no side Chat to restore")
+    }
+
+    /// A game opened during an outage at regular width, with Chat
+    /// remembered: its first pass, before Chat opens, already places the
+    /// status as Chat does, on one clock and never in the title slot, and so
+    /// does every pass after it. At compact width nothing waits, and the
+    /// capsule shows from the first pass.
+    func testAPendingChatRestoreCountsAsChatFromTheFirstPass() throws {
+        let scoring = try game(.stoneRemoval)
+        func placement(panel: GameDetailPanel, restore: GameDetailChatRestore) -> Placement {
+            Placement(Input(game: scoring, panel: panel, restoresChatPanel: restore.opensChat(from: panel),
+                            isVerticalToolbar: false, isZen: false, isCatalyst: false))
+        }
+        let firstPass = placement(panel: .playerInfo,
+                                  restore: GameDetailChatRestore(hasRestored: false, remembersChat: true, isCompact: false))
+        let afterRestore = placement(panel: .chat,
+                                     restore: GameDetailChatRestore(hasRestored: true, remembersChat: true, isCompact: false))
+        XCTAssertEqual(firstPass, afterRestore)
+        XCTAssertFalse(firstPass.showsTitleCapsule)
+        XCTAssertEqual(firstPass.clocks, .oneClock)
+
+        let compact = placement(panel: .playerInfo,
+                                restore: GameDetailChatRestore(hasRestored: false, remembersChat: true, isCompact: true))
+        XCTAssertTrue(compact.showsTitleCapsule)
+        XCTAssertEqual(compact.clocks, .unchanged)
+        let forgotten = placement(panel: .playerInfo,
+                                  restore: GameDetailChatRestore(hasRestored: false, remembersChat: false, isCompact: false))
+        XCTAssertTrue(forgotten.showsTitleCapsule, "Nothing to restore: Play keeps the capsule")
+    }
+
+    /// A game says an outage while it shows, as Reconnecting… or Can’t reach
+    /// OGS, never during a short drop, and never "Connected".
+    func testGamesSayOnlyAnOutageThatShows() {
+        XCTAssertFalse(ConnectionStatusModel.Status.hidden.showsInGame)
+        XCTAssertTrue(ConnectionStatusModel.Status.reconnecting.showsInGame)
+        XCTAssertTrue(ConnectionStatusModel.Status.unreachable(.timedOut).showsInGame)
+        XCTAssertTrue(ConnectionStatusModel.Status.unreachable(.noNetwork).showsInGame)
+        XCTAssertFalse(ConnectionStatusModel.Status.connected.showsInGame, "No Connected in games")
     }
 
     // MARK: Reading a game

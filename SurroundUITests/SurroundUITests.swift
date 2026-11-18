@@ -2563,25 +2563,22 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         // The fixture's conversations, newest first: hakhoa, then khoahong.
         let newestPeerID = 765_826
         let olderPeerID = 955_348
-        let messageButton = element(id.messagesButton, in: app, matching: .button)
+        let messageButton = app.buttons.matching(identifier: id.messagesButton).firstMatch
         func unread() -> Int { Int(messageButton.value as? String ?? "") ?? 0 }
-        let unreadCount = unread()
-        XCTAssertEqual(unreadCount, 2, "The fixture has two unread conversations.")
+        XCTAssertTrue(messageButton.waitForExistence(timeout: 10), "Home shows the app's Messages button.")
+        XCTAssertEqual(unread(), 2, "The fixture has two unread conversations.")
         tap(id.homeGame(gameID), in: app)
         let gameDetail = element(id.gameDetail(gameID), in: app)
 
-        // Until Game Detail has a design of its own for messages, it keeps
-        // the app's notice row like every other screen, in every pose.
-        XCTAssertTrue(messageButton.waitForExistence(timeout: 10))
-        XCTAssertEqual(app.buttons.matching(identifier: id.messagesButton).count, 1,
-                       "Game Detail shows the app's one Messages button.")
+        // The app's notice row leaves games: in a game, Messages is in the
+        // in-game control's popover, in every pose.
+        XCTAssertTrue(pollUntil(timeout: 10) { !messageButton.exists },
+                      "Game Detail shows no Messages button.")
         XCTAssertFalse(app.navigationBars.buttons[id.messagesButton].exists,
                        "Game Detail adds no Messages toolbar item.")
-        XCTAssertTrue(waitUntilHittable(messageButton, timeout: 10),
-                      "Private messages must remain reachable in Game Detail.")
-        XCTAssertEqual(unread(), unreadCount, "The button keeps the unread-message count.")
-        keepScreenshot("Messages button over Game Detail", in: app)
+        keepScreenshot("Game Detail without the Messages button", in: app)
 
+        _ = openGameControlPopover(in: app)
         let popover = app.popovers.firstMatch
         let conversation = app.descendants(matching: .any).matching(identifier: "messages.conversation").firstMatch
         // Back inside the popover, never Game Detail's own Back.
@@ -2593,40 +2590,32 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             XCTAssertTrue(pollUntil(timeout: 10) { !conversation.exists }, "Back shows Activity's list.")
             element(id.activityList, in: app)
         }
-        func closeActivity() {
-            dismissPopover(in: app)
-            XCTAssertFalse(app.descendants(matching: .any).matching(identifier: id.activityList).firstMatch.exists,
-                           "Closing the popover closes Activity.")
-            XCTAssertTrue(gameDetail.exists, "Closing Activity returns to Game Detail.")
-        }
 
-        // In a game, Activity is a popover at any width. With two unread
-        // conversations it opens at Messages, and neither opens by itself.
-        tap(messageButton, description: "Open Activity from Game Detail's Messages button", in: app)
+        // The control's popover lists both unread conversations under
+        // Messages, and neither opens by itself.
         element(id.activityList, in: app)
-        XCTAssertTrue(popover.waitForExistence(timeout: 10), "Over a game, Activity is a popover.")
+        XCTAssertTrue(app.popovers.firstMatch.exists, "In a game, Activity is a popover.")
         element(id.activitySection("messages"), in: app)
         let newest = element(id.activityRow("conversation-\(newestPeerID)"), in: app)
-        XCTAssertTrue(waitUntilHittable(newest, timeout: 10), "Activity opens at its Messages section.")
+        element(id.activityRow("conversation-\(olderPeerID)"), in: app)
+        XCTAssertTrue(waitUntilHittable(newest, timeout: 10), "The popover reaches Messages.")
         XCTAssertFalse(conversation.exists, "With two unread conversations, neither opens by itself.")
-        keepScreenshot("Activity at Messages over Game Detail", in: app)
+        keepScreenshot("The control's popover at Messages", in: app)
 
-        // Reading one leaves one unread, which the button then opens at once.
         tap(newest, description: "Open the newest conversation", in: app)
         element("messages.conversation.profile.\(newestPeerID)", in: app)
         backToActivity()
-        closeActivity()
+        dismissPopover(in: app)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: id.activityList).firstMatch.exists,
+                       "Closing the popover closes Activity.")
+        XCTAssertTrue(gameDetail.exists, "Closing Activity returns to Game Detail.")
+        XCTAssertFalse(messageButton.exists, "Still no Messages button in the game.")
+
+        // Back on Home the button returns, with one unread conversation.
+        returnHomeFromFixtureGame(in: app)
+        XCTAssertTrue(messageButton.waitForExistence(timeout: 10), "Home shows the Messages button again.")
         XCTAssertTrue(pollUntil(timeout: 10) { unread() == 1 },
-                      "Reading a conversation in Activity marks it read.")
-        tap(messageButton, description: "Open Activity with one unread conversation", in: app)
-        XCTAssertTrue(popover.waitForExistence(timeout: 10), "Over a game, Activity is a popover.")
-        element("messages.conversation.profile.\(olderPeerID)", in: app)
-        keepScreenshot("Activity – the only unread conversation, opened at once", in: app)
-        backToActivity()
-        element(id.activityRow("conversation-\(olderPeerID)"), in: app)
-        closeActivity()
-        XCTAssertTrue(pollUntil(timeout: 10) { !messageButton.exists },
-                      "With nothing unread, the Messages button goes.")
+                      "Reading a conversation in the game's popover marks it read: \(unread())")
     }
 
     func testLiveGameBannerUsesHomeNavigationStack() {
@@ -2644,10 +2633,11 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let carousel = app.descendants(matching: .any)
             .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel).firstMatch
         XCTAssertFalse(carousel.exists, "Active games must stay hidden until requested.")
-        let banner = element(SurroundUITestContract.AccessibilityID.liveGameBanner, in: app, matching: .button)
+        // Root screens keep the app's live-game pill; a game shows the live
+        // game on your move in its control instead.
+        let banner = app.buttons.matching(identifier: SurroundUITestContract.AccessibilityID.liveGameBanner).firstMatch
 
-        func openLiveGameFromBanner() {
-            tap(banner, description: "Open active live game", in: app)
+        func assertLiveGameOpened() {
             element(
                 SurroundUITestContract.AccessibilityID.gameDetail(SurroundUITestContract.fixtureGameID),
                 in: app
@@ -2659,6 +2649,24 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 app.buttons[SurroundUITestContract.AccessibilityID.gameZenExit].exists,
                 "The live game must open outside Zen mode."
             )
+        }
+
+        func openLiveGameFromBanner() {
+            XCTAssertTrue(banner.waitForExistence(timeout: 10), "A root screen shows the live-game banner.")
+            tap(banner, description: "Open active live game", in: app)
+            assertLiveGameOpened()
+        }
+
+        /// The in-game control's chip, or Zen's control beside Exit, shows
+        /// the live game on your move. Pressed at its trailing quarter, as
+        /// the other journeys press the control.
+        func openLiveGameFromControl(_ identifier: String, _ description: String) {
+            let control = app.buttons.matching(identifier: identifier).firstMatch
+            XCTAssertTrue(control.waitForExistence(timeout: 10), description)
+            XCTAssertTrue(waitUntilHittable(control, timeout: 10), description)
+            XCTAssertFalse(banner.exists, "A game shows no live-game banner.")
+            activate(control, at: CGVector(dx: 0.875, dy: 0.5))
+            assertLiveGameOpened()
         }
 
         func backToHome() {
@@ -2681,8 +2689,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
 
         activateZenControl(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
         element(SurroundUITestContract.AccessibilityID.gameZenExit, in: app)
-        openLiveGameFromBanner()
-        keepScreenshot("Live banner – replaces correspondence detail", in: app)
+        openLiveGameFromControl(SurroundUITestContract.AccessibilityID.gameZenControl,
+                                "Correspondence Zen shows the live game on your move")
+        keepScreenshot("Zen control – replaces correspondence detail", in: app)
         backToHome()
 
         // Leave Home for a tab the live banner does not cover: on an 11-inch
@@ -2774,14 +2783,14 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel).firstMatch.exists,
                        "A history game's popover has no picker.")
         dismissPopover(in: app)
-        XCTAssertTrue(banner.waitForExistence(timeout: 5),
-                      "Your finished realtime game must preserve the banner for the separate active live game.")
-        openLiveGameFromBanner()
-        keepScreenshot("Live banner – replaces a history detail", in: app)
+        openLiveGameFromControl(SurroundUITestContract.AccessibilityID.gameActiveGamesButton,
+                                "Your finished realtime game offers the separate active live game")
+        keepScreenshot("Chip – replaces a history detail", in: app)
         backToHome()
 
         // The same finished game opened from Home's own history section is
-        // Home's active game. It must not hide the banner (or a rematch offer).
+        // Home's active game. It must still offer the live game (and a
+        // rematch offer).
         let homeHistoryGame = elementAfterScrolling(
             SurroundUITestContract.AccessibilityID.homeHistoryGame(historyGameID),
             in: app
@@ -2789,9 +2798,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         scrollIntoTappableArea(homeHistoryGame, in: app)
         tap(homeHistoryGame, description: "Open your finished realtime game from Home", in: app)
         element(SurroundUITestContract.AccessibilityID.gameDetail(historyGameID), in: app)
-        XCTAssertTrue(banner.waitForExistence(timeout: 5),
-                      "A finished realtime game opened from Home must preserve the banner.")
-        openLiveGameFromBanner()
+        openLiveGameFromControl(SurroundUITestContract.AccessibilityID.gameActiveGamesButton,
+                                "A finished realtime game opened from Home offers the live game")
         backToHome()
     }
 

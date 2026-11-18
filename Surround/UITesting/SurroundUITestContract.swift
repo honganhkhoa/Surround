@@ -1288,6 +1288,10 @@ enum SurroundUITestContract {
         /// Zen's control beside Exit: the circle, or the bar item before
         /// a native Exit, for another live game on your move.
         static let gameZenControl = "game.zenControl"
+        /// The window's connection status in a game's title slot, and its
+        /// Retry where it offers one.
+        static let gameConnectionStatus = "game.connectionStatus"
+        static let gameConnectionStatusRetry = "game.connectionStatus.retry"
         static let gameSidebarToggle = "game.sidebar.toggle"
         static let gameBack = "game.back"
 

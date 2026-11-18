@@ -7,8 +7,8 @@
 
 import SwiftUI
 
-/// Message access in the global notice row, on every screen including Game
-/// Detail, until the game gets a design of its own for it. It opens the
+/// Message access in the global notice row, on every screen but a game's,
+/// whose in-game control reaches Messages in its popover. It opens the
 /// window's Activity list at Messages.
 struct PrivateMessageNotificationButton: View {
     @EnvironmentObject private var ogs: OGSService
@@ -123,16 +123,8 @@ struct NotificationPopup: View {
         .allowsHitTesting(false)
     }
 
-    /// The banner gives way only while a visible game renders its own
-    /// Reconnecting… badge on the running clock. Everywhere else, including
-    /// stone removal, a finished game and Analyze's glow-only chips, it shows
-    /// as on other screens and explains why the game's controls are disabled.
-    private var showsConnectionPopup: Bool {
-        !nav.visibleGameDetailShowsReconnectingBadge
-    }
-
     private var connectionBannerShown: Bool {
-        showsConnectionPopup && ogs.socketStatus != .connected
+        ogs.socketStatus != .connected
     }
 
     /// Tells the game when the banner occupies its title slot: from the
@@ -144,8 +136,7 @@ struct NotificationPopup: View {
             try? await Task.sleep(until: fadeIn)
             guard !Task.isCancelled else { return }
         }
-        if !connectionBannerShown && nav.connectionBannerVisible
-            && ogs.socketStatus == .connected && showsConnectionPopup {
+        if !connectionBannerShown && nav.connectionBannerVisible {
             try? await Task.sleep(for: .seconds(2.4))
             guard !Task.isCancelled else { return }
         }
@@ -227,8 +218,6 @@ struct NotificationPopup: View {
         ZStack(alignment: .top) {
             if ogs.socketStatus == .connected {
                 HStack {
-                    // Game Detail owns connection status, but its active
-                    // picker does not replace cross-speed live/challenge notices.
                     if visibility.showsLiveGames {
                         liveGamesPopup
                     } else if visibility.showsWaitingGames {
@@ -241,21 +230,19 @@ struct NotificationPopup: View {
                     }
                 }
             }
-            if showsConnectionPopup {
-                connectionPopup
-            }
+            connectionPopup
         }
         .onChange(of: ogs.socketStatus) { oldStatus, newStatus in
             if newStatus == .connected {
                 connectionBannerFadeIn = nil
             } else if oldStatus == .connected {
-                connectionBannerFadeIn = showsConnectionPopup ? ContinuousClock.now + .seconds(2) : nil
+                connectionBannerFadeIn = ContinuousClock.now + .seconds(2)
             }
         }
-        .onChange(of: showsConnectionPopup) { _, shows in
-            if shows { connectionBannerFadeIn = nil }
-        }
         .task(id: connectionBannerShown) { await publishConnectionBanner() }
+        // Unmounted over a game, which says its own status: a root screen's
+        // title no longer gives way, and back on one while offline the
+        // banner shows at once.
         .onDisappear {
             if nav.connectionBannerVisible { nav.connectionBannerVisible = false }
         }
