@@ -284,6 +284,12 @@ class NavigationService: ObservableObject {
     /// Who speaks this window's confirmed friendship actions: the Messages
     /// request row that shows the result, or else the window, once.
     let friendshipConfirmations = FriendshipConfirmations()
+    /// The live games that started while this window was open, until it
+    /// shows them. A constant, so its changes never publish through this
+    /// service.
+    let startedGamesRecorder = StartedGamesRecorder()
+    /// This window's warning haptic for another live game's last seconds.
+    let lowTimeHapticWatcher = LowTimeHapticWatcher()
 
     /// Set by the window's root: navigation waits while this window's account
     /// is covered by a moderator superchat.

@@ -109,16 +109,23 @@ struct MainView: View {
         backgroundTask = nil
     }
 
-    /// Connects the window's Activity stores to its service, and its list
-    /// to this presenter, once.
+    /// Connects the window's Activity stores and producers to its service,
+    /// and its list to this presenter, once.
     private func attachActivity() {
         guard activityFirstSeen == nil else { return }
         nav.activityResults.attach(client: .live(ogs), navigator: nav,
                                    scheduler: OGSMainQueueWebsocketScheduler.shared)
         nav.activityLastKnown.attach(ogs: ogs)
         activityFirstSeen = ActivityFirstSeenObserver(ogs: ogs)
-        let nav = nav
+        let nav = nav, ogs = ogs
         nav.onCloseActivity = { [weak nav] in nav?.main.activity = nil }
+        nav.startedGamesRecorder.attach(ogs: ogs, navigation: nav)
+        nav.lowTimeHapticWatcher.attach(
+            ogs: ogs,
+            post: { [weak nav] in nav?.announce($0) },
+            isCovered: { [weak ogs] in ogs?.superchatCover != nil },
+            gamesOnScreen: { [weak nav] in nav?.ownLiveGameIDsOnScreen ?? [] }
+        )
     }
 
     /// Another account's list, results, drafts and last-known rows don't

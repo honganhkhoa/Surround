@@ -196,6 +196,10 @@ enum ActivityModel {
     /// Under this many seconds to timeout is low time, on any clock but
     /// byo-yomi, where only the last period is.
     static let lowTimeThreshold: TimeInterval = 30
+    /// One warning haptic when another of your live games, on your move,
+    /// falls through this many seconds to timeout (LowTimeHapticWatcher).
+    /// In byo-yomi that is the last period's last seconds.
+    static let lowTimeHapticThreshold: TimeInterval = 10
     /// How many read conversations follow the unread ones in the list.
     static let recentConversationLimit = 3
 

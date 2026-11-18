@@ -4,9 +4,10 @@
 //
 //  The connection status rules from the in-app notices design: when a drop
 //  shows, when OGS can't be reached, when Connected shows, Retry, the network
-//  path and windows that leave the screen.
+//  path, windows that leave the screen, and when a window has connected.
 //
 
+import Combine
 import XCTest
 
 final class ConnectionStatusModelTests: XCTestCase {
@@ -216,6 +217,54 @@ final class ConnectionStatusModelTests: XCTestCase {
         window.wait(10)
         XCTAssertEqual(window.status, .hidden, "A normal launch says nothing about its connection.")
         XCTAssertTrue(window.effects.isEmpty)
+    }
+
+    func testAWindowHasConnectedFromItsFirstOpenSocketOnOrOffScreen() {
+        var window = Window()
+        window.send(.socket(isConnected: false))
+        window.send(.path(.satisfied))
+        window.send(.visibility(true))
+        window.wait(40)
+        XCTAssertFalse(window.state.hasConnected, "Waiting for its first connection, however long.")
+        window.send(.socket(isConnected: true))
+        XCTAssertTrue(window.state.hasConnected)
+        window.send(.socket(isConnected: false))
+        window.send(.visibility(false))
+        window.send(.retry)
+        window.wait(600)
+        XCTAssertTrue(window.state.hasConnected, "Every later drop is a lost connection.")
+
+        var offScreen = Window()
+        offScreen.send(.socket(isConnected: true))
+        XCTAssertTrue(offScreen.state.hasConnected, "A window off screen counts its connection too.")
+    }
+
+    /// Never wakes the source: these checks need no deadline.
+    private final class IdleScheduler: OGSWebsocketScheduling {
+        func async(_ block: @escaping () -> Void) { block() }
+        func schedule(after delay: TimeInterval, _ block: @escaping () -> Void) -> Cancellable { AnyCancellable {} }
+        func scheduleRepeating(every interval: TimeInterval, _ block: @escaping () -> Void) -> Cancellable {
+            AnyCancellable {}
+        }
+    }
+
+    func testTheSourcePublishesHasConnectedOnceTheSocketFirstOpens() {
+        let socket = CurrentValueSubject<Bool, Never>(false)
+        let source = ConnectionStatusSource(
+            socketIsConnected: socket.eraseToAnyPublisher(), path: ConstantNetworkPath.satisfied,
+            reconnect: {}, scheduler: IdleScheduler(), now: { 1_000 })
+        var published = [Bool]()
+        let observation = source.$hasConnected.sink { published.append($0) }
+        defer { observation.cancel() }
+        source.setVisible(true)
+        XCTAssertFalse(source.hasConnected, "Before its first connection the window is connecting.")
+        socket.send(true)
+        XCTAssertTrue(source.hasConnected)
+        socket.send(false)
+        source.setVisible(false)
+        socket.send(true)
+        XCTAssertTrue(source.hasConnected, "From then on, the window is reconnecting.")
+        XCTAssertEqual(published, [false, true], "It changes once.")
     }
 
     // MARK: - Retry

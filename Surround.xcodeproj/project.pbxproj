@@ -60,6 +60,8 @@
 		5C2E00092026111100000009 /* SuperchatStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00082026111100000008 /* SuperchatStoreTests.swift */; };
 		5C3E00102026111200000010 /* ActivityResultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E000F202611120000000F /* ActivityResultsTests.swift */; };
 		5C3E00122026111200000012 /* ActivityLastKnownTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E00112026111200000011 /* ActivityLastKnownTests.swift */; };
+		5C4E00172026111400000017 /* StartedGamesRecorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00162026111400000016 /* StartedGamesRecorderTests.swift */; };
+		5C4E00192026111400000019 /* LowTimeHapticWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00182026111400000018 /* LowTimeHapticWatcherTests.swift */; };
 		5C3E00172026111200000017 /* ConversationDraftStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E00162026111200000016 /* ConversationDraftStoreTests.swift */; };
 		5C2E000E202611110000000E /* PrivateMessageComposerStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E000D202611110000000D /* PrivateMessageComposerStateTests.swift */; };
 		C5A700022026110900000002 /* ConnectionStatusModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A700012026110900000001 /* ConnectionStatusModel.swift */; };
@@ -77,6 +79,10 @@
 		5C3E00092026111200000009 /* ActivityResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E00072026111200000007 /* ActivityResults.swift */; };
 		5C3E000B202611120000000B /* ActivityLastKnown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E000A202611120000000A /* ActivityLastKnown.swift */; };
 		5C3E000C202611120000000C /* ActivityLastKnown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E000A202611120000000A /* ActivityLastKnown.swift */; };
+		5C4E00112026111400000011 /* StartedGamesRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00102026111400000010 /* StartedGamesRecorder.swift */; };
+		5C4E00122026111400000012 /* StartedGamesRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00102026111400000010 /* StartedGamesRecorder.swift */; };
+		5C4E00142026111400000014 /* LowTimeHapticWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00132026111400000013 /* LowTimeHapticWatcher.swift */; };
+		5C4E00152026111400000015 /* LowTimeHapticWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00132026111400000013 /* LowTimeHapticWatcher.swift */; };
 		5C3E00142026111200000014 /* ConversationDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E00132026111200000013 /* ConversationDraftStore.swift */; };
 		5C3E00152026111200000015 /* ConversationDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E00132026111200000013 /* ConversationDraftStore.swift */; };
 		5C2E00072026111100000007 /* SuperchatStore+System.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2E00062026111100000006 /* SuperchatStore+System.swift */; };
@@ -633,6 +639,8 @@
 		5C2E00082026111100000008 /* SuperchatStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperchatStoreTests.swift; sourceTree = "<group>"; };
 		5C3E000F202611120000000F /* ActivityResultsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityResultsTests.swift; sourceTree = "<group>"; };
 		5C3E00112026111200000011 /* ActivityLastKnownTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLastKnownTests.swift; sourceTree = "<group>"; };
+		5C4E00162026111400000016 /* StartedGamesRecorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartedGamesRecorderTests.swift; sourceTree = "<group>"; };
+		5C4E00182026111400000018 /* LowTimeHapticWatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LowTimeHapticWatcherTests.swift; sourceTree = "<group>"; };
 		5C3E00162026111200000016 /* ConversationDraftStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationDraftStoreTests.swift; sourceTree = "<group>"; };
 		5C2E000D202611110000000D /* PrivateMessageComposerStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageComposerStateTests.swift; sourceTree = "<group>"; };
 		C5A700012026110900000001 /* ConnectionStatusModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusModel.swift; sourceTree = "<group>"; };
@@ -643,6 +651,8 @@
 		5C3E00012026111200000001 /* ActivitySession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySession.swift; sourceTree = "<group>"; };
 		5C3E00072026111200000007 /* ActivityResults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityResults.swift; sourceTree = "<group>"; };
 		5C3E000A202611120000000A /* ActivityLastKnown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLastKnown.swift; sourceTree = "<group>"; };
+		5C4E00102026111400000010 /* StartedGamesRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartedGamesRecorder.swift; sourceTree = "<group>"; };
+		5C4E00132026111400000013 /* LowTimeHapticWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LowTimeHapticWatcher.swift; sourceTree = "<group>"; };
 		5C3E00132026111200000013 /* ConversationDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationDraftStore.swift; sourceTree = "<group>"; };
 		5C2E00062026111100000006 /* SuperchatStore+System.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SuperchatStore+System.swift"; sourceTree = "<group>"; };
 		C5A700092026110900000009 /* ConnectionStatusModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusModelTests.swift; sourceTree = "<group>"; };
@@ -1089,6 +1099,8 @@
 				5C2E00082026111100000008 /* SuperchatStoreTests.swift */,
 				5C3E000F202611120000000F /* ActivityResultsTests.swift */,
 				5C3E00112026111200000011 /* ActivityLastKnownTests.swift */,
+				5C4E00162026111400000016 /* StartedGamesRecorderTests.swift */,
+				5C4E00182026111400000018 /* LowTimeHapticWatcherTests.swift */,
 				5C3E00162026111200000016 /* ConversationDraftStoreTests.swift */,
 				5C2E000D202611110000000D /* PrivateMessageComposerStateTests.swift */,
 				C5A700092026110900000009 /* ConnectionStatusModelTests.swift */,
@@ -1337,6 +1349,8 @@
 				5C3E00012026111200000001 /* ActivitySession.swift */,
 				5C3E00072026111200000007 /* ActivityResults.swift */,
 				5C3E000A202611120000000A /* ActivityLastKnown.swift */,
+				5C4E00102026111400000010 /* StartedGamesRecorder.swift */,
+				5C4E00132026111400000013 /* LowTimeHapticWatcher.swift */,
 				5C3E00132026111200000013 /* ConversationDraftStore.swift */,
 				5C2E00062026111100000006 /* SuperchatStore+System.swift */,
 				BC7407DA25493B71001D5581 /* SurroundService.swift */,
@@ -1836,6 +1850,8 @@
 				5C3E00022026111200000002 /* ActivitySession.swift in Sources */,
 				5C3E00082026111200000008 /* ActivityResults.swift in Sources */,
 				5C3E000B202611120000000B /* ActivityLastKnown.swift in Sources */,
+				5C4E00112026111400000011 /* StartedGamesRecorder.swift in Sources */,
+				5C4E00142026111400000014 /* LowTimeHapticWatcher.swift in Sources */,
 				5C3E00142026111200000014 /* ConversationDraftStore.swift in Sources */,
 				5C2E00072026111100000007 /* SuperchatStore+System.swift in Sources */,
 				C5A7000C202611090000000C /* ConnectionStatusProbe.swift in Sources */,
@@ -1992,10 +2008,14 @@
 				5C3E00032026111200000003 /* ActivitySession.swift in Sources */,
 				5C3E00092026111200000009 /* ActivityResults.swift in Sources */,
 				5C3E000C202611120000000C /* ActivityLastKnown.swift in Sources */,
+				5C4E00122026111400000012 /* StartedGamesRecorder.swift in Sources */,
+				5C4E00152026111400000015 /* LowTimeHapticWatcher.swift in Sources */,
 				5C3E00152026111200000015 /* ConversationDraftStore.swift in Sources */,
 				5C2E00092026111100000009 /* SuperchatStoreTests.swift in Sources */,
 				5C3E00102026111200000010 /* ActivityResultsTests.swift in Sources */,
 				5C3E00122026111200000012 /* ActivityLastKnownTests.swift in Sources */,
+				5C4E00172026111400000017 /* StartedGamesRecorderTests.swift in Sources */,
+				5C4E00192026111400000019 /* LowTimeHapticWatcherTests.swift in Sources */,
 				5C3E00172026111200000017 /* ConversationDraftStoreTests.swift in Sources */,
 				5C2E000E202611110000000E /* PrivateMessageComposerStateTests.swift in Sources */,
 				C5A700032026110900000003 /* ConnectionStatusModel.swift in Sources */,

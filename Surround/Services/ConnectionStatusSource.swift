@@ -34,6 +34,10 @@ final class ConstantNetworkPath: NetworkPathMonitoring {
 /// nothing until its host calls `setVisible(true)`.
 final class ConnectionStatusSource: ObservableObject {
     @Published private(set) var status = ConnectionStatusModel.Status.hidden
+    /// The window's socket has been open at least once since the source
+    /// started, on screen or not. Until then the window is still making its
+    /// first connection; only after it can a connection be lost.
+    @Published private(set) var hasConnected = false
 
     /// What VoiceOver should hear. The app posts these once per app, from
     /// the frontmost window; a window never posts its own.
@@ -117,6 +121,9 @@ final class ConnectionStatusSource: ObservableObject {
         if newStatus != status {
             status = newStatus
         }
+        if state.hasConnected != hasConnected {
+            hasConnected = state.hasConnected
+        }
         scheduleWakeUp(at: ConnectionStatusModel.nextDeadline(state, now: time), from: time)
         for effect in effects {
             switch effect {
@@ -134,6 +141,29 @@ final class ConnectionStatusSource: ObservableObject {
         guard let deadline else { return }
         wakeUp = scheduler.schedule(after: max(0, deadline - time)) { [weak self] in
             self?.send(.tick)
+        }
+    }
+}
+
+extension ConnectionStatusModel.Announcement {
+    /// What the app posts for it: once per app, from the window the user is
+    /// in, with "Connected" at low priority.
+    var appAnnouncement: AppAnnouncement {
+        switch self {
+        case .reconnecting:
+            AppAnnouncement(.connection(self), audience: .frontmostWindow, speech: String(
+                localized: "Reconnecting to OGS",
+                comment: "VoiceOver: spoken once when the app loses its connection to OGS and starts reconnecting"
+            ))
+        case .unreachable:
+            AppAnnouncement(.connection(self), audience: .frontmostWindow, speech: String(
+                localized: "Can’t reach OGS",
+                comment: "Activity: under the title while the app can't connect to OGS; shown with Retry"
+            ))
+        case .connected:
+            AppAnnouncement(.connection(self), audience: .frontmostWindow,
+                            speech: String(localized: "Connected", comment: "Connection status"),
+                            priority: .low)
         }
     }
 }

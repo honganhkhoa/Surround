@@ -49420,6 +49420,23 @@
         }
       }
     },
+    "Reconnecting to OGS" : {
+      "comment" : "VoiceOver: spoken once when the app loses its connection to OGS and starts reconnecting",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menghubungkan kembali ke OGS"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menyambung semula ke OGS"
+          }
+        }
+      }
+    },
     "Reconnecting to OGS. Find a game will return when the connection does." : {
       "comment" : "Explanation shown when Quick Match submission is unavailable during reconnection.",
       "localizations" : {
