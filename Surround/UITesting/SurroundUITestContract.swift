@@ -320,6 +320,7 @@ enum SurroundUITestContract {
         case unusualChallenge = "unusual-challenge", searching, waiting
         case correspondenceYourMove = "correspondence-your-move", nothingLeads = "nothing-leads"
         case several, superchat, rematchOffered = "rematch-offered", rematchBothAsked = "rematch-both-asked"
+        case unusualRematch = "unusual-rematch"
     }
 
     enum ActivityFixtureClock: String {
@@ -340,6 +341,10 @@ enum SurroundUITestContract {
         static let rengoChallengeID = 95_301
         /// The game an accepted challenge starts under `--surround-activity-actions`.
         static func acceptedGameID(_ challengeID: Int) -> Int { challengeID + 900_000 }
+        /// The game OGS made with a rematch challenge. OGS makes a challenge's
+        /// game when the challenge is made, so a challenge sent after game
+        /// 26268404 ended has the higher game id.
+        static func rematchGameID(_ challengeID: Int) -> Int { SurroundUITestContract.fixtureGameID + challengeID }
         static let liveQuickMatchUUID = "a1c7f100-0000-4000-8000-000000000001"
         static let correspondenceQuickMatchUUID = "a1c7f100-0000-4000-8000-000000000002"
         static let moderatorID = 916_002

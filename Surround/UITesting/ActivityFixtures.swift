@@ -145,6 +145,7 @@ enum ActivityFixtures {
         case .superchat: build.baseGame(.liveTheirMove); build.harborMist(.yourMove); build.moderatorMessage()
         case .rematchOffered: build.baseGame(.finished); build.receive(.rematch)
         case .rematchBothAsked: build.baseGame(.finished); build.receive(.rematch); build.send(.rematch)
+        case .unusualRematch: build.baseGame(.finished); build.receive(.unusualRematch)
         }
         state = build.state
         return build.seed
@@ -247,7 +248,7 @@ enum ActivityFixtures {
 
         enum BaseRole { case liveTheirMove, correspondenceTheirMove, finished }
         enum Turn { case yourMove, theirMove, lastPeriod }
-        enum Received { case usual, unusual, correspondence, rematch }
+        enum Received { case usual, unusual, correspondence, rematch, unusualRematch }
         enum Sent { case quietPine, rematch }
         enum Search { case live, correspondence }
 
@@ -343,9 +344,13 @@ enum ActivityFixtures {
             case .correspondence:
                 challenge = direct(ID.correspondenceChallengeID, from: Cast.cedarWave, to: user,
                                    Self.correspondence, ranked: true)
-            case .rematch:
+            case .rematch, .unusualRematch:
+                // Sent after 26268404 ended, so its game is the newer one. The
+                // unusual one asks for 0.5 komi, custom under 26268404's rules.
                 challenge = direct(ID.rematchChallengeID, from: template.players.black, to: user, Self.liveFischer,
-                                   ranked: template.ranked, rules: template.rules, komi: nil)
+                                   ranked: template.ranked, rules: template.rules,
+                                   komi: kind == .unusualRematch ? 0.5 : nil,
+                                   gameID: ID.rematchGameID(ID.rematchChallengeID))
                 seed.challengeNotificationTimes[challenge.id] = clock.ago(20)
             }
             state.challengesReceived.append(challenge)
@@ -359,7 +364,8 @@ enum ActivityFixtures {
                 seed.firstSeen["sent-\(challenge.id)"] = clock.ago(45)
             case .rematch:       // sent from 26268404's Rematch button 30 s ago
                 challenge = direct(ID.rematchSentChallengeID, from: user, to: template.players.black,
-                                   Self.liveFischer, ranked: template.ranked, rules: template.rules, komi: nil)
+                                   Self.liveFischer, ranked: template.ranked, rules: template.rules, komi: nil,
+                                   gameID: ID.rematchGameID(ID.rematchSentChallengeID))
                 seed.firstSeen["sent-\(challenge.id)"] = clock.ago(30)
                 seed.rematchSourceGameIDs[challenge.id] = Contract.fixtureGameID
             }
@@ -426,14 +432,16 @@ enum ActivityFixtures {
                 id: "activity-fixture-\(peer.id)", message: text, timestamp: clock.ago(seconds))))
         }
 
-        /// A direct challenge built on the sample one.
+        /// A direct challenge built on the sample one. Its game, which OGS
+        /// makes with the challenge, is `gameID`, by default `id + 10_000`.
         private func direct(_ id: Int, from challenger: OGSUser, to challenged: OGSUser, _ system: TimeControlSystem,
-                            ranked: Bool, rules: OGSRule = .japanese, komi: Double? = 6.5) -> OGSDirectChallenge {
+                            ranked: Bool, rules: OGSRule = .japanese, komi: Double? = 6.5,
+                            gameID: Int? = nil) -> OGSDirectChallenge {
             var challenge = OGSChallengeSampleData.sampleChallenge
             challenge.id = id
             challenge.challenger = challenger
             challenge.challenged = challenged
-            challenge.game.id = id + 10_000
+            challenge.game.id = gameID ?? id + 10_000
             challenge.game.name = "Friendly Match"
             challenge.game.width = 19
             challenge.game.height = 19

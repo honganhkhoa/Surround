@@ -144,14 +144,17 @@ struct GameDetailView: View {
         )
     }
 
-    /// The control's popover: the picker above Activity's sections, at this
-    /// game's place and with the window's connection status.
-    private func gameControlPopoverContent(for game: Game) -> some View {
+    /// The control's popover: at game over the game-over card, then the
+    /// picker, above Activity's sections, at this game's place and with the
+    /// window's connection status.
+    /// - Parameter cardChallengeID: The challenge of the card the control
+    ///   shows, if any.
+    private func gameControlPopoverContent(for game: Game, cardChallengeID: Int?) -> some View {
         AppNavigationStack {
             ActivityListView(
                 session: gameControlPopover.listSessionID, placement: .gamePopover,
-                place: ActivityModel.Place(showing: game), header: AnyView(gameControlPicker),
-                switchGame: showGame, connection: connectionStatus
+                place: ActivityModel.Place(showing: game), cardChallengeID: cardChallengeID,
+                header: AnyView(gameControlPicker), switchGame: showGame, connection: connectionStatus
             )
         }
         .environmentObject(ogs)
@@ -182,7 +185,7 @@ struct GameDetailView: View {
             windowClass: gameControlWindowClass,
             isPopoverOpen: gameControlPopover.isOpen,
             presentation: gameControlPresentation(at:),
-            popover: AnyView(gameControlPopoverContent(for: game)),
+            popover: { AnyView(gameControlPopoverContent(for: game, cardChallengeID: $0)) },
             openPopover: openGameControlPopover,
             show: showGame(id:)
         )
@@ -1171,6 +1174,9 @@ private struct GameToolbarLayout: ViewModifier {
     /// The control's last state, which it keeps while its popover is open
     /// and nothing waits any more, so the popover keeps its anchor.
     @State private var lastShownGameControl: GameControlSlot?
+    /// The challengers of the game-over cards the control has shown, by
+    /// challenge.
+    @State private var cardChallengers: [Int: OGSUser] = [:]
     /// The rail's and the Mac's native item is made again when its badge
     /// changes, as iOS 27 can keep a stale badge, but never while its
     /// popover is open or still on screen, which would leave the popover
@@ -1595,6 +1601,27 @@ private struct GameToolbarLayout: ViewModifier {
         return game.currentPlayer(with: color.opponentColor())?.username
     }
 
+    /// What the control knows of this Game Detail: whether its route has the
+    /// picker, Zen, and the game-over card's challenge, which
+    /// `GameOverCardRule` picks for the game on screen among those the user
+    /// received. The rule decides what the control and its popover lead
+    /// with, never an action.
+    private func gameControlContext(allowsPicker: Bool) -> ActivityModel.GameControlContext {
+        ActivityModel.GameControlContext(
+            allowsPicker: allowsPicker, isZen: zenMode,
+            cardChallengeID: GameOverCardRule.challengeID(for: game, among: ogs.challengesReceived)
+        )
+    }
+
+    /// The game-over card's challenger, whose tile the control draws and
+    /// VoiceOver names. The card keeps its state while its popover is open
+    /// after its challenge has gone, as after Reject, so the challenger the
+    /// state last had stays.
+    private func cardChallenger(for slot: GameControlSlot?) -> OGSUser? {
+        guard let challengeID = slot?.cardChallengeID else { return nil }
+        return ogs.challengesReceived.first { $0.id == challengeID }?.challenger ?? cardChallengers[challengeID]
+    }
+
     /// The control's state and its slot. The state comes from the model in
     /// this pass, from `ogs` and the game this layout observes, so the bar's
     /// first frame already has it, an in-place switch has the new game's at
@@ -1605,15 +1632,17 @@ private struct GameToolbarLayout: ViewModifier {
         let placement = arrangement.activeGamesPlacement(compact: compact, navigationBarHidden: navigationBarHidden)
         let input = gameControlInput()
         let allowsPicker = gameControl.switchRule.allowsPicker
-        let value = GameControlSlot(input, context: ActivityModel.GameControlContext(allowsPicker: allowsPicker,
-                                                                                    isZen: zenMode))
+        let value = GameControlSlot(input, context: gameControlContext(allowsPicker: allowsPicker))
         let isOpen = gameControl.isPopoverOpen
         // While its popover is open the control stays, in its last state,
         // even when nothing waits any more.
         let drawn = value ?? (isOpen ? lastShownGameControl : nil)
         let form = GameControlForm(placement, isCatalyst: Self.isCatalyst, windowClass: gameControl.windowClass)
         let otherGame = drawn?.gameID.flatMap { id in ogs.liveGames.first { $0.ogsID == id } }
+        let challenger = cardChallenger(for: drawn)
+        let name = opponentName(in: otherGame) ?? challenger?.username ?? ""
         let isPresented = gameControl.presentation(placement)
+        let popover = gameControl.popover(drawn?.cardChallengeID)
         let view: AnyView
         let isShown: Bool
         var nativeBadge: GameControlNativeItem.Badge?
@@ -1623,10 +1652,10 @@ private struct GameToolbarLayout: ViewModifier {
             nativeBadge = item?.badge
             isShown = (item != nil && !zenMode) || isOpen
             let label = GameControlAccessibility(drawn ?? .inbox(count: 0), form: form, allowsPicker: allowsPicker,
-                                                 name: opponentName(in: otherGame) ?? "").label
+                                                 name: name).label
             view = AnyView(GameControlNativeButton(
                 item: item ?? GameControlNativeItem(icon: .inbox, badge: .none), label: label,
-                isPresented: isPresented, popover: gameControl.popover, openPopover: gameControl.openPopover,
+                isPresented: isPresented, popover: popover, openPopover: gameControl.openPopover,
                 popoverAppeared: { nativeGameControlIdentity.popoverAppeared() },
                 popoverDisappeared: { nativeGameControlIdentity.popoverDisappeared() }
             ).id(nativeGameControlIdentity.id(showing: item?.badge, isPopoverOpen: isOpen)))
@@ -1636,11 +1665,11 @@ private struct GameToolbarLayout: ViewModifier {
                 slot: drawn ?? .base(plusN: 0), windowClass: gameControl.windowClass,
                 modeCount: showsConditionalMoves ? 3 : 2, sizeCategory: UIContentSizeCategory(dynamicTypeSize),
                 allowsPicker: allowsPicker, game: otherGame,
-                show: gameControl.show, openPopover: gameControl.openPopover
+                challenger: challenger, show: gameControl.show, openPopover: gameControl.openPopover
             )
             view = form == .bottomBar
-                ? AnyView(GameControlBottomBarItem(model: model, isPresented: isPresented, popover: gameControl.popover))
-                : AnyView(GameControlTopBarItem(model: model, isPresented: isPresented, popover: gameControl.popover))
+                ? AnyView(GameControlBottomBarItem(model: model, isPresented: isPresented, popover: popover))
+                : AnyView(GameControlTopBarItem(model: model, isPresented: isPresented, popover: popover))
         }
         return GameControlBarState(
             value: value, slot: GameActiveGamesSlot(placement: placement, isShown: isShown, view: view),
@@ -1664,6 +1693,10 @@ private struct GameToolbarLayout: ViewModifier {
 
     private func gameControlChanged(_ value: GameControlSlot?) {
         if let value { lastShownGameControl = value }
+        if let challengeID = value?.cardChallengeID,
+           let challenger = ogs.challengesReceived.first(where: { $0.id == challengeID })?.challenger {
+            cardChallengers[challengeID] = challenger
+        }
         announceStartedGame(value)
     }
 
@@ -1903,7 +1936,9 @@ private struct GameControlHost {
     var isPopoverOpen: Bool
     /// The popover binding of the item at a placement.
     var presentation: (GameActiveGamesPlacement) -> Binding<Bool>
-    var popover: AnyView
+    /// The popover's content, which leads with the game-over card of the
+    /// challenge passed in.
+    var popover: (_ cardChallengeID: Int?) -> AnyView
     var openPopover: () -> Void
     /// Shows one of the user's live games by its id.
     var show: (Int) -> Void

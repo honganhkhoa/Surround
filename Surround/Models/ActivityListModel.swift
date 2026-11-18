@@ -245,6 +245,56 @@ enum ActivityListSections {
     }
 }
 
+/// The game-over card a finished game's popover leads with: the challenge the
+/// in-game control shows, as a row of the list. The list keeps the card it
+/// first showed while that card has a row, its challenge or the row the user
+/// resolved, so a result stays in the card's place until the list closes,
+/// though the control has moved on. The list leaves the card's id out of its
+/// sections, its resolved row included, so the challenge never also shows
+/// under Challenges received.
+struct ActivityGameOverCard: Equatable {
+    /// The challenges the control showed while the list was open, oldest
+    /// first.
+    private(set) var shownChallengeIDs: [Int] = []
+
+    /// The control shows `challengeID`'s card, or none.
+    mutating func remember(_ challengeID: Int?) {
+        guard let challengeID, !shownChallengeIDs.contains(challengeID) else { return }
+        shownChallengeIDs.append(challengeID)
+    }
+
+    /// The card's row: of the challenges the control has shown, `showing`
+    /// included, the first that still has its listed challenge or, once that
+    /// has gone, the row the user resolved. Nil when none has either.
+    /// - Parameters:
+    ///   - showing: The control's card now, which counts before `remember`
+    ///     records it, so the first pass already leads with it.
+    ///   - listed: The model's items that the results store doesn't hide.
+    ///   - resolved: The rows the user acted on in the list's session.
+    func row(showing challengeID: Int?, listed: [ActivityModel.Item],
+             resolved: [ActivityResolvedRow]) -> ActivityListSections.Row? {
+        var candidates = shownChallengeIDs
+        if let challengeID, !candidates.contains(challengeID) {
+            candidates.append(challengeID)
+        }
+        for candidate in candidates {
+            let id = Self.itemID(candidate)
+            if let item = listed.first(where: { $0.id == id }) {
+                return .item(item)
+            }
+            if let row = resolved.first(where: { $0.id == id }) {
+                return .resolved(row)
+            }
+        }
+        return nil
+    }
+
+    /// A received challenge's id in the list.
+    static func itemID(_ challengeID: Int) -> String {
+        ActivityModel.Item.challenge(ActivityModel.Challenge(id: challengeID, isLive: false)).id
+    }
+}
+
 /// Where rows that act in place go once their live row has gone: after the
 /// id that preceded them when the user acted, or first when that id has gone
 /// too. Activity's sections and Messages' friend requests both use it.

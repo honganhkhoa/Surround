@@ -4,15 +4,15 @@
 //
 //  The in-game control in Game Detail's bars. The bottom bar and top bars
 //  draw a custom view: another live game's mini board and clock, a game
-//  that started elsewhere, or an icon with what waits. The Duo's rail and
-//  the Mac show the system's icon with its red badge. A tap on the chip
-//  shows its game; a touch and hold, or VoiceOver's Open Activity, opens
-//  the control's popover, which Game Detail fills. Each item keeps one
-//  identity across states, so an open popover keeps its anchor, and a frame
-//  fixed by its form, its state and the window's width class, so the bar's
-//  layout never follows the clock. The other game's clock ticks inside the
-//  item, which observes that game. GameControlModel.swift holds the rules
-//  each form follows.
+//  that started elsewhere, at game over the challenger's tile, or an icon
+//  with what waits. The Duo's rail and the Mac show the system's icon with
+//  its red badge. A tap on the chip shows its game; a touch and hold, or
+//  VoiceOver's Open Activity, opens the control's popover, which Game
+//  Detail fills. Each item keeps one identity across states, so an open
+//  popover keeps its anchor, and a frame fixed by its form, its state and
+//  the window's width class, so the bar's layout never follows the clock.
+//  The other game's clock ticks inside the item, which observes that game.
+//  GameControlModel.swift holds the rules each form follows.
 //
 
 import os
@@ -37,6 +37,8 @@ struct GameControlItemModel {
     /// The chip's game, or the one that started. The item observes it, so
     /// its clock ticks there and nowhere else in the bar.
     var game: Game?
+    /// The game-over card's challenger, whose tile the item draws.
+    var challenger: OGSUser?
     /// Shows a game by its id, as Game Detail switches games.
     var show: (Int) -> Void
     /// Opens the control's popover.
@@ -239,6 +241,8 @@ private struct GameControlFace {
     /// The other game is low on time: a red outline and red digits.
     let warns: Bool
     let board: BoardPosition?
+    /// The game-over card's challenger, drawn as the tile.
+    let challenger: OGSUser?
     let interaction: GameControlInteraction
     let accessibility: GameControlAccessibility
 
@@ -269,7 +273,8 @@ extension GameControlFace {
         var timeLeft: TimeInterval?
         var isSuddenDeath = false
         var lowTime = false
-        var name = ""
+        // The chip's or a started game's opponent, or the card's challenger.
+        var name = model.challenger?.username ?? ""
         if let game, let color = game.userStoneColor {
             // The user's time on that game's clock, as Home's chip reads it.
             timeLeft = HomeGameFacts(game: game, user: game.ogs?.user).chipTimeLeft(color)
@@ -295,6 +300,7 @@ extension GameControlFace {
         self.mark = mark
         warns = lowTime || drawing.isSuddenDeath
         board = game?.currentPosition
+        challenger = model.challenger
         interaction = GameControlInteraction(model.slot, form: form, windowClass: model.windowClass)
         accessibility = GameControlAccessibility(
             model.slot, form: form, windowClass: model.windowClass, allowsPicker: model.allowsPicker,
@@ -348,11 +354,7 @@ private struct GameControlFaceView: View {
         case .board:
             board
         case .tile:
-            // The challenger's tile.
-            RoundedRectangle(cornerRadius: 7)
-                .fill(Color(uiColor: .secondarySystemFill))
-                .overlay { Image(systemName: "person.fill").font(.system(size: 14)).foregroundStyle(.secondary) }
-                .frame(width: GameControlChipMetrics.boardWidth, height: GameControlChipMetrics.boardWidth)
+            tile
         case .icon(let icon):
             Image(systemName: icon.systemName)
                 .font(.system(size: 20))
@@ -402,6 +404,20 @@ private struct GameControlFaceView: View {
         }
         .frame(width: GameControlChipMetrics.boardWidth, height: GameControlChipMetrics.boardWidth)
         .clipShape(shape)
+    }
+
+    /// The challenger's avatar, as Activity's rows draw it, at the board's
+    /// size. A neutral tile stands in for a challenger the control no
+    /// longer knows.
+    @ViewBuilder private var tile: some View {
+        if let challenger = face.challenger {
+            MessageAvatar(user: challenger, size: GameControlChipMetrics.boardWidth)
+        } else {
+            RoundedRectangle(cornerRadius: 7)
+                .fill(Color(uiColor: .secondarySystemFill))
+                .overlay { Image(systemName: "person.fill").font(.system(size: 14)).foregroundStyle(.secondary) }
+                .frame(width: GameControlChipMetrics.boardWidth, height: GameControlChipMetrics.boardWidth)
+        }
     }
 
     @ViewBuilder private var surface: some View {

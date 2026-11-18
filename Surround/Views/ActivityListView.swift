@@ -13,8 +13,9 @@
 //  need OGS. Each window shows its list from one presenter, a sheet or a
 //  popover by the request, and the controls that open it record where they
 //  are so a popover is anchored there. Game Detail's in-game control
-//  presents its own popover instead, with its picker above the sections,
-//  its game's place and the window's connection status.
+//  presents its own popover instead: at game over the opponent's challenge
+//  leads it as the game-over card, then the picker, above the sections,
+//  with its game's place and the window's connection status.
 //
 
 import Combine
@@ -43,8 +44,12 @@ struct ActivityListView: View {
     /// the window's registry leaves out a game in a presented stack, such
     /// as the iPad Profile sheet. Nil reads the registry.
     var place: ActivityModel.Place?
-    /// Above the sections, under the status line, inside the list's scroll:
-    /// the in-game control's picker of same-speed games.
+    /// The challenge of the game-over card, which the in-game control shows
+    /// at game over. The card leads the list, under the status line, and
+    /// its challenge stays out of Challenges received.
+    var cardChallengeID: Int?
+    /// Above the sections, under the status line and the card, inside the
+    /// list's scroll: the in-game control's picker of same-speed games.
     var header: AnyView?
     /// How a live row shows its game. A game's popover switches as its Game
     /// Detail does, in place on Home's route; nil opens the game on Home's
@@ -59,12 +64,13 @@ struct ActivityListView: View {
     @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
 
     init(session: UUID, placement: Placement, focus: ActivityRequest.Focus = .top,
-         place: ActivityModel.Place? = nil, header: AnyView? = nil,
+         place: ActivityModel.Place? = nil, cardChallengeID: Int? = nil, header: AnyView? = nil,
          switchGame: ((Game) -> Void)? = nil, connection: ConnectionStatusSource? = nil) {
         self.session = session
         self.placement = placement
         self.focus = focus
         self.place = place
+        self.cardChallengeID = cardChallengeID
         self.header = header
         self.switchGame = switchGame
         self.connection = connection
@@ -72,8 +78,8 @@ struct ActivityListView: View {
 
     var body: some View {
         ActivityListContent(
-            session: session, placement: placement, focus: focus, place: place, header: header,
-            switchGame: switchGame, connection: connection, ogs: ogs, nav: nav,
+            session: session, placement: placement, focus: focus, place: place, cardChallengeID: cardChallengeID,
+            header: header, switchGame: switchGame, connection: connection, ogs: ogs, nav: nav,
             path: allowsRemoteActivity ? SystemNetworkPathMonitor.shared : ConstantNetworkPath.satisfied
         )
     }
@@ -96,12 +102,18 @@ struct ActivityListSource {
     struct Snapshot {
         var input: ActivityModel.Input
         var model: ActivityModel.Snapshot
+        /// The game-over card's row, which leads the list.
+        var card: ActivityListSections.Row?
+        /// Every section but the card's row.
         var sections: [ActivityListSections.Section]
         /// The user's open and Rengo challenges, as the rows read them.
         var openChallenges: ActivityLastKnown.OpenChallenges
         /// Ids the store hides that the model no longer lists, so they need
         /// no hiding.
         var settledHiddenIDs: Set<String>
+
+        /// No card and no section: the list reads "Nothing waiting".
+        var isEmpty: Bool { card == nil && sections.isEmpty }
     }
 
     /// One of the user's own waiting items, from its id.
@@ -153,16 +165,23 @@ struct ActivityListSource {
         return nav.activityLastKnown.openChallenges(live: ogs)
     }
 
-    func snapshot(now: TimeInterval) -> Snapshot {
+    /// - Parameters:
+    ///   - card: The game-over cards the list has shown.
+    ///   - cardChallengeID: The control's card now.
+    func snapshot(now: TimeInterval, card: ActivityGameOverCard = ActivityGameOverCard(),
+                  showing cardChallengeID: Int? = nil) -> Snapshot {
         let openChallenges = openChallenges
         let input = input(now: now, openChallenges: openChallenges)
         let model = ActivityModel.snapshot(input)
         let results = nav.activityResults
         let hidden = results.hiddenIDs
         let listed = model.list.filter { !hidden.contains($0.id) }
+        let resolved = results.resolvedRows
+        let cardRow = card.row(showing: cardChallengeID, listed: listed, resolved: resolved)
         return Snapshot(
-            input: input, model: model,
-            sections: ActivityListSections.sections(list: listed, resolved: results.resolvedRows),
+            input: input, model: model, card: cardRow,
+            sections: ActivityListSections.sections(list: listed, resolved: resolved,
+                                                    excluding: Set(cardRow.map { [$0.id] } ?? [])),
             openChallenges: openChallenges,
             settledHiddenIDs: hidden.subtracting(model.list.map(\.id))
         )
@@ -239,6 +258,7 @@ private struct ActivityListContent: View {
     let placement: ActivityListView.Placement
     let focus: ActivityRequest.Focus
     let place: ActivityModel.Place?
+    let cardChallengeID: Int?
     let header: AnyView?
     let switchGame: ((Game) -> Void)?
     @ObservedObject var ogs: OGSService
@@ -261,6 +281,9 @@ private struct ActivityListContent: View {
     /// The list is shown, or covered only by what it pushed.
     @State private var isPresented = true
     @State private var hasFocused = false
+    /// The game-over cards this list has shown, so the card keeps its place
+    /// and its result while the list is open.
+    @State private var card = ActivityGameOverCard()
     /// Where VoiceOver is among the rows' controls and results.
     @AccessibilityFocusState private var voiceOverFocus: ActivityFocus?
     /// The two settings Home reads, so the live games' clocks match Home's.
@@ -270,13 +293,14 @@ private struct ActivityListContent: View {
     private var themeAppliesToWholeApp = true
 
     init(session: UUID, placement: ActivityListView.Placement, focus: ActivityRequest.Focus,
-         place: ActivityModel.Place?, header: AnyView?, switchGame: ((Game) -> Void)?,
+         place: ActivityModel.Place?, cardChallengeID: Int?, header: AnyView?, switchGame: ((Game) -> Void)?,
          connection windowConnection: ConnectionStatusSource?,
          ogs: OGSService, nav: NavigationService, path: NetworkPathMonitoring) {
         self.session = session
         self.placement = placement
         self.focus = focus
         self.place = place
+        self.cardChallengeID = cardChallengeID
         self.header = header
         self.switchGame = switchGame
         _ogs = ObservedObject(wrappedValue: ogs)
@@ -313,15 +337,16 @@ private struct ActivityListContent: View {
     var body: some View {
         Group {
             if ActivityListSource.isClockFrozen {
-                list(source.snapshot(now: Date().timeIntervalSince1970))
+                list(source.snapshot(now: Date().timeIntervalSince1970, card: card, showing: cardChallengeID))
             } else {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    list(source.snapshot(now: context.date.timeIntervalSince1970))
+                    list(source.snapshot(now: context.date.timeIntervalSince1970, card: card, showing: cardChallengeID))
                 }
             }
         }
         .navigationTitle(Text("Activity", comment: "Title of the list of the user's games, challenges, searches and messages"))
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: cardChallengeID, initial: true) { _, challengeID in card.remember(challengeID) }
         .onAppear {
             results.begin(session: session)
             isPresented = true
@@ -382,7 +407,7 @@ private struct ActivityListContent: View {
 
     private func list(_ snapshot: ActivityListSource.Snapshot) -> some View {
         Group {
-            if snapshot.sections.isEmpty {
+            if snapshot.isEmpty {
                 VStack(spacing: 0) {
                     statusLine
                     header
@@ -397,12 +422,7 @@ private struct ActivityListContent: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 0) {
-                            statusLine
-                            header
-                            ForEach(snapshot.sections) { section in
-                                sectionView(section, snapshot)
-                                    .id(section.kind)
-                            }
+                            scrolledContent(snapshot)
                         }
                         .padding(.horizontal, density == .regular ? 16 : 0)
                         .padding(.bottom, 20)
@@ -417,6 +437,20 @@ private struct ActivityListContent: View {
         .accessibilityIdentifier(ID.activityList)
         .onChange(of: snapshot.settledHiddenIDs, initial: true) { _, ids in
             ids.forEach { results.forget(hidden: $0) }
+        }
+    }
+
+    /// What the list's scroll holds: the status line, the game-over card,
+    /// the header, then the sections.
+    @ViewBuilder private func scrolledContent(_ snapshot: ActivityListSource.Snapshot) -> some View {
+        statusLine
+        if let card = snapshot.card {
+            cardView(card, isFollowed: !snapshot.sections.isEmpty)
+        }
+        header
+        ForEach(snapshot.sections) { section in
+            sectionView(section, snapshot)
+                .id(section.kind)
         }
     }
 
@@ -517,9 +551,11 @@ private struct ActivityListContent: View {
 
     // MARK: Rows
 
-    private func actionState(for itemID: String, isUnusual: Bool = false) -> ActivityRowActionState {
+    private func actionState(for itemID: String, isUnusual: Bool = false,
+                             isGameOverCard: Bool = false) -> ActivityRowActionState {
         ActivityRowActionState(isUnusual: isUnusual, isInGamePopover: placement == .gamePopover,
-                               isOffline: isOffline, state: results.entries[itemID]?.state)
+                               isGameOverCard: isGameOverCard, isOffline: isOffline,
+                               state: results.entries[itemID]?.state)
     }
 
     @ViewBuilder
@@ -529,13 +565,45 @@ private struct ActivityListContent: View {
         case .item(let item):
             itemRow(item, after: after, snapshot)
         case .resolved(let resolved):
-            ActivityResolvedRowView(
-                row: resolved, entry: results.entries[resolved.id], density: density,
-                actionState: actionState(for: resolved.id), focus: $voiceOverFocus,
-                retry: { send(.retry, of: resolved.id) { results.retry(itemID: resolved.id) } },
-                openGame: openGame
-            )
+            resolvedRow(resolved)
         }
+    }
+
+    private func resolvedRow(_ resolved: ActivityResolvedRow) -> some View {
+        ActivityResolvedRowView(
+            row: resolved, entry: results.entries[resolved.id], density: density,
+            actionState: actionState(for: resolved.id), focus: $voiceOverFocus,
+            retry: { send(.retry, of: resolved.id) { results.retry(itemID: resolved.id) } },
+            openGame: openGame
+        )
+    }
+
+    /// The game-over card: the opponent's challenge with Reject and Accept,
+    /// or its warning and View when it is unusual, then its result in its
+    /// place until the list closes. Its requests are the list's, in the
+    /// list's session. A divider parts it from the sections.
+    private func cardView(_ row: ActivityListSections.Row, isFollowed: Bool) -> some View {
+        VStack(spacing: 0) {
+            switch row {
+            case .item(.challenge(let model)):
+                if let challenge = ogs.challengesReceived.first(where: { $0.id == model.id }) {
+                    challengeRow(challenge, model: model, itemID: row.id, after: nil, isGameOverCard: true)
+                }
+            case .item:
+                EmptyView()
+            case .resolved(let resolved):
+                resolvedRow(resolved)
+            }
+            if isFollowed, density == .dense {
+                Divider().padding(.horizontal, 16)
+            }
+        }
+        .background {
+            if density == .regular {
+                RoundedRectangle(cornerRadius: 14, style: .continuous).fill(MessagesStyle.card)
+            }
+        }
+        .padding(.top, density == .regular ? 16 : 0)
     }
 
     @ViewBuilder
@@ -572,14 +640,17 @@ private struct ActivityListContent: View {
         }
     }
 
+    /// A challenge's row. The game-over card's offers Reject and Accept in a
+    /// game's popover, unless the challenge is unusual.
     private func challengeRow(_ challenge: OGSDirectChallenge, model: ActivityModel.Challenge,
-                              itemID: String, after: String?) -> some View {
+                              itemID: String, after: String?, isGameOverCard: Bool = false) -> some View {
         let content = ActivityRowContents.challenge(challenge, isLive: model.isLive)
         let results = results
         let session = session
         return ActivityChallengeRow(
             itemID: itemID, challenge: challenge, content: content, density: density,
-            actionState: actionState(for: itemID, isUnusual: model.isUnusual), entry: results.entries[itemID],
+            actionState: actionState(for: itemID, isUnusual: model.isUnusual, isGameOverCard: isGameOverCard),
+            entry: results.entries[itemID],
             focus: $voiceOverFocus,
             accept: {
                 send(.action(.accept), of: itemID) {
@@ -595,7 +666,8 @@ private struct ActivityListContent: View {
             },
             view: { push(itemID) },
             retry: { send(.retry, of: itemID) { results.retry(itemID: itemID) } },
-            openGame: openGame
+            openGame: openGame,
+            isGameOverCard: isGameOverCard
         )
     }
 

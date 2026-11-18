@@ -184,6 +184,38 @@ final class ActivityListModelTests: XCTestCase {
         XCTAssertEqual(rowIDs([challenge(95_004)], [accepted]), [["challenge-95004"]], "Nothing is left out unasked.")
     }
 
+    func testTheCardLeadsWithItsChallengeThenTheRowTheUserResolved() {
+        var card = ActivityGameOverCard()
+        let listed = [challenge(95_001), challenge(95_004)]
+        XCTAssertNil(card.row(showing: nil, listed: listed, resolved: []), "No card until the control shows one.")
+        XCTAssertEqual(card.row(showing: 95_004, listed: listed, resolved: []), .item(challenge(95_004)),
+                       "The control's card leads from the list's first pass.")
+        card.remember(95_004)
+        let rejected = resolved("challenge-95004", after: nil, section: .challengesReceived)
+        XCTAssertEqual(card.row(showing: nil, listed: listed, resolved: [rejected]), .item(challenge(95_004)),
+                       "While the challenge is listed, its own row shows the result.")
+        XCTAssertEqual(card.row(showing: nil, listed: [challenge(95_001)], resolved: [rejected]), .resolved(rejected),
+                       "Once it has gone, its resolved row keeps the card's place, though the control moved on.")
+        XCTAssertNil(card.row(showing: nil, listed: [challenge(95_001)], resolved: []),
+                     "Gone with nothing to show, as when its sender withdraws it, there is no card.")
+        XCTAssertEqual(ActivityGameOverCard.itemID(95_004), challenge(95_004).id)
+    }
+
+    func testTheFirstCardStaysWhileItHasARow() {
+        var card = ActivityGameOverCard()
+        card.remember(95_004)
+        card.remember(nil)
+        card.remember(95_006)
+        card.remember(95_004)
+        XCTAssertEqual(card.shownChallengeIDs, [95_004, 95_006], "Each card counts once, in the order shown.")
+        XCTAssertEqual(card.row(showing: 95_006, listed: [challenge(95_004), challenge(95_006)], resolved: []),
+                       .item(challenge(95_004)), "A newer card waits until the list opens again, so rows don't move.")
+        let accepted = resolved("challenge-95004", after: nil, section: .challengesReceived)
+        XCTAssertEqual(card.row(showing: 95_006, listed: [challenge(95_006)], resolved: [accepted]), .resolved(accepted))
+        XCTAssertEqual(card.row(showing: 95_006, listed: [challenge(95_006)], resolved: []), .item(challenge(95_006)),
+                       "Once the first has nothing to show, the next leads.")
+    }
+
     // MARK: Presentation
 
     func testAGameAlwaysUsesAPopoverAndCompactRootsUseTheSheet() {

@@ -610,8 +610,9 @@ struct ActivityLiveGameRow: View {
 
 /// A challenge someone sent the user. A usual one, outside a game's
 /// popover, takes Reject and Accept on their own line; an unusual one, or
-/// any in a game's popover, shows its warnings and View, which opens the
-/// full card.
+/// any other in a game's popover, shows its warnings and View, which opens
+/// the full card. The game-over card, which leads a finished game's
+/// popover, is the exception there: a usual one takes Reject and Accept.
 struct ActivityChallengeRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let itemID: String
@@ -626,6 +627,9 @@ struct ActivityChallengeRow: View {
     let view: () -> Void
     let retry: () -> Void
     let openGame: (Int) -> Void
+    /// The game-over card shows the time control and komi in a game's
+    /// popover too, as the sheet's rows do, since its Accept needs no View.
+    var isGameOverCard = false
 
     private var name: String { challenge.challenger?.username ?? "" }
 
@@ -666,7 +670,8 @@ struct ActivityChallengeRow: View {
     private var summary: some View {
         HStack(spacing: 12) {
             ActivityRowTile(user: challenge.challenger, symbol: nil, size: density.tile)
-            ActivityRowLines(content: content, density: density, showsMoreDetails: density == .regular)
+            ActivityRowLines(content: content, density: density,
+                             showsMoreDetails: density == .regular || isGameOverCard)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)

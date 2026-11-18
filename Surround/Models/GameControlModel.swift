@@ -291,6 +291,12 @@ extension GameControlSlot {
         case .gameOverCard, .base, .dot, .inbox: nil
         }
     }
+
+    /// The challenge the game-over card shows.
+    var cardChallengeID: Int? {
+        if case let .gameOverCard(challengeID, _) = self { return challengeID }
+        return nil
+    }
 }
 
 // MARK: - The chip's clock

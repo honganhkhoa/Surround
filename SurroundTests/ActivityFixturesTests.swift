@@ -120,6 +120,18 @@ final class ActivityFixturesTests: XCTestCase {
         }
     }
 
+    /// What the game-over card offers in its game's popover: "no card", or
+    /// its challenge with "Reject and Accept" or "View".
+    private func describeCard(_ challengeID: Int?, in input: ActivityModel.Input) -> String {
+        guard let challengeID else { return "no card" }
+        guard let challenge = input.challengesReceived.first(where: { $0.id == challengeID }) else {
+            return "challenge-\(challengeID) gone"
+        }
+        let actions = ActivityRowActionState(isUnusual: challenge.isUnusual, isInGamePopover: true,
+                                             isGameOverCard: true, isOffline: false, state: nil)
+        return "challenge-\(challengeID) " + (actions.showsInlineAcceptAndReject ? "Reject and Accept" : "View")
+    }
+
     // MARK: The states
 
     private struct Expectation {
@@ -129,7 +141,9 @@ final class ActivityFixturesTests: XCTestCase {
         var lowTime: Set<Int> = []
         var baseIsLive: Bool
         var baseIsOver = false
+        /// The control in 26268404, with the card Game Detail's rule picks.
         var inGame: String
+        var card = "no card"
     }
 
     /// The designed table. Exhaustive, so a new state can't go unchecked.
@@ -181,10 +195,16 @@ final class ActivityFixturesTests: XCTestCase {
                                baseIsLive: true, inGame: chip + " dot")
         case .rematchOffered:
             return Expectation(lead: "challenge-95004", list: ["challenge-95004"], baseIsLive: true,
-                               baseIsOver: true, inGame: "base +1")
+                               baseIsOver: true, inGame: "card challenge-95004 +0",
+                               card: "challenge-95004 Reject and Accept")
         case .rematchBothAsked:
+            // The user's own challenge waits; it never counts.
             return Expectation(lead: "challenge-95004", list: ["challenge-95004", "waiting-sent-95202"],
-                               baseIsLive: true, baseIsOver: true, inGame: "base +1")
+                               baseIsLive: true, baseIsOver: true, inGame: "card challenge-95004 +0",
+                               card: "challenge-95004 Reject and Accept")
+        case .unusualRematch:
+            return Expectation(lead: "challenge-95004", list: ["challenge-95004"], baseIsLive: true,
+                               baseIsOver: true, inGame: "card challenge-95004 +0", card: "challenge-95004 View")
         }
     }
 
@@ -204,8 +224,12 @@ final class ActivityFixturesTests: XCTestCase {
             XCTAssertEqual(root.lowTimeGameIDs, want.lowTime, "\(state)")
             let base = try XCTUnwrap(ogs.activeGames[baseID], "\(state)")
             XCTAssertEqual(ActivityModel.Place(showing: base), basePlace(state), "\(state)")
-            let control = ActivityModel.gameControl(input(ogs, basePlace(state), seed))
+            // Game Detail on Home's route, with the card its rule picks.
+            let card = GameOverCardRule.challengeID(for: base, among: ogs.challengesReceived)
+            let inGame = input(ogs, basePlace(state), seed)
+            let control = ActivityModel.gameControl(inGame, context: ActivityModel.GameControlContext(cardChallengeID: card))
             XCTAssertEqual(describe(control), want.inGame, "\(state)")
+            XCTAssertEqual(describeCard(card, in: inGame), want.card, "\(state)")
         }
     }
 
@@ -349,6 +373,29 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertFalse(rematch.isUnusual)
         XCTAssertEqual(ogs.challengesSent.map(\.id), [ID.rematchSentChallengeID])
         XCTAssertEqual(ogs.challengesSent.first?.challenged?.id, template.players.black.id)
+
+        // OGS makes a challenge's game as it makes the challenge, so both
+        // rematches have games newer than 26268404.
+        XCTAssertEqual(rematch.game.id, ID.rematchGameID(ID.rematchChallengeID))
+        XCTAssertGreaterThan(rematch.game.id, baseID)
+        let sent = try XCTUnwrap(ogs.challengesSent.first)
+        XCTAssertEqual(sent.game.id, ID.rematchGameID(ID.rematchSentChallengeID))
+        XCTAssertGreaterThan(sent.game.id, baseID)
+    }
+
+    func testTheUnusualRematchAsksForCustomKomi() throws {
+        let (ogs, _) = try service(.unusualRematch)
+        let rematch = try XCTUnwrap(ogs.challengesReceived.first { $0.id == ID.rematchChallengeID })
+        XCTAssertEqual(rematch.game.komi, 0.5)
+        XCTAssertTrue(rematch.useCustomKomi)
+        XCTAssertFalse(rematch.hasHandicap || rematch.unusualBoardSize || rematch.game.timeControl.system.isUnusual,
+                       "Custom komi is its one warning.")
+        XCTAssertTrue(rematch.isUnusual)
+        XCTAssertGreaterThan(rematch.game.id, baseID)
+        XCTAssertTrue(ogs.challengesSent.isEmpty)
+        let base = try XCTUnwrap(ogs.activeGames[baseID])
+        XCTAssertEqual(GameOverCardRule.challengeID(for: base, among: ogs.challengesReceived), ID.rematchChallengeID,
+                       "Komi isn't compared, so the card still leads, with View.")
     }
 
     // MARK: Windows and the journey
