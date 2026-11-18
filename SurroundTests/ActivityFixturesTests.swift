@@ -106,12 +106,14 @@ final class ActivityFixturesTests: XCTestCase {
         }
     }
 
-    /// "none", "started game-N +K[ dot]", "chip game-N +K[ dot]", "base +K", "dot" or "inbox K".
+    /// "none", "started game-N +K[ dot]", "chip game-N +K[ dot]", "card challenge-N +K", "base +K", "dot"
+    /// or "inbox K".
     private func describe(_ control: ActivityModel.GameControl?) -> String {
         switch control {
         case .none: return "none"
         case let .gameStarted(game, plusN, hasDot): return "started game-\(game.id) +\(plusN)" + (hasDot ? " dot" : "")
         case let .chip(game, plusN, hasDot): return "chip game-\(game.id) +\(plusN)" + (hasDot ? " dot" : "")
+        case let .gameOverCard(challengeID, plusN): return "card challenge-\(challengeID) +\(plusN)"
         case .base(let plusN): return "base +\(plusN)"
         case .dot: return "dot"
         case .inbox(let count): return "inbox \(count)"

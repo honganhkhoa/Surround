@@ -49,6 +49,9 @@ struct ActivityRequest: Identifiable, Equatable {
         case livePill
         case messagesButton
         case debug
+        /// Game Detail's in-game control, which presents the list as its own
+        /// popover.
+        case gameControl
     }
 
     /// Where the list starts.
@@ -200,11 +203,14 @@ enum ActivityListSections {
     /// - A resolved row whose item has gone follows the id that preceded it
     ///   in its section, or comes first in its section when that id is no
     ///   longer there.
-    /// - No id shows twice.
+    /// - No id shows twice, and no id in `excludedIDs` shows at all, its
+    ///   resolved row included: the game-over card's challenge, which a
+    ///   game's popover shows above the sections.
     /// - Empty sections are left out, and Messages shows only with a
     ///   conversation.
-    static func sections(list: [ActivityModel.Item], resolved: [ActivityResolvedRow]) -> [Section] {
-        var seen = Set<String>()
+    static func sections(list: [ActivityModel.Item], resolved: [ActivityResolvedRow],
+                         excluding excludedIDs: Set<String> = []) -> [Section] {
+        var seen = excludedIDs
         let items = list.filter { seen.insert($0.id).inserted }
         // A listed item takes over its id; a repeated resolved id counts once.
         let gone = resolved.filter { seen.insert($0.id).inserted }
@@ -493,15 +499,20 @@ struct ActivityRowActionState: Equatable {
     }
 
     /// Inline Reject and Accept show only for a usual challenge outside a
-    /// game's popover. Otherwise the row shows its warning and View, and the
-    /// full challenge card decides.
+    /// game's popover, or on the game-over card, that popover's one
+    /// exception. Otherwise the row shows its warning and View, and the full
+    /// challenge card decides.
     let showsInlineAcceptAndReject: Bool
     private let isOffline: Bool
     private let isPending: Bool
 
-    /// - Parameter state: The row's latest action, if any.
-    init(isUnusual: Bool, isInGamePopover: Bool, isOffline: Bool, state: ActivityActionState?) {
-        showsInlineAcceptAndReject = !isUnusual && !isInGamePopover
+    /// - Parameters:
+    ///   - isGameOverCard: The row is the game-over card, which leads a
+    ///     finished game's popover.
+    ///   - state: The row's latest action, if any.
+    init(isUnusual: Bool, isInGamePopover: Bool, isGameOverCard: Bool = false, isOffline: Bool,
+         state: ActivityActionState?) {
+        showsInlineAcceptAndReject = !isUnusual && (!isInGamePopover || isGameOverCard)
         self.isOffline = isOffline
         isPending = state?.isPending ?? false
     }

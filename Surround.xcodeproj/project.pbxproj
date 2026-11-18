@@ -34,6 +34,12 @@
 		5C3E00062026111200000006 /* ActivityListModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E00042026111200000004 /* ActivityListModel.swift */; };
 		AC7100042026110900000004 /* ActivityModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC7100052026110900000005 /* ActivityModelTests.swift */; };
 		5C3E000E202611120000000E /* ActivityListModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3E000D202611120000000D /* ActivityListModelTests.swift */; };
+		5C4E00022026111400000002 /* GameControlModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00012026111400000001 /* GameControlModel.swift */; };
+		5C4E00032026111400000003 /* GameControlModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00012026111400000001 /* GameControlModel.swift */; };
+		5C4E00052026111400000005 /* GameControlModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00042026111400000004 /* GameControlModelTests.swift */; };
+		5C4E00072026111400000007 /* GameControlSwitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00062026111400000006 /* GameControlSwitchTests.swift */; };
+		5C4E00092026111400000009 /* GameOverCardRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00082026111400000008 /* GameOverCardRuleTests.swift */; };
+		5C4E000B202611140000000B /* GameConnectionPlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E000A202611140000000A /* GameConnectionPlacementTests.swift */; };
 		ACA1D0012026110900000001 /* ActivityPlaceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */; };
 		ACA1D0032026110900000003 /* ActivityPlaceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */; };
 		ACA1D0042026110900000004 /* ActivityPlaceRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACA1D0052026110900000005 /* ActivityPlaceRegistryTests.swift */; };
@@ -606,6 +612,11 @@
 		5C3E00042026111200000004 /* ActivityListModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityListModel.swift; sourceTree = "<group>"; };
 		AC7100052026110900000005 /* ActivityModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityModelTests.swift; sourceTree = "<group>"; };
 		5C3E000D202611120000000D /* ActivityListModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityListModelTests.swift; sourceTree = "<group>"; };
+		5C4E00012026111400000001 /* GameControlModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlModel.swift; sourceTree = "<group>"; };
+		5C4E00042026111400000004 /* GameControlModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlModelTests.swift; sourceTree = "<group>"; };
+		5C4E00062026111400000006 /* GameControlSwitchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlSwitchTests.swift; sourceTree = "<group>"; };
+		5C4E00082026111400000008 /* GameOverCardRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameOverCardRuleTests.swift; sourceTree = "<group>"; };
+		5C4E000A202611140000000A /* GameConnectionPlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameConnectionPlacementTests.swift; sourceTree = "<group>"; };
 		ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPlaceRegistry.swift; sourceTree = "<group>"; };
 		ACA1D0052026110900000005 /* ActivityPlaceRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPlaceRegistryTests.swift; sourceTree = "<group>"; };
 		A7F100022026110900000002 /* ActivityFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityFixtures.swift; sourceTree = "<group>"; };
@@ -1067,6 +1078,10 @@
 				517D00052026102700000005 /* StonePlacementSoundTests.swift */,
 				AC7100052026110900000005 /* ActivityModelTests.swift */,
 				5C3E000D202611120000000D /* ActivityListModelTests.swift */,
+				5C4E00042026111400000004 /* GameControlModelTests.swift */,
+				5C4E00062026111400000006 /* GameControlSwitchTests.swift */,
+				5C4E00082026111400000008 /* GameOverCardRuleTests.swift */,
+				5C4E000A202611140000000A /* GameConnectionPlacementTests.swift */,
 				ACA1D0052026110900000005 /* ActivityPlaceRegistryTests.swift */,
 				A7F100052026110900000005 /* ActivityFixturesTests.swift */,
 				6A7E00052026110900000005 /* ActivityHostPolicyTests.swift */,
@@ -1208,6 +1223,7 @@
 			children = (
 				AC7100022026110900000002 /* ActivityModel.swift */,
 				5C3E00042026111200000004 /* ActivityListModel.swift */,
+				5C4E00012026111400000001 /* GameControlModel.swift */,
 				6A7E00022026110900000002 /* ActivityHostPolicy.swift */,
 				C5A700012026110900000001 /* ConnectionStatusModel.swift */,
 				5C2E000A202611110000000A /* PrivateMessageComposerState.swift */,
@@ -1803,6 +1819,7 @@
 				517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */,
 				AC7100012026110900000001 /* ActivityModel.swift in Sources */,
 				5C3E00052026111200000005 /* ActivityListModel.swift in Sources */,
+				5C4E00022026111400000002 /* GameControlModel.swift in Sources */,
 				ACA1D0012026110900000001 /* ActivityPlaceRegistry.swift in Sources */,
 				6A7E00012026110900000001 /* ActivityHostPolicy.swift in Sources */,
 				6A7E00062026110900000006 /* ActivityHostSDK.swift in Sources */,
@@ -1956,8 +1973,13 @@
 				517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */,
 				AC7100032026110900000003 /* ActivityModel.swift in Sources */,
 				5C3E00062026111200000006 /* ActivityListModel.swift in Sources */,
+				5C4E00032026111400000003 /* GameControlModel.swift in Sources */,
 				AC7100042026110900000004 /* ActivityModelTests.swift in Sources */,
 				5C3E000E202611120000000E /* ActivityListModelTests.swift in Sources */,
+				5C4E00052026111400000005 /* GameControlModelTests.swift in Sources */,
+				5C4E00072026111400000007 /* GameControlSwitchTests.swift in Sources */,
+				5C4E00092026111400000009 /* GameOverCardRuleTests.swift in Sources */,
+				5C4E000B202611140000000B /* GameConnectionPlacementTests.swift in Sources */,
 				ACA1D0032026110900000003 /* ActivityPlaceRegistry.swift in Sources */,
 				ACA1D0042026110900000004 /* ActivityPlaceRegistryTests.swift in Sources */,
 				A7F100032026110900000003 /* ActivityFixtures.swift in Sources */,
