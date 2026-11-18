@@ -3050,6 +3050,98 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         #endif
     }
 
+    func testALinkReplacesTheGameOpenedFromHome() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("iOS only: it hands a link over through the iOS system; on the Mac, links are checked by hand.")
+        #else
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.widgetDeepLinkRoutingLaunchArgument,
+        ])
+        let id = SurroundUITestContract.AccessibilityID.self
+        let firstGameID = SurroundUITestContract.fixtureGameID
+        let secondGameID = SurroundUITestContract.widgetRoutingSecondGameID
+        func gameDetail(_ gameID: Int) -> XCUIElement {
+            app.descendants(matching: .any).matching(identifier: id.gameDetail(gameID)).firstMatch
+        }
+
+        // A row's game covers Home's list, which a game opened at launch doesn't.
+        tap(id.homeGame(firstGameID), in: app)
+        element(id.gameDetail(firstGameID), in: app)
+
+        // The link reaches the running app, as a notification's or a widget's
+        // does. XCUIApplication.open(_:) would launch the app again with it.
+        XCUIDevice.shared.system.open(URL(string: "surround://home/\(secondGameID)")!)
+        element(id.gameDetail(secondGameID), in: app)
+        XCTAssertTrue(pollUntil(timeout: 10) { !gameDetail(firstGameID).exists },
+                      "The link's game takes the place of the game that was showing.")
+        keepScreenshot("The link's game in place of the row's", in: app)
+
+        tapBackFromGame(to: "Active games", in: app)
+        element(id.screenHome, in: app)
+        XCTAssertTrue(pollUntil(timeout: 10) { !gameDetail(secondGameID).exists },
+                      "Back closes the link's game.")
+        XCTAssertFalse(pollUntil(timeout: 3) { gameDetail(firstGameID).exists || gameDetail(secondGameID).exists },
+                       "No game opens again after Back.")
+        #endif
+    }
+
+    func testALinkReplacesTheGameOpenedFromPublicGames() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("iOS only: it hands a link over through the iOS system; on the Mac, links are checked by hand.")
+        #else
+        let app = launchApp()
+        let id = SurroundUITestContract.AccessibilityID.self
+        // Public games resolves a link from the user's games too, so the
+        // user's own game stands in for a second public game.
+        let linkedGameID = SurroundUITestContract.fixtureGameID
+        func gameDetail(_ gameID: Int) -> XCUIElement {
+            app.descendants(matching: .any).matching(identifier: id.gameDetail(gameID)).firstMatch
+        }
+
+        selectMainNavigation(id.navigationPublicGames, in: app)
+        element(id.screenPublicGames, in: app)
+        let prefix = String(id.publicGame(0).dropLast())   // publicGame(_:) ends with the game's id
+        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "Public games lists the fixture's public game.")
+        let publicGameID = try XCTUnwrap(Int(card.identifier.dropFirst(prefix.count)))
+        tap(card, description: "Open the public game", in: app)
+        element(id.gameDetail(publicGameID), in: app)
+
+        XCUIDevice.shared.system.open(URL(string: "surround://publicGames/\(linkedGameID)")!)
+        element(id.gameDetail(linkedGameID), in: app)
+        XCTAssertTrue(pollUntil(timeout: 10) { !gameDetail(publicGameID).exists },
+                      "The link's game takes the place of the public game that was showing.")
+        keepScreenshot("The link's game in place of the public game", in: app)
+
+        tapBackFromGame(to: "Public live games", in: app)
+        element(id.screenPublicGames, in: app)
+        XCTAssertTrue(pollUntil(timeout: 10) { !gameDetail(linkedGameID).exists },
+                      "Back closes the link's game.")
+        XCTAssertFalse(pollUntil(timeout: 3) { gameDetail(publicGameID).exists || gameDetail(linkedGameID).exists },
+                       "No game opens again after Back.")
+        #endif
+    }
+
+    /// Taps the one visible Back of a game's page. iOS 18 titles Back with
+    /// the page below instead of identifying it.
+    private func tapBackFromGame(to previousTitle: String, in app: XCUIApplication) {
+        let identifiedBacks = app.buttons.matching(identifier: "BackButton")
+        let titledBacks = app.navigationBars.buttons.matching(NSPredicate(
+            format: "identifier != %@ AND (label == %@ OR label == %@)",
+            SurroundUITestContract.AccessibilityID.gameActiveGamesButton, previousTitle, "Back"
+        ))
+        var back: XCUIElement?
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            let identified = identifiedBacks.allElementsBoundByIndex.filter { $0.isHittable }
+            let titled = titledBacks.allElementsBoundByIndex.filter { $0.isHittable }
+            back = identified.count == 1 ? identified[0]
+                : identified.isEmpty && titled.count == 1 ? titled[0] : nil
+            return back != nil
+        }, "The game has one visible Back.")
+        guard let back else { return }
+        tap(back, description: "Back to \(previousTitle)", in: app)
+    }
+
     func testHomeHistoryRetryRecoversAndKeepsNavigationAvailable() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.homeHistoryFailsOnceLaunchArgument,

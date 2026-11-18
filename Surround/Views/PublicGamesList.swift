@@ -19,7 +19,11 @@ struct PublicGamesList: View {
     private var theme: SurroundTheme {
         SurroundTheme.current(storedID: gameThemeID, appliesToWholeApp: themeAppliesToWholeApp)
     }
-    
+
+    /// Resolves the window's pending game open while it is Public games',
+    /// with the request it resolves.
+    @State private var pendingGameOpenTask: (requestID: UUID, task: Task<Void, Never>)?
+
     @MainActor
     private func resolvePendingGameOpen(_ request: PendingGameOpen) async {
         guard request.rootView == .publicGames,
@@ -74,7 +78,7 @@ struct PublicGamesList: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))]) {
                     ForEach(ogs.sortedPublicGames) { game in
-                        Button(action: { nav.publicGames.activeGame = game }) {
+                        Button(action: { nav.showPublicGame(game) }) {
                             GameCell(game: game)
                                 .modifier(HomeCardOnScene(padding: 12))
                         }
@@ -102,12 +106,21 @@ struct PublicGamesList: View {
 //            print("Appeared \(self)")
             ogs.fetchPublicGames()
         }
-        .task(id: nav.pendingGameOpen?.id) {
-            guard let request = nav.pendingGameOpen,
-                  request.rootView == .publicGames else {
-                return
+        // A Task, not a task(id:): a task(id:) doesn't run while a public
+        // game covers the list, so a game requested then, such as a link's,
+        // would wait for Back. The list's reappearance runs this again, and
+        // an open still under way carries on.
+        .onChange(of: nav.pendingGameOpen?.id, initial: true) {
+            let request = nav.pendingGameOpen?.rootView == .publicGames ? nav.pendingGameOpen : nil
+            if let request, request.id == pendingGameOpenTask?.requestID { return }
+            pendingGameOpenTask?.task.cancel()
+            pendingGameOpenTask = nil
+            guard let request else { return }
+            let task = Task {
+                await resolvePendingGameOpen(request)
+                if pendingGameOpenTask?.requestID == request.id { pendingGameOpenTask = nil }
             }
-            await resolvePendingGameOpen(request)
+            pendingGameOpenTask = (request.id, task)
         }
         .modifier(ThemeSceneNavigationTitle(title: Text("Public live games"), theme: theme))
     }

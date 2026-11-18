@@ -66,6 +66,9 @@ struct HomeView: View {
 
     @State private var openingGameRequestID: UUID?
     @State private var failedGameOpen: PendingGameOpen?
+    /// Resolves the window's pending game open while it is Home's, with the
+    /// request it resolves.
+    @State private var pendingGameOpenTask: (requestID: UUID, task: Task<Void, Never>)?
 
     @State var recentFinishedGames: [Game] = []
     @State var recentFinishedCancellable: AnyCancellable?
@@ -107,8 +110,7 @@ struct HomeView: View {
 
     func showGameDetail(game: Game, showsCarousel: Bool = true) {
         print("Opening game \(game)")
-        nav.home.activeGameShowsCarousel = showsCarousel
-        nav.home.activeGame = game
+        nav.showHomeGame(game, showsCarousel: showsCarousel)
     }
 
     /// Reloads the most recent finished games.
@@ -1079,12 +1081,24 @@ struct HomeView: View {
                     .environmentObject(nav)
             }
         }
-        .task(id: nav.pendingGameOpen?.id) {
-            guard let request = nav.pendingGameOpen,
-                  request.rootView == .home else {
-                return
+        // A Task, not a task(id:). A task(id:) doesn't run while Home's own
+        // game covers Home, so an open from that game, such as Activity's,
+        // would wait for Back. And as Home appears in a tab switch, its body
+        // runs within the switch, where a push can leave a blank page on
+        // iOS 27.2 while a popover is still closing; a Task starts after it.
+        // Home's reappearance runs this again: an open still under way
+        // carries on, and one that failed starts over, so its alert shows.
+        .onChange(of: nav.pendingGameOpen?.id, initial: true) {
+            let request = nav.pendingGameOpen?.rootView == .home ? nav.pendingGameOpen : nil
+            if let request, request.id == pendingGameOpenTask?.requestID { return }
+            pendingGameOpenTask?.task.cancel()
+            pendingGameOpenTask = nil
+            guard let request else { return }
+            let task = Task {
+                await resolvePendingGameOpen(request)
+                if pendingGameOpenTask?.requestID == request.id { pendingGameOpenTask = nil }
             }
-            await resolvePendingGameOpen(request)
+            pendingGameOpenTask = (request.id, task)
         }
         .onChange(of: displayMode, initial: true) { _, newDisplayMode in
             guard allowsLocalPersistence else { return }

@@ -494,6 +494,22 @@ class NavigationService: ObservableObject {
         pendingGameOpen = nil
     }
 
+    /// Shows a game the user picks on Home. It takes the place of an open
+    /// still on its way there, such as a link's game being fetched, which
+    /// would otherwise replace the pick when it arrives.
+    func showHomeGame(_ game: Game, showsCarousel: Bool = true) {
+        if pendingGameOpen?.rootView == .home { pendingGameOpen = nil }
+        home.activeGameShowsCarousel = showsCarousel
+        home.activeGame = game
+    }
+
+    /// Shows a game the user picks in Public games. Like a pick on Home, it
+    /// takes the place of an open still on its way there.
+    func showPublicGame(_ game: Game) {
+        if pendingGameOpen?.rootView == .publicGames { pendingGameOpen = nil }
+        publicGames.activeGame = game
+    }
+
     private func dismissTrackedNavigation(
         preservingActiveGameIn rootView: RootView?
     ) {
