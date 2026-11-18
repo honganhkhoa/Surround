@@ -4576,7 +4576,7 @@ struct SakuraStreamCanopyLayout: Equatable {
         )
 
         // Elevated ~4.5 m riverside sakura boughs cast a softer far-displaced
-        // solar penumbra onto the stream/sand below and a slightly tighter,
+        // solar penumbra onto the stream and flowering bank below and a slightly tighter,
         // crisper parallax shadow across raised clocks, panels, and ceramic slab.
         groundBlurRadius = min(6.5, max(4.0, shortSide * 0.0125))
         blurRadius = min(4.5, max(2.8, shortSide * 0.0085))

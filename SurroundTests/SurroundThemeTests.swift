@@ -2547,9 +2547,7 @@ final class SurroundThemeTests: XCTestCase {
         for (size, boardStart) in viewports {
             let layout = SakuraStreamSceneLayout(size: size)
             let frame = layout.imageFrame
-            // Conservative bounds around the overhead canopy artwork's water,
-            // not its dry moss, blossoms or bank stones. The meandering
-            // landscape's upper bulge reaches about 20.8% of the source.
+            // Maximum water extents in the source plates along their cropped axes.
             let waterEnd = layout.composition == .portrait
                 ? frame.minY + frame.height * 0.21
                 : frame.minX + frame.width * 0.208
@@ -2606,92 +2604,75 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertGreaterThan(day, 0.1)
         XCTAssertLessThan(night, day * 0.8, "Evening subdues the same stream without changing its crop")
 
-        func canopyLumaSum(_ scheme: ColorScheme) throws -> Double {
-            let rendered = try nativeMaterialPixelsUsingDirectContext(
-                SakuraStreamCanopyBehind(size: CGSize(width: 240, height: 240), scheme: scheme)
-                    .environment(\.colorScheme, scheme),
-                scale: 1
+        // Home, Settings, Public games and Game history use this shared backdrop.
+        // Sample opaque canopy petals by location so pink groundcover cannot pass
+        // an integration check or be mistaken for an overhanging branch.
+        typealias Region = (columns: Range<Int>, rows: Range<Int>)
+        func checkCanopies(size: CGSize, corners: [Region], openings: [Region]) throws {
+            let canopy = try nativeMaterialPixelsUsingDirectContext(
+                SakuraStreamCanopyBehind(size: size, scheme: .light).environment(\.colorScheme, .light), scale: 1
             )
-            var sum = 0.0
-            for idx in stride(from: 0, to: rendered.pixels.count, by: 4) where rendered.pixels[idx + 3] > 200 {
-                sum += 0.2126 * Double(rendered.pixels[idx])
-                    + 0.7152 * Double(rendered.pixels[idx + 1])
-                    + 0.0722 * Double(rendered.pixels[idx + 2])
+            func backdrop(_ scheme: ColorScheme) throws -> [UInt8] {
+                try nativeMaterialPixelsUsingDirectContext(
+                    GameDetailBackdrop()
+                        .environment(\.surroundTheme, .sakuraStream)
+                        .environment(\.colorScheme, scheme)
+                        .frame(width: size.width, height: size.height), scale: 1
+                ).pixels
             }
-            return sum
-        }
-        let dayCanopy = try canopyLumaSum(.light), nightCanopy = try canopyLumaSum(.dark)
-        XCTAssertGreaterThan(dayCanopy, 1000)
-        XCTAssertLessThan(nightCanopy, dayCanopy * 0.72, "Matched sakura boughs dim in unison with the evening stream")
-
-        // Home, Settings, Public games, and Game history share GameDetailBackdrop
-        // via ThemeSceneBackdrop; verify it renders rosy sakura blossoms across
-        // both top and bottom bands without GameDetailSceneFoliage.
-        let sharedBackdrop = try nativeMaterialPixelsUsingDirectContext(
-            GameDetailBackdrop()
-                .environment(\.surroundTheme, .sakuraStream)
-                .environment(\.colorScheme, .light)
-                .frame(width: 402, height: 874),
-            scale: 1
-        )
-        func rosyBlossomPixels(in rows: Range<Int>) -> Int {
-            var count = 0
-            for y in rows {
-                for x in 0..<sharedBackdrop.width {
-                    let i = (y * sharedBackdrop.width + x) * 4
-                    let r = Int(sharedBackdrop.pixels[i])
-                    let g = Int(sharedBackdrop.pixels[i + 1])
-                    let b = Int(sharedBackdrop.pixels[i + 2])
-                    if r > 205 && r - g > 30 && b - g > 14 {
-                        count += 1
+            let day = try backdrop(.light), night = try backdrop(.dark)
+            func luma(_ pixels: [UInt8], _ offset: Int) -> Double {
+                0.2126 * Double(pixels[offset]) + 0.7152 * Double(pixels[offset + 1]) + 0.0722 * Double(pixels[offset + 2])
+            }
+            for (columns, rows) in corners {
+                var corePetals = 0, interiorPetals = 0, matchingPetals = 0
+                var dayLuma = 0.0, nightLuma = 0.0
+                for y in rows {
+                    for x in columns {
+                        let i = (y * canopy.width + x) * 4
+                        let r = Int(canopy.pixels[i]), g = Int(canopy.pixels[i + 1]), b = Int(canopy.pixels[i + 2])
+                        guard canopy.pixels[i + 3] >= 250, r > 205, r - g > 30, b - g > 14 else { continue }
+                        corePetals += 1
+                        // Older systems add a scrim at the screen edges. Compare
+                        // independent renders only where the petals are unobscured.
+                        guard y >= 92, y < canopy.height - 76 else { continue }
+                        interiorPetals += 1
+                        if abs(r - Int(day[i])) <= 10 && abs(g - Int(day[i + 1])) <= 10 && abs(b - Int(day[i + 2])) <= 10 {
+                            matchingPetals += 1
+                        }
+                        dayLuma += luma(day, i)
+                        nightLuma += luma(night, i)
                     }
                 }
+                let corner = "\(size), x \(columns), y \(rows)"
+                XCTAssertGreaterThan(corePetals, 1200, "Blooming bough is visible at \(corner)")
+                XCTAssertGreaterThan(interiorPetals, 50, "Petals reach beyond the edge scrim at \(corner)")
+                XCTAssertGreaterThan(matchingPetals, interiorPetals * 9 / 10,
+                                     "The shared backdrop renders the canopy's own petals at \(corner)")
+                XCTAssertLessThan(nightLuma, dayLuma * 0.72, "Evening subdues the bough at \(corner)")
             }
-            return count
-        }
-        XCTAssertGreaterThan(rosyBlossomPixels(in: 0..<200), 2500,
-                             "Shared app backdrop renders upper sakura blossoms outside Game Detail")
-        XCTAssertLessThan(rosyBlossomPixels(in: 0..<200), 25000,
-                          "Upper boughs stay restrained so the turquoise stream remains clearly visible")
-        XCTAssertLessThan(rosyBlossomPixels(in: 215..<660), 250,
-                          "Top-right canopy stays in the upper corner without overlapping the portrait board band")
-        XCTAssertGreaterThan(rosyBlossomPixels(in: 680..<874), 2500,
-                             "Shared app backdrop renders lower sakura blossoms along the bottom bank")
-        XCTAssertLessThan(rosyBlossomPixels(in: 680..<874), 25000,
-                          "Lower boughs stay tucked at the corners without overwhelming the bank")
 
-        let landscapeBackdrop = try nativeMaterialPixelsUsingDirectContext(
-            GameDetailBackdrop()
-                .environment(\.surroundTheme, .sakuraStream)
-                .environment(\.colorScheme, .light)
-                .frame(width: 874, height: 402),
-            scale: 1
-        )
-        func landscapeRosyPixels(cols: Range<Int>, rows: Range<Int>) -> Int {
-            var count = 0
-            for y in rows {
-                for x in cols {
-                    let i = (y * landscapeBackdrop.width + x) * 4
-                    let r = Int(landscapeBackdrop.pixels[i])
-                    let g = Int(landscapeBackdrop.pixels[i + 1])
-                    let b = Int(landscapeBackdrop.pixels[i + 2])
-                    if r > 205 && r - g > 30 && b - g > 14 { count += 1 }
+            // The separate canopy layer lets its translucent ground shadows pass
+            // while exposing any solid flowers, twigs or leaves in these gaps.
+            for (columns, rows) in openings {
+                var opaquePixels = 0
+                for y in rows {
+                    for x in columns where canopy.pixels[(y * canopy.width + x) * 4 + 3] > 200 {
+                        opaquePixels += 1
+                    }
                 }
+                XCTAssertLessThan(opaquePixels, 250, "Keep the bank and board clear at \(size), x \(columns), y \(rows)")
             }
-            return count
         }
-        XCTAssertGreaterThan(landscapeRosyPixels(cols: 0..<220, rows: 0..<170), 1500,
-                             "Landscape upper-left canopy frames the upper stream")
-        XCTAssertLessThan(landscapeRosyPixels(cols: 0..<160, rows: 185..<240), 400,
-                          "Middle-left stream remains open turquoise water between canopies")
-        XCTAssertGreaterThan(landscapeRosyPixels(cols: 0..<220, rows: 255..<402), 1500,
-                             "Landscape bottom-left canopy frames the lower stream")
-        XCTAssertGreaterThan(landscapeRosyPixels(cols: 620..<874, rows: 0..<140), 1200,
-                             "Landscape top-right canopy frames the top-right corner")
-        XCTAssertLessThan(landscapeRosyPixels(cols: 620..<874, rows: 145..<225), 300,
-                          "Middle-right sandy bank stays open between top-right and bottom-right canopies")
-        XCTAssertGreaterThan(landscapeRosyPixels(cols: 680..<874, rows: 240..<402), 1200,
-                             "Landscape bottom-right canopy frames the bottom-right corner")
+
+        try checkCanopies(size: CGSize(width: 402, height: 874),
+                          corners: [(0..<201, 0..<200), (201..<402, 0..<200),
+                                    (0..<201, 680..<874), (201..<402, 680..<874)],
+                          openings: [(175..<195, 34..<94), (0..<402, 215..<660), (170..<226, 706..<748)])
+        try checkCanopies(size: CGSize(width: 874, height: 402),
+                          corners: [(0..<220, 0..<170), (620..<874, 0..<140),
+                                    (0..<220, 255..<402), (680..<874, 240..<402)],
+                          openings: [(0..<160, 185..<240), (620..<874, 145..<225)])
     }
 
     func testAnUnknownStoredThemeFallsBackToStandard() {
