@@ -381,6 +381,53 @@ final class AppRouteTests: XCTestCase {
         navigation.openActivity(source: .homeSearching, anchor: pill, horizontalSizeClass: .compact)
         navigation.moveActivityAnchor(to: moved, from: .homeSearching)
         XCTAssertEqual(navigation.main.activity?.anchor, pill, "A sheet has nothing to follow.")
+
+        let game = ActivityModel.Place.game(id: 42, isOwnGame: true, isLive: false, isOver: false)
+        navigation.main.activity = ActivityRequest(source: .gameControl, style: .popover, place: game)
+        navigation.moveActivityAnchor(to: moved, from: .gameControl)
+        XCTAssertEqual(navigation.main.activity?.anchor, .zero,
+                       "The in-game control's popover hangs from the control, so nothing moves it.")
+    }
+
+    /// Every game Activity opens closes the iPad's account sheet, as a game
+    /// in the Profile sheet can open its control's popover there. A live
+    /// Accept, the correspondence row, Open game and a game opened from a
+    /// profile the list pushed all open through `openGame`. Under the
+    /// moderator cover the sheet waits with the open.
+    @MainActor
+    func testEveryGameActivityOpensClosesTheAccountSheet() throws {
+        let navigation = NavigationService()
+        navigation.main.rootView = .publicGames
+        navigation.main.accountSheet = .profile
+        navigation.home.showingNewGameView = true
+        navigation.openGame(42, closesNewGame: true)
+        XCTAssertNil(navigation.main.accountSheet, "The account sheet closes.")
+        XCTAssertFalse(navigation.home.showingNewGameView)
+        XCTAssertEqual(navigation.main.rootView, .home)
+        XCTAssertEqual(navigation.pendingGameOpen?.ogsGameID, 42)
+
+        navigation.main.accountSheet = .settings
+        navigation.home.showingNewGameView = true
+        navigation.openGame(43, closesNewGame: false)
+        XCTAssertNil(navigation.main.accountSheet, "Whichever account sheet is up.")
+        XCTAssertTrue(navigation.home.showingNewGameView, "New game stays unless asked.")
+        XCTAssertEqual(navigation.pendingGameOpen?.ogsGameID, 43)
+
+        let cover = Cover()
+        let covered = window(store: SuperchatStore(preferences: nil), cover: cover)
+        covered.main.accountSheet = .profile
+        covered.openGame(44, closesNewGame: false)
+        XCTAssertEqual(covered.main.accountSheet, .profile, "Under the cover the sheet waits with the open.")
+        XCTAssertNil(covered.pendingGameOpen)
+        cover.isRaised = false
+        covered.replayHeldNavigation()
+        XCTAssertNil(covered.main.accountSheet, "The replayed open closes it.")
+        XCTAssertEqual(covered.pendingGameOpen?.ogsGameID, 44)
+
+        let plain = NavigationService()
+        plain.main.accountSheet = .profile
+        plain.requestGameOpen(try XCTUnwrap(AppRoute(rootView: .home, ogsGameID: 45)))
+        XCTAssertEqual(plain.main.accountSheet, .profile, "Other internal opens keep the navigation they own.")
     }
 
     // MARK: - Game detail display reset

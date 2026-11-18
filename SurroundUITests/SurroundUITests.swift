@@ -1267,8 +1267,10 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             tap(id.homeGamePlayerInfo(gameID), in: app)
             element(id.gameBoard, in: app)
             // iOS 18 exposes the destination title; newer UIKit uses BackButton.
+            // The in-game control's base form shares that label.
             let back = app.navigationBars.buttons.matching(NSPredicate(
-                format: "identifier == %@ OR label == %@", "BackButton", "Active games"
+                format: "identifier == %@ OR (identifier != %@ AND label == %@)",
+                "BackButton", id.gameActiveGamesButton, "Active games"
             )).firstMatch
             tap(back, description: "Back to active games", in: app)
             XCTAssertTrue(app.navigationBars["Active games"].waitForExistence(timeout: 10))
@@ -2078,9 +2080,10 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         if chatInputHasKeyboardFocus(in: app) {
             dismissSoftwareKeyboardIfNeeded(in: app)
         }
+        // The in-game control's base form shares the label iOS 18 gives Back.
         let backs = app.buttons.matching(NSPredicate(
-            format: "identifier == %@ OR label == %@ OR label == %@",
-            "BackButton", "Active games", "Back"
+            format: "identifier == %@ OR (identifier != %@ AND (label == %@ OR label == %@))",
+            "BackButton", SurroundUITestContract.AccessibilityID.gameActiveGamesButton, "Active games", "Back"
         ))
         var back: XCUIElement?
         let visibleBack = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
@@ -2225,6 +2228,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel).firstMatch
         XCTAssertFalse(carousel.exists, "Game thumbnails must not occupy the game screen by default.")
 
+        // The control here is the chip for the live game on your move, whose
+        // tap would switch to it: a touch and hold opens the popover.
         func openActiveGames() {
             let identifier = SurroundUITestContract.AccessibilityID
                 .gameActiveGamesButton
@@ -2237,51 +2242,33 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 )
                 let topButton = app.navigationBars.buttons
                     .matching(identifier: identifier).firstMatch
-                if topButton.exists {
-                    let analyzeButton = app.navigationBars.descendants(matching: .any)
-                        .matching(identifier: SurroundUITestContract.AccessibilityID.gameAnalyzeToggle)
-                        .firstMatch
-                    let zenButton = app.navigationBars.buttons
-                        .matching(identifier: SurroundUITestContract.AccessibilityID.gameZenEnter)
-                        .firstMatch
-                    if analyzeButton.isHittable && topButton.isHittable && zenButton.isHittable {
-                        let order = XCTAttachment(string: """
-                            Analyze: \(analyzeButton.frame)
-                            Active Games: \(topButton.frame)
-                            Zen: \(zenButton.frame)
-                            """)
-                        order.name = "Regular iPad toolbar order checked"
-                        order.lifetime = .keepAlways
-                        add(order)
-                        XCTAssertLessThan(
-                            analyzeButton.frame.midX, topButton.frame.midX,
-                            "Active Games must follow Analyze in the regular iPad toolbar."
-                        )
-                        XCTAssertLessThan(
-                            topButton.frame.midX, zenButton.frame.midX,
-                            "Active Games must precede Zen in the regular iPad toolbar."
-                        )
-                    }
-                    tap(topButton, description: "Top Active Games action", in: app)
-                } else {
-                    tap(
-                        app.navigationBars.buttons["More"].firstMatch,
-                        description: "Game toolbar overflow",
-                        in: app
+                let analyzeButton = app.navigationBars.descendants(matching: .any)
+                    .matching(identifier: SurroundUITestContract.AccessibilityID.gameAnalyzeToggle)
+                    .firstMatch
+                let zenButton = app.navigationBars.buttons
+                    .matching(identifier: SurroundUITestContract.AccessibilityID.gameZenEnter)
+                    .firstMatch
+                if topButton.exists && analyzeButton.isHittable && topButton.isHittable && zenButton.isHittable {
+                    let order = XCTAttachment(string: """
+                        Analyze: \(analyzeButton.frame)
+                        Active Games: \(topButton.frame)
+                        Zen: \(zenButton.frame)
+                        """)
+                    order.name = "Regular iPad toolbar order checked"
+                    order.lifetime = .keepAlways
+                    add(order)
+                    XCTAssertLessThan(
+                        analyzeButton.frame.midX, topButton.frame.midX,
+                        "Active Games must follow Analyze in the regular iPad toolbar."
                     )
-                    tap(
-                        requiredMenuButton(identifier, title: "Active games", in: app),
-                        description: "Overflowed Active Games action",
-                        in: app
+                    XCTAssertLessThan(
+                        topButton.frame.midX, zenButton.frame.midX,
+                        "Active Games must precede Zen in the regular iPad toolbar."
                     )
                 }
-                return
             }
             #endif
-            let activeGamesButton = element(identifier, in: app, matching: .button)
-            // iOS 27 reports this visible bottom-bar item as not hittable while
-            // the hidden tab bar retains an accessibility frame over it.
-            activeGamesButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            openGameControlPopover(in: app)
         }
 
         openActiveGames()
@@ -2447,34 +2434,12 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                           "The selected game must have an unobstructed board.")
         }
 
+        // The control is the chip for the live game on your move: a touch and
+        // hold opens its popover, whose picker switches in place.
         func openActiveGames() {
-            let direct = app.buttons.matching(identifier: id.gameActiveGamesButton).firstMatch
-            let overflow = app.buttons.matching(NSPredicate(
-                format: "identifier IN %@ OR label == %@",
-                ["OverflowBarButtonItem", "BottomOverflowBarButtonItem", "More"], "More"
-            )).firstMatch
-            XCTAssertTrue(pollUntil(timeout: 10) { direct.exists || overflow.isHittable },
-                          "Expected Active games or its toolbar overflow.")
-            if direct.exists {
-                if UIDevice.current.userInterfaceIdiom == .phone {
-                    // iOS 27 can leave the hidden tab bar's AX frame over this
-                    // visible item. Use its freshly resolved center, as in the
-                    // single-switch journey, then verify the actual popover.
-                    XCTAssertTrue(direct.isEnabled)
-                    XCTAssertTrue(app.frame.contains(direct.frame))
-                    XCTAssertGreaterThan(direct.frame.width, 0)
-                    XCTAssertGreaterThan(direct.frame.height, 0)
-                    direct.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-                } else {
-                    tapReady(direct, description: "Active games")
-                }
-            } else {
-                tapReady(overflow, description: "game toolbar overflow")
-                tapReady(requiredMenuButton(id.gameActiveGamesButton, title: "Active games", in: app),
-                         description: "overflowed Active games")
-            }
+            openGameControlPopover(in: app)
             XCTAssertTrue(popover.waitForExistence(timeout: 10),
-                          "Opening Active games must respond within ten seconds.")
+                          "Opening the control's popover must respond within ten seconds.")
         }
 
         // SURROUND_UI_SUPERCHAT_MIDWAY=1 (TEST_RUNNER_SURROUND_UI_SUPERCHAT_MIDWAY
@@ -2698,9 +2663,11 @@ final class SurroundUITests: SurroundJourneyUITestCase {
 
         func backToHome() {
             // iOS 18 exposes the destination title; newer UIKit uses BackButton.
-            // Trailing toolbar controls can overflow, so match Back directly.
+            // Trailing toolbar controls can overflow, so match Back directly,
+            // never the in-game control's base form, which shares the label.
             let back = app.navigationBars.buttons.matching(NSPredicate(
-                format: "identifier == %@ OR label == %@", "BackButton", "Active games"
+                format: "identifier == %@ OR (identifier != %@ AND label == %@)",
+                "BackButton", SurroundUITestContract.AccessibilityID.gameActiveGamesButton, "Active games"
             )).firstMatch
             tap(back, description: "Back to active games", in: app)
             // Identify Home by its navigation bar and screen, even when its
@@ -2793,8 +2760,20 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         scrollIntoTappableArea(historyGame, in: app)
         tap(historyGame, description: "Open your finished realtime game from history", in: app)
         element(SurroundUITestContract.AccessibilityID.gameDetail(historyGameID), in: app)
-        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.gameActiveGamesButton].exists,
-                       "A history game does not own an active-games picker.")
+        // A history game's control is the chip for the live game on your
+        // move, and its popover has no picker: off Home's route a switch
+        // goes through Home.
+        #if DEBUG
+        let firstState = element(SurroundUITestContract.AccessibilityID.gameControlFirstState, in: app)
+        XCTAssertTrue((firstState.value as? String)?.hasPrefix("chip") == true,
+                      "A history game shows the chip: \(String(describing: firstState.value))")
+        #endif
+        let historyPopover = openGameControlPopover(in: app)
+        element(SurroundUITestContract.AccessibilityID.activityList, in: app)
+        XCTAssertFalse(historyPopover.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel).firstMatch.exists,
+                       "A history game's popover has no picker.")
+        dismissPopover(in: app)
         XCTAssertTrue(banner.waitForExistence(timeout: 5),
                       "Your finished realtime game must preserve the banner for the separate active live game.")
         openLiveGameFromBanner()
@@ -5624,18 +5603,23 @@ final class SurroundUITests: SurroundJourneyUITestCase {
     }
 
     func testFinishedGameKeepsNextInActionsMenu() {
+        // Next switches games as the in-game control does: from a route
+        // without the picker it opens the next game on Home's route. Start
+        // from Home, whose history section opens the finished game there.
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.compatibilityScreenshotLaunchArgument,
             SurroundUITestContract.compatibilitySceneLaunchArgument,
-            SurroundUITestContract.CompatibilityScene.gameHistory.rawValue,
-        ])
+            SurroundUITestContract.CompatibilityScene.home.rawValue,
+        ], orientation: .portrait)
 
-        tap(
+        let finishedGame = elementAfterScrolling(
             SurroundUITestContract.AccessibilityID.homeHistoryGame(
                 SurroundUITestContract.screenshotHistoryGameIDs[0]
             ),
             in: app
         )
+        scrollIntoTappableArea(finishedGame, in: app)
+        tap(finishedGame, description: "Open the finished game from Home's history", in: app)
         element(
             SurroundUITestContract.AccessibilityID.gameRematch,
             in: app,

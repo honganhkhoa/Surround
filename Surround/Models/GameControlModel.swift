@@ -3,12 +3,13 @@
 //  Surround
 //
 //  The in-game control's rules that need no view: the value Game Detail's
-//  Active games slot shows, the window's width class and shape that the
-//  control's frames follow, what each form draws and how its text fits a
-//  fixed frame, what a tap or a hold does, what VoiceOver says, how a Game
-//  Detail switches to another game, which challenge the game-over card
-//  shows, and where a game says that the connection is down. Each reads
-//  only state Game Detail has before it draws, so SurroundTests checks it
+//  Active games slot shows, the window's width class, shape and top-bar
+//  room that the control's frames and forms follow, what each form draws
+//  and how its text fits a fixed frame, what a tap or a hold does, what
+//  VoiceOver says, how a Game Detail switches to another game, when the
+//  control's popover is open, which challenge the game-over card shows,
+//  and where a game says that the connection is down. Each reads only
+//  state Game Detail has before it draws, so SurroundTests checks it
 //  without a socket or a view.
 //
 
@@ -81,9 +82,10 @@ enum GameControlSlot: Equatable {
 // MARK: - The window
 
 /// The window a Game Detail is in, as the window's root measures it: which
-/// class its width falls in, and its shape. The control's frames are fixed
-/// per class, so they change only when the window resizes or turns, which
-/// nothing inside the window can cause. The root knows both long before a
+/// class its width falls in, its shape, and whether a full-size top bar has
+/// room for the chip. The control's frames and forms are fixed per class,
+/// so they change only when the window resizes or turns, which nothing
+/// inside the window can cause. The root knows all three long before a
 /// game opens, while Game Detail's own geometry arrives a main-queue turn
 /// after its first layout.
 struct GameControlWindowClass: Equatable {
@@ -97,8 +99,15 @@ struct GameControlWindowClass: Equatable {
         /// modes pushes Analyze and Chat into More on iOS 26 and 27, so
         /// there the chip narrows.
         case narrow
-        /// 390 pt and wider, where the full chip fits beside three modes.
+        /// From 390 pt to 402 pt, where the full chip fits beside three
+        /// modes at the default text size. From one size larger, iOS 27's
+        /// bar keeps wider side insets at 390 pt and takes Analyze and Chat
+        /// out of it, so there the chip narrows too
+        /// (`GameControlDrawing.narrowsFromTextSize`).
         case standard
+        /// 402 pt and wider, where the full chip fits beside three modes at
+        /// every text size.
+        case wide
 
         /// The narrowest window in the class, in points.
         var minimumWidth: CGFloat {
@@ -106,6 +115,7 @@ struct GameControlWindowClass: Equatable {
             case .floor: 0
             case .narrow: 375
             case .standard: 390
+            case .wide: 402
             }
         }
 
@@ -124,16 +134,53 @@ struct GameControlWindowClass: Equatable {
 
     var widthClass: WidthClass
     var shape: Shape
+    /// A full-size top bar, the wide windows' one row of Back, the modes,
+    /// the control and the utilities, has room for the 96 pt chip beside
+    /// three modes, Zen and Options. Where it hasn't, the control there is
+    /// the system's icon with its badge (`GameControlForm.narrowTopBar`).
+    var topBarFitsChip: Bool
 
-    init(widthClass: WidthClass, shape: Shape) {
+    init(widthClass: WidthClass, shape: Shape, topBarFitsChip: Bool = true) {
         self.widthClass = widthClass
         self.shape = shape
+        self.topBarFitsChip = topBarFitsChip
     }
 
-    /// From the window's bounds.
-    init(windowSize: CGSize) {
+    /// From the window's bounds and horizontal size class, and the device.
+    init(windowSize: CGSize, isRegularWidth: Bool = false, isPhone: Bool = false) {
         self.init(widthClass: WidthClass(width: windowSize.width),
-                  shape: windowSize.width > windowSize.height ? .landscape : .portrait)
+                  shape: windowSize.width > windowSize.height ? .landscape : .portrait,
+                  topBarFitsChip: Self.topBarFitsChip(windowSize: windowSize, isRegularWidth: isRegularWidth,
+                                                      isPhone: isPhone))
+    }
+
+    /// The row a full-size top bar needs for the chip: Back and the sidebar
+    /// toggle, which end 128 pt from the window's leading edge; the 393 pt
+    /// platter of three modes, the chip, Zen and Options; at least 16 pt
+    /// between the two groups; and the window's 16 pt trailing corner.
+    static let topBarRowForChip: CGFloat = 553
+
+    /// What the status bar takes from the end of a top bar's row where it
+    /// shares the row: 144 pt on the Duo in its tall poses, 128 pt more than
+    /// the corner every window keeps.
+    static let statusBarShareOfTopBarRow: CGFloat = 128
+
+    /// Whether a full-size top bar has room for the chip, from the window's
+    /// width, less what the status bar takes where it shares the row. On a
+    /// phone at regular width in a window taller than wide, as the Duo's
+    /// tall poses are, the status bar sits at the end of the top bar's row
+    /// rather than above it, and the chip would push Zen and Options into
+    /// More. No inset the window reports gives that share steadily: the
+    /// bar's layout region drops it while Zen hides the status bar, which
+    /// would change the form when Zen ends. Window controls never decide
+    /// it: the narrowest regular iPad window still has room with them. Only
+    /// a regular-width window shows a full-size top bar, so a compact one
+    /// counts as having room and keeps its value while it resizes.
+    static func topBarFitsChip(windowSize: CGSize, isRegularWidth: Bool, isPhone: Bool) -> Bool {
+        guard isRegularWidth else { return true }
+        let sharesRowWithStatusBar = isPhone && windowSize.height > windowSize.width
+        let row = windowSize.width - (sharesRowWithStatusBar ? statusBarShareOfTopBarRow : 0)
+        return row >= topBarRowForChip
     }
 }
 
@@ -142,12 +189,16 @@ struct GameControlWindowClass: Equatable {
 /// Where the control sits, which decides how it draws. The bars draw a
 /// custom view. The Duo's rail and the Mac use the system's icon and badge:
 /// a native item draws only an image, and the Mac's toolbar never draws a
-/// custom view.
+/// custom view. So does a full-size top bar too narrow for the chip.
 enum GameControlForm: Equatable {
     /// The iPhone's bottom bar, and a narrow iPad window's.
     case bottomBar
     /// A top bar on iOS, in compact landscape or in a wide window.
     case topBar
+    /// A wide window's top bar without room for the chip, as the Duo's in
+    /// its tall poses, whose status bar shares the bar's row: the system's
+    /// icon and badge, as on the rail.
+    case narrowTopBar
     /// The Duo's vertical rail.
     case rail
     /// The Mac's toolbar.
@@ -165,8 +216,19 @@ enum GameControlForm: Equatable {
         }
     }
 
+    /// The form at `placement` in a window: a wide window's top bar shows
+    /// the system's icon where the window leaves it no room for the chip.
+    /// Compact landscape's bar always has room. A window the root hasn't
+    /// measured gets the chip, as it gets the full frames.
+    init(_ placement: GameActiveGamesPlacement, isCatalyst: Bool, windowClass: GameControlWindowClass?) {
+        self.init(placement.form, isCatalyst: isCatalyst)
+        if self == .topBar, placement == .topBarAfterModes, windowClass?.topBarFitsChip == false {
+            self = .narrowTopBar
+        }
+    }
+
     /// The system's own item, which takes no hold and badges a count.
-    var isNative: Bool { self == .rail || self == .mac }
+    var isNative: Bool { self == .rail || self == .mac || self == .narrowTopBar }
 
     /// The native items, and the bottom bar below 375 pt, show an icon and
     /// nothing of the state's content.
@@ -316,8 +378,9 @@ enum GameControlPart: Equatable {
 }
 
 /// What the control's custom view draws in a bar for a slot, before it
-/// fits: a frame fixed by the form, the state and the window's width class,
-/// never by the clock, so the bar's layout never changes as the clock ticks;
+/// fits: a frame fixed by the form, the state, the window's width class
+/// and, beside three modes in the bottom bar, the text size, never by the
+/// clock, so the bar's layout never changes as the clock ticks;
 /// the parts; and those that drop when the rest doesn't fit, the first to
 /// drop first. Text never truncates.
 ///
@@ -342,11 +405,17 @@ enum GameControlPart: Equatable {
 /// the first second of an hour-long one. The board drops last only so that
 /// a clock wider than those still can't overflow.
 struct GameControlDrawing: Equatable {
-    /// The bottom bar's chip, started game and card: from 390 pt, and from
-    /// 375 pt beside fewer than three modes.
+    /// The bottom bar's chip, started game and card: from 402 pt; from
+    /// 390 pt below `narrowsFromTextSize`; and from 375 pt beside fewer
+    /// than three modes.
     static let chipWidth: CGFloat = 160
-    /// The same, from 375 pt to 390 pt beside three modes.
+    /// The same beside three modes, from 375 pt to 390 pt, and from 390 pt
+    /// to 402 pt at `narrowsFromTextSize` and larger.
     static let narrowChipWidth: CGFloat = 120
+    /// The text size from which the bottom bar's own items have grown so
+    /// that the full chip beside three modes no longer fits a window from
+    /// 390 pt to 402 pt: one size above the default.
+    static let narrowsFromTextSize = UIContentSizeCategory.extraLarge
     /// A top bar's chip, started game and card.
     static let topBarChipWidth: CGFloat = 96
     /// An icon alone.
@@ -372,15 +441,18 @@ struct GameControlDrawing: Equatable {
     ///     measured it, which gives the full frames.
     ///   - modeCount: The mode buttons beside the control: Analyze and
     ///     Chat, and Conditional moves while it shows.
+    ///   - sizeCategory: The text size of the screen that owns the bar.
     ///   - allowsPicker: The route has the picker
     ///     (`GameControlSwitch.allowsPicker`).
     ///   - hasCountdown: The chip's game counts down. Without a countdown
     ///     the hourglass shows alone.
     ///   - isSuddenDeath: The chip's game is in its last byo-yomi period.
     init?(_ slot: GameControlSlot, form: GameControlForm, windowClass: GameControlWindowClass?,
-          modeCount: Int, allowsPicker: Bool, hasCountdown: Bool = true, isSuddenDeath: Bool = false) {
+          modeCount: Int, sizeCategory: UIContentSizeCategory, allowsPicker: Bool, hasCountdown: Bool = true,
+          isSuddenDeath: Bool = false) {
         guard !form.isNative else { return nil }
-        frame = Self.frame(slot, form: form, windowClass: windowClass, modeCount: modeCount)
+        frame = Self.frame(slot, form: form, windowClass: windowClass, modeCount: modeCount,
+                           sizeCategory: sizeCategory)
         hasDot = form == .bottomBar ? slot.hasDot : slot == .dot
         self.isSuddenDeath = false
         let inBottomBar = form == .bottomBar
@@ -423,11 +495,12 @@ struct GameControlDrawing: Equatable {
         plusN = parts.contains(.plusN) ? slot.plusN : 0
     }
 
-    /// The fixed frame, from the form, the state and the window's class
-    /// alone, so neither the clock nor sudden death moves the bar's layout.
-    static func frame(_ slot: GameControlSlot, form: GameControlForm,
-                      windowClass: GameControlWindowClass?, modeCount: Int) -> CGSize {
-        let widthClass = windowClass?.widthClass ?? .standard
+    /// The fixed frame, from the form, the state, the window's class, the
+    /// mode count and the text size alone, so neither the clock nor sudden
+    /// death moves the bar's layout.
+    static func frame(_ slot: GameControlSlot, form: GameControlForm, windowClass: GameControlWindowClass?,
+                      modeCount: Int, sizeCategory: UIContentSizeCategory) -> CGSize {
+        let widthClass = windowClass?.widthClass ?? .wide
         let width: CGFloat
         if form.showsIconAlone(in: windowClass) {
             width = iconWidth
@@ -437,13 +510,29 @@ struct GameControlDrawing: Equatable {
                 if form != .bottomBar {
                     width = topBarChipWidth
                 } else {
-                    width = widthClass == .narrow && modeCount >= 3 ? narrowChipWidth : chipWidth
+                    width = narrowsBesideModes(widthClass, modeCount: modeCount, sizeCategory: sizeCategory)
+                        ? narrowChipWidth : chipWidth
                 }
             case .base, .dot, .inbox:
                 width = slot.plusN > 0 ? iconWithCountWidth : iconWidth
             }
         }
         return CGSize(width: width, height: height)
+    }
+
+    /// The bottom bar's chip narrows beside three modes: from 375 pt to
+    /// 390 pt at every text size, and from 390 pt to 402 pt from
+    /// `narrowsFromTextSize`, where the bar's own items have grown. Nothing
+    /// else narrows it, so the bar's layout follows the window and the
+    /// text size alone.
+    static func narrowsBesideModes(_ widthClass: GameControlWindowClass.WidthClass, modeCount: Int,
+                                   sizeCategory: UIContentSizeCategory) -> Bool {
+        guard modeCount >= 3 else { return false }
+        switch widthClass {
+        case .narrow: return true
+        case .standard: return sizeCategory != .unspecified && sizeCategory >= narrowsFromTextSize
+        case .floor, .wide: return false
+        }
     }
 }
 
@@ -589,11 +678,12 @@ struct GameControlChipMetrics {
 
 // MARK: - The native forms
 
-/// The control on the Duo's rail and the Mac: the system's icon with its
-/// red badge. A native item draws only its image and badge, so the chip's
-/// game, a started game and the card show inside the popover instead.
+/// The control on the Duo's rail, on the Mac and in a top bar too narrow
+/// for the chip: the system's icon with its red badge. A native item draws
+/// only its image and badge, so the chip's game, a started game and the
+/// card show inside the popover instead.
 struct GameControlNativeItem: Equatable {
-    enum Badge: Equatable {
+    enum Badge: Hashable {
         case none
         case count(Int)
         /// An empty-text badge, which the system draws as a red dot.
@@ -632,6 +722,47 @@ struct GameControlNativeItem: Equatable {
     }
 }
 
+/// When the control's native item is made again. iOS 27 can keep a native
+/// bar item's stale badge, so the item takes a new identity when its badge
+/// changes. Never while the popover it presented is open or still on
+/// screen: the item that presented a popover has to stay until the popover
+/// has gone, or UIKit can no longer dismiss it and it stays on screen. A
+/// live Accept or a switch closes the popover in code in the same pass that
+/// changes the badge, so the item keeps the badge it was made with until
+/// the popover's content has disappeared, then takes the one it shows.
+struct GameControlNativeIdentity: Equatable {
+    /// The badge the item was made with; nil for no item.
+    private(set) var badge: GameControlNativeItem.Badge?
+    /// The popover's content is on screen: from its appearance until its
+    /// disappearance, which comes once the popover has gone.
+    private(set) var isPopoverOnScreen = false
+
+    /// The popover is open or still on screen, so the item stays as it is.
+    func holds(isPopoverOpen: Bool) -> Bool {
+        isPopoverOpen || isPopoverOnScreen
+    }
+
+    /// The item's identity in a pass that shows `badge`.
+    func id(showing badge: GameControlNativeItem.Badge?, isPopoverOpen: Bool) -> GameControlNativeItem.Badge? {
+        holds(isPopoverOpen: isPopoverOpen) ? self.badge : badge
+    }
+
+    /// The item shows `badge`. Unless the identity holds, that is now the
+    /// badge it was made with.
+    mutating func follow(_ badge: GameControlNativeItem.Badge?, isPopoverOpen: Bool) {
+        guard !holds(isPopoverOpen: isPopoverOpen) else { return }
+        self.badge = badge
+    }
+
+    mutating func popoverAppeared() {
+        isPopoverOnScreen = true
+    }
+
+    mutating func popoverDisappeared() {
+        isPopoverOnScreen = false
+    }
+}
+
 // MARK: - Tap, touch and hold
 
 /// What a tap, a click or a touch and hold on the control does.
@@ -650,9 +781,10 @@ enum GameControlAction: Equatable {
 ///   or VoiceOver's Open Activity, opens the popover, never a sheet over a
 ///   running clock.
 /// - Game over, base, dot and inbox: both open the popover.
-/// - The native items on the rail and the Mac can't show the chip, so a tap
-///   or a click opens the popover, which leads with the chip's game. They
-///   take no hold: the system makes a long press's release a tap.
+/// - The native items, on the rail, on the Mac and in a top bar too narrow
+///   for the chip, can't show the chip, so a tap or a click opens the
+///   popover, which leads with the chip's game. They take no hold: the
+///   system makes a long press's release a tap.
 /// - The bottom bar's floor shows the icon alone, so a tap opens the
 ///   popover there too, as a hold does.
 /// - Zen's circle and items: a tap switches; nothing else, since Zen has
@@ -701,7 +833,7 @@ struct GameControlInteraction: Equatable {
 
 /// What VoiceOver says for the control. The custom forms speak the other
 /// game's time in the label, with what waits as the value. The native items
-/// on the rail and the Mac, and the bottom bar's floor, show an icon alone:
+/// (`GameControlForm.isNative`) and the bottom bar's floor show an icon alone:
 /// their label carries no time, which would relabel a native item every
 /// second, and carries the count, which a native item can drop as a value.
 /// On the Mac that label is also the item's tooltip, so the pointer names
@@ -719,6 +851,12 @@ struct GameControlAccessibility: Equatable {
     static var openActivity: String {
         String(localized: "Open Activity",
                comment: "In-game control, VoiceOver: an action that opens the popover of the user's other games and Activity, as a touch and hold does")
+    }
+
+    /// What Game Detail says once when the control first shows a live game
+    /// that started elsewhere: the started state's label.
+    static func gameStarted(with name: String) -> String {
+        Words.gameStarted(with: name)
     }
 }
 
@@ -945,6 +1083,91 @@ enum GameControlSwitch: Equatable {
         }
     }
 }
+
+// MARK: - The popover
+
+/// The control's popover in one Game Detail: the placement its item had
+/// when it opened, and the window's Activity request it made, which App
+/// Review, the window's resets and the list's own actions follow. Each item
+/// presents only at its own placement, so the item a rotation, a pose
+/// change or a resize leaves can't keep the popover open, and the item that
+/// takes its place starts closed and opens again on the next hold, tap or
+/// VoiceOver action.
+struct GameControlPopover: Equatable {
+    private(set) var placement: GameActiveGamesPlacement?
+    /// The window's request this popover made.
+    private(set) var sessionID: UUID?
+    /// The list's session: the request's, kept after it closes, so the list
+    /// keeps its own while the popover goes.
+    private(set) var listSessionID = UUID()
+
+    var isOpen: Bool { placement != nil }
+
+    func isPresented(at placement: GameActiveGamesPlacement) -> Bool {
+        self.placement == placement
+    }
+
+    /// Opens the popover from the item at `placement`, with a new request
+    /// in the window. The window has one list, so this request replaces any
+    /// other, and another Game Detail's popover closes.
+    mutating func open(at placement: GameActiveGamesPlacement, place: ActivityModel.Place,
+                       navigation: NavigationService) {
+        let request = ActivityRequest(source: .gameControl, style: .popover, place: place)
+        navigation.main.activity = request
+        self.placement = placement
+        sessionID = request.sessionID
+        listSessionID = request.sessionID
+    }
+
+    /// Closes the popover, and clears the window's request while it is
+    /// still this popover's. Game Detail calls it when the slot moves to
+    /// another bar, as SwiftUI may never report the old item's popover
+    /// closed, on a switch, on entering Zen and when it disappears.
+    mutating func close(navigation: NavigationService) {
+        if let sessionID, navigation.main.activity?.sessionID == sessionID {
+            navigation.main.activity = nil
+        }
+        placement = nil
+        sessionID = nil
+    }
+
+    /// The item at `placement` reports its popover closed, after a tap
+    /// outside it or Escape. A late report from an item the control has
+    /// already left closes nothing.
+    mutating func itemClosed(at placement: GameActiveGamesPlacement, navigation: NavigationService) {
+        guard self.placement == placement else { return }
+        close(navigation: navigation)
+    }
+
+    /// The window's request is now `sessionID`: something cleared this
+    /// popover's, such as a reset of the window's navigation, an account
+    /// change or one of the list's own actions, or another surface replaced
+    /// it. The popover closes and leaves the window's request alone.
+    mutating func windowRequestChanged(to sessionID: UUID?) {
+        guard let current = self.sessionID, sessionID != current else { return }
+        placement = nil
+        self.sessionID = nil
+    }
+}
+
+#if DEBUG
+extension GameControlSlot {
+    /// The state as UI tests read it: "chip game-N +K", "started game-N +K"
+    /// (each with " dot" while a dot shows), "card challenge-N +K",
+    /// "base +K", "dot", "inbox K", and "none" without a slot.
+    static func testDescription(_ slot: GameControlSlot?) -> String {
+        switch slot {
+        case .none: "none"
+        case let .chip(gameID, plusN, hasDot)?: "chip game-\(gameID) +\(plusN)" + (hasDot ? " dot" : "")
+        case let .gameStarted(gameID, plusN, hasDot)?: "started game-\(gameID) +\(plusN)" + (hasDot ? " dot" : "")
+        case let .gameOverCard(challengeID, plusN)?: "card challenge-\(challengeID) +\(plusN)"
+        case .base(let plusN)?: "base +\(plusN)"
+        case .dot?: "dot"
+        case .inbox(let count)?: "inbox \(count)"
+        }
+    }
+}
+#endif
 
 // MARK: - The game-over card
 

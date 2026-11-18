@@ -17,6 +17,11 @@ struct GameDetailView: View {
     @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.openPlayerProfile) private var openPlayerProfile
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The window's width class and shape, measured at its root long before
+    /// a game opens.
+    @Environment(\.gameControlWindowClass) private var gameControlWindowClass
+    /// The window's connection status, which the control's popover shares.
+    @Environment(\.connectionStatus) private var connectionStatus
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
@@ -35,7 +40,9 @@ struct GameDetailView: View {
     var allowsActiveGamesCarousel = true
     
     @State var showSettings = false
-    @State private var showsActiveGames = false
+    /// The in-game control's popover: where it is open, and the window's
+    /// Activity request it made.
+    @State private var gameControlPopover = GameControlPopover()
     @State private var contentWidth: CGFloat = 0
     @State private var notificationContextID = UUID()
     @State private var showsClocksInHeader = false
@@ -71,10 +78,6 @@ struct GameDetailView: View {
     @State private var animationObservationID = UUID()
     #endif
 
-    private var onTurnActiveGameCount: Int {
-        activeGames.filter(ogs.isOnUserTurn).count
-    }
-
     private func cycleFlowingInkTheme() {
         let selectedTheme = SurroundTheme.current(storedID: gameThemeID)
         guard selectedTheme.isFlowingInk else { return }
@@ -84,47 +87,104 @@ struct GameDetailView: View {
         flowingInkCycleRevision += 1
     }
 
-    private var activeGamesButton: some View {
-        Button {
-            showsActiveGames = true
-        } label: {
-            Label("Active games", systemImage: "square.grid.2x2")
-                .modifier(GameToolbarMinimumTouchTarget())
-        }
-        .accessibilityValue(Text(verbatim: String(onTurnActiveGameCount)))
-        .accessibilityIdentifier(
-            SurroundUITestContract.AccessibilityID.gameActiveGamesButton
-        )
-        .popover(isPresented: $showsActiveGames) {
-            activeGamesPopoverContent
-                .presentationCompactAdaptation(.popover)
+    // MARK: The in-game control
+
+    /// How this Game Detail switches games, and whether its route has the
+    /// picker: in place only on Home's route with the picker allowed.
+    private var gameControlSwitch: GameControlSwitch {
+        GameControlSwitch(route: owningStackRoute, allowsActiveGamesCarousel: allowsActiveGamesCarousel)
+    }
+
+    /// Where this layout puts the control. It follows the arrangement and
+    /// the pose alone, never the control.
+    private var gameControlPlacement: GameActiveGamesPlacement {
+        toolbarArrangement.activeGamesPlacement(compact: compactLayout,
+                                                navigationBarHidden: hidesNavigationBarInDuoWide)
+    }
+
+    /// Shows `game` as this route switches games: in place on Home's route,
+    /// through Home elsewhere. The chip, the picker, the popover's live rows
+    /// and Next all come here.
+    private func showGame(_ game: Game) {
+        gameControlSwitch.perform(game, navigation: nav) { next in
+            withAnimation { currentGame = next }
         }
     }
 
-    /// Today's picker: the user's other games at this game's speed. Phase 4's
-    /// in-game popover puts Activity's sections under it.
-    private var activeGamesPopoverContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Group {
-                if currentGame?.gameData?.timeControl.speed?.isRealtime == true {
-                    Text("Live games")
-                } else {
-                    Text("Correspondence games")
+    private func showGame(id gameID: Int) {
+        guard let game = ogs.liveGames.first(where: { $0.ogsID == gameID }) else { return }
+        showGame(game)
+    }
+
+    /// A hold, a tap or VoiceOver's Open Activity. It opens the popover from
+    /// the item at this layout's placement, unless it is open there already,
+    /// so a popover left open at an item a turn removed can never keep the
+    /// new item from opening it.
+    private func openGameControlPopover() {
+        let placement = gameControlPlacement
+        guard let game = currentGame, !gameControlPopover.isPresented(at: placement) else { return }
+        gameControlPopover.open(at: placement, place: ActivityModel.Place(showing: game), navigation: nav)
+    }
+
+    private func closeGameControlPopover() {
+        gameControlPopover.close(navigation: nav)
+    }
+
+    /// The popover binding of the item at `placement`. It reads true only at
+    /// the placement the popover opened from, so the item a rotation leaves
+    /// can't hold it open and the one that replaces it starts closed.
+    private func gameControlPresentation(at placement: GameActiveGamesPlacement) -> Binding<Bool> {
+        Binding(
+            get: { gameControlPopover.isPresented(at: placement) },
+            set: { presented in
+                if !presented {
+                    gameControlPopover.itemClosed(at: placement, navigation: nav)
                 }
             }
-            .font(.headline)
-            .padding(.horizontal)
+        )
+    }
+
+    /// The control's popover: the picker above Activity's sections, at this
+    /// game's place and with the window's connection status.
+    private func gameControlPopoverContent(for game: Game) -> some View {
+        AppNavigationStack {
+            ActivityListView(
+                session: gameControlPopover.listSessionID, placement: .gamePopover,
+                place: ActivityModel.Place(showing: game), header: AnyView(gameControlPicker),
+                switchGame: showGame, connection: connectionStatus
+            )
+        }
+        .environmentObject(ogs)
+        .environmentObject(nav)
+        .frame(idealWidth: 400, idealHeight: 620)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameActiveGamesPopover)
+    }
+
+    /// The user's games at this game's speed, where the route has the picker
+    /// and it lists another game. Picking one switches in place.
+    @ViewBuilder private var gameControlPicker: some View {
+        if gameControlSwitch.allowsPicker, activeGames.contains(where: { $0.ID != currentGame?.ID }) {
             ActiveGamesCarousel(
                 currentGame: $currentGame,
                 activeGames: activeGames,
-                onSelectGame: { showsActiveGames = false }
+                onSelectGame: closeGameControlPopover,
+                switchGame: showGame
             )
+            .padding(.vertical, 8)
         }
-        .padding(.vertical)
-        .frame(idealWidth: 420)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(
-            SurroundUITestContract.AccessibilityID.gameActiveGamesPopover
+    }
+
+    /// What the toolbar needs from this screen to fill the control's slot.
+    private func gameControlHost(for game: Game) -> GameControlHost {
+        GameControlHost(
+            switchRule: gameControlSwitch,
+            windowClass: gameControlWindowClass,
+            isPopoverOpen: gameControlPopover.isOpen,
+            presentation: gameControlPresentation(at:),
+            popover: AnyView(gameControlPopoverContent(for: game)),
+            openPopover: openGameControlPopover,
+            show: showGame(id:)
         )
     }
 
@@ -203,26 +263,16 @@ struct GameDetailView: View {
         return windowGeometry.keyboardOverlap(keyboardScreenFrame)
     }
 
-    /// The Active games slot's rule today. Phase 4 replaces it, together with
-    /// `GameDetailNotificationContext.listsLiveGames`, through
-    /// `activeGamesSlot(in:isShown:)`.
-    var canShowActiveGames: Bool {
-        guard allowsActiveGamesCarousel else {
-            return false
-        }
-        guard !zenMode else {
-            return false
-        }
-        if let currentGame = currentGame {
-            return currentGame.isUserPlaying && !activeGames.isEmpty
-        } else {
-            return false
-        }
-    }
-
+    /// Until Game Detail's own geometry arrives, a main-queue turn after its
+    /// first layout, the window root's shape decides, so a game opened in
+    /// landscape draws its first pass with the top bar's items, the in-game
+    /// control among them, in the bar they stay in.
     private var compactLandscape: Bool {
-        guard compactLayout, let size = windowGeometry?.windowSize else { return false }
-        return size.width > size.height
+        guard compactLayout else { return false }
+        if let size = windowGeometry?.windowSize {
+            return size.width > size.height
+        }
+        return gameControlWindowClass?.shape == .landscape
     }
 
     private var openLandscape: Bool {
@@ -364,23 +414,6 @@ struct GameDetailView: View {
         }
     }
 
-    #if DEBUG && MAIN_APP
-    /// The probe's rail-tile: drawn in the content at the bottom of Duo's
-    /// vertical bar, centred on the line where Back sits (duoBackButton).
-    @ViewBuilder private func gameControlProbeRailTile(in geometry: GeometryProxy) -> some View {
-        if let probe = GameControlProbeConfiguration.current, probe.variants.contains(.railTile),
-           isVerticalToolbar, !zenMode, canShowActiveGames || probe.variants.contains(.everyGame),
-           let barWidth = trailingVerticalBarWidth(in: geometry) {
-            let width = probe.size(for: .rail).width
-            GameControlProbeItem(placement: .rail, configuration: probe, isPresented: $showsActiveGames,
-                                 onTurnCount: onTurnActiveGameCount,
-                                 popoverContent: AnyView(activeGamesPopoverContent))
-                .padding(.bottom, 16)
-                .offset(x: (barWidth - 48 + width / 2) * (layoutDirection == .rightToLeft ? -1 : 1))
-        }
-    }
-    #endif
-
     private var extendsContentToBottomEdge: Bool {
         #if os(iOS) && !targetEnvironment(macCatalyst)
         return GameDetailBottomEdgePolicy.extendsContent(
@@ -492,29 +525,6 @@ struct GameDetailView: View {
                                       compactLandscape: compactLandscape, isCatalyst: isCatalyst)
     }
 
-    /// The Active games slot in this arrangement. Every arrangement emits it
-    /// at its own place (GameActiveGamesSlotItems); phase 4's in-game control
-    /// replaces its view and rule here, never in the arrangements.
-    private func activeGamesSlot(in arrangement: GameToolbarArrangement,
-                                 isShown: Bool) -> GameActiveGamesSlot {
-        let placement = arrangement.activeGamesPlacement(
-            compact: compactLayout, navigationBarHidden: hidesNavigationBarInDuoWide)
-        #if DEBUG && MAIN_APP
-        if let probe = GameControlProbeConfiguration.current {
-            let shown = isShown || probe.variants.contains(.everyGame)
-            // The rail tile replaces the rail's item; the slot keeps its spacer.
-            let tileInContent = probe.variants.contains(.railTile) && placement.form == .rail
-            return GameActiveGamesSlot(
-                placement: placement, isShown: shown && !tileInContent,
-                view: AnyView(GameControlProbeItem(
-                    placement: placement, configuration: probe, isPresented: $showsActiveGames,
-                    onTurnCount: onTurnActiveGameCount, popoverContent: AnyView(activeGamesPopoverContent))))
-        }
-        #endif
-        return GameActiveGamesSlot(placement: placement, isShown: isShown,
-                                   view: AnyView(activeGamesButton))
-    }
-    
     func updateDetailOfCurrentGameIfNecessary() {
         guard let requestedGame = currentGame, requestedGame.ogsID != nil else {
             detailConnection.release()
@@ -565,6 +575,8 @@ struct GameDetailView: View {
         }
     }
         
+    /// Next (N): the next game at this speed on the user's move, shown as
+    /// the control switches, so off Home's route it opens on Home's.
     func goToNextGame() {
         let candidates: [Game]
         if let currentIndex = activeGames.firstIndex(where: {
@@ -577,14 +589,12 @@ struct GameDetailView: View {
         }
 
         if let nextGame = candidates.first(where: ogs.isOnUserTurn) {
-            withAnimation {
-                currentGame = nextGame
-            }
+            showGame(nextGame)
         }
     }
     
     func enterZenMode() {
-        showsActiveGames = false
+        closeGameControlPopover()
         withAnimation {
             zenMode = true
         }
@@ -756,7 +766,6 @@ struct GameDetailView: View {
             return AnyView(EmptyView())
         }
 
-        let showsActiveGamesButton = canShowActiveGames
         let toolbarArrangement = self.toolbarArrangement
         #if targetEnvironment(macCatalyst)
         // Keep the document identity in the Mac window title. The game
@@ -798,9 +807,6 @@ struct GameDetailView: View {
                      SurroundTheme.current(storedID: gameThemeID) == .frostPine)
         .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
         .coordinateSpace(name: ChristmasKeepsakesLightContext.coordinateSpace)
-        .onChange(of: showsActiveGamesButton) { _, isVisible in
-            if !isVisible { showsActiveGames = false }
-        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.gameDetail(currentGame)
@@ -826,9 +832,6 @@ struct GameDetailView: View {
         .overlay(alignment: .topTrailing) { zenExitOverlay }
         .overlay(alignment: .topLeading) { duoSidebarButton }
         .overlay(alignment: .topTrailing) { duoBackButton(in: geometry) }
-        #if DEBUG && MAIN_APP
-        .overlay(alignment: .bottomTrailing) { gameControlProbeRailTile(in: geometry) }
-        #endif
         .sheet(isPresented: self.$showSettings) {
             AppNavigationStack {
                 ScrollView {
@@ -866,7 +869,7 @@ struct GameDetailView: View {
         .navigationBarBackButtonHidden(zenMode)
         .navigationBarTitleDisplayMode(.inline)
         .modifier(GameDetailNotificationRegistration(
-            game: currentGame, allowsActiveGamesCarousel: allowsActiveGamesCarousel,
+            game: currentGame, allowsPicker: gameControlSwitch.allowsPicker,
             contextID: notificationContextID
         ))
         .onAppear {
@@ -877,12 +880,17 @@ struct GameDetailView: View {
         .onDisappear {
             clearKeyboardVisibility()
         }
+        .modifier(GameControlPopoverLifecycle(
+            placement: gameControlPlacement, gameID: currentGame.ogsID,
+            close: closeGameControlPopover, open: openGameControlPopover,
+            windowRequestChanged: { gameControlPopover.windowRequestChanged(to: $0) }
+        ))
         .onChange(of: currentGame) { oldGame, newGame in
             if newGame.ID != oldGame.ID {
                 chatSessions.deactivate(gameID: oldGame.ID, accountID: ogs.user?.id)
                 selectedConditionalVariation = nil
                 showSettings = false
-                showsActiveGames = false
+                closeGameControlPopover()
                 if GameDetailDisplayReset.restoresDisplayDefaults(
                     from: oldGame.gameData?.timeControl.speed,
                     to: newGame.gameData?.timeControl.speed
@@ -904,7 +912,7 @@ struct GameDetailView: View {
             zenMode = false
             interaction.resetPanels()
             showsCompactChatBoard = true
-            showsActiveGames = false
+            closeGameControlPopover()
             variationShareDraft = nil
             selectedChatChannel = .main
         }
@@ -952,7 +960,7 @@ struct GameDetailView: View {
                 showsCurrentPlayerClockInHeader: showsCurrentPlayerClockInHeader,
                 keyboardVisible: effectiveAttachedKeyboardVisible || chatSession.wantsInputFocus,
                 softwareKeyboardVisible: effectiveAttachedKeyboardVisible,
-                activeGamesSlot: activeGamesSlot(in: toolbarArrangement, isShown: showsActiveGamesButton),
+                gameControl: gameControlHost(for: currentGame),
                 cycleFlowingInk: cycleFlowingInkTheme,
                 dismissChatInput: chatSession.dismissInput,
                 enterZenMode: enterZenMode,
@@ -989,7 +997,8 @@ struct GameDetailView: View {
 /// window's Activity hosts that a Game Detail is on top of its tab.
 private struct GameDetailNotificationRegistration: ViewModifier {
     @ObservedObject var game: Game
-    let allowsActiveGamesCarousel: Bool
+    /// The route has the control's picker of same-speed games.
+    let allowsPicker: Bool
     let contextID: UUID
     @EnvironmentObject private var nav: NavigationService
     // Whether the user plays this game follows the signed-in account.
@@ -997,7 +1006,7 @@ private struct GameDetailNotificationRegistration: ViewModifier {
     @StateObject private var lifetime = ViewLifetime()
 
     private var context: GameDetailNotificationContext {
-        GameDetailNotificationContext(showing: game, allowsActiveGamesCarousel: allowsActiveGamesCarousel)
+        GameDetailNotificationContext(showing: game, allowsPicker: allowsPicker)
     }
 
     func body(content: Content) -> some View {
@@ -1157,6 +1166,19 @@ private struct GameToolbarLayout: ViewModifier {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var game: Game
     @ObservedObject var gameControlState: GameControlState
+    /// Redraws the in-game control where time alone changes its state.
+    @StateObject private var gameControlDeadlines = GameControlDeadlines()
+    /// The control's last state, which it keeps while its popover is open
+    /// and nothing waits any more, so the popover keeps its anchor.
+    @State private var lastShownGameControl: GameControlSlot?
+    /// The rail's and the Mac's native item is made again when its badge
+    /// changes, as iOS 27 can keep a stale badge, but never while its
+    /// popover is open or still on screen, which would leave the popover
+    /// there.
+    @State private var nativeGameControlIdentity = GameControlNativeIdentity()
+    #if DEBUG && MAIN_APP
+    @State private var gameControlFirstState: GameControlFirstState?
+    #endif
     @Binding var selectedConditionalVariation: ConditionalMoveBranch?
     @Binding var interaction: GameDetailInteraction
     @Binding var showsCompactChatBoard: Bool
@@ -1173,8 +1195,9 @@ private struct GameToolbarLayout: ViewModifier {
     let keyboardVisible: Bool
     /// An on-screen keyboard; a hardware keyboard leaves nothing to dismiss.
     let softwareKeyboardVisible: Bool
-    /// The Active games slot; every arrangement emits it at its own place.
-    let activeGamesSlot: GameActiveGamesSlot
+    /// What the in-game control needs from its Game Detail. Every
+    /// arrangement emits the control's slot at its own place.
+    let gameControl: GameControlHost
     let cycleFlowingInk: () -> Void
     let dismissChatInput: () -> Void
     let enterZenMode: () -> Void
@@ -1236,9 +1259,15 @@ private struct GameToolbarLayout: ViewModifier {
                                         to: nil, from: nil, for: nil)
     }
 
+    /// Conditional moves shows beside Analyze and Chat while the user waits
+    /// for the opponent with branches saved.
+    private var showsConditionalMoves: Bool {
+        game.gamePhase == .play && game.isUserPlaying && !game.isUserTurn
+            && !game.conditionalMoveBranches.isEmpty
+    }
+
     @ViewBuilder private var modeButtons: some View {
-        if game.gamePhase == .play && game.isUserPlaying && !game.isUserTurn
-            && !game.conditionalMoveBranches.isEmpty {
+        if showsConditionalMoves {
             ConditionalMovesButton(game: game, context: .gameDetail, usesToolbarStyle: true) {
                 selectedConditionalVariation = $0
             }
@@ -1410,7 +1439,6 @@ private struct GameToolbarLayout: ViewModifier {
             // Set on the item itself: toolbar content is
             // hosted apart from the game's content.
             .environment(\.gameDetailNotificationContextID, notificationContextID)
-            .gameControlProbeFrame("headerClocks")
     }
 
     private var headerIdentity: some View {
@@ -1466,27 +1494,27 @@ private struct GameToolbarLayout: ViewModifier {
         }
     }
 
-    /// Modes, utilities and the Active games slot. Each arrangement's builder
-    /// keeps its bar items in order, the slot composed in place, never through
-    /// a separate `.toolbar` (whose items coalesce before a spacer). Split by
-    /// arrangement so Xcode 26.2 can type-check each.
-    @ToolbarContentBuilder private var controlItems: some ToolbarContent {
+    /// Modes, utilities and the in-game control's slot. Each arrangement's
+    /// builder keeps its bar items in order, the slot composed in place,
+    /// never through a separate `.toolbar` (whose items coalesce before a
+    /// spacer). Split by arrangement so Xcode 26.2 can type-check each.
+    @ToolbarContentBuilder private func controlItems(_ slot: GameActiveGamesSlot) -> some ToolbarContent {
         if arrangement != .vertical {
             flowingInkItems(placement: .topBarTrailing)
         }
         if arrangement == .vertical {
-            verticalControlItems
+            verticalControlItems(slot)
         } else if arrangement == .bottomBar {
-            bottomBarControlItems
+            bottomBarControlItems(slot)
         } else if arrangement == .compactLandscape {
-            compactLandscapeControlItems
+            compactLandscapeControlItems(slot)
         } else {
-            wideControlItems
+            wideControlItems(slot)
         }
     }
 
-    /// Duo's vertical toolbar, with Active games in its own group at the bottom.
-    @ToolbarContentBuilder private var verticalControlItems: some ToolbarContent {
+    /// Duo's vertical toolbar, with the control in its own group at the bottom.
+    @ToolbarContentBuilder private func verticalControlItems(_ slot: GameActiveGamesSlot) -> some ToolbarContent {
         if compact {
             flowingInkItems(placement: .topBarTrailing)
             // Closed keeps utilities beside upper navigation
@@ -1513,7 +1541,7 @@ private struct GameToolbarLayout: ViewModifier {
                 modeButtons
                 utilityButtons
             }
-            // The slot's own spacer keeps Active Games in its circle.
+            // The slot's own spacer keeps the control in its circle.
         } else {
             flowingInkItems(placement: .topBarTrailing)
             GameVerticalToolbarGroup(placement: .topBarTrailing) {
@@ -1521,14 +1549,14 @@ private struct GameToolbarLayout: ViewModifier {
                 utilityButtons
             }
         }
-        activeGamesItems
+        GameActiveGamesSlotItems(slot: slot)
     }
 
-    /// Compact portrait: utilities at the top; Active games, a spacer and the
+    /// Compact portrait: utilities at the top; the control, a spacer and the
     /// modes in the bottom bar, all in this one builder.
-    @ToolbarContentBuilder private var bottomBarControlItems: some ToolbarContent {
+    @ToolbarContentBuilder private func bottomBarControlItems(_ slot: GameActiveGamesSlot) -> some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) { utilityButtons }
-        activeGamesItems
+        GameActiveGamesSlotItems(slot: slot)
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
         if #available(iOS 26.0, *) {
             ToolbarSpacer(.flexible, placement: .bottomBar)
@@ -1541,32 +1569,138 @@ private struct GameToolbarLayout: ViewModifier {
         ToolbarItemGroup(placement: .bottomBar) { modeButtons }
     }
 
-    /// Compact landscape: Active games, then the modes and the utilities, at the top.
-    @ToolbarContentBuilder private var compactLandscapeControlItems: some ToolbarContent {
-        activeGamesItems
+    // MARK: The in-game control
+
+    private static var isCatalyst: Bool {
+        #if targetEnvironment(macCatalyst)
+        true
+        #else
+        false
+        #endif
+    }
+
+    /// One read of the window's state for the game on screen, as Activity
+    /// reads it: in Debug runs with an Activity state, the state's own on its
+    /// clock.
+    private func gameControlInput() -> ActivityModel.Input {
+        let place = ActivityModel.Place(showing: game)
+        #if DEBUG && MAIN_APP
+        if let input = ActivityFixtures.selectedInput(ogs, place: place) { return input }
+        #endif
+        return ActivityModel.Input(ogs: ogs, place: place, startedGames: nav.startedGamesRecorder.startedGames)
+    }
+
+    private func opponentName(in game: Game?) -> String? {
+        guard let game, let color = game.userStoneColor else { return nil }
+        return game.currentPlayer(with: color.opponentColor())?.username
+    }
+
+    /// The control's state and its slot. The state comes from the model in
+    /// this pass, from `ogs` and the game this layout observes, so the bar's
+    /// first frame already has it, an in-place switch has the new game's at
+    /// once, and so does the game's end. No geometry takes part: the form
+    /// follows the placement and the window's class, and the frame follows
+    /// the form, the state and the class.
+    private func gameControlBarState() -> GameControlBarState {
+        let placement = arrangement.activeGamesPlacement(compact: compact, navigationBarHidden: navigationBarHidden)
+        let input = gameControlInput()
+        let allowsPicker = gameControl.switchRule.allowsPicker
+        let value = GameControlSlot(input, context: ActivityModel.GameControlContext(allowsPicker: allowsPicker,
+                                                                                    isZen: zenMode))
+        let isOpen = gameControl.isPopoverOpen
+        // While its popover is open the control stays, in its last state,
+        // even when nothing waits any more.
+        let drawn = value ?? (isOpen ? lastShownGameControl : nil)
+        let form = GameControlForm(placement, isCatalyst: Self.isCatalyst, windowClass: gameControl.windowClass)
+        let otherGame = drawn?.gameID.flatMap { id in ogs.liveGames.first { $0.ogsID == id } }
+        let isPresented = gameControl.presentation(placement)
+        let view: AnyView
+        let isShown: Bool
+        var nativeBadge: GameControlNativeItem.Badge?
+        if form.isNative {
+            let item = GameControlNativeItem(drawn, allowsPicker: allowsPicker,
+                                             keepsPlace: placement == .railSeparated)
+            nativeBadge = item?.badge
+            isShown = (item != nil && !zenMode) || isOpen
+            let label = GameControlAccessibility(drawn ?? .inbox(count: 0), form: form, allowsPicker: allowsPicker,
+                                                 name: opponentName(in: otherGame) ?? "").label
+            view = AnyView(GameControlNativeButton(
+                item: item ?? GameControlNativeItem(icon: .inbox, badge: .none), label: label,
+                isPresented: isPresented, popover: gameControl.popover, openPopover: gameControl.openPopover,
+                popoverAppeared: { nativeGameControlIdentity.popoverAppeared() },
+                popoverDisappeared: { nativeGameControlIdentity.popoverDisappeared() }
+            ).id(nativeGameControlIdentity.id(showing: item?.badge, isPopoverOpen: isOpen)))
+        } else {
+            isShown = (drawn != nil && !zenMode) || isOpen
+            let model = GameControlItemModel(
+                slot: drawn ?? .base(plusN: 0), windowClass: gameControl.windowClass,
+                modeCount: showsConditionalMoves ? 3 : 2, sizeCategory: UIContentSizeCategory(dynamicTypeSize),
+                allowsPicker: allowsPicker, game: otherGame,
+                show: gameControl.show, openPopover: gameControl.openPopover
+            )
+            view = form == .bottomBar
+                ? AnyView(GameControlBottomBarItem(model: model, isPresented: isPresented, popover: gameControl.popover))
+                : AnyView(GameControlTopBarItem(model: model, isPresented: isPresented, popover: gameControl.popover))
+        }
+        return GameControlBarState(
+            value: value, slot: GameActiveGamesSlot(placement: placement, isShown: isShown, view: view),
+            nativeBadge: nativeBadge, deadlines: gameControlDeadlinePlan(input, value: value), now: input.now
+        )
+    }
+
+    /// When time alone can change the control's state: at the latest
+    /// started game's end, and each second while two or more other live
+    /// games are on the user's move or a started game leads.
+    private func gameControlDeadlinePlan(_ input: ActivityModel.Input,
+                                         value: GameControlSlot?) -> GameControlDeadlines.Plan {
+        let shownID = ActivityModel.Place(showing: game).gameID
+        let othersOnYourMove = input.liveGames.filter { $0.id != shownID && $0.isYourMove }.count
+        var startedLeads = false
+        if case .gameStarted? = value { startedLeads = true }
+        let leadEnds = input.startedGames.values.max().map { $0 + ActivityModel.startedLeadDuration }
+        let ticks = !ActivityListSource.isClockFrozen && (othersOnYourMove >= 2 || startedLeads)
+        return GameControlDeadlines.Plan(leadEnds: leadEnds, ticksEachSecond: ticks)
+    }
+
+    private func gameControlChanged(_ value: GameControlSlot?) {
+        if let value { lastShownGameControl = value }
+        announceStartedGame(value)
+    }
+
+    /// "Game started with CedarWave", once per game in this window, when the
+    /// control first shows a live game that started elsewhere.
+    private func announceStartedGame(_ value: GameControlSlot?) {
+        guard case let .gameStarted(gameID, _, _)? = value,
+              let name = opponentName(in: ogs.liveGames.first(where: { $0.ogsID == gameID })),
+              nav.startedGamesRecorder.claimAnnouncement(for: gameID) else { return }
+        nav.announce(AppAnnouncement(.gameStarted(gameID), audience: .frontmostWindow,
+                                     speech: GameControlAccessibility.gameStarted(with: name)))
+    }
+
+    /// Compact landscape: the control, then the modes and the utilities, at the top.
+    @ToolbarContentBuilder private func compactLandscapeControlItems(_ slot: GameActiveGamesSlot) -> some ToolbarContent {
+        GameActiveGamesSlotItems(slot: slot)
         ToolbarItemGroup(placement: .topBarTrailing) { modeButtons }
         ToolbarItemGroup(placement: .topBarTrailing) { utilityButtons }
     }
 
-    /// Wide windows and the Mac: modes, Active games and utilities at the top.
-    @ToolbarContentBuilder private var wideControlItems: some ToolbarContent {
-        // Wide windows keep modes and Active Games at the top.
+    /// Wide windows and the Mac: modes, the control and utilities at the top.
+    @ToolbarContentBuilder private func wideControlItems(_ slot: GameActiveGamesSlot) -> some ToolbarContent {
+        // Wide windows keep the modes and the control at the top.
         GameVerticalToolbarGroup(placement: .topBarTrailing) {
             modeButtons
         }
-        activeGamesItems
+        GameActiveGamesSlotItems(slot: slot)
         ToolbarItemGroup(placement: .topBarTrailing) {
             utilityButtons
         }
     }
 
-    /// The one Active games unit every arrangement emits.
-    private var activeGamesItems: GameActiveGamesSlotItems {
-        GameActiveGamesSlotItems(slot: activeGamesSlot)
-    }
-
     func body(content: Content) -> some View {
-        content
+        // One read of the window's state for the control, in the pass that
+        // draws the bar, so the control is there from the bar's first frame.
+        let control = gameControlBarState()
+        return content
             // SwiftUI also places custom principal content in its title
             // slot. Remove only an unused slot, preserving clocks, player
             // identity and the connection banner when they occupy it.
@@ -1587,11 +1721,26 @@ private struct GameToolbarLayout: ViewModifier {
                     }
                 } else {
                     principalItems
-                    controlItems
+                    controlItems(control.slot)
                 }
             }
             .toolbar { iPadSidebarItems }
             .modifier(GameToolbarCompression())
+            .modifier(GameControlUpdates(
+                value: control.value, nativeBadge: control.nativeBadge, deadlines: control.deadlines,
+                now: control.now,
+                holdsNativeIdentity: nativeGameControlIdentity.holds(isPopoverOpen: gameControl.isPopoverOpen),
+                onValue: gameControlChanged, onNativeBadge: { badge in
+                    nativeGameControlIdentity.follow(badge, isPopoverOpen: gameControl.isPopoverOpen)
+                },
+                onDeadlines: { gameControlDeadlines.follow($0, now: $1) }
+            ))
+            #if DEBUG && MAIN_APP
+            .modifier(GameControlFirstStateRecorder(
+                gameID: game.ogsID, shown: control.slot.isShown ? control.value : nil,
+                recorded: $gameControlFirstState
+            ))
+            #endif
     }
 }
 
@@ -1700,18 +1849,158 @@ private struct GameVerticalToolbarGroup<Content: View>: ToolbarContent {
     }
 }
 
-/// What fills Game Detail's Active games slot: today the Active games button
-/// and its popover. Phase 4's in-game control replaces it.
+/// When the in-game control's popover closes with its screen: when the
+/// slot moves to another bar, since the old item goes with its popover and
+/// SwiftUI may never report that popover closed, so the item that replaces
+/// it starts closed and opens again; when the window's request goes or
+/// another replaces it; and when the screen goes with the popover open, so
+/// no request waits on a list no one can see. Apart from Game Detail's
+/// body so Xcode 26.2 can type-check it.
+private struct GameControlPopoverLifecycle: ViewModifier {
+    let placement: GameActiveGamesPlacement
+    let gameID: Int?
+    let close: () -> Void
+    let open: () -> Void
+    let windowRequestChanged: (UUID?) -> Void
+    @EnvironmentObject private var nav: NavigationService
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: placement) { _, _ in close() }
+            .onChange(of: nav.main.activity?.sessionID) { _, sessionID in windowRequestChanged(sessionID) }
+            .onDisappear(perform: close)
+            #if DEBUG && MAIN_APP
+            .onReceive(nav.debugGameControlPopoverRequests) { requested in
+                if requested == gameID { open() }
+            }
+            .background { debugActivityRequest }
+            #endif
+    }
+
+    #if DEBUG && MAIN_APP
+    /// Hidden, for UI tests: the window's Activity request's source.
+    @ViewBuilder private var debugActivityRequest: some View {
+        if SurroundUITestContract.isEnabled {
+            Color.clear
+                .frame(width: 1, height: 1)
+                .accessibilityElement()
+                .accessibilityLabel(Text(verbatim: "Activity request"))
+                .accessibilityValue(Text(verbatim: nav.main.activity.map { "\($0.source)" } ?? "none"))
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.debugActivityRequest)
+                .accessibilityHidden(true)
+                .allowsHitTesting(false)
+        }
+    }
+    #endif
+}
+
+/// What the in-game control needs from its Game Detail: how a switch happens
+/// on its route, its popover and the popover's content, and what a tap or a
+/// hold does. The toolbar reads the control's state itself.
+private struct GameControlHost {
+    var switchRule: GameControlSwitch
+    var windowClass: GameControlWindowClass?
+    var isPopoverOpen: Bool
+    /// The popover binding of the item at a placement.
+    var presentation: (GameActiveGamesPlacement) -> Binding<Bool>
+    var popover: AnyView
+    var openPopover: () -> Void
+    /// Shows one of the user's live games by its id.
+    var show: (Int) -> Void
+}
+
+/// The control's state in one pass of the toolbar.
+private struct GameControlBarState {
+    /// The model's state for the game on screen; nil where the slot hides.
+    var value: GameControlSlot?
+    var slot: GameActiveGamesSlot
+    /// The native item's badge, on the rail and the Mac.
+    var nativeBadge: GameControlNativeItem.Badge?
+    var deadlines: GameControlDeadlines.Plan
+    /// When the state was read, in seconds since 1970.
+    var now: TimeInterval
+}
+
+/// What happens when the control's state changes, apart from the toolbar's
+/// body so Xcode 26.2 can type-check both.
+private struct GameControlUpdates: ViewModifier {
+    let value: GameControlSlot?
+    let nativeBadge: GameControlNativeItem.Badge?
+    let deadlines: GameControlDeadlines.Plan
+    let now: TimeInterval
+    /// The native item's popover is open or still on screen.
+    let holdsNativeIdentity: Bool
+    let onValue: (GameControlSlot?) -> Void
+    let onNativeBadge: (GameControlNativeItem.Badge?) -> Void
+    let onDeadlines: (GameControlDeadlines.Plan, TimeInterval) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: value, initial: true) { _, value in onValue(value) }
+            .onChange(of: nativeBadge, initial: true) { _, badge in onNativeBadge(badge) }
+            // A badge that changed while the popover was open or on screen
+            // takes effect once the popover has gone.
+            .onChange(of: holdsNativeIdentity) { _, holds in
+                if !holds { onNativeBadge(nativeBadge) }
+            }
+            .onChange(of: deadlines, initial: true) { _, plan in onDeadlines(plan, now) }
+    }
+}
+
+#if DEBUG && MAIN_APP
+/// The control's state as it first drew for one game.
+private struct GameControlFirstState: Equatable {
+    var gameID: Int?
+    var text: String
+}
+
+/// Hidden, for UI tests: the control's state as it first drew for the game
+/// on screen, from the pass that first drew the bar for it, or "none".
+private struct GameControlFirstStateRecorder: ViewModifier {
+    private struct Shown: Equatable {
+        var gameID: Int?
+        var value: GameControlSlot?
+    }
+
+    let gameID: Int?
+    let shown: GameControlSlot?
+    @Binding var recorded: GameControlFirstState?
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: Shown(gameID: gameID, value: shown), initial: true) { _, current in
+                guard recorded?.gameID != current.gameID else { return }
+                recorded = GameControlFirstState(gameID: current.gameID,
+                                                 text: GameControlSlot.testDescription(current.value))
+            }
+            .background {
+                if SurroundUITestContract.isEnabled {
+                    Color.clear
+                        .frame(width: 1, height: 1)
+                        .accessibilityElement()
+                        .accessibilityLabel(Text(verbatim: "Game control first state"))
+                        .accessibilityValue(Text(verbatim: recorded?.text ?? ""))
+                        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameControlFirstState)
+                        .accessibilityHidden(true)
+                        .allowsHitTesting(false)
+                }
+            }
+    }
+}
+#endif
+
+/// What fills Game Detail's control slot: the in-game control's item for
+/// its placement, and whether it shows.
 private struct GameActiveGamesSlot {
     var placement: GameActiveGamesPlacement
-    /// `GameDetailView.canShowActiveGames` today.
+    /// A state outside Zen, or the popover is open.
     var isShown: Bool
     var view: AnyView
 }
 
-/// The Active games slot at the place its arrangement gives it. Every
+/// The control's slot at the place its arrangement gives it. Every
 /// arrangement emits this one unit, so the slot changes here and in
-/// `GameDetailView.activeGamesSlot(in:isShown:)`, never in the arrangements.
+/// `GameToolbarLayout.gameControlBarState()`, never in the arrangements.
 private struct GameActiveGamesSlotItems: ToolbarContent {
     let slot: GameActiveGamesSlot
 

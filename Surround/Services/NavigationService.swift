@@ -108,8 +108,8 @@ struct GameDetailNotificationContext: Equatable {
     /// The user's own unfinished live game on screen. The live-game notice
     /// never points at it, and challenge notices wait during live play.
     var ownLiveGame: GameID?
-    /// Its Active games picker lists the user's other live games, so the
-    /// live-game notice gives way to it.
+    /// The in-game control's popover has the picker of the user's other
+    /// live games, so the live-game notice gives way to it.
     var listsLiveGames = false
     /// An unfinished live game is on screen, played or watched: its window
     /// keeps the display awake until the game ends.
@@ -117,7 +117,9 @@ struct GameDetailNotificationContext: Equatable {
 }
 
 extension GameDetailNotificationContext {
-    init(showing game: Game, allowsActiveGamesCarousel: Bool) {
+    /// - Parameter allowsPicker: The route has the picker of same-speed
+    ///   games: Home's route with its picker allowed (`GameControlSwitch`).
+    init(showing game: Game, allowsPicker: Bool) {
         let timeControl = game.gameData?.timeControl
         // Like the service's live list, a game without a speed tag counts
         // by its clock.
@@ -126,13 +128,14 @@ extension GameDetailNotificationContext {
         let ended = game.gamePhase == .finished
             || !(game.gameData?.outcome?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         let inPlay = speed?.isRealtime == true && !ended
-        // A profile route has no picker, so the notice still points at the
-        // user's other live games, but never at the one on screen.
+        // Routes without the picker (Public games, history and profiles)
+        // keep the notice for the user's other live games, but it never
+        // points at the one on screen.
         let playing = inPlay && game.isUserPlaying
         self.init(
             ownLiveGame: playing ? game.ID : nil,
             // The picker lists games by their tag only.
-            listsLiveGames: playing && allowsActiveGamesCarousel && timeControl?.speed?.isRealtime == true,
+            listsLiveGames: playing && allowsPicker && timeControl?.speed?.isRealtime == true,
             showsLiveGameInPlay: inPlay
         )
     }
@@ -290,6 +293,11 @@ class NavigationService: ObservableObject {
     let startedGamesRecorder = StartedGamesRecorder()
     /// This window's warning haptic for another live game's last seconds.
     let lowTimeHapticWatcher = LowTimeHapticWatcher()
+    #if DEBUG && MAIN_APP
+    /// `--surround-activity-open game-popover`: the Game Detail showing
+    /// this game opens its control's popover.
+    let debugGameControlPopoverRequests = PassthroughSubject<Int, Never>()
+    #endif
 
     /// Set by the window's root: navigation waits while this window's account
     /// is covered by a moderator superchat.
@@ -298,7 +306,7 @@ class NavigationService: ObservableObject {
     /// What the app itself asked for while covered.
     enum HeldNavigation {
         case route(AppRoute)
-        case gameOpen(AppRoute, closesNewGame: Bool)
+        case gameOpen(AppRoute, closesNewGame: Bool, closesAccountSheet: Bool)
         case activeGame(Game)
         case messagesInbox
     }
@@ -328,7 +336,8 @@ class NavigationService: ObservableObject {
         }
         switch internalNavigation {
         case .route(let route): handle(route: route)
-        case .gameOpen(let route, let closesNewGame): requestGameOpen(route, closesNewGame: closesNewGame)
+        case .gameOpen(let route, let closesNewGame, let closesAccountSheet):
+            requestGameOpen(route, closesNewGame: closesNewGame, closesAccountSheet: closesAccountSheet)
         case .activeGame(let game): goToActiveGame(game: game)
         case .messagesInbox: openMessagesInbox()
         case nil: break
@@ -377,7 +386,7 @@ class NavigationService: ObservableObject {
     }
 
     /// The user's unfinished live games that no visible Game Detail shows or
-    /// lists in its Active games picker: the ones the live-game notice offers.
+    /// lists in its control's picker: the ones the live-game notice offers.
     func liveGamesNeedingNotice(among liveGames: [Game]) -> [Game] {
         let contexts = gameDetailNotificationContexts.values
         guard !contexts.contains(where: \.listsLiveGames) else { return [] }
@@ -469,10 +478,13 @@ class NavigationService: ObservableObject {
     /// Publishes a game-open request without applying the broad dismissal
     /// policy used for external URLs, so internal flows such as challenge
     /// acceptance keep the navigation they own. `closesNewGame` closes New
-    /// game with the open, so both wait while the window is covered.
-    func requestGameOpen(_ route: AppRoute, closesNewGame: Bool = false) {
+    /// game with the open, and `closesAccountSheet` the iPad's account
+    /// sheet, so each waits with it while the window is covered.
+    func requestGameOpen(_ route: AppRoute, closesNewGame: Bool = false, closesAccountSheet: Bool = false) {
         #if MAIN_APP || TESTING
-        if holdsInternal(.gameOpen(route, closesNewGame: closesNewGame)) { return }
+        if holdsInternal(.gameOpen(route, closesNewGame: closesNewGame, closesAccountSheet: closesAccountSheet)) {
+            return
+        }
         #endif
         guard let ogsGameID = route.ogsGameID else { return }
         #if MAIN_APP || TESTING
@@ -481,6 +493,7 @@ class NavigationService: ObservableObject {
         if main.activity != nil { main.activity = nil }
         #endif
         if closesNewGame { home.showingNewGameView = false }
+        if closesAccountSheet { main.accountSheet = nil }
 
         main.rootView = route.rootView
         pendingGameOpen = PendingGameOpen(
@@ -816,12 +829,24 @@ extension NavigationService {
     }
 
     /// The opener of this window's Activity popover moved while it stays on
-    /// screen, as on rotation, so the popover follows it.
+    /// screen, as on rotation, so the popover follows it. The in-game
+    /// control's popover hangs from the control itself, so it has nothing
+    /// to follow.
     func moveActivityAnchor(to anchor: CGRect, from source: ActivityRequest.Source) {
         guard var request = main.activity, request.style == .popover, request.source == source,
-              request.anchor != anchor else { return }
+              source != .gameControl, request.anchor != anchor else { return }
         request.anchor = anchor
         main.activity = request
+    }
+
+    /// Opens a game from Activity on Home's route: a live Accept, the
+    /// correspondence row, Open game, and a game opened from a profile the
+    /// list pushed. The account sheet closes, as a game in the iPad Profile
+    /// sheet can open its control's popover there. `closesNewGame` closes
+    /// New game too.
+    func openGame(_ gameID: Int, closesNewGame: Bool) {
+        guard let route = AppRoute(rootView: .home, ogsGameID: gameID) else { return }
+        requestGameOpen(route, closesNewGame: closesNewGame, closesAccountSheet: true)
     }
 }
 
@@ -910,11 +935,6 @@ extension NavigationService: ActivityNavigating {
     /// Closes the window's Activity list, for the list's own rows.
     func closeActivity() {
         onCloseActivity?()
-    }
-
-    func openGame(_ gameID: Int, closesNewGame: Bool) {
-        guard let route = AppRoute(rootView: .home, ogsGameID: gameID) else { return }
-        requestGameOpen(route, closesNewGame: closesNewGame)
     }
 }
 #endif

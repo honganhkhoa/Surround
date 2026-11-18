@@ -103,18 +103,24 @@ struct HomeGameFacts {
     }
 
     func chipTime(_ color: StoneColor) -> String {
+        if let left = chipTimeLeft(color) {
+            return timeString(timeLeft: left)
+        }
+        let state = clock(color)
+        return state.firstMoveDeadline ? String(localized: "Waiting…") : state.compactUnavailableTimeText
+    }
+
+    /// The time `chipTime` shows, when it shows one: the first move's
+    /// deadline on the side to move, otherwise the clock's time left. The
+    /// in-game control's chip and Activity's live rows read the same value.
+    func chipTimeLeft(_ color: StoneColor) -> TimeInterval? {
         let state = clock(color)
         if state.firstMoveDeadline {
-            guard state.clock?.currentPlayerColor == color, let deadline = state.clock?.timeUntilExpiration else {
-                return String(localized: "Waiting…")
-            }
-            return timeString(timeLeft: deadline)
+            guard state.clock?.currentPlayerColor == color else { return nil }
+            return state.clock?.timeUntilExpiration
         }
-        guard state.canShowTimer, let clock = state.displayClock,
-              let left = (color == .black ? clock.blackTime : clock.whiteTime).timeLeft else {
-            return state.compactUnavailableTimeText
-        }
-        return timeString(timeLeft: left)
+        guard state.canShowTimer, let clock = state.displayClock else { return nil }
+        return (color == .black ? clock.blackTime : clock.whiteTime).timeLeft
     }
 
     /// Overtime keeps its periods or stones beside the time; the main time

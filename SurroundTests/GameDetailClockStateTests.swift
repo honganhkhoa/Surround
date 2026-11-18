@@ -710,7 +710,7 @@ final class GameDetailClockStateTests: XCTestCase {
     /// has not ended, played or watched, and lets it sleep once the game ends.
     func testWatchedLiveGameKeepsTheWindowAwakeUntilItEnds() throws {
         let live = try game()
-        let context = GameDetailNotificationContext(showing: live, allowsActiveGamesCarousel: true)
+        let context = GameDetailNotificationContext(showing: live, allowsPicker: true)
         XCTAssertTrue(context.showsLiveGameInPlay, "A spectated live game in play keeps the display awake")
         XCTAssertNil(context.ownLiveGame, "Watching is not playing")
         XCTAssertFalse(context.listsLiveGames)
@@ -721,22 +721,55 @@ final class GameDetailClockStateTests: XCTestCase {
         XCTAssertTrue(nav.visibleGameDetailShowsLiveGameInPlay)
 
         live.gamePhase = .stoneRemoval
-        XCTAssertTrue(GameDetailNotificationContext(showing: live, allowsActiveGamesCarousel: true)
+        XCTAssertTrue(GameDetailNotificationContext(showing: live, allowsPicker: true)
             .showsLiveGameInPlay, "Stone removal is still part of the game")
         live.gamePhase = .finished
-        let ended = GameDetailNotificationContext(showing: live, allowsActiveGamesCarousel: true)
+        let ended = GameDetailNotificationContext(showing: live, allowsPicker: true)
         XCTAssertFalse(ended.showsLiveGameInPlay, "A finished game lets the display sleep")
         nav.gameDetailNotificationContexts[contextID] = ended
         XCTAssertFalse(nav.visibleGameDetailShowsLiveGameInPlay)
 
         let resigned = try game()
         resigned.gameData?.outcome = "Resignation"
-        XCTAssertFalse(GameDetailNotificationContext(showing: resigned, allowsActiveGamesCarousel: true)
+        XCTAssertFalse(GameDetailNotificationContext(showing: resigned, allowsPicker: true)
             .showsLiveGameInPlay, "A result ends the game before its phase does")
 
         let correspondence = try game(.Simple(perMove: 86_400))
-        XCTAssertFalse(GameDetailNotificationContext(showing: correspondence, allowsActiveGamesCarousel: true)
+        XCTAssertFalse(GameDetailNotificationContext(showing: correspondence, allowsPicker: true)
             .showsLiveGameInPlay, "A correspondence game never keeps the display awake")
+    }
+
+    /// The live-game notice gives way to the in-game control's picker, which
+    /// only Home's route with the picker allowed has. On Public games, a
+    /// history game or a profile's game the user's own live game lists
+    /// nothing, so the notice still offers the other live games, though
+    /// never the one on screen.
+    func testOnlyHomesRouteWithThePickerListsLiveGames() throws {
+        let live = try game()
+        let blackID = try XCTUnwrap(live.gameData?.players.black.id)
+        let service = OGSService.previewInstance(user: OGSUser(username: "black", id: blackID))
+        live.ogs = service
+        XCTAssertTrue(live.isUserPlaying)
+        let routes: [(route: StackRoute?, allowsCarousel: Bool, lists: Bool)] = [
+            (.homeGame, true, true),
+            (.homeGame, false, false),      // Home's finished games
+            (nil, true, true),              // a stack's root: previews and compatibility scenes
+            (.publicGame, true, false),     // its flag keeps the default
+            (.historyGame, false, false),
+            (.game(41), false, false),      // a profile's game, the iPad Profile sheet's too
+        ]
+        for (route, allowsCarousel, lists) in routes {
+            let allowsPicker = GameControlSwitch(route: route, allowsActiveGamesCarousel: allowsCarousel).allowsPicker
+            let context = GameDetailNotificationContext(showing: live, allowsPicker: allowsPicker)
+            let name = "\(route.map { "\($0)" } ?? "root") \(allowsCarousel)"
+            XCTAssertEqual(context.listsLiveGames, lists, name)
+            XCTAssertEqual(context.ownLiveGame, live.ID, "The notice never points at the game on screen: \(name)")
+        }
+
+        let correspondence = try game(.Simple(perMove: 86_400))
+        correspondence.ogs = service
+        XCTAssertFalse(GameDetailNotificationContext(showing: correspondence, allowsPicker: true).listsLiveGames,
+                       "A correspondence game's picker lists correspondence games.")
     }
 
     /// Only the foreground counts; a finished live game stops counting before
@@ -751,7 +784,7 @@ final class GameDetailClockStateTests: XCTestCase {
         XCTAssertTrue(keepsAwake(liveGames: [live]))
         XCTAssertTrue(keepsAwake(waiting: 1), "Waiting for a live game to start")
         nav.gameDetailNotificationContexts[UUID()] = GameDetailNotificationContext(
-            showing: live, allowsActiveGamesCarousel: false)
+            showing: live, allowsPicker: false)
         XCTAssertTrue(keepsAwake(), "Watching a live game in play")
         XCTAssertFalse(keepsAwake(isActive: false, liveGames: [live], waiting: 1))
         live.gamePhase = .finished

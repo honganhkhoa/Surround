@@ -561,29 +561,9 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
 
         func switchTo(_ gameID: Int) {
             dismissSoftwareKeyboardIfNeeded(in: app)
-            let direct = app.buttons.matching(identifier: ID.gameActiveGamesButton).firstMatch
-            let overflow = app.buttons.matching(NSPredicate(
-                format: "identifier IN %@ OR label == %@",
-                ["OverflowBarButtonItem", "BottomOverflowBarButtonItem", "More"], "More"
-            )).firstMatch
-            XCTAssertTrue(pollUntil(timeout: 10) { direct.exists || overflow.isHittable })
-            if direct.exists {
-                if UIDevice.current.userInterfaceIdiom == .phone {
-                    // Native hidden tab-bar AX can overlap this visible item.
-                    // Resolve its center freshly, then require the real popover.
-                    XCTAssertTrue(direct.isEnabled)
-                    XCTAssertTrue(app.frame.contains(direct.frame))
-                    XCTAssertGreaterThan(direct.frame.width, 0)
-                    XCTAssertGreaterThan(direct.frame.height, 0)
-                    direct.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-                } else {
-                    tap(direct, description: "Active games", in: app)
-                }
-            } else {
-                tap(overflow, description: "Game toolbar overflow", in: app)
-                tap(requiredMenuButton(ID.gameActiveGamesButton, title: "Active games", in: app),
-                    description: "Active games", in: app)
-            }
+            // The control is the chip for the live game on your move; a
+            // touch and hold opens its popover, whose picker switches here.
+            openGameControlPopover(in: app)
             XCTAssertTrue(popover.waitForExistence(timeout: 10))
             let entry = popover.buttons.matching(identifier: ID.gameActiveGamesEntry(gameID)).firstMatch
             XCTAssertTrue(entry.waitForExistence(timeout: 10))
@@ -710,9 +690,10 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             if chatInputHasKeyboardFocus(in: app) {
                 dismissSoftwareKeyboardIfNeeded(in: app)
             }
+            // The in-game control's base form shares the label iOS 18 gives Back.
             let backs = app.buttons.matching(NSPredicate(
-                format: "identifier == %@ OR label == %@ OR label == %@",
-                "BackButton", "Active games", "Back"
+                format: "identifier == %@ OR (identifier != %@ AND (label == %@ OR label == %@))",
+                "BackButton", ID.gameActiveGamesButton, "Active games", "Back"
             ))
             var back: XCUIElement?
             let visibleBack = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in

@@ -100,7 +100,8 @@ final class GameControlChipFitTests: XCTestCase {
                                             .joined(separator: " ")
                                         let drawing = try XCTUnwrap(GameControlDrawing(
                                             slot, form: form, windowClass: windowClass, modeCount: modes,
-                                            allowsPicker: true, hasCountdown: clock != nil, isSuddenDeath: suddenDeath), name)
+                                            sizeCategory: size, allowsPicker: true, hasCountdown: clock != nil,
+                                            isSuddenDeath: suddenDeath), name)
                                         let fit = drawing.fit(metrics, clock: clock, mark: mark)
                                         checked += 1
                                         XCTAssertTrue([160, 120, 96, 84, 44].contains(drawing.frame.width), name)
@@ -131,13 +132,15 @@ final class GameControlChipFitTests: XCTestCase {
     func testTheDrawnChipKeepsEveryPartInEnglishAtTheDefaultSize() throws {
         let metrics = GameControlChipMetrics(form: .bottomBar, sizeCategory: .large)
         let drawing = try XCTUnwrap(GameControlDrawing(.chip(gameID: 1, plusN: 3, hasDot: false), form: .bottomBar,
-                                                       windowClass: nil, modeCount: 2, allowsPicker: true))
+                                                       windowClass: nil, modeCount: 2, sizeCategory: .large,
+                                                       allowsPicker: true))
         let fit = drawing.fit(metrics, clock: GameControlClock(timeLeft: 42),
                               mark: GameControlSuddenDeathMark(bottomBar: try localizedSD("en")))
         XCTAssertEqual(drawing.frame.width, 160)
         XCTAssertEqual(fit.parts, [.board, .hourglass, .clock, .plusN])
         let top = try XCTUnwrap(GameControlDrawing(.chip(gameID: 1, plusN: 3, hasDot: false), form: .topBar,
-                                                   windowClass: nil, modeCount: 2, allowsPicker: true))
+                                                   windowClass: nil, modeCount: 2, sizeCategory: .large,
+                                                   allowsPicker: true))
         XCTAssertEqual(top.fit(GameControlChipMetrics(form: .topBar, sizeCategory: .large),
                                clock: GameControlClock(timeLeft: 42), mark: .glyph).parts,
                        [.board, .hourglass, .clock], "The top bar's chip keeps its hourglass for 00:42.")

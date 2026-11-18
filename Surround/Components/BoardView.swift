@@ -612,10 +612,14 @@ private struct BoardBorder: View {
         // joins differently; overlapping them would double translucent colors.
         let patchSide = ceil(cornerRadius * displayScale) / displayScale
         ZStack {
+            // Clear views hold the strips apart, not spacers. SwiftUI leaves
+            // a custom bottom-bar item out of the bar when its button's label
+            // holds a Spacer (iOS 18 to 27), and the in-game control's chip
+            // draws its board in such a label.
             VStack(spacing: 0) {
                 LinearGradient(colors: [start, middle], startPoint: .leading, endPoint: .trailing)
                     .frame(height: width)
-                Spacer(minLength: 0)
+                Color.clear
                 LinearGradient(colors: [middle, end], startPoint: .leading, endPoint: .trailing)
                     .frame(height: width)
             }
@@ -624,7 +628,7 @@ private struct BoardBorder: View {
             HStack(spacing: 0) {
                 LinearGradient(colors: [start, middle], startPoint: .top, endPoint: .bottom)
                     .frame(width: width)
-                Spacer(minLength: 0)
+                Color.clear
                 LinearGradient(colors: [middle, end], startPoint: .top, endPoint: .bottom)
                     .frame(width: width)
             }

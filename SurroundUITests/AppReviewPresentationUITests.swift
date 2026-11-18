@@ -62,10 +62,11 @@ final class AppReviewPresentationUITests: SurroundJourneyUITestCase {
         assertHostedCoordinator("home")
         assertContext(home: false, blocked: false)
         // Regular layouts put Back in the vertical toolbar. A hidden
-        // navigation-bar copy may remain in the accessibility hierarchy.
+        // navigation-bar copy may remain in the accessibility hierarchy. The
+        // in-game control's base form shares the label iOS 18 gives Back.
         let backs = app.buttons.matching(NSPredicate(
-            format: "identifier == %@ OR label == %@ OR label == %@",
-            "BackButton", "Active games", "Back"
+            format: "identifier == %@ OR (identifier != %@ AND (label == %@ OR label == %@))",
+            "BackButton", SurroundUITestContract.AccessibilityID.gameActiveGamesButton, "Active games", "Back"
         ))
         var back: XCUIElement?
         let visibleBack = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in

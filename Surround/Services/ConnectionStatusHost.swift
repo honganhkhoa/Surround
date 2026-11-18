@@ -89,13 +89,15 @@ struct GameControlWindowClassHost: ViewModifier {
     }
 }
 
-/// Measures the window it is in. It reads the window's own bounds, never
-/// its content's layout: when it arrives in the window, when the window's
-/// scene changes geometry, and when it lays out with the root. It reports a
-/// main-queue turn later, and only when the class or shape changes, so it
-/// publishes only when the window resizes or turns. Nothing drawn inside
-/// the window, such as a tab bar that hides, a toolbar item or a keyboard,
-/// changes the window's bounds, so none of them publishes anything.
+/// Measures the window it is in. It reads the window's own bounds and
+/// horizontal size class, and the device, never its content's layout: when
+/// it arrives in the window, when the window's scene changes geometry, when
+/// the size class changes, and when it lays out with the root. It reports a
+/// main-queue turn later, and only when the class, shape or top-bar room
+/// changes, so it publishes only when the window resizes or turns. Nothing
+/// drawn inside the window, such as a tab bar that hides, a toolbar item,
+/// a keyboard or a hidden status bar, changes the window's bounds or size
+/// class, so none of them publishes anything.
 private struct GameControlWindowClassReporter: UIViewRepresentable {
     let onChange: (GameControlWindowClass) -> Void
 
@@ -118,6 +120,9 @@ private struct GameControlWindowClassReporter: UIViewRepresentable {
             super.init(frame: frame)
             isUserInteractionEnabled = false
             accessibilityElementsHidden = true
+            registerForTraitChanges([UITraitHorizontalSizeClass.self]) { (view: ReporterView, _: UITraitCollection) in
+                view.measure()
+            }
         }
 
         @available(*, unavailable)
@@ -142,7 +147,11 @@ private struct GameControlWindowClassReporter: UIViewRepresentable {
 
         private func measure() {
             guard let window, !window.bounds.isEmpty else { return }
-            let measured = GameControlWindowClass(windowSize: window.bounds.size)
+            let measured = GameControlWindowClass(
+                windowSize: window.bounds.size,
+                isRegularWidth: window.traitCollection.horizontalSizeClass == .regular,
+                isPhone: UIDevice.current.userInterfaceIdiom == .phone
+            )
             guard measured != reported else { return }
             reported = measured
             // Never inside a SwiftUI update or a UIKit layout pass, such as

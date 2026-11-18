@@ -63,17 +63,21 @@ final class GameControlModelTests: XCTestCase {
     private typealias WindowClass = GameControlWindowClass
     private typealias WidthClass = GameControlWindowClass.WidthClass
 
-    func testTheWidthClassesChangeAt375And390Points() {
+    func testTheWidthClassesChangeAt375And390And402Points() {
         XCTAssertEqual(WidthClass(width: 320), .floor, "Display Zoom's narrowest phone")
         XCTAssertEqual(WidthClass(width: 374.5), .floor, "Below 375 pt")
         XCTAssertEqual(WidthClass(width: 375), .narrow, "The iPhone SE and the narrowest iPad window")
         XCTAssertEqual(WidthClass(width: 389.5), .narrow, "Below 390 pt")
         XCTAssertEqual(WidthClass(width: 390), .standard, "390 pt itself, as the iPhone 16e")
-        XCTAssertEqual(WidthClass(width: 402), .standard)
-        XCTAssertEqual(WidthClass(width: 1366), .standard)
-        XCTAssertEqual(WidthClass.allCases, [.floor, .narrow, .standard], "The classes go from narrowest to widest.")
+        XCTAssertEqual(WidthClass(width: 393), .standard, "The iPhone 16")
+        XCTAssertEqual(WidthClass(width: 401.5), .standard, "Below 402 pt")
+        XCTAssertEqual(WidthClass(width: 402), .wide, "402 pt itself, as the iPhone 17 Pro")
+        XCTAssertEqual(WidthClass(width: 1366), .wide)
+        XCTAssertEqual(WidthClass.allCases, [.floor, .narrow, .standard, .wide],
+                       "The classes go from narrowest to widest.")
         XCTAssertLessThan(WidthClass.floor, .narrow)
         XCTAssertLessThan(WidthClass.narrow, .standard)
+        XCTAssertLessThan(WidthClass.standard, .wide)
     }
 
     func testEachClassRunsFromItsMinimumToTheNextOne() {
@@ -93,13 +97,15 @@ final class GameControlModelTests: XCTestCase {
 
     func testTheShapeIsLandscapeOnlyWhenTheWindowIsWiderThanTall() {
         XCTAssertEqual(WindowClass(windowSize: CGSize(width: 402, height: 874)),
-                       WindowClass(widthClass: .standard, shape: .portrait))
+                       WindowClass(widthClass: .wide, shape: .portrait))
         XCTAssertEqual(WindowClass(windowSize: CGSize(width: 874, height: 402)),
-                       WindowClass(widthClass: .standard, shape: .landscape))
+                       WindowClass(widthClass: .wide, shape: .landscape))
+        XCTAssertEqual(WindowClass(windowSize: CGSize(width: 390, height: 844)),
+                       WindowClass(widthClass: .standard, shape: .portrait))
         XCTAssertEqual(WindowClass(windowSize: CGSize(width: 320, height: 568)),
                        WindowClass(widthClass: .floor, shape: .portrait))
         XCTAssertEqual(WindowClass(windowSize: CGSize(width: 568, height: 320)),
-                       WindowClass(widthClass: .standard, shape: .landscape), "Turned, the same window is wide enough.")
+                       WindowClass(widthClass: .wide, shape: .landscape), "Turned, the same window is wide enough.")
         XCTAssertEqual(WindowClass(windowSize: CGSize(width: 375, height: 548)),
                        WindowClass(widthClass: .narrow, shape: .portrait))
         XCTAssertEqual(WindowClass(windowSize: CGSize(width: 600, height: 600)).shape, .portrait,
@@ -107,27 +113,61 @@ final class GameControlModelTests: XCTestCase {
     }
 
     func testAResizeWithinAClassAndShapeKeepsTheValue() {
-        let phones = [CGSize(width: 390, height: 844), CGSize(width: 393, height: 852),
-                      CGSize(width: 402, height: 874), CGSize(width: 440, height: 956)]
-        let values = phones.map { WindowClass(windowSize: $0) }
-        XCTAssertTrue(values.allSatisfy { $0 == WindowClass(widthClass: .standard, shape: .portrait) },
+        let standardPhones = [CGSize(width: 390, height: 844), CGSize(width: 393, height: 852)]
+        let widePhones = [CGSize(width: 402, height: 874), CGSize(width: 440, height: 956)]
+        XCTAssertTrue(standardPhones.allSatisfy { WindowClass(windowSize: $0) == WindowClass(widthClass: .standard,
+                                                                                               shape: .portrait) },
                       "Only a resize across a boundary, or a turn, gives the root a new value to publish.")
-        let turned = phones.map { WindowClass(windowSize: CGSize(width: $0.height, height: $0.width)) }
-        XCTAssertTrue(turned.allSatisfy { $0 == WindowClass(widthClass: .standard, shape: .landscape) })
+        XCTAssertTrue(widePhones.allSatisfy { WindowClass(windowSize: $0) == WindowClass(widthClass: .wide,
+                                                                                           shape: .portrait) })
+        let turned = (standardPhones + widePhones).map { WindowClass(windowSize: CGSize(width: $0.height,
+                                                                                         height: $0.width)) }
+        XCTAssertTrue(turned.allSatisfy { $0 == WindowClass(widthClass: .wide, shape: .landscape) })
+    }
+
+    func testAFullSizeTopBarLacksRoomForTheChipOnlyWhereTheStatusBarSharesItsRow() {
+        func fits(_ width: CGFloat, _ height: CGFloat, regular: Bool = true, phone: Bool = false) -> Bool {
+            WindowClass(windowSize: CGSize(width: width, height: height), isRegularWidth: regular,
+                        isPhone: phone).topBarFitsChip
+        }
+        // The windows measured with the chip beside three modes.
+        XCTAssertFalse(fits(669, 951, phone: true),
+                       "The Duo in its tall poses: the status bar takes the row's end, and Zen and Options went to More")
+        XCTAssertTrue(fits(668, 741), "iPadOS 27's narrowest regular window, its window controls in the row")
+        XCTAssertTrue(fits(671, 741), "iPadOS 26's narrowest regular window")
+        XCTAssertTrue(fits(715, 915), "Stage Manager's narrowest regular window on iPadOS 18")
+        XCTAssertTrue(fits(834, 1210))
+        XCTAssertTrue(fits(1210, 834))
+        XCTAssertTrue(fits(744, 1133), "An iPad mini in portrait")
+        XCTAssertTrue(fits(956, 440, phone: true), "A Max iPhone in landscape, whose status bar hides")
+        XCTAssertTrue(fits(402, 874, regular: false, phone: true), "A compact window shows no full-size top bar")
+        XCTAssertTrue(fits(375, 548, regular: false))
+        XCTAssertTrue(WindowClass(windowSize: CGSize(width: 669, height: 951)).topBarFitsChip,
+                      "Without a size class the window counts as compact")
+
+        // The row's need against what the window leaves it.
+        let need = WindowClass.topBarRowForChip, share = WindowClass.statusBarShareOfTopBarRow
+        XCTAssertTrue(fits(need, need + 100))
+        XCTAssertFalse(fits(need - 0.5, need + 100))
+        XCTAssertTrue(fits(need + share, need + share + 100, phone: true), "A tall phone window with room beside the status bar")
+        XCTAssertFalse(fits(need + share - 0.5, need + share + 100, phone: true))
+        XCTAssertTrue(fits(need + share - 0.5, need, phone: true), "Turned wider than tall, the status bar leaves the row")
     }
 
     // MARK: What each form draws
 
     private typealias Drawing = GameControlDrawing
+    private let wide = GameControlWindowClass(widthClass: .wide, shape: .portrait)
     private let standard = GameControlWindowClass(widthClass: .standard, shape: .portrait)
     private let narrow = GameControlWindowClass(widthClass: .narrow, shape: .portrait)
     private let floor = GameControlWindowClass(widthClass: .floor, shape: .portrait)
 
     private func drawing(_ slot: GameControlSlot, _ form: GameControlForm, _ windowClass: GameControlWindowClass? = nil,
-                         modes: Int = 2, allowsPicker: Bool = true, hasCountdown: Bool = true,
-                         suddenDeath: Bool = false) throws -> Drawing {
-        try XCTUnwrap(Drawing(slot, form: form, windowClass: windowClass, modeCount: modes, allowsPicker: allowsPicker,
-                              hasCountdown: hasCountdown, isSuddenDeath: suddenDeath), "\(slot) in \(form)")
+                         modes: Int = 2, size: UIContentSizeCategory = .large, allowsPicker: Bool = true,
+                         hasCountdown: Bool = true, suddenDeath: Bool = false) throws -> Drawing {
+        try XCTUnwrap(Drawing(slot, form: form, windowClass: windowClass, modeCount: modes, sizeCategory: size,
+                              allowsPicker: allowsPicker, hasCountdown: hasCountdown, isSuddenDeath: suddenDeath),
+                      "\(slot) in \(form)")
     }
 
     func testTheBottomBarDrawsEachStatesParts() throws {
@@ -183,8 +223,9 @@ final class GameControlModelTests: XCTestCase {
         XCTAssertEqual(try drawing(.base(plusN: 3), .topBar).parts, [.icon(.grid), .plusN])
         XCTAssertEqual(try drawing(.inbox(count: 3), .topBar).parts, [.icon(.inbox), .plusN])
         XCTAssertTrue(try drawing(.dot, .topBar).hasDot)
-        for form in [GameControlForm.rail, .mac] {
-            XCTAssertNil(Drawing(.base(plusN: 3), form: form, windowClass: standard, modeCount: 2, allowsPicker: true),
+        for form in [GameControlForm.rail, .mac, .narrowTopBar] {
+            XCTAssertNil(Drawing(.base(plusN: 3), form: form, windowClass: standard, modeCount: 2, sizeCategory: .large,
+                             allowsPicker: true),
                          "\(form) draws the system's item, not a custom view.")
         }
     }
@@ -197,8 +238,9 @@ final class GameControlModelTests: XCTestCase {
             for modes in [2, 3] {
                 XCTAssertEqual(try drawing(slot, .bottomBar, nil, modes: modes).frame.width, 160, "\(slot): nil gives the full frame")
                 XCTAssertEqual(try drawing(slot, .bottomBar, standard, modes: modes).frame.width, 160, "\(slot)")
+                XCTAssertEqual(try drawing(slot, .bottomBar, wide, modes: modes).frame.width, 160, "\(slot)")
                 XCTAssertEqual(try drawing(slot, .bottomBar, floor, modes: modes).frame.width, 44, "\(slot): the floor")
-                for windowClass in [nil, floor, narrow, standard] {
+                for windowClass in [nil, floor, narrow, standard, wide] {
                     XCTAssertEqual(try drawing(slot, .topBar, windowClass, modes: modes).frame.width, 96, "\(slot)")
                 }
             }
@@ -220,7 +262,7 @@ final class GameControlModelTests: XCTestCase {
 
     func testNoFrameDependsOnTheClock() throws {
         for form in [GameControlForm.bottomBar, .topBar] {
-            for windowClass in [nil, floor, narrow, standard] {
+            for windowClass in [nil, floor, narrow, standard, wide] {
                 for modes in [2, 3] {
                     let frames = Set(try [(true, false), (true, true), (false, false)].map { countdown, suddenDeath in
                         try drawing(.chip(gameID: 7, plusN: 3, hasDot: false), form, windowClass, modes: modes,
@@ -229,6 +271,52 @@ final class GameControlModelTests: XCTestCase {
                     XCTAssertEqual(frames.count, 1, "\(form) \(String(describing: windowClass)) \(modes): \(frames)")
                 }
             }
+        }
+    }
+
+    /// Above the default text size the bar's own items grow, and a 390 pt
+    /// bar on iOS 27 keeps wider side insets: beside three modes the chip
+    /// then narrows in a window from 390 pt to 402 pt as well. From 402 pt,
+    /// beside two modes and in top bars it keeps its frame at every size.
+    func testAboveTheDefaultTextSizeTheChipNarrowsBesideThreeModesBelow402Points() throws {
+        XCTAssertEqual(GameControlDrawing.narrowsFromTextSize, .extraLarge,
+                       "At 390 pt on iOS 27.2 the full chip fits at the default size and folds the bar from XL.")
+        let sizes: [UIContentSizeCategory] = [
+            .extraSmall, .small, .medium, .large, .extraLarge, .extraExtraLarge, .extraExtraExtraLarge,
+            .accessibilityMedium, .accessibilityLarge, .accessibilityExtraLarge, .accessibilityExtraExtraLarge,
+            .accessibilityExtraExtraExtraLarge,
+        ]
+        let chipStates: [GameControlSlot] = [.chip(gameID: 7, plusN: 3, hasDot: false),
+                                             .gameStarted(gameID: 8, plusN: 3, hasDot: false),
+                                             .gameOverCard(challengeID: 9, plusN: 3)]
+        for slot in chipStates {
+            for size in sizes {
+                let large = size >= GameControlDrawing.narrowsFromTextSize
+                let name = "\(slot) at \(size.rawValue)"
+                XCTAssertEqual(try drawing(slot, .bottomBar, standard, modes: 3, size: size).frame.width,
+                               large ? 120 : 160, "\(name) beside three modes from 390 pt")
+                XCTAssertEqual(try drawing(slot, .bottomBar, standard, modes: 2, size: size).frame.width, 160,
+                               "\(name) beside two modes")
+                XCTAssertEqual(try drawing(slot, .bottomBar, wide, modes: 3, size: size).frame.width, 160,
+                               "\(name) from 402 pt")
+                XCTAssertEqual(try drawing(slot, .bottomBar, narrow, modes: 3, size: size).frame.width, 120,
+                               "\(name) from 375 pt")
+                XCTAssertEqual(try drawing(slot, .bottomBar, floor, modes: 3, size: size).frame.width, 44,
+                               "\(name) below 375 pt")
+                XCTAssertEqual(try drawing(slot, .bottomBar, nil, modes: 3, size: size).frame.width, 160,
+                               "\(name) before the root has measured the window")
+                XCTAssertEqual(try drawing(slot, .topBar, standard, modes: 3, size: size).frame.width, 96, name)
+                XCTAssertEqual(GameControlDrawing.narrowsBesideModes(.standard, modeCount: 3, sizeCategory: size), large,
+                               name)
+            }
+            XCTAssertEqual(try drawing(slot, .bottomBar, standard, modes: 3, size: .unspecified).frame.width, 160,
+                           "An unknown text size counts as the default one.")
+        }
+        for size in [UIContentSizeCategory.large, .accessibilityExtraExtraExtraLarge] {
+            XCTAssertEqual(try drawing(.base(plusN: 0), .bottomBar, standard, modes: 3, size: size).frame.width, 44)
+            XCTAssertEqual(try drawing(.base(plusN: 3), .bottomBar, standard, modes: 3, size: size).frame.width, 84)
+            XCTAssertEqual(try drawing(.inbox(count: 3), .bottomBar, standard, modes: 3, size: size).frame.width, 84)
+            XCTAssertEqual(try drawing(.dot, .bottomBar, standard, modes: 3, size: size).frame.width, 44)
         }
     }
 
@@ -357,6 +445,23 @@ final class GameControlModelTests: XCTestCase {
         XCTAssertEqual([GameControlForm.bottomBar, .topBar, .rail, .mac].map(\.isNative), [false, false, true, true])
     }
 
+    func testAWideWindowsTopBarWithoutRoomForTheChipShowsTheNativeItem() {
+        let duoTall = WindowClass(windowSize: CGSize(width: 669, height: 951), isRegularWidth: true, isPhone: true)
+        let iPadWindow = WindowClass(windowSize: CGSize(width: 671, height: 741), isRegularWidth: true, isPhone: false)
+        XCTAssertEqual(GameControlForm(.topBarAfterModes, isCatalyst: false, windowClass: duoTall), .narrowTopBar)
+        XCTAssertTrue(GameControlForm.narrowTopBar.isNative)
+        XCTAssertEqual(GameControlForm(.topBarAfterModes, isCatalyst: false, windowClass: iPadWindow), .topBar)
+        XCTAssertEqual(GameControlForm(.topBarAfterModes, isCatalyst: false, windowClass: nil), .topBar,
+                       "Before the root has measured its window, the chip, as the full frames")
+        XCTAssertEqual(GameControlForm(.topBarBeforeModes, isCatalyst: false, windowClass: duoTall), .topBar,
+                       "Compact landscape's bar always has room")
+        XCTAssertEqual(GameControlForm(.bottomBar, isCatalyst: false, windowClass: duoTall), .bottomBar)
+        XCTAssertEqual(GameControlForm(.rail, isCatalyst: false, windowClass: duoTall), .rail)
+        XCTAssertEqual(GameControlForm(.railSeparated, isCatalyst: false, windowClass: duoTall), .rail)
+        XCTAssertEqual(GameControlForm(.topBarAfterModes, isCatalyst: true, windowClass: duoTall), .mac)
+        XCTAssertEqual(GameControlForm(.topBarAfterModes, isCatalyst: true, windowClass: iPadWindow), .mac)
+    }
+
     func testTheNativeItemsShowTheSystemsIconAndCount() {
         typealias Item = GameControlNativeItem
         XCTAssertEqual(Item(.chip(gameID: 7, plusN: 2, hasDot: true), allowsPicker: true),
@@ -412,7 +517,7 @@ final class GameControlModelTests: XCTestCase {
     }
 
     func testTheNativeItemsAndTheFloorOpenThePopoverOnATap() {
-        for form in [GameControlForm.rail, .mac] {
+        for form in [GameControlForm.rail, .mac, .narrowTopBar] {
             for slot in [GameControlSlot.chip(gameID: 7, plusN: 0, hasDot: false), .gameStarted(gameID: 8, plusN: 0, hasDot: false),
                          .gameOverCard(challengeID: 9, plusN: 0), .base(plusN: 0), .dot, .inbox(count: 1)] {
                 let interaction = Interaction(slot, form: form)
@@ -543,7 +648,7 @@ final class GameControlModelTests: XCTestCase {
     }
 
     func testTheNativeLabelCarriesTheCountButNoTime() {
-        for form in [GameControlForm.rail, .mac] {
+        for form in [GameControlForm.rail, .mac, .narrowTopBar] {
             let chip = Spoken(.chip(gameID: 7, plusN: 2, hasDot: false), form: form, name: "HarborMist",
                               timeLeft: 42, locale: english)
             XCTAssertEqual(chip, Spoken(label: "HarborMist, your move in your live game, 2 more in Activity", value: nil,

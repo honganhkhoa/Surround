@@ -12,7 +12,9 @@
 //  challenges from the window's last-known copy and dims the actions that
 //  need OGS. Each window shows its list from one presenter, a sheet or a
 //  popover by the request, and the controls that open it record where they
-//  are so a popover is anchored there.
+//  are so a popover is anchored there. Game Detail's in-game control
+//  presents its own popover instead, with its picker above the sections,
+//  its game's place and the window's connection status.
 //
 
 import Combine
@@ -37,20 +39,41 @@ struct ActivityListView: View {
     let session: UUID
     let placement: Placement
     let focus: ActivityRequest.Focus
+    /// The list's place, which a game's popover takes from its Game Detail:
+    /// the window's registry leaves out a game in a presented stack, such
+    /// as the iPad Profile sheet. Nil reads the registry.
+    var place: ActivityModel.Place?
+    /// Above the sections, under the status line, inside the list's scroll:
+    /// the in-game control's picker of same-speed games.
+    var header: AnyView?
+    /// How a live row shows its game. A game's popover switches as its Game
+    /// Detail does, in place on Home's route; nil opens the game on Home's
+    /// route and resets the window's stacks.
+    var switchGame: ((Game) -> Void)?
+    /// The window's connection status, which a game's popover shares with
+    /// its game. Nil makes the list's own.
+    var connection: ConnectionStatusSource?
 
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
     @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
 
-    init(session: UUID, placement: Placement, focus: ActivityRequest.Focus = .top) {
+    init(session: UUID, placement: Placement, focus: ActivityRequest.Focus = .top,
+         place: ActivityModel.Place? = nil, header: AnyView? = nil,
+         switchGame: ((Game) -> Void)? = nil, connection: ConnectionStatusSource? = nil) {
         self.session = session
         self.placement = placement
         self.focus = focus
+        self.place = place
+        self.header = header
+        self.switchGame = switchGame
+        self.connection = connection
     }
 
     var body: some View {
         ActivityListContent(
-            session: session, placement: placement, focus: focus, ogs: ogs, nav: nav,
+            session: session, placement: placement, focus: focus, place: place, header: header,
+            switchGame: switchGame, connection: connection, ogs: ogs, nav: nav,
             path: allowsRemoteActivity ? SystemNetworkPathMonitor.shared : ConstantNetworkPath.satisfied
         )
     }
@@ -67,6 +90,8 @@ struct ActivityListSource {
     let ogs: OGSService
     let nav: NavigationService
     let placement: ActivityListView.Placement
+    /// A game's popover's own place, from its Game Detail.
+    var placeOverride: ActivityModel.Place? = nil
 
     struct Snapshot {
         var input: ActivityModel.Input
@@ -105,9 +130,11 @@ struct ActivityListSource {
         #endif
     }
 
-    /// Inside New game's stack the place is the root's.
+    /// Inside New game's stack the place is the root's; a game's popover
+    /// can bring its own.
     var place: ActivityModel.Place {
-        placement == .route
+        if let placeOverride { return placeOverride }
+        return placement == .route
             ? .root(isMessagesTab: nav.main.rootView == .privateMessages)
             : nav.activityPlaces.place(in: nav.main.rootView)
     }
@@ -211,6 +238,9 @@ private struct ActivityListContent: View {
     let session: UUID
     let placement: ActivityListView.Placement
     let focus: ActivityRequest.Focus
+    let place: ActivityModel.Place?
+    let header: AnyView?
+    let switchGame: ((Game) -> Void)?
     @ObservedObject var ogs: OGSService
     let nav: NavigationService
     @ObservedObject var results: ActivityResults
@@ -220,7 +250,11 @@ private struct ActivityListContent: View {
     @EnvironmentObject private var navigation: StackRouter
     @Environment(\.owningStackRoute) private var owningStackRoute
     @Environment(\.scenePhase) private var scenePhase
+    /// The window's, in a game's popover; otherwise the list's own.
     @StateObject private var connection: ConnectionStatusSource
+    /// The list made its own source, so it says when it is on screen. The
+    /// window's host says that for the window's source.
+    private let ownsConnection: Bool
     /// Ends the session if the list goes while something covers it, such as
     /// a sheet closed with a card pushed.
     @StateObject private var lifetime = ViewLifetime()
@@ -236,16 +270,22 @@ private struct ActivityListContent: View {
     private var themeAppliesToWholeApp = true
 
     init(session: UUID, placement: ActivityListView.Placement, focus: ActivityRequest.Focus,
+         place: ActivityModel.Place?, header: AnyView?, switchGame: ((Game) -> Void)?,
+         connection windowConnection: ConnectionStatusSource?,
          ogs: OGSService, nav: NavigationService, path: NetworkPathMonitoring) {
         self.session = session
         self.placement = placement
         self.focus = focus
+        self.place = place
+        self.header = header
+        self.switchGame = switchGame
         _ogs = ObservedObject(wrappedValue: ogs)
         self.nav = nav
         _results = ObservedObject(wrappedValue: nav.activityResults)
         _lastKnown = ObservedObject(wrappedValue: nav.activityLastKnown)
         _places = ObservedObject(wrappedValue: nav.activityPlaces)
-        _connection = StateObject(wrappedValue: {
+        ownsConnection = windowConnection == nil
+        _connection = StateObject(wrappedValue: windowConnection ?? {
             let source = ConnectionStatusSource(ogs: ogs, path: path)
             // On screen from its first frame, so the rows know at once.
             source.setVisible(true)
@@ -254,7 +294,9 @@ private struct ActivityListContent: View {
     }
 
     private var density: ActivityRowDensity { placement.density }
-    private var source: ActivityListSource { ActivityListSource(ogs: ogs, nav: nav, placement: placement) }
+    private var source: ActivityListSource {
+        ActivityListSource(ogs: ogs, nav: nav, placement: placement, placeOverride: place)
+    }
 
     private var isOffline: Bool { connection.dimsActivityActions }
 
@@ -283,7 +325,8 @@ private struct ActivityListContent: View {
         .onAppear {
             results.begin(session: session)
             isPresented = true
-            // The cards this list pushes dim by its status.
+            // The cards this list pushes dim by its status: the window's,
+            // in a game's popover.
             navigation.activityConnection = connection
             if lifetime.release == nil {
                 let results = results
@@ -308,7 +351,9 @@ private struct ActivityListContent: View {
             results.end(session: session)
         }
         .onChange(of: isPresented && scenePhase != .background, initial: true) { _, visible in
-            connection.setVisible(visible)
+            if ownsConnection {
+                connection.setVisible(visible)
+            }
         }
         .onReceive(results.$entries) { claimResults($0) }
     }
@@ -340,6 +385,7 @@ private struct ActivityListContent: View {
             if snapshot.sections.isEmpty {
                 VStack(spacing: 0) {
                     statusLine
+                    header
                     ContentUnavailableView(
                         String(localized: "Nothing waiting", comment: "Activity: the list has no games, challenges, searches or messages"),
                         systemImage: "tray"
@@ -352,6 +398,7 @@ private struct ActivityListContent: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 0) {
                             statusLine
+                            header
                             ForEach(snapshot.sections) { section in
                                 sectionView(section, snapshot)
                                     .id(section.kind)
@@ -629,7 +676,11 @@ private struct ActivityListContent: View {
 
     private func openLiveGame(_ game: Game) {
         closeList()
-        nav.goToActiveGame(game: game)
+        if let switchGame {
+            switchGame(game)
+        } else {
+            nav.goToActiveGame(game: game)
+        }
     }
 
     private func openGame(_ gameID: Int) {
@@ -952,10 +1003,11 @@ struct ActivitySheetPresenter: ViewModifier {
 }
 
 /// The window's Activity list as a popover, for a popover request: regular
-/// widths, and every game. It hangs off this always-mounted, invisible
-/// anchor, placed at the opener's frame as it was tapped, so the popover
-/// never depends on its opener staying on screen. An outside tap or Escape
-/// closes the request.
+/// widths, and games opened from the window's pills. It hangs off this
+/// always-mounted, invisible anchor, placed at the opener's frame as it was
+/// tapped, so the popover never depends on its opener staying on screen. An
+/// outside tap or Escape closes the request. The in-game control's requests
+/// are its own popover's, so this presenter never shows them.
 struct ActivityPopoverPresenter: View {
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
@@ -963,7 +1015,9 @@ struct ActivityPopoverPresenter: View {
     @State private var latest: ActivityRequest?
 
     private var current: ActivityRequest? {
-        nav.main.activity?.style == .popover ? nav.main.activity : nil
+        guard let request = nav.main.activity, request.style == .popover,
+              request.source != .gameControl else { return nil }
+        return request
     }
 
     private var isPresented: Binding<Bool> {
@@ -1077,24 +1131,21 @@ private struct ActivityOpenerFrameRecorder: ViewModifier {
 
 #if DEBUG && MAIN_APP
 /// `--surround-activity-open sheet|game-popover`: opens the list once at
-/// launch, through the window's presenter, for UI tests and captures.
-/// `sheet` opens a sheet over the offline root. `game-popover` opens game
-/// 26268404, then, a main-queue turn after Game Detail's place settles,
-/// the game's popover from a fixed anchor near the top centre of the window.
+/// launch, for UI tests and captures. `sheet` opens a sheet over the
+/// offline root, through the window's presenter. `game-popover` opens game
+/// 26268404, then, once Game Detail's place has settled and its push has
+/// ended, asks that Game Detail to open its control's popover
+/// (`NavigationService.debugGameControlPopoverRequests`).
 struct ActivityDebugOpener: ViewModifier {
     @EnvironmentObject private var nav: NavigationService
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var awaitsGame = false
-    @State private var window = CGRect.zero
     private static var hasOpened = false
+    /// Long enough for the push of the game to end, so its bar's items are
+    /// in the window when the popover presents from one of them.
+    private static let gamePopoverDelay: TimeInterval = 0.8
 
     func body(content: Content) -> some View {
         content
-            .onGeometryChange(for: CGRect.self) { proxy in
-                proxy.frame(in: .global)
-            } action: { value in
-                window = value
-            }
             .onAppear {
                 // Read first, so a malformed flag stops the launch, also in
                 // a run whose service isn't an Activity state's.
@@ -1113,13 +1164,12 @@ struct ActivityDebugOpener: ViewModifier {
                 }
             }
             .onReceive(nav.activityPlaces.stateDidChange) { state in
-                guard awaitsGame, state.places[.home]?.gameID == SurroundUITestContract.fixtureGameID else { return }
+                let gameID = SurroundUITestContract.fixtureGameID
+                guard awaitsGame, state.places[.home]?.gameID == gameID else { return }
                 awaitsGame = false
-                let anchor = CGRect(x: window.midX - 22, y: window.minY + 8, width: 44, height: 44)
-                let sizeClass = horizontalSizeClass
                 let nav = nav
-                DispatchQueue.main.async { [weak nav] in
-                    nav?.openActivity(source: .debug, anchor: anchor, horizontalSizeClass: sizeClass)
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.gamePopoverDelay) { [weak nav] in
+                    nav?.debugGameControlPopoverRequests.send(gameID)
                 }
             }
     }

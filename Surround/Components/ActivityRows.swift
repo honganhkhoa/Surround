@@ -586,13 +586,15 @@ struct ActivityLiveGameRow: View {
         .accessibilityIdentifier(ID.activityRow(itemID))
     }
 
-    /// The user's clock, as Home's row reads it, then Low on time: the row's
-    /// value, which changes each second while the user's clock runs, so the
-    /// label holds still.
+    /// The user's clock as a spoken duration, such as "42 seconds", as the
+    /// in-game control says it, then Low on time: the row's value, which
+    /// changes each second while the user's clock runs, so the label holds
+    /// still.
     private func clockValue(_ facts: HomeGameFacts) -> String {
         var parts = [String]()
         if facts.userColor != nil {
-            parts.append("\(String(localized: "You")): \(facts.chipTime(facts.bottomColor))")
+            let time = facts.chipTimeLeft(facts.bottomColor).map { GameControlAccessibility.spokenDuration($0) }
+            parts.append("\(String(localized: "You")): \(time ?? facts.chipTime(facts.bottomColor))")
         }
         if isLowOnTime {
             parts.append(String(

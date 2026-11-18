@@ -26,20 +26,6 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         ] == "1"
     }
 
-    /// The Debug toolbar-item probe in every journey: SURROUND_UI_GAME_CONTROL_PROBE
-    /// (Xcode forwards TEST_RUNNER_SURROUND_UI_GAME_CONTROL_PROBE) is `1`, or a
-    /// variant list such as `chip,rail-tile`. Empty, absent or `0` adds nothing.
-    var gameControlProbeLaunchArguments: [String] {
-        let value = ProcessInfo.processInfo.environment["SURROUND_UI_GAME_CONTROL_PROBE"] ?? ""
-        switch value {
-        case "", "0": return []
-        case "1": return [SurroundUITestContract.gameControlProbeLaunchArgument]
-        default:
-            return [SurroundUITestContract.gameControlProbeLaunchArgument,
-                    SurroundUITestContract.gameControlProbeVariantLaunchArgument, value]
-        }
-    }
-
     func traceAnimationTest(_ event: String) {
         guard animationDiagnosticsEnabled else { return }
         let message =
@@ -71,7 +57,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         app.launchEnvironment = launchEnvironment
         app.launchArguments = languageLaunchArguments + [
             SurroundUITestContract.launchArgument,
-        ] + additionalLaunchArguments + gameControlProbeLaunchArguments
+        ] + additionalLaunchArguments
         #if DEBUG
         app.launchArguments += SurroundUITestContract.noticesHostProbeArguments(ProcessInfo.processInfo.environment)
         #endif
@@ -843,6 +829,80 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             _ = pollUntil(timeout: 5) { isFull() }
         }
         XCTAssertTrue(isFull(), "Expected the full-size iPad window; got \(window.frame)")
+    }
+
+    /// Opens Game Detail's in-game control's popover as a person does: a
+    /// touch and hold on the bar's custom item, a click on the Mac's native
+    /// item, or the item in the bar's More menu. On the Duo's rail the
+    /// native item takes no hold, and the hold's release acts as its tap. A
+    /// hold that opens nothing is tried once more, and the retry is kept as
+    /// an attachment.
+    @discardableResult
+    func openGameControlPopover(in app: XCUIApplication, file: StaticString = #filePath,
+                                line: UInt = #line) -> XCUIElement {
+        let id = SurroundUITestContract.AccessibilityID.self
+        let popover = app.descendants(matching: .any).matching(identifier: id.gameActiveGamesPopover).firstMatch
+        let control = app.buttons.matching(identifier: id.gameActiveGamesButton).firstMatch
+        let overflow = app.buttons.matching(NSPredicate(
+            format: "identifier IN %@ OR label == %@",
+            ["OverflowBarButtonItem", "BottomOverflowBarButtonItem", "More"], "More"
+        )).firstMatch
+        XCTAssertTrue(pollUntil(timeout: 10) { control.exists || overflow.isHittable },
+                      "Expected the in-game control or its toolbar overflow", file: file, line: line)
+        if control.exists {
+            #if targetEnvironment(macCatalyst)
+            control.click()
+            #else
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                control.exists && !control.frame.isEmpty && app.frame.contains(control.frame)
+            }, "Expected the in-game control on screen", file: file, line: line)
+            holdGameControl(control, at: gameControlHoldOffset(control, in: app))
+            if !popover.waitForExistence(timeout: 5) {
+                let retry = XCTAttachment(string: "The first hold opened no popover; held again.\n"
+                                          + control.debugDescription)
+                retry.name = "Game control hold retried"
+                retry.lifetime = .keepAlways
+                add(retry)
+                holdGameControl(control, at: gameControlHoldOffset(control, in: app))
+            }
+            #endif
+        } else {
+            tap(overflow, description: "the game toolbar's overflow", in: app, file: file, line: line)
+            let item = app.descendants(matching: .any).matching(NSPredicate(
+                format: "(elementType == %lu OR elementType == %lu) AND (identifier == %@ OR (identifier == '' AND "
+                    + "(label BEGINSWITH %@ OR label BEGINSWITH %@ OR label CONTAINS %@)))",
+                XCUIElement.ElementType.button.rawValue, XCUIElement.ElementType.menuItem.rawValue,
+                id.gameActiveGamesButton, "Active games", "Activity", "your move"
+            )).firstMatch
+            XCTAssertTrue(item.waitForExistence(timeout: 10), "Expected the control in the overflow menu",
+                          file: file, line: line)
+            tap(item, description: "the control in the overflow menu", in: app, file: file, line: line)
+        }
+        XCTAssertTrue(popover.waitForExistence(timeout: 10),
+                      "The control's popover must open within ten seconds", file: file, line: line)
+        return popover
+    }
+
+    /// A one-second press on the control. iOS 27 can leave the hidden tab
+    /// bar's accessibility frame over a bottom-bar item, so the press goes
+    /// to the item's freshly resolved frame instead of waiting for it to be
+    /// hittable.
+    func holdGameControl(_ control: XCUIElement, at offset: CGVector = CGVector(dx: 0.5, dy: 0.5)) {
+        control.coordinate(withNormalizedOffset: offset).press(forDuration: 1.0)
+    }
+
+    /// Where a press on the control lands. Until NotificationPopup leaves
+    /// games, its live pill can lie over the middle of the control in a
+    /// phone's landscape bar, as iOS 18 draws it, but not over the control's
+    /// trailing quarter.
+    func gameControlHoldOffset(_ control: XCUIElement, in app: XCUIApplication) -> CGVector {
+        #if targetEnvironment(macCatalyst)
+        return CGVector(dx: 0.5, dy: 0.5)
+        #else
+        let landscapePhoneBar = UIDevice.current.userInterfaceIdiom == .phone
+            && app.frame.width > app.frame.height && control.frame.midY < app.frame.midY
+        return CGVector(dx: landscapePhoneBar ? 0.875 : 0.5, dy: 0.5)
+        #endif
     }
 
     /// Closes a popover the way a person does: with a tap outside it.

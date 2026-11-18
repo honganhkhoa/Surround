@@ -27,11 +27,6 @@ enum SurroundUITestContract {
     /// the service's timer can while disconnected.
     static let gameDetailSocketDownLaunchArgument = "--surround-game-detail-socket-down"
     static let gameDetailDesignArtboardLaunchArgument = "--surround-game-detail-design-artboard"
-    /// DEBUG toolbar-item probe: Game Detail's Active games slot shows
-    /// GameControlProbeItem.
-    static let gameControlProbeLaunchArgument = "--surround-notices-placeholder-game-control"
-    static let gameControlProbeVariantLaunchArgument = "--surround-notices-placeholder-game-control-variant"
-    static let gameControlProbeSizeLaunchArgument = "--surround-notices-placeholder-game-control-size"
     static let gameDetailDesignAnalysisBaseMoveNumber = 38
     static let gameDetailDesignAnalysisSelectedMoveNumber = 41
     static let gameDetailDesignAnalysisSelectedRow = 10
@@ -1221,8 +1216,13 @@ enum SurroundUITestContract {
         static let gameActiveGamesCarousel = "game.activeGamesCarousel"
         static let gameActiveGamesButton = "game.activeGames.button"
         static let gameActiveGamesPopover = "game.activeGames.popover"
-        static let gameControlProbeEvents = "game.controlProbe.events"
-        static let gameControlProbeComposer = "game.controlProbe.composer"
+        #if DEBUG
+        /// Hidden: the in-game control's state as it first drew for the
+        /// game on screen, as `GameControlSlot.testDescription` reads it.
+        static let gameControlFirstState = "game.control.firstState"
+        /// Hidden: the source of the window's Activity request, or "none".
+        static let debugActivityRequest = "debug.activity.request"
+        #endif
         static func gameActiveGamesEntry(_ id: Int) -> String {
             "game.activeGames.entry.\(id)"
         }
@@ -1397,8 +1397,8 @@ extension SurroundUITestContract {
 
     /// Opens the Activity list once at launch, over the offline root:
     /// `--surround-activity-open sheet`, or `game-popover`, which opens game
-    /// 26268404 and then the game's popover. It needs an Activity state
-    /// (`--surround-activity-state`).
+    /// 26268404 and then its in-game control's popover. It needs an
+    /// Activity state (`--surround-activity-state`).
     static let activityOpenLaunchArgument = "--surround-activity-open"
 
     enum ActivityOpen: String, CaseIterable {
