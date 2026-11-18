@@ -12,6 +12,10 @@
 //  popover keeps its anchor, and a frame fixed by its form, its state and
 //  the window's width class, so the bar's layout never follows the clock.
 //  The other game's clock ticks inside the item, which observes that game.
+//  In Zen only another live game on your move shows, beside Exit: a circle
+//  where Exit is drawn in the game's content, the top-bar chip before a
+//  native Exit, and the system's icon on the Mac and the Duo's rail. A tap
+//  shows that game; Zen has no popover.
 //  GameControlModel.swift holds the rules each form follows.
 //
 
@@ -43,6 +47,8 @@ struct GameControlItemModel {
     var show: (Int) -> Void
     /// Opens the control's popover.
     var openPopover: () -> Void
+    /// Zen's control, whose tap shows the chip's game and nothing else.
+    var isZen = false
 }
 
 /// The control in the bottom bar: a custom view, 160 pt wide at most.
@@ -52,7 +58,10 @@ struct GameControlBottomBarItem: View {
     let popover: AnyView
 
     var body: some View {
-        GameControlCustomItem(form: .bottomBar, model: model, isPresented: $isPresented, popover: popover)
+        GameControlCustomItem(form: .bottomBar, model: model)
+            .popover(isPresented: $isPresented) {
+                popover.presentationCompactAdaptation(.popover)
+            }
     }
 }
 
@@ -65,15 +74,27 @@ struct GameControlTopBarItem: View {
     let popover: AnyView
 
     var body: some View {
-        GameControlCustomItem(form: .topBar, model: model, isPresented: $isPresented, popover: popover)
+        GameControlCustomItem(form: .topBar, model: model)
+            .popover(isPresented: $isPresented) {
+                popover.presentationCompactAdaptation(.popover)
+            }
+    }
+}
+
+/// Zen's control in a top bar, before a native Exit: the top-bar chip for
+/// another live game on your move, in the chip's fixed 96 pt frame, which a
+/// tap shows. Zen has no popover.
+struct GameControlZenTopBarItem: View {
+    let model: GameControlItemModel
+
+    var body: some View {
+        GameControlCustomItem(form: .topBar, model: model)
     }
 }
 
 private struct GameControlCustomItem: View {
     let form: GameControlForm
     let model: GameControlItemModel
-    @Binding var isPresented: Bool
-    let popover: AnyView
 
     private var frame: CGSize {
         GameControlDrawing.frame(model.slot, form: form, windowClass: model.windowClass, modeCount: model.modeCount,
@@ -99,9 +120,6 @@ private struct GameControlCustomItem: View {
                 .accessibilityHidden(true)
         }
         .accessibilityElement(children: .contain)
-        .popover(isPresented: $isPresented) {
-            popover.presentationCompactAdaptation(.popover)
-        }
     }
 }
 
@@ -134,13 +152,15 @@ private struct GameControlIconButton: View {
     }
 }
 
-/// A custom item's button: a tap does the state's tap and a touch and hold
-/// opens the popover. Its press timing keeps a release 0.5 s or more after
-/// the press began from ever switching games, whatever took the touch on
-/// the way, as the Large Content Viewer does at accessibility sizes.
-private struct GameControlButton: View {
+/// A custom item's button, and the Zen circle's: a tap does the state's tap
+/// and a touch and hold opens the popover, or in Zen does nothing. Its press
+/// timing keeps a release 0.5 s or more after the press began from ever
+/// switching games, whatever took the touch on the way, as the Large Content
+/// Viewer does at accessibility sizes.
+private struct GameControlButton<Label: View>: View {
     let face: GameControlFace
     let model: GameControlItemModel
+    @ViewBuilder let label: () -> Label
     @State private var press = GameControlPress()
 
     var body: some View {
@@ -149,7 +169,7 @@ private struct GameControlButton: View {
             let release = press.release()
             perform(face.interaction.release(after: release.duration, holdFired: release.holdFired))
         } label: {
-            GameControlFaceView(face: face)
+            label()
         }
         .buttonStyle(GameControlPressStyle(onPress: press.begin))
         .simultaneousGesture(LongPressGesture(minimumDuration: GameControlInteraction.holdDuration).onEnded { _ in
@@ -167,7 +187,9 @@ private struct GameControlButton: View {
                 Button(GameControlAccessibility.openActivity) { perform(.openPopover) }
             }
         }
-        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameActiveGamesButton)
+        .accessibilityIdentifier(model.isZen
+            ? SurroundUITestContract.AccessibilityID.gameZenControl
+            : SurroundUITestContract.AccessibilityID.gameActiveGamesButton)
     }
 
     private func perform(_ action: GameControlAction) {
@@ -176,6 +198,13 @@ private struct GameControlButton: View {
         case .show(let gameID): model.show(gameID)
         case .openPopover: model.openPopover()
         }
+    }
+}
+
+extension GameControlButton where Label == GameControlFaceView {
+    /// A bar item's button, which draws the item's face.
+    init(face: GameControlFace, model: GameControlItemModel) {
+        self.init(face: face, model: model) { GameControlFaceView(face: face) }
     }
 }
 
@@ -301,10 +330,11 @@ extension GameControlFace {
         warns = lowTime || drawing.isSuddenDeath
         board = game?.currentPosition
         challenger = model.challenger
-        interaction = GameControlInteraction(model.slot, form: form, windowClass: model.windowClass)
+        interaction = GameControlInteraction(model.slot, form: form, windowClass: model.windowClass,
+                                             isZen: model.isZen)
         accessibility = GameControlAccessibility(
-            model.slot, form: form, windowClass: model.windowClass, allowsPicker: model.allowsPicker,
-            name: name, timeLeft: timeLeft, isSuddenDeath: isSuddenDeath
+            model.slot, form: form, windowClass: model.windowClass, isZen: model.isZen,
+            allowsPicker: model.allowsPicker, name: name, timeLeft: timeLeft, isSuddenDeath: isSuddenDeath
         )
     }
 }
@@ -482,7 +512,7 @@ struct GameControlNativeButton: View {
             .frame(minWidth: 44, minHeight: 44)
             #endif
         }
-        .badge(badge)
+        .badge(item.badgeText)
         #if targetEnvironment(macCatalyst)
         .help(Text(verbatim: label))
         #endif
@@ -494,14 +524,254 @@ struct GameControlNativeButton: View {
                 .presentationCompactAdaptation(.popover)
         }
     }
+}
 
+/// Zen's control on the Mac and on the Duo's rail in Closed portrait,
+/// before Exit: the system's grid icon with a badge of 1 for another live
+/// game on your move. A tap or a click shows that game. Its label names the
+/// game without its time, and on the Mac it is also the tooltip.
+struct GameControlZenNativeButton: View {
+    let item: GameControlNativeItem
+    let label: String
+    let hint: String?
+    let show: () -> Void
+
+    var body: some View {
+        Button(action: show) {
+            Label {
+                Text(verbatim: label)
+            } icon: {
+                Image(systemName: item.icon.systemName)
+            }
+            #if os(iOS) && !targetEnvironment(macCatalyst)
+            .frame(minWidth: 44, minHeight: 44)
+            #endif
+        }
+        .badge(item.badgeText)
+        #if targetEnvironment(macCatalyst)
+        .help(Text(verbatim: label))
+        #endif
+        .accessibilityHint(Text(verbatim: hint ?? ""))
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenControl)
+    }
+}
+
+private extension GameControlNativeItem {
     /// One badge modifier for every state, so a change of state keeps the
     /// item: an empty text draws the system's dot.
-    private var badge: Text? {
-        switch item.badge {
+    var badgeText: Text? {
+        switch badge {
         case .none: nil
         case .count(let count): Text(count, format: .number)
         case .dot: Text(verbatim: "")
+        }
+    }
+}
+
+// MARK: - The Zen circle
+
+/// Where the Zen circle's countdown sits, from the window's shape, or that
+/// the circle shows alone.
+enum GameControlZenCountdownPlacement: Equatable {
+    /// 4 pt below the circle, as drawn, where the window is wider than tall
+    /// and the board's column leaves its corners clear.
+    case below
+    /// On the circle's leading side, inside Exit's 44 pt band, where the
+    /// layout is portrait-shaped, so it reaches no lower than Exit.
+    case leading
+    /// No countdown: the 44 pt circle alone, in the board's column where it
+    /// has room for no more, or beside Exit where the countdown would reach
+    /// the clocks.
+    case omitted
+}
+
+private struct GameControlZenKey: EnvironmentKey {
+    static let defaultValue: GameControlItemModel? = nil
+}
+
+extension EnvironmentValues {
+    /// Zen's control for the game on screen, which the toolbar reads in the
+    /// pass that draws the bar, for the game's content to draw beside Exit
+    /// or in the board's column under it. Nil outside Zen, without another
+    /// live game on your move, and where the control is a bar item before
+    /// Exit or has no room.
+    var gameControlZen: GameControlItemModel? {
+        get { self[GameControlZenKey.self] }
+        set { self[GameControlZenKey.self] = newValue }
+    }
+}
+
+/// Zen's control where Exit is drawn in the game's content: another live
+/// game on your move, as a 44 pt glass circle with its mini board and a 22 pt
+/// countdown capsule, in a 76 pt button beside Exit and on Exit's surface, or
+/// the circle alone where the capsule would reach the clocks. A tap shows
+/// that game; a touch and hold does nothing. Draws nothing without the
+/// toolbar's `gameControlZen`.
+struct GameControlZenCircle: View {
+    let placement: GameControlZenCountdownPlacement
+    @Environment(\.gameControlZen) private var zen
+
+    var body: some View {
+        if let zen, let game = zen.game {
+            GameControlZenCircleButton(model: zen, game: game, placement: placement)
+                // The circle keeps the place the 76 pt button gives it in
+                // every placement: 18 pt from Exit's circle.
+                .padding(.trailing, placement == .below
+                         ? GameControlZenMetrics.gapBeforeExit
+                         : GameControlZenMetrics.buttonInset + GameControlZenMetrics.gapBeforeExit)
+        }
+    }
+}
+
+/// Zen's control in the board's trailing column under Exit
+/// (`GameControlZenCorner.circle`): in compact landscape where the top-bar
+/// chip and Exit would reach over the board, and in an iPad's compact window
+/// where the circle beside Exit would reach over the clocks or the board. Its
+/// countdown hangs below where the column holds the 76 pt button. As beside
+/// Exit, a tap shows that game and a touch and hold does nothing. Draws
+/// nothing without the toolbar's `gameControlZen`.
+struct GameControlZenColumnCircle: View {
+    let showsCountdown: Bool
+    @Environment(\.gameControlZen) private var zen
+
+    var body: some View {
+        if let zen, let game = zen.game {
+            GameControlZenCircleButton(model: zen, game: game, placement: showsCountdown ? .below : .omitted)
+        }
+    }
+}
+
+private enum GameControlZenMetrics {
+    static let circle: CGFloat = 44
+    static let buttonWidth: CGFloat = 76
+    /// The space on each side of the circle in its 76 pt button.
+    static let buttonInset = (buttonWidth - circle) / 2
+    static let gapBeforeExit: CGFloat = 2
+    static let countdownGap: CGFloat = 4
+    static let countdownHeight: CGFloat = 22
+    static let countdownPadding: CGFloat = 7
+    static let countdownSpacing: CGFloat = 3
+    static let symbolSize: CGFloat = 11
+}
+
+/// The circle's button, which observes the other game so its countdown
+/// ticks here alone. It speaks as the bar chip does in Zen: the game and its
+/// time, with no value.
+private struct GameControlZenCircleButton: View {
+    let model: GameControlItemModel
+    @ObservedObject var game: Game
+    let placement: GameControlZenCountdownPlacement
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        // The top bar's chip in Zen: its clock, its sudden-death glyph and its
+        // text capped at the large size, which the 22 pt capsule fits.
+        if let face = GameControlFace(form: .topBar, model: model, game: game, dynamicTypeSize: dynamicTypeSize) {
+            GameControlButton(face: face, model: model) {
+                GameControlZenCircleLabel(face: face, countdown: GameControlZenCountdown(face: face),
+                                          placement: placement)
+            }
+        }
+    }
+}
+
+/// The capsule's parts: the clock after its hourglass, or after the
+/// sudden-death mark, no wider than the circle's 76 pt button. The hourglass
+/// drops first, as a clock of an hour or more needs its room; the clock and
+/// the mark never drop. A game with no countdown shows the hourglass alone.
+private struct GameControlZenCountdown {
+    var symbol: String?
+    var symbolIsWarning: Bool
+    var showsClock: Bool
+
+    init(face: GameControlFace) {
+        let isSuddenDeath = face.drawing.isSuddenDeath
+        let name = isSuddenDeath ? GameControlSuddenDeathMark.glyphSystemName : "hourglass"
+        symbolIsWarning = isSuddenDeath
+        guard let clock = face.clock else {
+            symbol = name
+            showsClock = false
+            return
+        }
+        showsClock = true
+        let configuration = UIImage.SymbolConfiguration(pointSize: GameControlZenMetrics.symbolSize, weight: .semibold)
+        let symbolWidth = ceil(UIImage(systemName: name, withConfiguration: configuration)?.size.width
+                               ?? GameControlZenMetrics.symbolSize)
+        let clockWidth = ceil(GameControlChipMetrics.textWidth(clock.widestSample, font: face.metrics.textFont))
+        let width = GameControlZenMetrics.countdownPadding * 2 + symbolWidth
+            + GameControlZenMetrics.countdownSpacing + clockWidth
+        symbol = isSuddenDeath || width <= GameControlZenMetrics.buttonWidth ? name : nil
+    }
+}
+
+/// The circle and its countdown, each on Exit's glass, the countdown below
+/// the circle or on its leading side.
+private struct GameControlZenCircleLabel: View {
+    let face: GameControlFace
+    let countdown: GameControlZenCountdown
+    let placement: GameControlZenCountdownPlacement
+
+    var body: some View {
+        Group {
+            switch placement {
+            case .below:
+                VStack(spacing: GameControlZenMetrics.countdownGap) {
+                    circle
+                    capsule
+                }
+                .frame(minWidth: GameControlZenMetrics.buttonWidth)
+            case .leading:
+                HStack(spacing: GameControlZenMetrics.countdownGap) {
+                    capsule
+                    circle
+                }
+                .frame(height: GameControlZenMetrics.circle)
+            case .omitted:
+                circle
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    /// The other game's flat mini board in a 44 pt glass circle.
+    private var circle: some View {
+        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+        return Group {
+            if let position = face.board {
+                PositionBoardView(boardPosition: position).equatable()
+            } else {
+                shape.fill(Color(uiColor: .secondarySystemFill))
+            }
+        }
+        .frame(width: GameControlChipMetrics.boardWidth, height: GameControlChipMetrics.boardWidth)
+        .clipShape(shape)
+        .frame(width: GameControlZenMetrics.circle, height: GameControlZenMetrics.circle)
+        .modifier(GameChromeButtonSurface())
+    }
+
+    /// The countdown in a 22 pt glass capsule, with a red outline and red
+    /// digits when the other game is low on time.
+    private var capsule: some View {
+        HStack(spacing: GameControlZenMetrics.countdownSpacing) {
+            if let symbol = countdown.symbol {
+                Image(systemName: symbol)
+                    .font(.system(size: GameControlZenMetrics.symbolSize, weight: .semibold))
+                    .foregroundStyle(countdown.symbolIsWarning ? Color.gameControlWarning : Color.secondary)
+            }
+            if countdown.showsClock {
+                Text(verbatim: face.clock?.text ?? "")
+                    .font(face.textFont)
+                    .foregroundStyle(face.warns ? Color.gameControlWarning : Color.primary)
+                    .fixedSize()
+            }
+        }
+        .padding(.horizontal, GameControlZenMetrics.countdownPadding)
+        .frame(height: GameControlZenMetrics.countdownHeight)
+        .modifier(GameChromeButtonSurface(shape: Capsule()))
+        .overlay {
+            if face.warns {
+                Capsule().strokeBorder(Color.gameControlWarning, lineWidth: 1.5)
+            }
         }
     }
 }

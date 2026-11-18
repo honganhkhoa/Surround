@@ -671,6 +671,141 @@ final class GameControlModelTests: XCTestCase {
                                          offersOpenActivity: false), "The floor shows the icon alone, as the native items do.")
     }
 
+    // MARK: Zen in compact layouts
+
+    func testCompactLandscapeZenPutsTheCircleUnderExitWhereTheChipWouldReachOverTheBoard() {
+        typealias Corner = GameControlZenCorner
+        func corner(_ size: CGSize, trailingInset: CGFloat = 0, verticalToolbar: Bool = false) -> Corner {
+            let plan = GameDetailLayoutPlan(size: size, compact: true, zen: true, analyze: false, chat: false,
+                                            hidesBoard: false, keyboard: false, accessibility: false,
+                                            foldsClock: false, usesVerticalToolbar: verticalToolbar)
+            return Corner(column: size.width - plan[.board].maxX, trailingInset: trailingInset)
+        }
+        // The Zen layouts measured, where the platter lay over the board's
+        // corner (by 96 pt in Duo Closed landscape and 21.5 pt on the SE),
+        // and where it cleared the board.
+        XCTAssertEqual(corner(CGSize(width: 678, height: 466), verticalToolbar: true), .circle(showsCountdown: true),
+                       "Duo Closed landscape: a 78 pt column holds the 76 pt button")
+        XCTAssertEqual(corner(CGSize(width: 667, height: 375)), .circle(showsCountdown: true),
+                       "The iPhone SE in landscape: a 154 pt column")
+        XCTAssertEqual(corner(CGSize(width: 750, height: 402), trailingInset: 62), .barChip,
+                       "The iPhone 17 Pro in landscape: 182 pt beside the board and 62 beyond the content")
+
+        XCTAssertEqual(Corner(column: Corner.barChipRoom, trailingInset: 0), .barChip)
+        XCTAssertEqual(Corner(column: Corner.barChipRoom - 62, trailingInset: 62), .barChip,
+                       "The bar puts the platter beyond the content beside a Dynamic Island")
+        XCTAssertEqual(Corner(column: Corner.barChipRoom - 0.5, trailingInset: 0), .circle(showsCountdown: true))
+        XCTAssertEqual(Corner(column: 76, trailingInset: 0), .circle(showsCountdown: true))
+        XCTAssertEqual(Corner(column: 75.5, trailingInset: 100), .circle(showsCountdown: false),
+                       "The circle stays inside the content")
+        XCTAssertEqual(Corner(column: 44, trailingInset: 0), .circle(showsCountdown: false))
+        XCTAssertEqual(Corner(column: 43.5, trailingInset: 0), .noRoom)
+        XCTAssertEqual(Corner.width(showsCountdown: true), 76)
+        XCTAssertEqual(Corner.width(showsCountdown: false), 44)
+    }
+
+    func testAnIPadsCompactZenMovesTheCircleUnderExitWhereBesideItWouldReachOverTheClocks() {
+        typealias Corner = GameControlZenCorner
+        /// An iPad's compact window, its content from the window's top to
+        /// 10 pt above its bottom, with the fixture's 156 pt chips, and Exit
+        /// 16 pt from the content's top and 24 from its trailing edge.
+        func corner(window: CGSize) -> (corner: Corner?, column: CGFloat, plan: GameDetailLayoutPlan) {
+            let size = CGSize(width: window.width, height: window.height - 10)
+            let plan = GameDetailLayoutPlan(size: size, compact: true, zen: true, analyze: false, chat: false,
+                                            hidesBoard: false, keyboard: false, accessibility: false,
+                                            foldsClock: false, zenBoardCenterY: window.height / 2,
+                                            narrowChipWidth: 156)
+            let column = size.width - plan[.board].maxX
+            let exit = CGRect(x: size.width - 24 - 44, y: 16, width: 44, height: 44)
+            let corner = Corner(contentExit: exit, countdownBelow: window.width > window.height, width: size.width,
+                                column: column, occupied: [plan[.clocks], plan[.board], plan[.actions]])
+            return (corner, column, plan)
+        }
+        // The window measured: barely wider than tall, so the clocks sit above
+        // the board, and the circle beside Exit reached over the white clock
+        // and the board's top. The 96 pt column under Exit holds it.
+        let measured = corner(window: CGSize(width: 524, height: 486))
+        XCTAssertEqual(measured.plan[.board], CGRect(x: 96, y: 84, width: 332, height: 332), "As drawn")
+        XCTAssertEqual(measured.plan[.clocks], CGRect(x: 102, y: 8, width: 320, height: 68), "As drawn")
+        XCTAssertEqual(measured.column, 96)
+        XCTAssertEqual(measured.corner, .circle(showsCountdown: true))
+        XCTAssertEqual(Corner.columnFrame(showsCountdown: true, width: 524, column: 96, top: 68),
+                       CGRect(x: 438, y: 68, width: 76, height: 70), "Clear of the clocks, which end at 422")
+        XCTAssertEqual(corner(window: CGSize(width: 486, height: 486)).corner, .circle(showsCountdown: true),
+                       "A square window")
+        // Wider, the board is centred between columns and the circle stays
+        // beside Exit; tall, the board's centring takes the clocks below
+        // Exit's band.
+        XCTAssertNil(corner(window: CGSize(width: 582, height: 486)).corner)
+        XCTAssertNil(corner(window: CGSize(width: 375, height: 800)).corner)
+        // A portrait window not much taller than wide keeps its clocks at the
+        // top: the circle alone where the column holds it, else none.
+        XCTAssertEqual(corner(window: CGSize(width: 486, height: 540)).corner, .circle(showsCountdown: false))
+        XCTAssertEqual(corner(window: CGSize(width: 486, height: 600)).corner, .noRoom)
+
+        XCTAssertEqual(Corner.besideExitFrame(CGRect(x: 456, y: 16, width: 44, height: 44), countdownBelow: true),
+                       CGRect(x: 378, y: 16, width: 76, height: 70), "2 pt before Exit, as drawn")
+        XCTAssertEqual(Corner.besideExitFrame(CGRect(x: 766, y: 16, width: 44, height: 44), countdownBelow: false),
+                       CGRect(x: 624, y: 16, width: 124, height: 44), "The circle 18 pt before Exit, as drawn")
+    }
+
+    func testAnIPadsHalfScreenZenKeepsTheCircleAloneBesideExitWhereItStaysClearOfTheClocks() {
+        typealias Corner = GameControlZenCorner
+        /// An iPad window, its content from `top` below the window's top to
+        /// `bottom` above its bottom, with the fixture's 156 pt chips, and
+        /// Exit 16 pt from the content's top and 24 from its trailing edge.
+        func corner(_ width: CGFloat, _ height: CGFloat, top: CGFloat, bottom: CGFloat)
+            -> (corner: Corner?, exit: CGRect, plan: GameDetailLayoutPlan) {
+            let size = CGSize(width: width, height: height - top - bottom)
+            let plan = GameDetailLayoutPlan(size: size, compact: true, zen: true, analyze: false, chat: false,
+                                            hidesBoard: false, keyboard: false, accessibility: false,
+                                            foldsClock: false, zenBoardCenterY: height / 2 - top,
+                                            narrowChipWidth: 156)
+            let exit = CGRect(x: width - 24 - 44, y: 16, width: 44, height: 44)
+            let corner = Corner(contentExit: exit, countdownBelow: width > height, width: width,
+                                column: width - plan[.board].maxX,
+                                occupied: [plan[.clocks], plan[.board], plan[.actions]])
+            return (corner, exit, plan)
+        }
+        // Half of an 11-inch iPad in landscape, measured: the clocks sit
+        // above the board, the board fills the width, and the circle alone
+        // stays beside Exit, 10 pt clear of the white clock.
+        let half = corner(600, 834, top: 0, bottom: 20)
+        XCTAssertEqual(half.plan[.clocks], CGRect(x: 140, y: 41, width: 320, height: 68), "As drawn")
+        XCTAssertEqual(half.plan[.board], CGRect(x: 0, y: 117, width: 600, height: 600), "As drawn")
+        XCTAssertEqual(half.corner, .besideExitAlone)
+        let circle = Corner.besideExitAloneFrame(half.exit)
+        XCTAssertEqual(circle, CGRect(x: 470, y: 16, width: 44, height: 44), "18 pt before Exit, at its top")
+        XCTAssertEqual(circle.minX - half.plan[.clocks].maxX, 10)
+        // Half of an iPad mini in landscape: within 8 pt of the clock, and
+        // no column.
+        XCTAssertEqual(corner(561.5, 744, top: 0, bottom: 20).corner, .noRoom)
+        // The cramped windows keep the column, which comes first.
+        XCTAssertEqual(corner(524, 486, top: 0, bottom: 10).corner, .circle(showsCountdown: true))
+        XCTAssertEqual(corner(489, 541, top: 10, bottom: 10).corner, .circle(showsCountdown: false))
+        // Portrait halves (11-inch, 13-inch, mini), a landscape third and
+        // iPadOS 18.6's narrow Stage Manager window keep the circle and its
+        // countdown beside Exit; wider windows are regular and never reach
+        // the rule.
+        let besideExit: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
+            (412, 1210, 0, 20), (511, 1376, 0, 20), (367, 1133, 0, 20), (400, 834, 0, 20), (456, 915, 24, 25),
+        ]
+        for (width, height, top, bottom) in besideExit {
+            XCTAssertNil(corner(width, height, top: top, bottom: bottom).corner, "\(width) × \(height)")
+        }
+        // The clearance, both ways: 8 pt all round.
+        let exit = CGRect(x: 532, y: 16, width: 44, height: 44)
+        let lone = Corner.besideExitAloneFrame(exit)
+        func clock(endingAt maxX: CGFloat) -> [CGRect] { [CGRect(x: 0, y: 0, width: maxX, height: 100)] }
+        XCTAssertEqual(Corner(contentExit: exit, countdownBelow: false, width: 600, column: 0,
+                              occupied: clock(endingAt: lone.minX - 8)), .besideExitAlone)
+        XCTAssertEqual(Corner(contentExit: exit, countdownBelow: false, width: 600, column: 0,
+                              occupied: clock(endingAt: lone.minX - 7.5)), .noRoom)
+        XCTAssertEqual(Corner(contentExit: exit, countdownBelow: false, width: 600, column: 44,
+                              occupied: clock(endingAt: lone.minX - 7.5)), .circle(showsCountdown: false),
+                       "Then the column alone")
+    }
+
     #if DEBUG
     // MARK: A window's first read
 

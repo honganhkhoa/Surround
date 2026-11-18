@@ -17,6 +17,10 @@ struct GameDetailView: View {
     @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.openPlayerProfile) private var openPlayerProfile
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.locale) private var locale
+    /// The game content's clock scale, for the Zen layout it draws.
+    @ScaledMetric(relativeTo: .body) private var clockScale: CGFloat = 1
     /// The window's width class and shape, measured at its root long before
     /// a game opens.
     @Environment(\.gameControlWindowClass) private var gameControlWindowClass
@@ -183,6 +187,8 @@ struct GameDetailView: View {
         GameControlHost(
             switchRule: gameControlSwitch,
             windowClass: gameControlWindowClass,
+            zenForm: zenControlForm,
+            zenCorner: barZenCorner?.form,
             isPopoverOpen: gameControlPopover.isOpen,
             presentation: gameControlPresentation(at:),
             popover: { AnyView(gameControlPopoverContent(for: game, cardChallengeID: $0)) },
@@ -344,23 +350,165 @@ struct GameDetailView: View {
         return max(0, max(24, windowGeometry.windowSafeAreaTop) - contentTop)
     }
 
-    @ViewBuilder private var zenExitOverlay: some View {
+    /// Exit, and before it the circle for another live game on your move,
+    /// which the toolbar reads for the game on screen. Where the circle there
+    /// would reach over the clocks or the board, as in an iPad's compact
+    /// window, it sits under Exit in the board's trailing column instead, or
+    /// beside Exit without its countdown, or not at all. In compact
+    /// landscape, where Exit is a bar item, the circle alone, under Exit in
+    /// that column, where the chip and Exit would reach over the board.
+    @ViewBuilder private func zenExitOverlay(in size: CGSize) -> some View {
         if hidesZenChrome {
-            Button(action: exitZenMode) {
-                Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
-                    .labelStyle(.iconOnly)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Circle())
+            let corner = contentZenCorner(in: size)
+            // Each in the corner on its own: the overlay's implicit stack
+            // would centre them on each other.
+            ZStack(alignment: .topTrailing) {
+                HStack(alignment: .top, spacing: 0) {
+                    switch corner?.form {
+                    case nil: GameControlZenCircle(placement: zenCountdownPlacement)
+                    case .besideExitAlone?: GameControlZenCircle(placement: .omitted)
+                    default: EmptyView()
+                    }
+                    Button(action: exitZenMode) {
+                        Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
+                            .labelStyle(.iconOnly)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .modifier(GameChromeButtonSurface())
+                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenExit)
+                    .surroundUITestZenShortcut()
+                }
+                .padding(.top, zenExitTop)
+                .padding(.trailing, zenExitTrailing)
+                if let corner {
+                    zenColumnCircle(corner)
+                }
             }
-            .buttonStyle(.plain)
-            .modifier(GameChromeButtonSurface())
-            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenExit)
-            .surroundUITestZenShortcut()
-            .padding(.top, chromeBandTop ?? 16)
-            .padding(.trailing, regularLandscape || chromeBandTop != nil ? 16 : 24)
+        } else if let corner = barZenCorner {
+            zenColumnCircle(corner)
         }
+    }
+
+    /// The circle in the board's trailing column, centred in it, where the
+    /// column holds it.
+    @ViewBuilder private func zenColumnCircle(_ corner: ZenCornerPlacement) -> some View {
+        if case .circle(let showsCountdown) = corner.form {
+            GameControlZenColumnCircle(showsCountdown: showsCountdown)
+                .padding(.top, corner.top)
+                .padding(.trailing, max(0, (corner.column - GameControlZenCorner.width(showsCountdown: showsCountdown)) / 2))
+        }
+    }
+
+    /// Where the game's content draws Exit, its distance from the content's
+    /// top: in Duo's chrome band, else 16 pt.
+    private var zenExitTop: CGFloat { chromeBandTop ?? 16 }
+    /// Its distance from the content's trailing edge: 16 pt in regular
+    /// landscape and in Duo's chrome band, else 24.
+    private var zenExitTrailing: CGFloat { regularLandscape || chromeBandTop != nil ? 16 : 24 }
+
+    /// Where compact landscape's bar items end, from the top of the game's
+    /// content, which reaches the window's top in Zen and reports no inset
+    /// for the bar there: 44 pt items 24 pt down from iOS 26; before, a
+    /// 32 pt bar whose items keep their 44 pt touch target from the top.
+    private static var compactLandscapeBarBottom: CGFloat {
+        if #available(iOS 26.0, macCatalyst 26.0, *) { return 68 }
+        return 44
+    }
+
+    /// The Zen circle's countdown hangs below the circle where the window is
+    /// wider than tall, as the board's column leaves its corners clear there
+    /// (a compact window barely wider than tall puts its clocks above the
+    /// board, and the circle moves into the column). Book wide is the
+    /// exception: its board fills a portrait-shaped pane right below Exit,
+    /// so there, as in portrait windows, the countdown sits beside the
+    /// circle, inside Exit's band.
+    private var zenCountdownPlacement: GameControlZenCountdownPlacement {
+        let windowIsLandscape = windowGeometry.map { $0.windowSize.width > $0.windowSize.height }
+            ?? (gameControlWindowClass?.shape == .landscape)
+        return windowIsLandscape && !hasActiveVerticalDisplayDivision ? .below : .leading
+    }
+
+    /// The form of Zen's control where Exit is a bar item: the Mac's native
+    /// icon; the rail's in Duo Closed portrait, whose Zen keeps the vertical
+    /// toolbar; and the top-bar chip elsewhere, as on compact iPhones and in
+    /// Duo Closed landscape, whose Zen turns the toolbar horizontal. From the
+    /// window root's shape, not the toolbar's own state, so the first pass
+    /// already has it.
+    private var zenControlForm: GameControlForm {
+        #if targetEnvironment(macCatalyst)
+        return .mac
+        #else
+        return isVerticalToolbar && gameControlWindowClass?.shape != .landscape ? .rail : .topBar
+        #endif
+    }
+
+    /// Where Zen's control sits in the board's trailing column: its form, the
+    /// column's width, and how far down the content the control starts.
+    private struct ZenCornerPlacement {
+        var form: GameControlZenCorner
+        var column: CGFloat
+        var top: CGFloat
+    }
+
+    /// Zen's control in compact landscape, where Exit is a bar item and the
+    /// board reaches the window's top: the chip before Exit where they clear
+    /// the board, else the circle in the board's trailing column, 8 pt below
+    /// the bar. From the Zen layout the game's content draws, at the
+    /// content's width and the window's height, which entering Zen leaves as
+    /// they are, so the bar's first Zen pass has it and it keeps for the
+    /// pose. Nil everywhere else.
+    private var barZenCorner: ZenCornerPlacement? {
+        guard zenMode, !hidesZenChrome, compactLandscape, zenControlForm == .topBar,
+              let windowGeometry, let game = currentGame ?? departingGame else { return nil }
+        let size = CGSize(width: windowGeometry.contentFrame.width, height: windowGeometry.windowSize.height)
+        let column = max(0, size.width - zenLayoutPlan(size: size, game: game)[.board].maxX)
+        let content = windowGeometry.contentFrame, window = windowGeometry.windowFrame
+        let trailingInset = layoutDirection == .rightToLeft ? content.minX - window.minX : window.maxX - content.maxX
+        return ZenCornerPlacement(form: GameControlZenCorner(column: column, trailingInset: max(0, trailingInset)),
+                                  column: column, top: Self.compactLandscapeBarBottom + GameControlZenCorner.gapUnderExit)
+    }
+
+    /// Zen's control where an iPad's compact window draws Exit in the game's
+    /// content: nil where the circle beside Exit clears the Zen layout's
+    /// clocks, board and actions, else the circle under Exit in the board's
+    /// trailing column, the circle alone beside Exit, or no control. From the
+    /// Zen layout the game's content draws at `size`, the content's own, in
+    /// the same pass.
+    private func contentZenCorner(in size: CGSize) -> ZenCornerPlacement? {
+        guard zenMode, hidesZenChrome, compactLayout, UIDevice.current.userInterfaceIdiom == .pad,
+              let game = currentGame ?? departingGame else { return nil }
+        let plan = zenLayoutPlan(size: size, game: game)
+        let column = max(0, size.width - plan[.board].maxX)
+        let exit = CGRect(x: size.width - zenExitTrailing - 44, y: zenExitTop, width: 44, height: 44)
+        guard let form = GameControlZenCorner(contentExit: exit, countdownBelow: zenCountdownPlacement == .below,
+                                              width: size.width, column: column,
+                                              occupied: [plan[.clocks], plan[.board], plan[.actions]])
+        else { return nil }
+        return ZenCornerPlacement(form: form, column: column, top: exit.maxY + GameControlZenCorner.gapUnderExit)
+    }
+
+    /// The compact Zen layout the game's content draws at `size`, from the
+    /// same inputs but the action row's offline label, which moves the board
+    /// only where that label doesn't fit beside it.
+    private func zenLayoutPlan(size: CGSize, game: Game) -> GameDetailLayoutPlan {
+        let actions = GameControlRowMetrics(dynamicTypeSize: dynamicTypeSize, locale: locale, phase: game.gamePhase)
+        let theme = SurroundTheme.current(storedID: gameThemeID)
+        let scale = min(clockScale, 1.65)
+        let lineWidth = GameDetailClockPair.compactLineWidth(game: game, scale: scale, theme: theme)
+        let chipWidth = GameDetailClockPair.narrowChipWidth(game: game, scale: scale, theme: theme)
+        let centerY = windowGeometry.map { $0.windowFrame.midY - $0.contentFrame.minY }
+        return GameDetailLayoutPlan(
+            size: size, compact: true, zen: true, analyze: false, chat: false, hidesBoard: false, keyboard: false,
+            accessibility: dynamicTypeSize.isAccessibilitySize, foldsClock: dynamicTypeSize >= .xxxLarge,
+            clockScale: scale, actionSize: actions.horizontalSize, actionMetrics: actions,
+            usesVerticalToolbar: isVerticalToolbar || (compactLandscape && verticalToolbarOutsideZen),
+            zenBoardCenterY: centerY, compactClockLineWidth: lineWidth, narrowChipWidth: chipWidth,
+            chromeBandTop: chromeBandTop
+        )
     }
 
     /// The system toggle leaves with the hidden navigation bar; this one
@@ -832,7 +980,7 @@ struct GameDetailView: View {
             }
             .ignoresSafeArea(.container)
         }
-        .overlay(alignment: .topTrailing) { zenExitOverlay }
+        .overlay(alignment: .topTrailing) { zenExitOverlay(in: geometry.size) }
         .overlay(alignment: .topLeading) { duoSidebarButton }
         .overlay(alignment: .topTrailing) { duoBackButton(in: geometry) }
         .sheet(isPresented: self.$showSettings) {
@@ -1664,17 +1812,50 @@ private struct GameToolbarLayout: ViewModifier {
             let model = GameControlItemModel(
                 slot: drawn ?? .base(plusN: 0), windowClass: gameControl.windowClass,
                 modeCount: showsConditionalMoves ? 3 : 2, sizeCategory: UIContentSizeCategory(dynamicTypeSize),
-                allowsPicker: allowsPicker, game: otherGame,
-                challenger: challenger, show: gameControl.show, openPopover: gameControl.openPopover
+                allowsPicker: allowsPicker, game: otherGame, challenger: challenger, show: gameControl.show,
+                openPopover: gameControl.openPopover
             )
             view = form == .bottomBar
                 ? AnyView(GameControlBottomBarItem(model: model, isPresented: isPresented, popover: popover))
                 : AnyView(GameControlTopBarItem(model: model, isPresented: isPresented, popover: popover))
         }
+        let zen = gameControlZen(value, game: otherGame, name: name, allowsPicker: allowsPicker)
         return GameControlBarState(
             value: value, slot: GameActiveGamesSlot(placement: placement, isShown: isShown, view: view),
+            zen: zen.item, zenCircle: zen.circle,
             nativeBadge: nativeBadge, deadlines: gameControlDeadlinePlan(input, value: value), now: input.now
         )
+    }
+
+    /// Zen's control: in Zen the model gives only another live game on your
+    /// move, which a tap shows. Before a native Exit it is a bar item, the
+    /// top-bar chip or the Mac's or the rail's native icon with a badge of 1;
+    /// where Exit is drawn in the content, the content draws it as the circle.
+    private func gameControlZen(_ value: GameControlSlot?, game other: Game?, name: String,
+                                allowsPicker: Bool) -> (item: GameControlZenItem, circle: GameControlItemModel?) {
+        guard zenMode, let value, let gameID = value.gameID, let other else { return (.hidden, nil) }
+        let model = GameControlItemModel(
+            slot: value, windowClass: gameControl.windowClass, modeCount: 2,
+            sizeCategory: UIContentSizeCategory(dynamicTypeSize), allowsPicker: allowsPicker,
+            game: other, challenger: nil, show: gameControl.show, openPopover: {}, isZen: true
+        )
+        if exitsZenFromContent { return (.hidden, model) }
+        // Where the chip and Exit would reach over the board, the content
+        // draws the circle in the board's column instead; with no room even
+        // for the circle, Zen shows no control.
+        switch gameControl.zenCorner {
+        case .circle?, .besideExitAlone?: return (.hidden, model)
+        case .noRoom?: return (.hidden, nil)
+        case .barChip?, nil: break
+        }
+        let form = gameControl.zenForm
+        guard form.isNative, let item = GameControlNativeItem(value, allowsPicker: allowsPicker) else {
+            return (GameControlZenItem(isShown: true, view: AnyView(GameControlZenTopBarItem(model: model))), nil)
+        }
+        let spoken = GameControlAccessibility(value, form: form, isZen: true, allowsPicker: allowsPicker, name: name)
+        let show = gameControl.show
+        let button = GameControlZenNativeButton(item: item, label: spoken.label, hint: spoken.hint) { show(gameID) }
+        return (GameControlZenItem(isShown: true, view: AnyView(button)), nil)
     }
 
     /// When time alone can change the control's state: at the latest
@@ -1717,6 +1898,24 @@ private struct GameToolbarLayout: ViewModifier {
         ToolbarItemGroup(placement: .topBarTrailing) { utilityButtons }
     }
 
+    /// Zen's bar where Exit is a bar item: another live game on your move,
+    /// then Exit. Independent conditions, as in principalItems.
+    @ToolbarContentBuilder private func zenItems(_ zen: GameControlZenItem) -> some ToolbarContent {
+        if zen.isShown {
+            ToolbarItem(placement: .topBarTrailing) { zen.view }
+        }
+        if !exitsZenFromContent {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(action: exitZenMode) {
+                    Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
+                        .modifier(GameToolbarMinimumTouchTarget())
+                }
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenExit)
+                .surroundUITestZenShortcut()
+            }
+        }
+    }
+
     /// Wide windows and the Mac: modes, the control and utilities at the top.
     @ToolbarContentBuilder private func wideControlItems(_ slot: GameActiveGamesSlot) -> some ToolbarContent {
         // Wide windows keep the modes and the control at the top.
@@ -1740,18 +1939,11 @@ private struct GameToolbarLayout: ViewModifier {
             .toolbar(removing: isVerticalToolbar
                      || (principalItem == .none && !nav.connectionBannerVisible) ? .title : nil)
             .environment(\.compactGameModesInToolbar, !zenMode)
+            // Where Exit is drawn in the content, Zen's circle beside it.
+            .environment(\.gameControlZen, control.zenCircle)
             .toolbar {
                 if zenMode {
-                    if !exitsZenFromContent {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button(action: exitZenMode) {
-                                Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
-                                    .modifier(GameToolbarMinimumTouchTarget())
-                            }
-                            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenExit)
-                            .surroundUITestZenShortcut()
-                        }
-                    }
+                    zenItems(control.zen)
                 } else {
                     principalItems
                     controlItems(control.slot)
@@ -1778,14 +1970,22 @@ private struct GameToolbarLayout: ViewModifier {
 }
 
 /// Our own chrome where a hidden navigation bar leaves its corner: Exit Zen,
-/// and the Duo sidebar button.
-private struct GameChromeButtonSurface: ViewModifier {
+/// the Zen circle and its countdown, and the Duo sidebar button.
+struct GameChromeButtonSurface<SurfaceShape: Shape>: ViewModifier {
+    var shape: SurfaceShape
+
     func body(content: Content) -> some View {
         if #available(iOS 26.0, macCatalyst 26.0, *) {
-            content.glassEffect(.regular.interactive(), in: Circle())
+            content.glassEffect(.regular.interactive(), in: shape)
         } else {
-            content.background(.regularMaterial, in: Circle())
+            content.background(.regularMaterial, in: shape)
         }
+    }
+}
+
+extension GameChromeButtonSurface where SurfaceShape == Circle {
+    init() {
+        self.init(shape: Circle())
     }
 }
 
@@ -1933,6 +2133,11 @@ private struct GameControlPopoverLifecycle: ViewModifier {
 private struct GameControlHost {
     var switchRule: GameControlSwitch
     var windowClass: GameControlWindowClass?
+    /// Zen's control where Exit is a bar item.
+    var zenForm: GameControlForm
+    /// In compact landscape, whether Zen's control is the chip before Exit
+    /// or the circle the content draws in the board's column; nil elsewhere.
+    var zenCorner: GameControlZenCorner?
     var isPopoverOpen: Bool
     /// The popover binding of the item at a placement.
     var presentation: (GameActiveGamesPlacement) -> Binding<Bool>
@@ -1949,6 +2154,10 @@ private struct GameControlBarState {
     /// The model's state for the game on screen; nil where the slot hides.
     var value: GameControlSlot?
     var slot: GameActiveGamesSlot
+    /// Zen's control before a native Exit.
+    var zen: GameControlZenItem
+    /// Zen's control where the content draws Exit, for the circle beside it.
+    var zenCircle: GameControlItemModel?
     /// The native item's badge, on the rail and the Mac.
     var nativeBadge: GameControlNativeItem.Badge?
     var deadlines: GameControlDeadlines.Plan
@@ -2031,6 +2240,16 @@ private struct GameActiveGamesSlot {
     /// A state outside Zen, or the popover is open.
     var isShown: Bool
     var view: AnyView
+}
+
+/// Zen's control in the bar, before a native Exit, and whether it shows:
+/// only for another live game on your move. One item in one place, so the
+/// game's clock ticks inside it and nothing else in the bar moves.
+private struct GameControlZenItem {
+    var isShown: Bool
+    var view: AnyView
+
+    static var hidden: GameControlZenItem { GameControlZenItem(isShown: false, view: AnyView(EmptyView())) }
 }
 
 /// The control's slot at the place its arrangement gives it. Every

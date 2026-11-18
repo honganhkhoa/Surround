@@ -433,8 +433,10 @@ final class AppRouteTests: XCTestCase {
     // MARK: - Game detail display reset
 
     func testCrossingTheSpeedBoundaryRestoresDisplayDefaults() {
-        // The live-game banner and resolved routes are the only ways to jump
-        // between speed classes, and both start again from the full game view.
+        // The in-game control's chip, its Zen circle and its popover's live
+        // rows switch between speed classes in place, as the live-game banner
+        // and resolved routes jump between them; each starts again from the
+        // full game view.
         XCTAssertTrue(
             GameDetailDisplayReset.restoresDisplayDefaults(
                 from: .correspondence,
@@ -465,7 +467,9 @@ final class AppRouteTests: XCTestCase {
 
     func testSwitchingInsideOneSpeedClassKeepsDisplayChoices() {
         // These are the carousel and Next game, which never leave their speed
-        // class. A browsing session there keeps what the player chose.
+        // class, and the in-game control's switches from one live game to
+        // another, in Zen too. A browsing session there keeps what the player
+        // chose.
         XCTAssertFalse(
             GameDetailDisplayReset.restoresDisplayDefaults(
                 from: .correspondence,
@@ -498,6 +502,45 @@ final class AppRouteTests: XCTestCase {
         XCTAssertFalse(
             GameDetailDisplayReset.restoresDisplayDefaults(from: nil, to: nil)
         )
+    }
+
+    /// The in-game control switches games in place on Home's route, across
+    /// speed classes too: in a correspondence game its chip, or in Zen its
+    /// circle, shows another live game on your move. Zen ends there, and the
+    /// panels and the compact Chat board return; from one live game to
+    /// another they stay.
+    @MainActor
+    func testASwitchInPlaceFromCorrespondenceToLiveRestoresDisplayDefaults() throws {
+        let navigation = NavigationService()
+        let correspondence = try displayResetGame(41, .Simple(perMove: 86_400))
+        let live = try displayResetGame(42, .ByoYomi(mainTime: 600, periods: 3, periodTime: 30))
+        let otherLive = try displayResetGame(43, .Fischer(initialTime: 1_800, timeIncrement: 30, maxTime: 1_800))
+        navigation.home.activeGame = correspondence
+        let rule = GameControlSwitch(route: .homeGame, allowsActiveGamesCarousel: true)
+        let speed = { (game: Game) in game.gameData?.timeControl.speed }
+        var shown = correspondence
+        XCTAssertEqual(speed(correspondence), .correspondence)
+
+        rule.perform(live, navigation: navigation) { shown = $0 }
+        XCTAssertTrue(shown === live, "The switch happens in place.")
+        XCTAssertEqual(speed(live)?.isRealtime, true)
+        XCTAssertTrue(GameDetailDisplayReset.restoresDisplayDefaults(from: speed(correspondence), to: speed(shown)),
+                      "From correspondence to live, Zen ends, and the panels and the compact Chat board return.")
+
+        rule.perform(otherLive, navigation: navigation) { shown = $0 }
+        XCTAssertTrue(shown === otherLive)
+        XCTAssertFalse(GameDetailDisplayReset.restoresDisplayDefaults(from: speed(live), to: speed(shown)),
+                       "From one live game to another, Zen and the panels stay.")
+    }
+
+    private func displayResetGame(_ id: Int, _ system: TimeControlSystem) throws -> Game {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "game-27053412", withExtension: "json"))
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        var data = try decoder.decode(OGSGame.self, from: Data(contentsOf: url))
+        data.gameId = id
+        data.timeControl = system.timeControlObject
+        return Game(ogsGame: data)
     }
 
     @MainActor

@@ -1283,12 +1283,15 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
 
         tap(ID.gameZenEnter, in: app, matching: .button)
         element(ID.gameZenExit, in: app, matching: .button)
-        let banner = element(ID.liveGameBanner, in: app, matching: .button)
-        keepScreenshot("live-banner-visible-in-correspondence-zen", in: app)
-        tap(banner, description: "Open active live game from Zen", in: app)
+        let zenControl = element(ID.gameZenControl, in: app, matching: .button)
+        XCTAssertTrue(waitUntilHittable(zenControl, timeout: 10), "Zen shows the live game on your move")
+        keepScreenshot("zen-control-in-correspondence-zen", in: app)
+        // Until the app's notices leave games, the live-game pill can lie
+        // over the middle of the bar, but not over the control's trailing
+        // quarter.
+        activate(zenControl, at: CGVector(dx: 0.875, dy: 0.5))
 
         element(ID.gameDetail(SurroundUITestContract.fixtureGameID), in: app)
-        XCTAssertFalse(banner.exists, "The live-game banner must disappear on the live board.")
         XCTAssertFalse(app.buttons[ID.gameZenExit].exists,
                        "Switching from correspondence to live must leave Zen mode.")
         XCTAssertFalse(app.descendants(matching: .any)
@@ -1296,7 +1299,7 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
                        "The correspondence carousel must not remain on the live game.")
         XCTAssertFalse(app.navigationBars.buttons["Close"].exists,
                        "The live game must use the existing navigation stack.")
-        keepScreenshot("live-banner-opens-live-game-outside-zen", in: app)
+        keepScreenshot("zen-control-opens-live-game-outside-zen", in: app)
     }
 
     func testPhoneZen() {

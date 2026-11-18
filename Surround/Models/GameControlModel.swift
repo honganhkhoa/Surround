@@ -1038,6 +1038,137 @@ extension GameControlAccessibility {
     }
 }
 
+// MARK: - Zen in compact layouts
+
+/// Where compact Zen shows another live game on your move. In compact
+/// landscape Exit is a bar item and the board reaches the window's top, so
+/// the top-bar chip and Exit share one platter above the board's trailing
+/// column. Where that column is too narrow for the platter, the platter
+/// would lie over the board's corner, and the control is the drawn circle
+/// in the column under Exit instead, the board keeping its size. It follows
+/// the column the Zen layout leaves beside the board, never the bar, so the
+/// bar's first Zen pass has it and it keeps for the pose: one control at a
+/// time. Where Exit is drawn in the game's content, as in an iPad's compact
+/// window, the circle beside Exit moves to the same column where it would
+/// reach over the clocks or the board, or stays beside Exit without its
+/// countdown.
+enum GameControlZenCorner: Equatable {
+    /// The top-bar chip before Exit, where their platter clears the board.
+    case barChip
+    /// The circle in the board's trailing column under Exit, its countdown
+    /// hanging below where the column holds the 76 pt button, alone where
+    /// it holds only the 44 pt circle.
+    case circle(showsCountdown: Bool)
+    /// Where Exit is drawn in the game's content: the 44 pt circle alone
+    /// beside Exit, where it sits when its countdown shows, 18 pt before
+    /// Exit at Exit's top.
+    case besideExitAlone
+    /// A column narrower than the circle, or none that clears the layout:
+    /// no control in Zen.
+    case noRoom
+
+    /// The room the platter needs beside the board, from the window's
+    /// trailing edge: the chip and Exit with their spacing reach about
+    /// 180 pt in on the iPhone SE and the Duo, and 199 pt beside a Dynamic
+    /// Island, whose bar keeps a wider margin; 8 pt more keep them off the
+    /// board.
+    static let barChipRoom: CGFloat = 208
+    /// The circle's button with its countdown below.
+    static let circleWithCountdownWidth: CGFloat = 76
+    /// The circle alone.
+    static let circleAloneWidth: CGFloat = 44
+
+    /// - Parameters:
+    ///   - column: From the board's trailing edge to the content's.
+    ///   - trailingInset: The window beyond the content's trailing edge,
+    ///     where the bar still puts its items, as beside a Dynamic Island.
+    init(column: CGFloat, trailingInset: CGFloat) {
+        if column + trailingInset >= Self.barChipRoom {
+            self = .barChip
+        } else if column >= Self.circleWithCountdownWidth {
+            self = .circle(showsCountdown: true)
+        } else if column >= Self.circleAloneWidth {
+            self = .circle(showsCountdown: false)
+        } else {
+            self = .noRoom
+        }
+    }
+
+    /// The width the circle takes in the column.
+    static func width(showsCountdown: Bool) -> CGFloat {
+        showsCountdown ? circleWithCountdownWidth : circleAloneWidth
+    }
+
+    /// Where Exit is drawn in the game's content, as in an iPad's compact
+    /// window: nil where the circle beside Exit, with its countdown, clears
+    /// the Zen layout's clocks, board and actions, so it stays there.
+    /// Elsewhere, as where the clocks sit above the board, the first of: the
+    /// circle with its countdown under Exit in the board's trailing column,
+    /// where that clears them too; the circle alone beside Exit, where it
+    /// keeps 8 pt clear of them; the circle alone in the column; no control.
+    /// - Parameters:
+    ///   - exit: Exit's frame, in the layout's coordinates.
+    ///   - countdownBelow: Whether the countdown hangs below the circle
+    ///     beside Exit, rather than on its leading side.
+    ///   - width: The layout's width.
+    ///   - column: From the board's trailing edge to the layout's.
+    ///   - occupied: The layout's clocks, board and actions.
+    init?(contentExit exit: CGRect, countdownBelow: Bool, width: CGFloat, column: CGFloat, occupied: [CGRect]) {
+        let occupied = occupied.filter { !$0.isEmpty }
+        func clears(_ frame: CGRect) -> Bool { !occupied.contains { $0.intersects(frame) } }
+        if clears(Self.besideExitFrame(exit, countdownBelow: countdownBelow)) { return nil }
+        func columnClears(showsCountdown: Bool) -> Bool {
+            column >= Self.width(showsCountdown: showsCountdown)
+                && clears(Self.columnFrame(showsCountdown: showsCountdown, width: width, column: column,
+                                           top: exit.maxY + Self.gapUnderExit))
+        }
+        let clearance = -Self.besideExitAloneClearance
+        if columnClears(showsCountdown: true) {
+            self = .circle(showsCountdown: true)
+        } else if clears(Self.besideExitAloneFrame(exit).insetBy(dx: clearance, dy: clearance)) {
+            self = .besideExitAlone
+        } else if columnClears(showsCountdown: false) {
+            self = .circle(showsCountdown: false)
+        } else {
+            self = .noRoom
+        }
+    }
+
+    /// The circle's button with its countdown below: the 44 pt circle, 4 pt,
+    /// and the 22 pt capsule.
+    static let circleWithCountdownHeight: CGFloat = 70
+    /// From Exit, or the bar under it, to the circle in the column.
+    static let gapUnderExit: CGFloat = 8
+    /// What the circle alone beside Exit keeps clear of the clocks, the
+    /// board and the actions, all round.
+    static let besideExitAloneClearance: CGFloat = 8
+
+    /// Where the circle's button sits beside an Exit drawn at `exit`: with
+    /// its countdown below, 2 pt before Exit; with the countdown on its
+    /// leading side, the circle 18 pt before Exit and a capsule of up to
+    /// 76 pt 4 pt before that.
+    static func besideExitFrame(_ exit: CGRect, countdownBelow: Bool) -> CGRect {
+        countdownBelow
+            ? CGRect(x: exit.minX - 2 - circleWithCountdownWidth, y: exit.minY,
+                     width: circleWithCountdownWidth, height: circleWithCountdownHeight)
+            : CGRect(x: exit.minX - 18 - circleAloneWidth - 4 - circleWithCountdownWidth, y: exit.minY,
+                     width: circleWithCountdownWidth + 4 + circleAloneWidth, height: circleAloneWidth)
+    }
+
+    /// Where the circle alone sits beside an Exit drawn at `exit`: where it
+    /// sits with its countdown, 18 pt before Exit, at Exit's top.
+    static func besideExitAloneFrame(_ exit: CGRect) -> CGRect {
+        CGRect(x: exit.minX - 18 - circleAloneWidth, y: exit.minY, width: circleAloneWidth, height: circleAloneWidth)
+    }
+
+    /// The circle `top` down the board's trailing column, centred in it.
+    static func columnFrame(showsCountdown: Bool, width: CGFloat, column: CGFloat, top: CGFloat) -> CGRect {
+        let side = Self.width(showsCountdown: showsCountdown)
+        return CGRect(x: width - (column + side) / 2, y: top, width: side,
+                      height: showsCountdown ? circleWithCountdownHeight : circleAloneWidth)
+    }
+}
+
 // MARK: - Switching games
 
 /// How a Game Detail switches to another game. The control's chip and its

@@ -2821,7 +2821,12 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         selectSegment(at: 1, in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker, app: app)
         activateZenControl(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
         element(SurroundUITestContract.AccessibilityID.gameZenExit, in: app)
-        tap(SurroundUITestContract.AccessibilityID.liveGameBanner, in: app, matching: .button)
+        // Zen shows the live game on your move beside Exit. Until the app's
+        // notices leave games, the live-game pill can lie over the middle of
+        // a phone's bar, but not over the control's trailing quarter.
+        let zenControl = element(SurroundUITestContract.AccessibilityID.gameZenControl, in: app, matching: .button)
+        XCTAssertTrue(waitUntilHittable(zenControl, timeout: 10), "Zen shows the live game on your move")
+        activate(zenControl, at: CGVector(dx: 0.875, dy: 0.5))
         element(
             SurroundUITestContract.AccessibilityID.gameDetail(SurroundUITestContract.fixtureGameID),
             in: app
@@ -2836,7 +2841,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         element(SurroundUITestContract.AccessibilityID.gameChatBoardHide, in: app, matching: .button)
         XCTAssertFalse(app.descendants(matching: .any)
             .matching(identifier: SurroundUITestContract.AccessibilityID.gameChatBoardShow).firstMatch.exists)
-        keepScreenshot("Live banner – restores the compact Chat board", in: app)
+        keepScreenshot("Zen control – restores the compact Chat board", in: app)
         #endif
     }
 

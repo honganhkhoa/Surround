@@ -1285,6 +1285,9 @@ enum SurroundUITestContract {
         static let gameResign = "game.resign"
         static let gameZenEnter = "game.zen.enter"
         static let gameZenExit = "game.zen.exit"
+        /// Zen's control beside Exit: the circle, or the bar item before
+        /// a native Exit, for another live game on your move.
+        static let gameZenControl = "game.zenControl"
         static let gameSidebarToggle = "game.sidebar.toggle"
         static let gameBack = "game.back"
 
