@@ -3,7 +3,8 @@
 //  Surround
 //
 //  The in-game control's rules that need no view: the value Game Detail's
-//  Active games slot shows, how a Game Detail switches to another game,
+//  Active games slot shows, the window's width class and shape that the
+//  control's frames follow, how a Game Detail switches to another game,
 //  which challenge the game-over card shows, and where a game says that the
 //  connection is down. Each reads only state Game Detail has before it
 //  draws, so SurroundTests checks it without a socket or a view.
@@ -71,6 +72,60 @@ enum GameControlSlot: Equatable {
         let input = ActivityModel.Input(ogs: ogs, place: ActivityModel.Place(showing: game),
                                         startedGames: startedGames, now: now)
         self.init(input, context: context)
+    }
+}
+
+// MARK: - The window
+
+/// The window a Game Detail is in, as the window's root measures it: which
+/// class its width falls in, and its shape. The control's frames are fixed
+/// per class, so they change only when the window resizes or turns, which
+/// nothing inside the window can cause. The root knows both long before a
+/// game opens, while Game Detail's own geometry arrives a main-queue turn
+/// after its first layout.
+struct GameControlWindowClass: Equatable {
+    /// The window widths at which the control's frames change, narrowest
+    /// first. Another boundary is one more case with its minimum width.
+    enum WidthClass: Comparable, CaseIterable {
+        /// Narrower than 390 pt. At 375 pt the full chip beside three modes
+        /// pushes Analyze and Chat into More on iOS 26 and 27.
+        case narrow
+        /// 390 pt and wider, where the full chip fits beside three modes.
+        case standard
+
+        /// The narrowest window in the class, in points.
+        var minimumWidth: CGFloat {
+            switch self {
+            case .narrow: 0
+            case .standard: 390
+            }
+        }
+
+        /// The widest class whose minimum `width` reaches.
+        init(width: CGFloat) {
+            self = Self.allCases.last { width >= $0.minimumWidth } ?? .narrow
+        }
+    }
+
+    enum Shape: Equatable {
+        case portrait
+        /// Wider than tall, as Game Detail reads its window for its
+        /// landscape layouts.
+        case landscape
+    }
+
+    var widthClass: WidthClass
+    var shape: Shape
+
+    init(widthClass: WidthClass, shape: Shape) {
+        self.widthClass = widthClass
+        self.shape = shape
+    }
+
+    /// From the window's bounds.
+    init(windowSize: CGSize) {
+        self.init(widthClass: WidthClass(width: windowSize.width),
+                  shape: windowSize.width > windowSize.height ? .landscape : .portrait)
     }
 }
 

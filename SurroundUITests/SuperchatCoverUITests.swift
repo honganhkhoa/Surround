@@ -92,7 +92,8 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
 
     func testOfflineTheCoverStaysWithReconnecting() {
         // The offline root's network path is always satisfied, so
-        // "Reconnecting…" shows 2 s after the rise (ConnectionStatusModel).
+        // "Reconnecting…" shows 2 s after the window opens, here covered: the
+        // cover shares the window's source (ConnectionStatusModel).
         var app = launchCovered([SurroundUITestContract.activityConnectionLaunchArgument,
                                  SurroundUITestContract.ActivityFixtureConnection.offline.rawValue])
         let launched = Date()

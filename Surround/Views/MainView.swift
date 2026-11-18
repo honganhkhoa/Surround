@@ -193,6 +193,10 @@ struct MainView: View {
             .environment(\.scenePhase, environment.scenePhase)
             .environment(\.surroundAllowsLocalPersistence, environment.surroundAllowsLocalPersistence)
             .environment(\.surroundAllowsRemoteActivity, allowsRemoteActivity)
+            // The window root's, so a game in any tab reads the same source
+            // and the window's measured width class and shape.
+            .environment(\.connectionStatus, environment.connectionStatus)
+            .environment(\.gameControlWindowClass, environment.gameControlWindowClass)
             .modifier(AppReviewHostedPresentation(root: root))
             .environment(\.appReviewCoordinator, environment.appReviewCoordinator)
             .environment(\.appReviewPresentationRelay, environment.appReviewPresentationRelay))

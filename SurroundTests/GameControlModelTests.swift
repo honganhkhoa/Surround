@@ -4,7 +4,8 @@
 //
 //  The value Game Detail's Active games slot shows, computed from one input
 //  with no state from before it: a pure value, and a window's first read of
-//  each Activity state.
+//  each Activity state. Also the window's width class and shape, which the
+//  control's frames follow.
 //
 
 import XCTest
@@ -53,6 +54,61 @@ final class GameControlModelTests: XCTestCase {
         XCTAssertEqual(GameControlSlot(input, context: .home), first, "Nothing carries over between reads.")
         XCTAssertEqual(GameControlSlot(input, context: Context(isZen: true)), first, "Zen keeps only the chip.")
         XCTAssertNil(GameControlSlot(Model.Input(), context: .home), "A root screen has no slot.")
+    }
+
+    // MARK: The window
+
+    private typealias WindowClass = GameControlWindowClass
+    private typealias WidthClass = GameControlWindowClass.WidthClass
+
+    func testTheWidthClassChangesAt390Points() {
+        XCTAssertEqual(WidthClass(width: 320), .narrow)
+        XCTAssertEqual(WidthClass(width: 375), .narrow, "The iPhone SE and the narrowest iPad window")
+        XCTAssertEqual(WidthClass(width: 389.5), .narrow, "Below 390 pt")
+        XCTAssertEqual(WidthClass(width: 390), .standard, "390 pt itself, as the iPhone 16e")
+        XCTAssertEqual(WidthClass(width: 402), .standard)
+        XCTAssertEqual(WidthClass(width: 1366), .standard)
+        XCTAssertLessThan(WidthClass.narrow, .standard, "The classes go from narrowest to widest.")
+    }
+
+    func testEachClassRunsFromItsMinimumToTheNextOne() {
+        let classes = WidthClass.allCases
+        let minimums = classes.map(\.minimumWidth)
+        XCTAssertEqual(minimums.first, 0, "Every width has a class.")
+        XCTAssertEqual(minimums, minimums.sorted(), "Declared narrowest first.")
+        XCTAssertEqual(Set(minimums).count, minimums.count, "No two classes start at one width.")
+        for widthClass in classes {
+            XCTAssertEqual(WidthClass(width: widthClass.minimumWidth), widthClass, "\(widthClass) starts at its minimum.")
+        }
+        for (narrower, wider) in zip(classes, classes.dropFirst()) {
+            XCTAssertEqual(WidthClass(width: wider.minimumWidth - 0.5), narrower,
+                           "Just under \(wider)'s minimum is still \(narrower).")
+        }
+    }
+
+    func testTheShapeIsLandscapeOnlyWhenTheWindowIsWiderThanTall() {
+        XCTAssertEqual(WindowClass(windowSize: CGSize(width: 402, height: 874)),
+                       WindowClass(widthClass: .standard, shape: .portrait))
+        XCTAssertEqual(WindowClass(windowSize: CGSize(width: 874, height: 402)),
+                       WindowClass(widthClass: .standard, shape: .landscape))
+        XCTAssertEqual(WindowClass(windowSize: CGSize(width: 320, height: 568)),
+                       WindowClass(widthClass: .narrow, shape: .portrait))
+        XCTAssertEqual(WindowClass(windowSize: CGSize(width: 568, height: 320)),
+                       WindowClass(widthClass: .standard, shape: .landscape), "Turned, the same window is wide enough.")
+        XCTAssertEqual(WindowClass(windowSize: CGSize(width: 375, height: 548)),
+                       WindowClass(widthClass: .narrow, shape: .portrait))
+        XCTAssertEqual(WindowClass(windowSize: CGSize(width: 600, height: 600)).shape, .portrait,
+                       "A square window isn't landscape-shaped.")
+    }
+
+    func testAResizeWithinAClassAndShapeKeepsTheValue() {
+        let phones = [CGSize(width: 390, height: 844), CGSize(width: 393, height: 852),
+                      CGSize(width: 402, height: 874), CGSize(width: 440, height: 956)]
+        let values = phones.map { WindowClass(windowSize: $0) }
+        XCTAssertTrue(values.allSatisfy { $0 == WindowClass(widthClass: .standard, shape: .portrait) },
+                      "Only a resize across a boundary, or a turn, gives the root a new value to publish.")
+        let turned = phones.map { WindowClass(windowSize: CGSize(width: $0.height, height: $0.width)) }
+        XCTAssertTrue(turned.allSatisfy { $0 == WindowClass(widthClass: .standard, shape: .landscape) })
     }
 
     #if DEBUG
