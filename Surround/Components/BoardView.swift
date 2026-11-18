@@ -496,10 +496,7 @@ private enum BoardReflectionTile {
     }
 }
 
-/// The board texture as images rather than an ImagePaint fill, so an
-/// animated resize does not redraw the layer on every frame: a tile repeated
-/// at its tile size, or one composition covering the board from its top-left
-/// corner at `paintScale(in:)`, as the paint placed it.
+/// All mappings use the same prepared images during a board resize.
 private struct BoardTextureImage: View {
     let texture: BoardTexture
     /// The margin's lift: `brightness(0.1)` then `contrast(1.25)`.
@@ -521,6 +518,8 @@ private struct BoardTextureImage: View {
                                    height: texture.image.size.height * scale)
                     }
                     .clipped()
+            case .framed:
+                texture.framedImage(image, in: boardSize)
             }
         }
         .colorMultiply(texture.tint)
@@ -697,6 +696,52 @@ private struct BoardDepthView: View {
                     .shadow(color: material.shadow, radius: shadowRadius, y: shadowOffset)
             }
             .frame(width: geometry.size.width, height: geometry.size.height + thickness)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Continue the fired glaze around the lower lip. The upper row of the wall
+/// meets the face at the same color and the underside turns away from daylight.
+private struct PorcelainBoardWall: View {
+    let material: BoardDepth
+    let texture: BoardTexture?
+    let layout: BoardDepthGeometry
+    let cornerRadius: CGFloat
+    @Environment(\.displayScale) private var displayScale
+
+    var body: some View {
+        GeometryReader { geometry in
+            let tuck = layout.thickness * 0.18
+            let silhouette = RoundedRectangle(cornerRadius: cornerRadius + layout.thickness * 0.4, style: .circular)
+            // Expose the same glaze below the curved corners and the straight
+            // front. The downward shading begins where the straight lip ends.
+            let overlap = max(cornerRadius, 1 / displayScale)
+            let strip = CGSize(width: geometry.size.width, height: layout.thickness + overlap)
+            let lip = overlap / strip.height
+            silhouette.fill(material.upperFace)
+                .overlay(alignment: .bottom) {
+                    ZStack {
+                        if let texture, let glaze = texture.frontGlaze {
+                            texture.framedImage(glaze, in: strip, faceSize: geometry.size)
+                                .colorMultiply(texture.tint)
+                        }
+                        LinearGradient(stops: [
+                            .init(color: material.lowerFace.opacity(0), location: lip),
+                            .init(color: material.lowerFace.opacity(0.23), location: lip + (1 - lip) * 0.46),
+                            .init(color: material.lowerFace, location: 1)
+                        ], startPoint: .top, endPoint: .bottom)
+                    }
+                    .frame(width: strip.width, height: strip.height)
+                }
+                .clipShape(silhouette)
+                .background {
+                    silhouette.fill(material.lowerFace)
+                        .shadow(color: material.shadow, radius: layout.shadowRadius, y: layout.shadowOffset)
+                }
+                .padding(.horizontal, tuck)
+                .frame(width: geometry.size.width, height: geometry.size.height + layout.thickness)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -1809,10 +1854,17 @@ struct BoardView: View {
                                     RoundedRectangle(cornerRadius: cornerRadius)
                                         .fill(appearance.surfaceColor(detailed: detailed))
                                         .opacity(detailed ? 0 : 1)
-                                    BoardDepthView(material: depth, thickness: depthGeometry.thickness,
-                                                   cornerRadius: faceRadius, shadowRadius: depthGeometry.shadowRadius,
-                                                   shadowOffset: depthGeometry.shadowOffset)
-                                        .opacity(detailed ? 1 : 0)
+                                    Group {
+                                        if depth.edgeStyle == .porcelain {
+                                            PorcelainBoardWall(material: depth, texture: appearance.boardTexture,
+                                                               layout: depthGeometry, cornerRadius: faceRadius)
+                                        } else {
+                                            BoardDepthView(material: depth, thickness: depthGeometry.thickness,
+                                                           cornerRadius: faceRadius, shadowRadius: depthGeometry.shadowRadius,
+                                                           shadowOffset: depthGeometry.shadowOffset)
+                                        }
+                                    }
+                                    .opacity(detailed ? 1 : 0)
                                 }
                             } else {
                                 RoundedRectangle(cornerRadius: faceRadius)
@@ -1839,7 +1891,8 @@ struct BoardView: View {
                 Color.clear
                     .frame(width: geometry.size.width, height: geometry.size.height + depthGeometry.thickness)
                     .modifier(BoardSceneShadowExclusion(cornerRadius: faceRadius,
-                                                        isDetailed: detailed, cellSize: cellSize))
+                                                        isDetailed: detailed, cellSize: cellSize,
+                                                        frontDepth: depthGeometry.thickness))
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }

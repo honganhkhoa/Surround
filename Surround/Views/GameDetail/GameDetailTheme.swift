@@ -137,11 +137,11 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             night.stoneImages?.tint = Color(themeHex: 0xE7DEE0)
             night.boardEdge = Color(themeHex: 0x8C7474)
             night.boardDepth = BoardDepth(
-                upperFace: Color(themeHex: 0xB5A397), lowerFace: Color(themeHex: 0x7C6664),
+                upperFace: Color(themeHex: 0x939080), lowerFace: Color(themeHex: 0x6A6458),
                 highlight: Color(themeHex: 0xE8DAD0).opacity(0.6),
                 shade: Color(themeHex: 0x695157).opacity(0.6),
                 shadow: Color(themeHex: 0x24191D).opacity(0.32),
-                thicknessRatio: 0.008, maximumThickness: 5)
+                thicknessRatio: 0.008, maximumThickness: 5, edgeStyle: .porcelain)
             night.black.flat = Color(themeHex: 0x4B1A29)
             night.black.territory = Color(themeHex: 0x4B1A29)
             night.white.flat = Color(themeHex: 0xE6CDD6)
@@ -389,13 +389,13 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 compactBoardColor: Color(themeHex: 0xF2E7D7),
                 boardEdge: Color(themeHex: 0xAF9690),
                 boardTexture: SakuraStreamAssets.board,
-                boardBevel: true,
+                // The porcelain render already contains the lit, rolled shoulder.
                 boardDepth: BoardDepth(
-                    upperFace: Color(themeHex: 0xE4D2C0), lowerFace: Color(themeHex: 0xB2988F),
+                    upperFace: Color(themeHex: 0xABA998), lowerFace: Color(themeHex: 0x827B6C),
                     highlight: Color(themeHex: 0xFFF8EE).opacity(0.85),
                     shade: Color(themeHex: 0x927674).opacity(0.45),
                     shadow: Color(themeHex: 0x503A36).opacity(0.25),
-                    thicknessRatio: 0.008, maximumThickness: 5),
+                    thicknessRatio: 0.008, maximumThickness: 5, edgeStyle: .porcelain),
                 // The warm ceramic face has no baked lines. The exact native
                 // plum grid stays thin and clear at every board size.
                 gridLineScale: 1,
@@ -866,8 +866,34 @@ private final class SakuraStreamAssets {
         return StoneImages(black: [black], white: [white])
     }()
 
-    static let board = UIImage(named: "SakuraStreamBoard", in: bundle, compatibleWith: nil)
-        .map { BoardTexture(image: $0, mapping: .board) }
+    static let board = UIImage(named: "SakuraStreamBoard", in: bundle, compatibleWith: nil).map {
+        BoardTexture(image: $0, frontGlaze: frontGlaze(from: $0), mapping: .framed)
+    }
+
+    /// Unroll the visible front contour into a single cached row. At the
+    /// corners the last visible texel sits on the arc, above the image border.
+    private static func frontGlaze(from image: UIImage) -> UIImage? {
+        guard let pixels = image.cgImage,
+              let row = pixels.cropping(to: CGRect(x: 0, y: pixels.height - 1, width: pixels.width, height: 1)),
+              let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let strip = CGContext(data: nil, width: pixels.width, height: 1, bitsPerComponent: 8,
+                                    bytesPerRow: 0, space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+        strip.interpolationQuality = .none
+        strip.draw(row, in: CGRect(x: 0, y: 0, width: pixels.width, height: 1))
+        let radius = CGFloat(min(pixels.width, pixels.height)) * BoardDepth.porcelainCornerFraction
+        for inset in 0..<Int(radius.rounded()) {
+            let dx = radius - CGFloat(inset) - 0.5
+            let rise = radius - sqrt(radius * radius - dx * dx)
+            let y = pixels.height - 1 - Int(rise.rounded())
+            for x in [inset, pixels.width - 1 - inset] {
+                if let texel = pixels.cropping(to: CGRect(x: x, y: y, width: 1, height: 1)) {
+                    strip.draw(texel, in: CGRect(x: x, y: 0, width: 1, height: 1))
+                }
+            }
+        }
+        return strip.makeImage().map { UIImage(cgImage: $0, scale: image.scale, orientation: .up) }
+    }
 }
 
 /// Oxblood and pink porcelain keep the two players distinct by value. The
@@ -3804,6 +3830,7 @@ struct GameDetailBackdrop: View {
     @Environment(\.surroundTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     var usesPhoneLandscapeFraming = false
+    var sakuraBoards: [BoardSceneShadowRegion] = []
 
     var body: some View {
         switch theme {
@@ -3829,7 +3856,7 @@ struct GameDetailBackdrop: View {
         case .frostPine:
             FrostPineScene(scheme: colorScheme)
         case .sakuraStream:
-            SakuraStreamScene(scheme: colorScheme)
+            SakuraStreamScene(scheme: colorScheme, boards: sakuraBoards)
         }
     }
 }
@@ -3889,10 +3916,11 @@ private final class SakuraStreamSceneAssets {
 
 private struct SakuraStreamScene: View {
     let scheme: ColorScheme
+    let boards: [BoardSceneShadowRegion]
 
     var body: some View {
         GeometryReader { geometry in
-            SakuraStreamSceneContent(size: geometry.size, scheme: scheme).equatable()
+            SakuraStreamSceneContent(size: geometry.size, scheme: scheme, boards: boards).equatable()
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -3902,6 +3930,7 @@ private struct SakuraStreamScene: View {
 private struct SakuraStreamSceneContent: View, Equatable {
     let size: CGSize
     let scheme: ColorScheme
+    let boards: [BoardSceneShadowRegion]
 
     private var usesLegacyChrome: Bool {
         if #available(iOS 26.0, *) { return false }
@@ -3925,7 +3954,7 @@ private struct SakuraStreamSceneContent: View, Equatable {
             // Keep the matched sakura canopies in the shared scene backdrop so
             // Home, Public games, Game history, Settings, picker previews, and
             // Game Detail all wear the same riverside canopy ring.
-            SakuraStreamCanopyBehind(size: layout.size, scheme: scheme).equatable()
+            SakuraStreamCanopyBehind(size: layout.size, scheme: scheme, boards: boards).equatable()
             // Modern navigation owns its edge effect. Older systems need
             // local pigment beneath bare toolbar labels and the title.
             if usesLegacyChrome {
@@ -4495,7 +4524,7 @@ private struct SurroundStudioSceneContent: View, Equatable {
 /// One placement drives all four matched tall-tree sakura boughs and their
 /// parallel upper-left sunlight cast across both the riverside ground/water
 /// plane and raised UI controls + main detailed ceramic board.
-/// No game, board, or panel state enters this viewport-only layout.
+/// Visible tips can move toward their offscreen stems to keep the playing field open.
 struct SakuraStreamCanopyLayout: Equatable {
     let size: CGSize
     let canopy: CGRect
@@ -4518,7 +4547,7 @@ struct SakuraStreamCanopyLayout: Equatable {
     let topFadeHeight: CGFloat
     let bottomFadeHeight: CGFloat
 
-    init(size: CGSize) {
+    init(size: CGSize, boards: [BoardSceneShadowRegion] = []) {
         let width = size.width.isFinite ? max(0, size.width) : 0
         let height = size.height.isFinite ? max(0, size.height) : 0
         self.size = CGSize(width: width, height: height)
@@ -4547,98 +4576,75 @@ struct SakuraStreamCanopyLayout: Equatable {
             return
         }
         let wide = min(1, max(0, (width / max(1, height) - 0.80) / 0.90))
-        // Cap side <= 430 pt (~305 pt on Phone, 430 pt on iPad) so 1024x1024 native
-        // sprites always downsample (>1.1x supersampled on @3x Phone and @2x iPad).
         let side = min(430, max(shortSide * 0.68, min(shortSide * 0.76, longSide * 0.35)))
-        leftCanopy = CGRect(
-            x: -side * (0.16 - 0.08 * wide),
-            y: -side * (0.09 + 0.075 * wide),
-            width: side,
-            height: side
-        )
-        canopy = CGRect(
-            x: width - side * (0.84 + 0.02 * wide),
-            y: -side * (0.09 + 0.14 * wide),
-            width: side,
-            height: side
-        )
-        bottomLeftCanopy = CGRect(
-            x: -side * (0.06 + 0.02 * wide),
-            y: height - side * (0.95 - 0.03 * wide),
-            width: side,
-            height: side
-        )
-        bottomRightCanopy = CGRect(
-            x: width - side * (0.94 - 0.03 * wide),
-            y: height - side * (0.95 - 0.03 * wide),
-            width: side,
-            height: side
-        )
+        let main = SakuraStreamBoardCanopyLayout(size: self.size, boards: boards).board
+        let viewport = CGRect(origin: .zero, size: self.size)
+        // Move the whole bough along its offscreen stem until its outermost
+        // visible petals clear the grid. The near tips can graze the rim.
+        func place(_ corner: SakuraStreamCanopyAssets.Corner, scale: CGFloat,
+                   outsideX: CGFloat, outsideY: CGFloat) -> CGRect {
+            let span = side * scale
+            let x = corner.isLeft ? -outsideX * span : width - (1 - outsideX) * span
+            let y = corner.isTop ? -outsideY * span : height - (1 - outsideY) * span
+            let frame = CGRect(x: x, y: y, width: span, height: span)
+            guard let main else { return frame }
+            // Leave room for the soft petal edge above the sidewall so the
+            // protected playing face never shears a blossom in half.
+            let clearance = corner.isNear ? min(1.2, span * 0.0021) : min(12, main.cellSize * 0.32)
+            // The picker shows one corner of an oversized board. Its unseen
+            // edges should have no influence on the branches in the viewport.
+            let visibleFace = main.faceBounds.intersection(viewport)
+            guard !visibleFace.isEmpty else { return frame }
+            let field = visibleFace.insetBy(dx: -clearance, dy: -clearance)
+            let boardCorner = CGPoint(x: corner.isLeft ? main.faceBounds.minX : main.faceBounds.maxX,
+                                      y: corner.isTop ? main.faceBounds.minY : main.faceBounds.maxY)
+            let radius = corner.isNear && viewport.contains(boardCorner) ? main.cellSize * 0.5 : 0
+            var retreat: CGFloat = 0
+            for tip in SakuraStreamCanopyAssets.reach[corner] ?? [] {
+                let dx = corner.isLeft ? frame.minX + tip.x * span - field.minX
+                                       : field.maxX - (frame.maxX - tip.x * span)
+                let dy = corner.isTop ? frame.minY + tip.y * span - field.minY
+                                      : field.maxY - (frame.maxY - tip.y * span)
+                // A corner stone has a round footprint. Solve the diagonal
+                // retreat against its arc where both edges constrain the tip.
+                let halfDifference = abs(dx - dy) * 0.5
+                let distance = halfDifference < radius * 0.5
+                    ? (dx + dy) * 0.5 - radius + sqrt(radius * radius * 0.5 - halfDifference * halfDifference)
+                    : min(dx, dy)
+                retreat = max(retreat, distance)
+            }
+            return frame.offsetBy(dx: corner.isLeft ? -retreat : retreat,
+                                  dy: corner.isTop ? -retreat : retreat)
+        }
+        leftCanopy = place(.topLeft, scale: 1.18, outsideX: 0.20 - 0.06 * wide, outsideY: 0.12 + 0.095 * wide)
+        canopy = place(.topRight, scale: 1, outsideX: 0.16 - 0.02 * wide, outsideY: 0.09 + 0.14 * wide)
+        bottomLeftCanopy = place(.bottomLeft, scale: 1, outsideX: 0.06 + 0.02 * wide, outsideY: 0.05 + 0.03 * wide)
+        bottomRightCanopy = place(.bottomRight, scale: 1.30, outsideX: 0.12 + 0.02 * wide, outsideY: 0.115 + 0.035 * wide)
 
-        // Elevated ~4.5 m riverside sakura boughs cast a softer far-displaced
-        // solar penumbra onto the stream and flowering bank below and a slightly tighter,
-        // crisper parallax shadow across raised clocks, panels, and ceramic slab.
-        groundBlurRadius = min(6.5, max(4.0, shortSide * 0.0125))
-        blurRadius = min(4.5, max(2.8, shortSide * 0.0085))
+        groundBlurRadius = min(16, max(7, shortSide * 0.026))
+        blurRadius = min(10, max(5, shortSide * 0.017))
         topClearHeight = min(44, height * 0.06)
         topFadeHeight = topClearHeight + min(42, shortSide * 0.09)
         bottomFadeHeight = min(64, height * 0.09)
 
-        let sunDX = side * (0.40 + 0.16 * wide)
-        let sunDY = side * (0.56 - 0.24 * wide)
-        let groundSide = side * (1.34 + 0.06 * wide)
-        leftGroundShadowCanopy = CGRect(
-            x: leftCanopy.minX + sunDX,
-            y: leftCanopy.minY + sunDY,
-            width: groundSide,
-            height: groundSide
-        )
-        rightGroundShadowCanopy = CGRect(
-            x: canopy.minX + sunDX,
-            y: canopy.minY + sunDY,
-            width: groundSide,
-            height: groundSide
-        )
-        bottomLeftGroundShadowCanopy = CGRect(
-            x: bottomLeftCanopy.minX + sunDX,
-            y: bottomLeftCanopy.minY + sunDY * 0.40,
-            width: groundSide,
-            height: groundSide
-        )
-        bottomRightGroundShadowCanopy = CGRect(
-            x: bottomRightCanopy.minX + sunDX,
-            y: bottomRightCanopy.minY + sunDY * 0.40,
-            width: groundSide,
-            height: groundSide
-        )
-
-        let fgDX = sunDX * 0.88
-        let fgDY = sunDY * 0.88
-        let fgSide = side * (1.30 + 0.08 * wide)
-        leftShadowCanopy = CGRect(
-            x: leftCanopy.minX + fgDX,
-            y: leftCanopy.minY + fgDY,
-            width: fgSide,
-            height: fgSide
-        )
-        rightShadowCanopy = CGRect(
-            x: canopy.minX + fgDX,
-            y: canopy.minY + fgDY,
-            width: fgSide,
-            height: fgSide
-        )
-        bottomLeftShadowCanopy = CGRect(
-            x: bottomLeftCanopy.minX + fgDX,
-            y: bottomLeftCanopy.minY + fgDY * 0.40,
-            width: fgSide,
-            height: fgSide
-        )
-        bottomRightShadowCanopy = CGRect(
-            x: bottomRightCanopy.minX + fgDX,
-            y: bottomRightCanopy.minY + fgDY * 0.40,
-            width: fgSide,
-            height: fgSide
-        )
+        // All casts follow the same daylight. The nearer crowns cast farther;
+        // the bank receives a wider penumbra than the raised slab and controls.
+        let sunDX = side * (0.55 + 0.12 * wide)
+        let sunDY = side * (0.71 - 0.25 * wide)
+        func cast(_ frame: CGRect, elevation: CGFloat, ground: Bool) -> CGRect {
+            let distance = elevation * (ground ? 1 : 0.84)
+            let spread = frame.width * (ground ? 0.14 : 0.11)
+            return frame.insetBy(dx: -spread, dy: -spread)
+                .offsetBy(dx: sunDX * distance, dy: sunDY * distance)
+        }
+        leftGroundShadowCanopy = cast(leftCanopy, elevation: 1.18, ground: true)
+        rightGroundShadowCanopy = cast(canopy, elevation: 1, ground: true)
+        bottomLeftGroundShadowCanopy = cast(bottomLeftCanopy, elevation: 1, ground: true)
+        bottomRightGroundShadowCanopy = cast(bottomRightCanopy, elevation: 1.30, ground: true)
+        leftShadowCanopy = cast(leftCanopy, elevation: 1.18, ground: false)
+        rightShadowCanopy = cast(canopy, elevation: 1, ground: false)
+        bottomLeftShadowCanopy = cast(bottomLeftCanopy, elevation: 1, ground: false)
+        bottomRightShadowCanopy = cast(bottomRightCanopy, elevation: 1.30, ground: false)
         leftShadowFeather = 0.22
         shadowEdgeFeather = 0.22
     }
@@ -4650,7 +4656,11 @@ struct SakuraStreamBoardCanopyLayout: Equatable {
     let board: BoardSceneShadowRegion?
 
     init(size: CGSize, boards: [BoardSceneShadowRegion]) {
-        let viewport = CGRect(origin: .zero, size: SakuraStreamCanopyLayout(size: size).size)
+        guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else {
+            board = nil
+            return
+        }
+        let viewport = CGRect(origin: .zero, size: size)
         board = boards.filter { region in
             let rect = region.bounds
             return region.isDetailed && region.cellSize.isFinite
@@ -4708,8 +4718,12 @@ struct SakuraStreamBoardCanopyMask: View, Equatable {
 }
 
 private final class SakuraStreamCanopyAssets {
-    enum Corner: Equatable, CaseIterable {
+    enum Corner: Hashable, CaseIterable {
         case topLeft, topRight, bottomLeft, bottomRight
+
+        var isLeft: Bool { self == .topLeft || self == .bottomLeft }
+        var isTop: Bool { self == .topLeft || self == .topRight }
+        var isNear: Bool { self == .topLeft || self == .bottomRight }
     }
 
     private init() {}
@@ -4718,6 +4732,38 @@ private final class SakuraStreamCanopyAssets {
     static let leftCanopy = UIImage(named: "SakuraStreamCanopyLeft", in: bundle, compatibleWith: nil)
     static let bottomLeftCanopy = UIImage(named: "SakuraStreamCanopyBottomLeft", in: bundle, compatibleWith: nil)
     static let bottomRightCanopy = UIImage(named: "SakuraStreamCanopyBottomRight", in: bundle, compatibleWith: nil)
+
+    /// Only the outwardmost ink in each direction can be the first petal to
+    /// meet the board. Measure that outline once, in coordinates pointing
+    /// inward from each sprite's tree trunk.
+    static let reach: [Corner: [CGPoint]] = Dictionary(uniqueKeysWithValues: Corner.allCases.map { corner in
+        let side = 192
+        var tips: [CGPoint] = []
+        guard let source = image(for: corner)?.cgImage,
+              let raster = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8,
+                                     bytesPerRow: side * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let bytes = raster.data?.assumingMemoryBound(to: UInt8.self) else { return (corner, tips) }
+        raster.interpolationQuality = .high
+        let bounds = CGRect(x: 0, y: 0, width: side, height: side)
+        raster.clear(bounds)
+        raster.draw(source, in: bounds)
+        var deepest = -1
+        for x in (0..<side).reversed() {
+            let column = corner.isLeft ? x : side - 1 - x
+            for y in stride(from: side - 1, to: deepest, by: -1) {
+                let row = corner.isTop ? y : side - 1 - y
+                if bytes[(row * side + column) * 4 + 3] > 40 {
+                    tips.append(CGPoint(x: (CGFloat(x) + 0.5) / CGFloat(side),
+                                        y: (CGFloat(y) + 0.5) / CGFloat(side)))
+                    deepest = y
+                    break
+                }
+            }
+        }
+        withExtendedLifetime(raster) {}
+        return (corner, tips)
+    })
 
     static func image(for corner: Corner) -> UIImage? {
         switch corner {
@@ -4748,7 +4794,7 @@ private struct SakuraStreamCanopyImage: View, Equatable {
                 .resizable()
                 .foregroundStyle(Color(themeHex: scheme == .dark ? 0x0B0710 : 0x2A1822))
                 .saturation(silhouette ? 1 : (scheme == .dark ? 0.65 : 1))
-                .colorMultiply(silhouette ? .white : (scheme == .dark ? Color(themeHex: 0x827488) : .white))
+                .colorMultiply(silhouette || scheme != .dark ? .white : Color(themeHex: corner.isNear ? 0x948397 : 0x827488))
                 .mask {
                     LinearGradient(
                         stops: [
@@ -4774,6 +4820,8 @@ private struct SakuraStreamCanopyImage: View, Equatable {
                 // Keep each image mounted while its visibility changes.
                 .opacity(isEnabled && !frame.isEmpty ? 1 : 0)
                 .frame(width: frame.width, height: frame.height)
+                // The upper-left bough gets its height from scale and its displaced shadow.
+                .blur(radius: !silhouette && corner == .bottomRight ? min(1.2, frame.width * 0.0025) : 0)
                 .position(x: frame.midX, y: frame.midY)
                 .frame(width: viewportSize.width, height: viewportSize.height)
         }
@@ -4783,13 +4831,12 @@ private struct SakuraStreamCanopyImage: View, Equatable {
 struct SakuraStreamCanopyBehind: View, Equatable {
     let size: CGSize
     let scheme: ColorScheme
+    var boards: [BoardSceneShadowRegion] = []
 
     var body: some View {
-        let layout = SakuraStreamCanopyLayout(size: size)
+        let layout = SakuraStreamCanopyLayout(size: size, boards: boards)
         ZStack {
-            // Far-displaced solar penumbra on the riverside ground/water plane
-            // (with zero contact shadow directly under the blossoms) establishes
-            // 4-5 m tall-tree height across both Game Detail and whole-app screens.
+            // The crown and its softened cast occupy distinct planes.
             ZStack {
                 SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.rightGroundShadowCanopy,
                                         scheme: scheme, silhouette: true, corner: .topRight,
@@ -4806,17 +4853,17 @@ struct SakuraStreamCanopyBehind: View, Equatable {
             }
             .compositingGroup()
             .blur(radius: layout.groundBlurRadius)
-            .opacity(scheme == .dark ? 0.17 : 0.20)
+            .opacity(scheme == .dark ? 0.19 : 0.25)
 
             ZStack {
                 SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.canopy,
                                         scheme: scheme, corner: .topRight)
+                SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomLeftCanopy,
+                                        scheme: scheme, corner: .bottomLeft)
                 SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.leftCanopy,
                                         scheme: scheme, corner: .topLeft)
                 SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomRightCanopy,
                                         scheme: scheme, corner: .bottomRight)
-                SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomLeftCanopy,
-                                        scheme: scheme, corner: .bottomLeft)
             }
             .compositingGroup()
         }
@@ -4852,7 +4899,7 @@ struct SakuraStreamCanopyShadowProjection: View {
     }
 
     var body: some View {
-        let layout = SakuraStreamCanopyLayout(size: size)
+        let layout = SakuraStreamCanopyLayout(size: size, boards: boards)
         ZStack {
             SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.rightShadowCanopy,
                                     scheme: scheme, silhouette: true, corner: .topRight,
@@ -4864,12 +4911,58 @@ struct SakuraStreamCanopyShadowProjection: View {
             SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomLeftShadowCanopy,
                                     scheme: scheme, silhouette: true, corner: .bottomLeft,
                                     leadingFeather: layout.shadowEdgeFeather, isEnabled: isEnabled)
+            SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomRightShadowCanopy,
+                                    scheme: scheme, silhouette: true, corner: .bottomRight, isEnabled: isEnabled)
         }
         .compositingGroup()
         .blur(radius: layout.blurRadius)
         .mask(SakuraStreamBoardCanopyMask(boards: boards, isEnabled: isEnabled))
         .clipped()
         .opacity(isEnabled ? Self.opacity(for: scheme) : 0)
+        .transaction { $0.animation = nil }
+    }
+}
+
+/// Only the exposed ceramic can sit behind a blossom. Reserve the playing
+/// face, including the footprint of a stone at every edge intersection.
+struct SakuraStreamCanopyRim: View {
+    let size: CGSize
+    let scheme: ColorScheme
+    let boards: [BoardSceneShadowRegion]
+    let isEnabled: Bool
+
+    var body: some View {
+        let layout = SakuraStreamCanopyLayout(size: size, boards: boards)
+        ZStack {
+            SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.leftCanopy,
+                                    scheme: scheme, corner: .topLeft)
+            SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomRightCanopy,
+                                    scheme: scheme, corner: .bottomRight)
+        }
+        .mask {
+            Canvas { context, viewportSize in
+                guard isEnabled, let main = SakuraStreamBoardCanopyLayout(size: viewportSize, boards: boards).board
+                else { return }
+                let viewport = CGRect(origin: .zero, size: viewportSize)
+                let tile = RoundedRectangle(cornerRadius: main.cornerRadius, style: .circular).path(in: main.bounds)
+                context.clip(to: tile)
+                for other in boards where other != main && other.bounds.intersects(main.bounds) {
+                    var outside = Path(viewport)
+                    outside.addRect(other.bounds)
+                    context.clip(to: outside, style: FillStyle(eoFill: true))
+                }
+                // Sakura's stone diameter is 94% of its cell. A 2% fringe
+                // leaves the stone, move marks and coordinate lettering clear.
+                let fringe = min(0.8, main.cellSize * 0.02)
+                let protected = RoundedRectangle(cornerRadius: main.cellSize * 0.5 - fringe, style: .circular)
+                    .path(in: main.faceBounds.insetBy(dx: fringe, dy: fringe))
+                var rim = Path(viewport)
+                rim.addPath(protected)
+                context.fill(rim, with: .color(.white), style: FillStyle(eoFill: true))
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
         .transaction { $0.animation = nil }
     }
 }
@@ -4888,11 +4981,12 @@ struct SakuraStreamCanopyProjection: View {
     }
 
     var body: some View {
-        SakuraStreamCanopyShadowProjection(size: size, scheme: scheme, boards: boards,
-                                           isEnabled: allowsProjection)
-            // Keep the image/mask layers mounted at the 14 pt boundary. No resize
-            // animation may blend decoration into the compact board's solid colors.
-            .transaction { $0.animation = nil }
+        ZStack {
+            SakuraStreamCanopyShadowProjection(size: size, scheme: scheme, boards: boards,
+                                               isEnabled: allowsProjection)
+            SakuraStreamCanopyRim(size: size, scheme: scheme, boards: boards, isEnabled: allowsProjection)
+        }
+        .transaction { $0.animation = nil }
     }
 }
 

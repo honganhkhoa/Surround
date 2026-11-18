@@ -45,7 +45,7 @@ struct ThemeLivePreview: View {
                     // Anchor the lower tree to the tile, not the oversized
                     // board whose corner fills this preview.
                     GameDetailBackdrop().frame(width: side, height: side)
-                } else {
+                } else if theme != .sakuraStream {
                     GameDetailBackdrop()
                 }
                 BoardView(boardPosition: Self.position)
@@ -55,13 +55,17 @@ struct ThemeLivePreview: View {
                     .offset(x: side * 0.22, y: side * 0.22)
             }
             .frame(width: side, height: side, alignment: .topLeading)
+            .backgroundPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
+                if theme == .sakuraStream {
+                    GeometryReader { scene in
+                        GameDetailBackdrop(sakuraBoards: scene.boardShadowRegions(anchors))
+                    }
+                }
+            }
             .overlayPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
                 if theme == .frostPine || theme == .sakuraStream {
                     GeometryReader { scene in
-                        GameDetailSceneForeground(shadowExclusions: anchors.map {
-                            BoardSceneShadowRegion(bounds: scene[$0.bounds], cornerRadius: $0.cornerRadius,
-                                                   isDetailed: $0.isDetailed, cellSize: $0.cellSize)
-                        })
+                        GameDetailSceneForeground(shadowExclusions: scene.boardShadowRegions(anchors))
                     }
                 }
             }

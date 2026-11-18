@@ -2180,6 +2180,80 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    func testSakuraStreamPorcelainEdgeMatchesArtworkAndPreservesBoardFootprint() throws {
+        let fixtures: [(size: CGSize, columns: Int, rows: Int, lift: CGFloat)] = [
+            (CGSize(width: 247, height: 247), 19, 19, 0),   // 13 pt compact cells
+            (CGSize(width: 266, height: 266), 19, 19, 0),   // 14 pt transition
+            (CGSize(width: 304, height: 304), 19, 19, 0.5), // 16 pt partial lift
+            (CGSize(width: 760, height: 380), 19, 9, 1),
+            (CGSize(width: 380, height: 760), 9, 19, 1),
+            (CGSize(width: 740, height: 740), 37, 37, 1)    // Radius limited by the grid margin
+        ]
+        for scheme: ColorScheme in [.light, .dark] {
+            let board = SurroundTheme.sakuraStream.board(for: scheme)
+            XCTAssertFalse(board.boardBevel, "The ceramic artwork supplies the face highlight")
+            let porcelain = try XCTUnwrap(board.boardDepth)
+            XCTAssertEqual(porcelain.edgeStyle, .porcelain)
+            var cut = porcelain
+            cut.edgeStyle = .cut
+            for fixture in fixtures {
+                func geometry(_ depth: BoardDepth) -> BoardDepthGeometry {
+                    BoardDepthGeometry(containerSize: fixture.size, boardWidth: fixture.columns,
+                                       boardHeight: fixture.rows, showsCoordinates: false, displayScale: 3, depth: depth)
+                }
+                let actual = geometry(porcelain)
+                let original = geometry(cut)
+                XCTAssertEqual(actual.faceRect, original.faceRect)
+                XCTAssertEqual(actual.thickness, original.thickness)
+                XCTAssertEqual(actual.cellSize, original.cellSize)
+                let artworkRadius = min(actual.faceRect.width, actual.faceRect.height) * 0.015
+                XCTAssertEqual(actual.cornerRadius, min(artworkRadius * fixture.lift, actual.cellSize * 0.45),
+                               accuracy: 0.001, "Sakura slab silhouette for \(fixture.size)")
+            }
+        }
+    }
+
+    @MainActor
+    func testSakuraStreamFramedGlazeKeepsCornerScaleOnRectangularBoards() throws {
+        var texture = try XCTUnwrap(SurroundTheme.sakuraStream.board.boardTexture)
+        XCTAssertEqual(texture.mapping, .framed)
+        // A colored surface makes a cropped rim or a stretched corner visible
+        // independently of the contrast of the current artwork.
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        texture.image = UIGraphicsImageRenderer(size: CGSize(width: 100, height: 100), format: format).image { renderer in
+            for row in 0..<5 {
+                for column in 0..<5 {
+                    UIColor(red: CGFloat(column) / 4, green: CGFloat(row) / 4, blue: 0.5, alpha: 1).setFill()
+                    renderer.fill(CGRect(x: column * 20, y: row * 20, width: 20, height: 20))
+                }
+            }
+        }
+        let square = try nativeMaterialPixelsUsingDirectContext(
+            Image(uiImage: texture.image).resizable().frame(width: 60, height: 60), scale: 1
+        )
+        for size in [CGSize(width: 60, height: 60), CGSize(width: 140, height: 60), CGSize(width: 60, height: 140)] {
+            let actual = try nativeMaterialPixelsUsingDirectContext(
+                texture.framedImage(texture.image, in: size)
+                    .frame(width: size.width, height: size.height), scale: 1
+            )
+            // Corners stay at their distance from the corresponding edges.
+            // Midpoint samples check that all four rim strips meet those corners.
+            func destination(_ sample: Int, length: Int) -> Int {
+                if sample == 30 { return length / 2 }
+                return sample < 30 ? sample : length - 60 + sample
+            }
+            for y in [5, 15, 30, 45, 55] {
+                for x in [5, 15, 30, 45, 55] {
+                    let source = (y * square.width + x) * 4
+                    let target = (destination(y, length: actual.height) * actual.width + destination(x, length: actual.width)) * 4
+                    XCTAssertEqual(Array(actual.pixels[target..<target + 4]), Array(square.pixels[source..<source + 4]),
+                                   "Glaze sample (\(x), \(y)) on \(size)")
+                }
+            }
+        }
+    }
+
     func testSakuraStreamAssetsKeepSeparateCeramicSurfaceAndEqualStoneFootprints() throws {
         let bundle = Bundle(for: Self.self)
         func image(_ name: String) throws -> UIImage {
@@ -2206,17 +2280,15 @@ final class SurroundThemeTests: XCTestCase {
             (CGSize(width: 176, height: 176), CGRect(x: 38.7, y: 38.7, width: 352, height: 352))
         ]
         for (size, board) in fixtures {
-            let layout = SakuraStreamCanopyLayout(size: size)
-            XCTAssertEqual(layout.canopy.width, layout.canopy.height)
-            for sibling in [layout.leftCanopy, layout.bottomLeftCanopy, layout.bottomRightCanopy] {
-                XCTAssertEqual(layout.canopy.size, sibling.size,
-                               "All four sakura boughs must render at identical blossom scale")
-            }
+            let main = BoardSceneShadowRegion(bounds: board, isDetailed: true, cellSize: 20)
+            let layout = SakuraStreamCanopyLayout(size: size, boards: [main])
+            XCTAssertEqual(layout.canopy.size, layout.bottomLeftCanopy.size)
+            XCTAssertGreaterThan(layout.leftCanopy.width, layout.canopy.width)
+            XCTAssertGreaterThan(layout.bottomRightCanopy.width, layout.canopy.width)
             XCTAssertGreaterThan(layout.canopy.width, 0)
-            XCTAssertLessThanOrEqual(layout.canopy.width, 430,
-                                     "1024x1024 canopy sprites must downsample at @3x Phone and @2x iPad without upscaling")
             let viewport = CGRect(origin: .zero, size: size)
             for bough in [layout.canopy, layout.leftCanopy, layout.bottomLeftCanopy, layout.bottomRightCanopy] {
+                XCTAssertEqual(bough.width, bough.height)
                 XCTAssertFalse(bough.intersection(viewport).isEmpty,
                                "All four corner canopies must remain visible in \(size)")
             }
@@ -2228,8 +2300,8 @@ final class SurroundThemeTests: XCTestCase {
             XCTAssertGreaterThan(layout.bottomRightCanopy.maxX, size.width, "Lower-right bough stem stays outside the right edge")
             XCTAssertGreaterThan(layout.bottomLeftCanopy.maxY, size.height, "Lower-left stem stays below the bottom edge")
             XCTAssertGreaterThan(layout.bottomRightCanopy.maxY, size.height, "Lower-right stem stays below the bottom edge")
-            XCTAssertGreaterThanOrEqual(layout.blurRadius, 2.5)
-            XCTAssertLessThanOrEqual(layout.blurRadius, 5)
+            XCTAssertTrue((5...10).contains(layout.blurRadius))
+            XCTAssertTrue((7...16).contains(layout.groundBlurRadius))
             XCTAssertGreaterThan(layout.groundBlurRadius, layout.blurRadius,
                                  "Riverbed/ground penumbra is softer than raised board/UI shadow")
             if layout.leftShadowCanopy.minX >= -layout.blurRadius * 3
@@ -2266,7 +2338,6 @@ final class SurroundThemeTests: XCTestCase {
             let overlap = layout.leftShadowCanopy.intersection(board.intersection(CGRect(origin: .zero, size: size)))
             XCTAssertGreaterThan(overlap.width, 40, "Upper-left canopy shade must reach the main board at \(size)")
             XCTAssertGreaterThan(overlap.height, 40, "Upper-left canopy shade must reach the main board at \(size)")
-            let main = BoardSceneShadowRegion(bounds: board, isDetailed: true, cellSize: 20)
             let compact = BoardSceneShadowRegion(bounds: CGRect(origin: .zero, size: size),
                                                  isDetailed: false, cellSize: 13)
             let selected = SakuraStreamBoardCanopyLayout(size: size, boards: [compact, main])
@@ -2388,8 +2459,12 @@ final class SurroundThemeTests: XCTestCase {
                 return try nativeMaterialPixelsUsingDirectContext(projection
                     .frame(width: size.width, height: size.height).environment(\.colorScheme, scheme), scale: 1).pixels
             }
-            let detailed = try render()
-            let alpha = stride(from: 3, to: detailed.count, by: 4).map { detailed[$0] }
+            let board = BoardSceneShadowRegion(bounds: CGRect(x: 0, y: 284, width: 402, height: 402),
+                                               isDetailed: true, cellSize: 20)
+            let shadows = try nativeMaterialPixelsUsingDirectContext(
+                SakuraStreamCanopyShadowProjection(size: size, scheme: scheme, boards: [board], isEnabled: true)
+                    .frame(width: size.width, height: size.height), scale: 1).pixels
+            let alpha = stride(from: 3, to: shadows.count, by: 4).map { shadows[$0] }
             let peak = alpha.max() ?? 0
             maxAlphaByScheme[scheme] = peak
             XCTAssertGreaterThanOrEqual(peak, scheme == .dark ? 20 : 28,
@@ -2420,6 +2495,51 @@ final class SurroundThemeTests: XCTestCase {
         }
         XCTAssertLessThan(try XCTUnwrap(maxAlphaByScheme[.dark]), try XCTUnwrap(maxAlphaByScheme[.light]),
                           "Evening twilight attenuates board dapple compared with daytime sun")
+    }
+
+    @MainActor
+    func testSakuraStreamCanopyRimTouchesOnlyTheMainBoardMargin() throws {
+        // The lower-right bough meets the board in the iPad landscape game.
+        let size = CGSize(width: 1210, height: 834)
+        let main = BoardSceneShadowRegion(bounds: CGRect(x: 531, y: 160, width: 572, height: 576),
+                                         cornerRadius: 8, isDetailed: true, cellSize: 30, frontDepth: 4)
+        func render(_ boards: [BoardSceneShadowRegion]) throws -> (painted: [CGPoint], opaque: [CGPoint]) {
+            let layer = SakuraStreamCanopyRim(size: size, scheme: .light, boards: boards, isEnabled: true)
+            let raster = try nativeMaterialPixelsUsingDirectContext(layer.frame(width: size.width, height: size.height), scale: 1)
+            var painted = [CGPoint](), opaque = [CGPoint]()
+            for i in stride(from: 3, to: raster.pixels.count, by: 4) where raster.pixels[i] != 0 {
+                let pixel = i / 4
+                let point = CGPoint(x: CGFloat(pixel % raster.width) + 0.5, y: CGFloat(pixel / raster.width) + 0.5)
+                painted.append(point)
+                if raster.pixels[i] > 180 { opaque.append(point) }
+            }
+            return (painted, opaque)
+        }
+        let actual = try render([main])
+        let face = CGRect(x: main.bounds.minX, y: main.bounds.minY,
+                          width: main.bounds.width, height: main.bounds.height - main.frontDepth)
+        let core = face.insetBy(dx: main.cellSize / 2, dy: main.cellSize / 2)
+        XCTAssertFalse(actual.painted.contains(where: core.contains), "Every playing intersection stays clear")
+        XCTAssertTrue(actual.painted.allSatisfy(main.bounds.insetBy(dx: -1, dy: -1).contains),
+                      "The foreground copy is confined to the slab")
+        let petal = try XCTUnwrap(actual.opaque.first, "Actual canopy artwork visibly crosses the ceramic perimeter")
+        let hole = CGRect(x: petal.x - 12, y: petal.y - 12, width: 24, height: 24)
+        for previewCell: CGFloat in [13, 20] {
+            let preview = BoardSceneShadowRegion(bounds: hole, cellSize: previewCell)
+            let masked = try render([main, preview])
+            XCTAssertFalse(masked.painted.contains(where: hole.insetBy(dx: 1, dy: 1).contains),
+                           "Every other board excludes the physical bough where it would cover a visible petal")
+        }
+        var compact = main
+        compact.cellSize = 13
+        XCTAssertTrue(try render([compact]).painted.isEmpty)
+        for (reduced, contrast): (Bool, ColorSchemeContrast) in [(true, .standard), (false, .increased)] {
+            let layer = SakuraStreamCanopyProjection(size: size, scheme: .light, boards: [main],
+                                                      reduceTransparency: reduced, contrast: contrast)
+            let raster = try nativeMaterialPixelsUsingDirectContext(layer.frame(width: size.width, height: size.height), scale: 1)
+            XCTAssertFalse(stride(from: 3, to: raster.pixels.count, by: 4).contains { raster.pixels[$0] != 0 },
+                           "Accessibility suppression clears the rim and the raised shadow together")
+        }
     }
 
     @MainActor

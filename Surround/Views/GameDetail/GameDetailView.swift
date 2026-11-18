@@ -8,6 +8,15 @@
 import SwiftUI
 import Combine
 
+extension GeometryProxy {
+    func boardShadowRegions(_ anchors: [BoardSceneShadowAnchor]) -> [BoardSceneShadowRegion] {
+        anchors.map {
+            BoardSceneShadowRegion(bounds: self[$0.bounds], cornerRadius: $0.cornerRadius,
+                                   isDetailed: $0.isDetailed, cellSize: $0.cellSize, frontDepth: $0.frontDepth)
+        }
+    }
+}
+
 struct GameDetailView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.isVerticalToolbar) private var isVerticalToolbar
@@ -791,12 +800,11 @@ struct GameDetailView: View {
         let navigationTitle = ""
         #endif
         
+        let theme = SurroundTheme.current(storedID: gameThemeID)
         let result = gameBody(compact: compactLayout, geometry: geometry)
         .environment(\.christmasKeepsakesLightContext,
                      ChristmasKeepsakesLightContext(size: geometry.size, safeAreaInsets: geometry.safeAreaInsets))
-        .environment(\.excludesBoardsFromSceneShadows,
-                     SurroundTheme.current(storedID: gameThemeID) == .frostPine
-                        || SurroundTheme.current(storedID: gameThemeID) == .sakuraStream)
+        .environment(\.excludesBoardsFromSceneShadows, theme == .frostPine || theme == .sakuraStream)
         .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
         .coordinateSpace(name: ChristmasKeepsakesLightContext.coordinateSpace)
         .onChange(of: showsActiveGamesButton) { _, isVisible in
@@ -806,22 +814,27 @@ struct GameDetailView: View {
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.gameDetail(currentGame)
         )
-        .background {
-            GameDetailBackdrop(usesPhoneLandscapeFraming: usesPhoneLandscapeRoomFraming(in: geometry))
-                .overlay {
-                    GameDetailSceneFoliage(hasTopEdgeClocks: hasActiveVerticalDisplayDivision(in: geometry))
+        .backgroundPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
+            Group {
+                if theme == .sakuraStream {
+                    GeometryReader { scene in
+                        GameDetailBackdrop(sakuraBoards: scene.boardShadowRegions(anchors))
+                    }
+                } else {
+                    GameDetailBackdrop(usesPhoneLandscapeFraming: usesPhoneLandscapeRoomFraming(in: geometry))
                 }
-                .overlay {
-                    ThemeStatusBarContrast(hidden: hidesZenChrome && hidesStatusBarInZen)
-                }
-                .ignoresSafeArea(.container)
+            }
+            .overlay {
+                GameDetailSceneFoliage(hasTopEdgeClocks: hasActiveVerticalDisplayDivision(in: geometry))
+            }
+            .overlay {
+                ThemeStatusBarContrast(hidden: hidesZenChrome && hidesStatusBarInZen)
+            }
+            .ignoresSafeArea(.container)
         }
         .overlayPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
             GeometryReader { scene in
-                GameDetailSceneForeground(shadowExclusions: anchors.map {
-                                              BoardSceneShadowRegion(bounds: scene[$0.bounds], cornerRadius: $0.cornerRadius,
-                                                                     isDetailed: $0.isDetailed, cellSize: $0.cellSize)
-                                          })
+                GameDetailSceneForeground(shadowExclusions: scene.boardShadowRegions(anchors))
             }
             .ignoresSafeArea(.container)
         }
@@ -975,7 +988,7 @@ struct GameDetailView: View {
             .environment(\.gameDetailNotificationContextID, notificationContextID)
             // A departing screen gives the window back at once, so the
             // screen sliding in already has its own appearance.
-            .surroundTheme(SurroundTheme.current(storedID: gameThemeID),
+            .surroundTheme(theme,
                              ownsWindow: self.currentGame != nil)
             // Only this toolbar action animates the theme. Picking a theme in
             // Settings, game updates and layout changes keep their own policy.

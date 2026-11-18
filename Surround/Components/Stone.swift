@@ -14,6 +14,13 @@ struct BoardSceneShadowRegion: Equatable {
     var cornerRadius: CGFloat = 0
     var isDetailed = true
     var cellSize: CGFloat = 0
+    var frontDepth: CGFloat = 0
+
+    var faceBounds: CGRect {
+        var face = bounds
+        face.size.height -= frontDepth.isFinite ? min(face.height, max(0, frontDepth)) : 0
+        return face
+    }
 }
 
 struct BoardSceneShadowAnchor {
@@ -21,6 +28,7 @@ struct BoardSceneShadowAnchor {
     let cornerRadius: CGFloat
     var isDetailed = true
     var cellSize: CGFloat = 0
+    var frontDepth: CGFloat = 0
 }
 
 struct BoardSceneShadowExclusionKey: PreferenceKey {
@@ -47,11 +55,12 @@ struct BoardSceneShadowExclusion: ViewModifier {
     var cornerRadius: CGFloat = 0
     var isDetailed = true
     var cellSize: CGFloat = 0
+    var frontDepth: CGFloat = 0
 
     func body(content: Content) -> some View {
         content.anchorPreference(key: BoardSceneShadowExclusionKey.self, value: .bounds) {
             enabled ? [BoardSceneShadowAnchor(bounds: $0, cornerRadius: cornerRadius,
-                                             isDetailed: isDetailed, cellSize: cellSize)] : []
+                                             isDetailed: isDetailed, cellSize: cellSize, frontDepth: frontDepth)] : []
         }
     }
 }
@@ -266,14 +275,15 @@ enum ImageStoneShading: Equatable {
     }
 }
 
-/// A board surface, either a seamless fixed-size tile or one composition
-/// scaled to cover the entire board without repeating within its bounds.
+/// A board surface can tile, cover the face, or preserve its four decorated corners.
 struct BoardTexture: Equatable {
     enum Mapping: Equatable {
-        case tiled, board
+        case tiled, board, framed
     }
 
     var image: UIImage
+    /// Colors along the rounded front contour, continued down the porcelain wall.
+    var frontGlaze: UIImage? = nil
     /// The tile's width in points; unused for a board-wide composition.
     var tileSize: CGFloat = 320
     var mapping: Mapping = .tiled
@@ -293,7 +303,27 @@ struct BoardTexture: Equatable {
             // layout slot still needs a positive, finite ImagePaint scale.
             return max(max(1, size.width) / max(1, image.size.width),
                        max(1, size.height) / max(1, image.size.height))
+        case .framed:
+            return min(max(1, size.width) / max(1, image.size.width),
+                       max(1, size.height) / max(1, image.size.height))
         }
+    }
+
+    func framedImage(_ prepared: UIImage, in size: CGSize, faceSize: CGSize? = nil) -> some View {
+        // Slice in the image's own coordinates. The outer 35% holds the
+        // ceramic rim and corner impressions; only the middle stretches.
+        // The narrow front wall shares the playing face's horizontal mapping.
+        let scale = paintScale(in: faceSize ?? size)
+        let x = prepared.size.width * 0.35
+        let y = faceSize == nil ? prepared.size.height * 0.35 : 0
+        return Color.clear
+            .overlay {
+                Image(uiImage: prepared)
+                    .resizable(capInsets: EdgeInsets(top: y, leading: x, bottom: y, trailing: x))
+                    .frame(width: size.width / scale, height: size.height / scale)
+                    .scaleEffect(scale)
+            }
+            .clipped()
     }
 }
 
@@ -380,8 +410,10 @@ struct BoardReflection: Equatable {
 
 /// The material visible on a board's lower face, below the playing surface.
 struct BoardDepth: Equatable {
+    static let porcelainCornerFraction: CGFloat = 0.015
+
     enum EdgeStyle: Equatable {
-        case cut, frosted, rolledTin
+        case cut, frosted, rolledTin, porcelain
     }
 
     var upperFace: Color
@@ -443,11 +475,16 @@ struct BoardDepthGeometry: Equatable {
                                width: faceSize.width, height: faceSize.height)
         self.thickness = thickness
         self.cellSize = floor(proposedCell * factor * scale) / scale
-        // Soft ice rounds within the half-cell margin; this changes only
-        // the slab silhouette, never the grid frame or interaction geometry.
-        self.cornerRadius = depth?.edgeStyle == .frosted
-            ? min(thickness * 2.8, self.cellSize * 0.45)
-            : min(thickness * 0.65, self.cellSize / 4)
+        switch depth?.edgeStyle {
+        case .porcelain:
+            // Follow the corner modelled into the glaze as the slab gains depth.
+            let radius = min(faceSize.width, faceSize.height) * BoardDepth.porcelainCornerFraction * growth
+            self.cornerRadius = min(radius, self.cellSize * 0.45)
+        case .frosted:
+            self.cornerRadius = min(thickness * 2.8, self.cellSize * 0.45)
+        default:
+            self.cornerRadius = min(thickness * 0.65, self.cellSize / 4)
+        }
         self.shadowRadius = shadowRadius
         self.shadowOffset = shadowOffset
     }
