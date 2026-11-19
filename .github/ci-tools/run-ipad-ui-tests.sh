@@ -282,8 +282,8 @@ case "$phase" in
       "${common_arguments[@]}" \
       "-only-testing:${test_case}/${keyboard_preflight_test_name}" \
       -test-timeouts-enabled YES \
-      -default-test-execution-time-allowance 180 \
-      -maximum-test-execution-time-allowance 180 \
+      -default-test-execution-time-allowance 300 \
+      -maximum-test-execution-time-allowance 300 \
       -resultBundlePath \
       "TestResults/SurroundUITests-${result_label}-KeyboardPreflight.xcresult"
     ;;

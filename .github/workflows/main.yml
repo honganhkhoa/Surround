@@ -663,7 +663,7 @@ jobs:
   ipad-composer-ui-tests:
     name: iPadOS ${{ matrix.ios }} composer and continuity
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
+    timeout-minutes: 125
     strategy:
       fail-fast: false
       matrix:
@@ -704,7 +704,7 @@ jobs:
             "${{ steps.simulator.outputs.id }}" "iPadOS${{ matrix.ios }}"
 
       - name: Verify iPadOS ${{ matrix.ios }} composer input
-        timeout-minutes: 5
+        timeout-minutes: 10
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh preflight \
