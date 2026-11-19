@@ -170,7 +170,7 @@ struct GameDetailView: View {
             ActivityListView(
                 session: gameControlPopover.listSessionID, placement: .gamePopover,
                 place: ActivityModel.Place(showing: game), cardChallengeID: cardChallengeID,
-                header: AnyView(gameControlPicker), switchGame: showGame, connection: connectionStatus
+                header: gameControlPicker, switchGame: showGame, connection: connectionStatus
             )
         }
         .id(gameControlPopover.listSessionID)
@@ -182,9 +182,14 @@ struct GameDetailView: View {
     }
 
     /// The user's games at this game's speed, where the route has the picker
-    /// and it lists another game. Picking one switches in place.
-    @ViewBuilder private var gameControlPicker: some View {
-        if gameControlSwitch.allowsPicker, activeGames.contains(where: { $0.ID != currentGame?.ID }) {
+    /// and it lists another game; nil elsewhere, so the list knows whether
+    /// anything draws below its game-over card. Picking one switches in
+    /// place.
+    private var gameControlPicker: AnyView? {
+        guard gameControlSwitch.allowsPicker, activeGames.contains(where: { $0.ID != currentGame?.ID }) else {
+            return nil
+        }
+        return AnyView(
             ActiveGamesCarousel(
                 currentGame: $currentGame,
                 activeGames: activeGames,
@@ -192,7 +197,7 @@ struct GameDetailView: View {
                 switchGame: showGame
             )
             .padding(.vertical, 8)
-        }
+        )
     }
 
     /// What the toolbar needs from this screen to fill the control's slot.

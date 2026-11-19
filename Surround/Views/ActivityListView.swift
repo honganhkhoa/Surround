@@ -49,7 +49,8 @@ struct ActivityListView: View {
     /// its challenge stays out of Challenges received.
     var cardChallengeID: Int?
     /// Above the sections, under the status line and the card, inside the
-    /// list's scroll: the in-game control's picker of same-speed games.
+    /// list's scroll: the in-game control's picker of same-speed games. Nil
+    /// where nothing draws there, so the card knows what follows it.
     var header: AnyView?
     /// How a live row shows its game. A game's popover switches as its Game
     /// Detail does, in place on Home's route; nil opens the game on Home's
@@ -445,7 +446,7 @@ private struct ActivityListContent: View {
     @ViewBuilder private func scrolledContent(_ snapshot: ActivityListSource.Snapshot) -> some View {
         statusLine
         if let card = snapshot.card {
-            cardView(card, isFollowed: !snapshot.sections.isEmpty)
+            cardView(card, isFollowed: header != nil || !snapshot.sections.isEmpty)
         }
         header
         ForEach(snapshot.sections) { section in
@@ -581,7 +582,8 @@ private struct ActivityListContent: View {
     /// The game-over card: the opponent's challenge with Reject and Accept,
     /// or its warning and View when it is unusual, then its result in its
     /// place until the list closes. Its requests are the list's, in the
-    /// list's session. A divider parts it from the sections.
+    /// list's session. A divider parts it from what follows: the header, or
+    /// the sections.
     private func cardView(_ row: ActivityListSections.Row, isFollowed: Bool) -> some View {
         VStack(spacing: 0) {
             switch row {
