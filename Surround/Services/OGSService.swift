@@ -1333,6 +1333,10 @@ class OGSService: ObservableObject {
     }
 
     @Published private(set) public var isLoadingOverview = true
+    /// How many overviews the service has applied, so a follower can tell a
+    /// load that listed the user's games from one that failed. A bootstrap
+    /// state that isn't loading counts as one.
+    @Published private(set) var appliedOverviewCount = 0
     
     private var openChallengeById: [Int: OGSSeekgraphChallenge] = [:]
     @Published private(set) public var eligibleOpenChallengeById: [Int: OGSSeekgraphChallenge] = [:]
@@ -1528,6 +1532,9 @@ class OGSService: ObservableObject {
         isLoggedIn = state.isLoggedIn
         socketStatus = state.socketStatus
         isLoadingOverview = state.isLoadingOverview
+        // A state that isn't loading is complete, with no transport to load
+        // it: it stands for a load that applied its overview.
+        appliedOverviewCount = state.isLoadingOverview ? 0 : 1
         activeGames = state.activeGames
         publicGames = state.publicGames
         sortedPublicGames = state.sortedPublicGames
@@ -2849,6 +2856,7 @@ class OGSService: ObservableObject {
             }
         }
         processOverview(overview: overviewValue)
+        appliedOverviewCount += 1
     }
 
     /// Direct, error-propagating overview refresh used by live integration tests.

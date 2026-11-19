@@ -7,9 +7,11 @@
 //  when it first appears among the window's live games until the window
 //  shows or opens it, or for ActivityModel.startedLeadDuration. The games of
 //  the window's first overview load, and of the first load after an account
-//  change, were already running, so they never count. One per window, held
-//  by NavigationService; MainView attaches it. Main thread by convention,
-//  like its owner.
+//  change, were already running, so they never count. A load counts only if
+//  it applied an overview: one that failed lists no games, or the last
+//  launch's, so the recorder waits for the next. One per window, held by
+//  NavigationService; MainView attaches it. Main thread by convention, like
+//  its owner.
 //
 
 import Combine
@@ -25,6 +27,9 @@ final class StartedGamesRecorder {
         /// An overview load is in progress. Each load sends true as it starts
         /// and false as it ends.
         var isLoadingOverview: AnyPublisher<Bool, Never>
+        /// How many overviews the service has applied: a load that went up
+        /// by one or more listed the user's games.
+        var appliedOverviews: AnyPublisher<Int, Never>
         /// The user's live games.
         var liveGameIDs: AnyPublisher<Set<Int>, Never>
         /// The games the window shows or is about to open.
@@ -33,7 +38,8 @@ final class StartedGamesRecorder {
 
     /// When the window's live games so far are taken as already running.
     private enum Seeding {
-        /// When the load in progress ends, or at once if none is.
+        /// When a load ends that applied an overview, or at once if none is
+        /// in progress and the service has applied one.
         case atLoadEnd
         /// After an account change a load that was already running would
         /// list the old account's games, so a new one has to start first.
@@ -49,6 +55,9 @@ final class StartedGamesRecorder {
     private var announcedGameIDs = Set<Int>()
     private var latestLiveGameIDs = Set<Int>()
     private var latestOpenedGameIDs = Set<Int>()
+    private var appliedOverviews = 0
+    /// The service's applied overviews when the load in progress started.
+    private var appliedAtLoadStart: Int?
     private var now: () -> TimeInterval = { Date().timeIntervalSince1970 }
     private var subscriptions = Set<AnyCancellable>()
 
@@ -67,6 +76,7 @@ final class StartedGamesRecorder {
         attach(Feed(
             accountID: ogs.$user.map { $0?.id }.eraseToAnyPublisher(),
             isLoadingOverview: ogs.$isLoadingOverview.eraseToAnyPublisher(),
+            appliedOverviews: ogs.$appliedOverviewCount.eraseToAnyPublisher(),
             liveGameIDs: ogs.$liveGames.map { Set($0.compactMap(\.ogsID)) }.eraseToAnyPublisher(),
             openedGameIDs: Self.openedGameIDs(in: navigation)
         ), now: now)
@@ -88,6 +98,10 @@ final class StartedGamesRecorder {
             .removeDuplicates()
             .dropFirst()
             .sink { [weak self] _ in self?.startOver(.atNextLoad) }
+            .store(in: &subscriptions)
+        // Before the loading state, so a seed at once knows of them.
+        feed.appliedOverviews
+            .sink { [weak self] in self?.appliedOverviews = $0 }
             .store(in: &subscriptions)
         feed.isLoadingOverview
             .sink { [weak self] in self?.receiveLoading($0) }
@@ -123,16 +137,19 @@ final class StartedGamesRecorder {
     }
 
     private func receiveLoading(_ isLoading: Bool) {
-        switch (seeding, isLoading) {
-        case (.atNextLoad, true):
-            seeding = .atLoadEnd
-        case (.atLoadEnd, false):
-            // Silently: these were running before the window heard of them.
-            knownGameIDs = latestLiveGameIDs
-            seeding = .seeded
-        default:
-            break
+        if isLoading {
+            appliedAtLoadStart = appliedOverviews
+            if seeding == .atNextLoad { seeding = .atLoadEnd }
+            return
         }
+        // With no start seen, as between loads when the window attaches,
+        // any overview the service has applied counts.
+        let applied = appliedOverviews > (appliedAtLoadStart ?? 0)
+        appliedAtLoadStart = nil
+        guard seeding == .atLoadEnd, applied else { return }
+        // Silently: these were running before the window heard of them.
+        knownGameIDs = latestLiveGameIDs
+        seeding = .seeded
     }
 
     private func receiveLiveGames(_ gameIDs: Set<Int>) {

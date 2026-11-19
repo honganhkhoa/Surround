@@ -4,9 +4,9 @@
 //
 //  The live games a window records as started. The games of its first
 //  overview load, and of the first load after an account change, were
-//  already running. A game that appears after them counts from then until
-//  the window shows or opens it, or for 30 s, and its "Game started" is
-//  said once.
+//  already running; a load that failed applied no overview and doesn't
+//  count. A game that appears after them counts from then until the window
+//  shows or opens it, or for 30 s, and its "Game started" is said once.
 //
 
 import Combine
@@ -21,18 +21,23 @@ final class StartedGamesRecorderTests: XCTestCase {
     private final class Window {
         let account = CurrentValueSubject<Int?, Never>(592_684)
         let isLoading: CurrentValueSubject<Bool, Never>
+        let applied: CurrentValueSubject<Int, Never>
         let live: CurrentValueSubject<Set<Int>, Never>
         let opened = CurrentValueSubject<Set<Int>, Never>([])
         let clock = Clock()
         let recorder = StartedGamesRecorder()
 
-        init(isLoading: Bool, live: Set<Int> = []) {
+        /// A service that isn't loading has applied an overview, unless
+        /// `appliedOverviews` says otherwise.
+        init(isLoading: Bool, live: Set<Int> = [], appliedOverviews: Int? = nil) {
             self.isLoading = CurrentValueSubject(isLoading)
+            applied = CurrentValueSubject(appliedOverviews ?? (isLoading ? 0 : 1))
             self.live = CurrentValueSubject(live)
             let clock = clock
             recorder.attach(StartedGamesRecorder.Feed(
                 accountID: account.eraseToAnyPublisher(),
                 isLoadingOverview: self.isLoading.eraseToAnyPublisher(),
+                appliedOverviews: applied.eraseToAnyPublisher(),
                 liveGameIDs: self.live.eraseToAnyPublisher(),
                 openedGameIDs: opened.eraseToAnyPublisher()
             ), now: { clock.now })
@@ -40,10 +45,22 @@ final class StartedGamesRecorderTests: XCTestCase {
 
         var started: Set<Int> { Set(recorder.startedGames.keys) }
 
+        /// The service applies an overview that lists `games`.
+        func apply(_ games: Set<Int>) {
+            live.send(games)
+            applied.send(applied.value + 1)
+        }
+
         /// An overview load from start to end that lists `games`.
         func load(_ games: Set<Int>) {
             isLoading.send(true)
-            live.send(games)
+            apply(games)
+            isLoading.send(false)
+        }
+
+        /// An overview load from start to end that fails, applying nothing.
+        func failLoad() {
+            isLoading.send(true)
             isLoading.send(false)
         }
     }
@@ -52,7 +69,7 @@ final class StartedGamesRecorderTests: XCTestCase {
 
     func testTheFirstLoadsGamesWereAlreadyRunning() {
         let window = Window(isLoading: true, live: [1])
-        window.live.send([1, 2])
+        window.apply([1, 2])
         XCTAssertEqual(window.started, [], "Nothing counts before the window's first load ends.")
         window.isLoading.send(false)
         XCTAssertEqual(window.started, [], "The first load's games were running before the window heard of them.")
@@ -70,6 +87,38 @@ final class StartedGamesRecorderTests: XCTestCase {
         XCTAssertEqual(window.started, [])
         window.live.send([1, 4])
         XCTAssertEqual(window.started, [4])
+    }
+
+    func testAFailedLoadSeedsNothing() {
+        let window = Window(isLoading: true)
+        window.isLoading.send(false)
+        window.live.send([1, 2])
+        XCTAssertEqual(window.started, [], "A first load that failed listed no games, so none can count.")
+        window.failLoad()
+        XCTAssertEqual(window.started, [], "Nor does a pull to refresh that fails.")
+        window.load([1, 2, 3])
+        XCTAssertEqual(window.started, [], "The first load that applies an overview seeds silently.")
+        window.live.send([1, 2, 3, 4])
+        XCTAssertEqual(window.started, [4])
+    }
+
+    func testAWindowWhoseServiceHasAppliedNoOverviewWaitsForOne() {
+        let window = Window(isLoading: false, live: [1], appliedOverviews: 0)
+        window.live.send([1, 2])
+        XCTAssertEqual(window.started, [], "The last launch's games, or none, never seed.")
+        window.load([1, 2, 3])
+        XCTAssertEqual(window.started, [], "The first overview applied seeds silently.")
+        window.live.send([1, 2, 3, 4])
+        XCTAssertEqual(window.started, [4])
+
+        window.account.send(915_100)
+        window.failLoad()
+        window.live.send([30, 31])
+        XCTAssertEqual(window.started, [], "After an account change, a first load that fails seeds nothing either.")
+        window.load([30, 31])
+        XCTAssertEqual(window.started, [])
+        window.live.send([30, 31, 32])
+        XCTAssertEqual(window.started, [32])
     }
 
     func testAStartedGameCountsForThirtySeconds() {
@@ -170,7 +219,9 @@ final class StartedGamesRecorderTests: XCTestCase {
 
     /// The plain offline journey in `challenge-received`, with Accept answered
     /// at once by a new live game, as `--surround-activity-actions succeed` does.
-    private func challengeReceivedService() throws -> OGSService {
+    /// - Parameter isLoading: The service starts with an overview load in
+    ///   progress and none applied, as an app launch does.
+    private func challengeReceivedService(isLoading: Bool = false) throws -> OGSService {
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "game-26268404", withExtension: "json"))
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -180,7 +231,7 @@ final class StartedGamesRecorderTests: XCTestCase {
         state.user = try XCTUnwrap(game.whitePlayer)
         state.isLoggedIn = true
         state.socketStatus = .connected
-        state.isLoadingOverview = false
+        state.isLoadingOverview = isLoading
         state.activeGames[SurroundUITestContract.fixtureGameID] = game
         state.finishedGamesSnapshot = []
         ActivityFixtures.apply(.challengeReceived, to: &state, clock: fixtureClock)
@@ -215,6 +266,7 @@ final class StartedGamesRecorderTests: XCTestCase {
         let recorder = StartedGamesRecorder()
         recorder.attach(ogs: ogs, navigation: nav, now: { clock.now })
         XCTAssertFalse(ogs.liveGames.isEmpty)
+        XCTAssertEqual(ogs.appliedOverviewCount, 1, "A state that isn't loading stands for an applied overview.")
         XCTAssertEqual(recorder.startedGames, [:], "The window had loaded: its live games were running.")
 
         let challenge = try XCTUnwrap(ogs.challengesReceived.first)
@@ -228,6 +280,25 @@ final class StartedGamesRecorderTests: XCTestCase {
 
         ogs.user = OGSUser(username: "tenuki_tom", id: 915_100)
         XCTAssertTrue(recorder.claimAnnouncement(for: gameID), "Another account starts over.")
+    }
+
+    func testAFailedLoadOfTheServiceSeedsNothing() throws {
+        let ogs = try challengeReceivedService(isLoading: true)
+        XCTAssertEqual(ogs.appliedOverviewCount, 0)
+        let clock = Clock()
+        let recorder = StartedGamesRecorder()
+        recorder.attach(ogs: ogs, navigation: NavigationService(), now: { clock.now })
+
+        let ended = expectation(description: "The load ends")
+        let loading = ogs.$isLoadingOverview.dropFirst().filter { !$0 }.sink { _ in ended.fulfill() }
+        ogs.loadOverview()
+        wait(for: [ended], timeout: 5)
+        loading.cancel()
+        XCTAssertEqual(ogs.appliedOverviewCount, 0, "Offline, the load fails and applies nothing.")
+
+        let gameID = try accept(try XCTUnwrap(ogs.challengesReceived.first), in: ogs)
+        XCTAssertTrue(ogs.liveGames.contains { $0.ogsID == gameID })
+        XCTAssertEqual(recorder.startedGames, [:], "The failed load seeded nothing, so nothing reads as started.")
     }
     #endif
 }
