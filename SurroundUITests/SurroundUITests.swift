@@ -2335,6 +2335,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             XCTFail("SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES must be an integer from 2 through 100.")
             return
         }
+        // Five minutes a cycle: a hosted iPadOS 18 runner took nearly 14 of
+        // the 15 minutes a UI test is given by default for CI's four cycles.
+        executionTimeAllowance = TimeInterval(cycles) * 300
         // The control's state steps as each game's screen closes, or with
         // SURROUND_UI_GAME_CONTROL_CYCLE=on-appear as each one opens, inside
         // the tab bar's hide.

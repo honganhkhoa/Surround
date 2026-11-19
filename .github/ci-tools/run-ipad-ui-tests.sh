@@ -81,7 +81,7 @@ readonly continuity_test_case="${test_target}/${continuity_test_class}"
 # SurroundUITests class, part 2 runs these whole classes, so that the three
 # parts take similar time; main's other classes stay in part 1. Part 3 runs
 # only its share of SurroundUITests: that share holds the own-game navigation
-# journey, which takes about 10 minutes on a hosted iPad at four cycles.
+# journey, which took 9 to 14 minutes on hosted iPads at four cycles.
 readonly main_part_classes=(
   LocalizationUITests:2
 )
@@ -241,6 +241,13 @@ common_arguments=(
   -parallel-testing-enabled NO
 )
 
+# A UI test gets 15 minutes, and one that asks for more gets up to 20 in the
+# main suite and the supervised phases: the own-game navigation journey asks
+# for five minutes a cycle, and at four cycles took nearly 14 on a hosted
+# iPadOS 18 runner.
+readonly ui_test_allowance_seconds=900
+readonly ui_test_maximum_allowance_seconds=1200
+
 # Runs the selected tests under the supervisor into one result bundle; its
 # failure evidence goes beside the bundle.
 run_supervised_tests() {
@@ -255,8 +262,8 @@ run_supervised_tests() {
     "${common_arguments[@]}" \
     "$@" \
     -test-timeouts-enabled YES \
-    -default-test-execution-time-allowance 900 \
-    -maximum-test-execution-time-allowance 900 \
+    -default-test-execution-time-allowance "$ui_test_allowance_seconds" \
+    -maximum-test-execution-time-allowance "$ui_test_maximum_allowance_seconds" \
     -resultBundlePath "$result_bundle"
 }
 
@@ -290,8 +297,8 @@ case "$phase" in
       "${common_arguments[@]}" \
       "${selection_arguments[@]}" \
       -test-timeouts-enabled YES \
-      -default-test-execution-time-allowance 900 \
-      -maximum-test-execution-time-allowance 900 \
+      -default-test-execution-time-allowance "$ui_test_allowance_seconds" \
+      -maximum-test-execution-time-allowance "$ui_test_maximum_allowance_seconds" \
       -resultBundlePath \
       "TestResults/SurroundUITests-${result_label}-Main.xcresult"
     ;;
