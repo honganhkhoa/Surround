@@ -7715,13 +7715,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld weitere in Aktivität"
+                  "value" : "Noch %lld in Aktivität"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld weitere in Aktivität"
+                  "value" : "Noch %lld in Aktivität"
                 }
               }
             }
@@ -7799,7 +7799,7 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "アクティビティに他%lld件"
+                  "value" : "アクティビティにほか%lld件"
                 }
               }
             }
@@ -7924,13 +7924,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld weitere ausstehend"
+                  "value" : "Noch %lld ausstehend"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld weitere ausstehend"
+                  "value" : "Noch %lld ausstehend"
                 }
               }
             }
@@ -8008,7 +8008,7 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "他%lld件が待機中"
+                  "value" : "ほか%lld件が待機中"
                 }
               }
             }
