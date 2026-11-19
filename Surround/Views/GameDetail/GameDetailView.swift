@@ -203,7 +203,8 @@ struct GameDetailView: View {
             presentation: gameControlPresentation(at:),
             popover: { AnyView(gameControlPopoverContent(for: game, cardChallengeID: $0)) },
             openPopover: openGameControlPopover,
-            show: showGame(id:)
+            show: showGame(id:),
+            isOnScreen: nav.gameDetailNotificationContexts[notificationContextID] != nil
         )
     }
 
@@ -1994,14 +1995,12 @@ private struct GameToolbarLayout: ViewModifier {
            let challenger = ogs.challengesReceived.first(where: { $0.id == challengeID })?.challenger {
             cardChallengers[challengeID] = challenger
         }
-        announceStartedGame(value)
     }
 
-    /// "Game started with CedarWave", once per game in this window, when the
-    /// control first shows a live game that started elsewhere.
-    private func announceStartedGame(_ value: GameControlSlot?) {
-        guard case let .gameStarted(gameID, _, _)? = value,
-              let name = opponentName(in: ogs.liveGames.first(where: { $0.ogsID == gameID })),
+    /// "Game started with CedarWave", once per game in this window, when a
+    /// control on screen first shows a live game that started elsewhere.
+    private func announceStartedGame(_ gameID: Int) {
+        guard let name = opponentName(in: ogs.liveGames.first(where: { $0.ogsID == gameID })),
               nav.startedGamesRecorder.claimAnnouncement(for: gameID) else { return }
         nav.announce(AppAnnouncement(.gameStarted(gameID), audience: .frontmostWindow,
                                      speech: GameControlAccessibility.gameStarted(with: name)))
@@ -2068,9 +2067,9 @@ private struct GameToolbarLayout: ViewModifier {
             .modifier(GameToolbarCompression())
             .modifier(GameControlUpdates(
                 value: control.value, nativeBadge: control.nativeBadge, deadlines: control.deadlines,
-                now: control.now,
+                now: control.now, isOnScreen: gameControl.isOnScreen,
                 holdsNativeIdentity: nativeGameControlIdentity.holds(isPopoverOpen: gameControl.isPopoverOpen),
-                onValue: gameControlChanged, onNativeBadge: { badge in
+                onValue: gameControlChanged, onStartedGame: announceStartedGame, onNativeBadge: { badge in
                     nativeGameControlIdentity.follow(badge, isPopoverOpen: gameControl.isPopoverOpen)
                 },
                 onDeadlines: { gameControlDeadlines.follow($0, now: $1) }
@@ -2321,6 +2320,9 @@ private struct GameControlHost {
     var openPopover: () -> Void
     /// Shows one of the user's live games by its id.
     var show: (Int) -> Void
+    /// This Game Detail's visible registration exists: it is on screen, not
+    /// kept by a stack under another screen or in another tab.
+    var isOnScreen: Bool
 }
 
 /// The control's state in one pass of the toolbar.
@@ -2346,22 +2348,37 @@ private struct GameControlUpdates: ViewModifier {
     let nativeBadge: GameControlNativeItem.Badge?
     let deadlines: GameControlDeadlines.Plan
     let now: TimeInterval
+    /// Game Detail is on screen. Only then is a started game announced
+    /// (`GameControlOnScreen`) and are the deadlines followed.
+    let isOnScreen: Bool
     /// The native item's popover is open or still on screen.
     let holdsNativeIdentity: Bool
     let onValue: (GameControlSlot?) -> Void
+    let onStartedGame: (Int) -> Void
     let onNativeBadge: (GameControlNativeItem.Badge?) -> Void
     let onDeadlines: (GameControlDeadlines.Plan, TimeInterval) -> Void
 
     func body(content: Content) -> some View {
         content
             .onChange(of: value, initial: true) { _, value in onValue(value) }
+            // Keyed on the state and on being on screen, so a Game Detail
+            // that comes back on screen announces a start the window has
+            // not announced yet.
+            .onChange(of: GameControlOnScreen.startedGameToAnnounce(value, isOnScreen: isOnScreen),
+                      initial: true) { _, gameID in
+                if let gameID { onStartedGame(gameID) }
+            }
             .onChange(of: nativeBadge, initial: true) { _, badge in onNativeBadge(badge) }
             // A badge that changed while the popover was open or on screen
             // takes effect once the popover has gone.
             .onChange(of: holdsNativeIdentity) { _, holds in
                 if !holds { onNativeBadge(nativeBadge) }
             }
-            .onChange(of: deadlines, initial: true) { _, plan in onDeadlines(plan, now) }
+            // Off screen no deadline, which stops the control's timer; back
+            // on screen the deadlines again.
+            .onChange(of: isOnScreen ? deadlines : GameControlDeadlines.Plan(), initial: true) { _, plan in
+                onDeadlines(plan, now)
+            }
     }
 }
 

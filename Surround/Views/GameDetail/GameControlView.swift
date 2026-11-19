@@ -765,7 +765,8 @@ private struct GameControlZenCircleLabel: View {
 /// game's lead ends, and each second while two or more of the user's other
 /// live games are on their move, whose order can change, or while a started
 /// game leads. It only redraws; Game Detail computes the state again in its
-/// body.
+/// body. Off screen Game Detail gives it no deadline, so its timer stops
+/// until Game Detail is back on screen.
 final class GameControlDeadlines: ObservableObject {
     struct Plan: Equatable {
         /// When the latest started game's lead ends, in seconds since 1970.

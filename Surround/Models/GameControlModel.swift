@@ -1366,6 +1366,25 @@ struct GameControlPopover: Equatable {
     }
 }
 
+// MARK: - On screen
+
+/// What the control does only while its Game Detail is on screen, as the
+/// Game Detail's visible registration says. A stack can keep a Game Detail
+/// under another screen, and each tab keeps its own: their controls
+/// announce nothing, and keep no timer (`GameControlDeadlines`). The Game
+/// Detail the user sees is the one that announces a game that started, and
+/// one that comes back on screen announces a start the window has not
+/// announced yet.
+enum GameControlOnScreen {
+    /// The game whose start to announce, as "Game started with CedarWave":
+    /// the started game the control shows, while on screen. The window
+    /// announces each game once (`StartedGamesRecorder`).
+    static func startedGameToAnnounce(_ value: GameControlSlot?, isOnScreen: Bool) -> Int? {
+        guard isOnScreen, case let .gameStarted(gameID, _, _)? = value else { return nil }
+        return gameID
+    }
+}
+
 #if DEBUG
 extension GameControlSlot {
     /// The state as UI tests read it: "chip game-N +K", "started game-N +K"

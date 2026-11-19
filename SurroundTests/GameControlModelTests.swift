@@ -741,6 +741,22 @@ final class GameControlModelTests: XCTestCase {
                        "The Mac's Zen item: no time in a native label")
     }
 
+    /// A Game Detail that a stack keeps under another screen, or one in
+    /// another tab, announces no started game. On screen it announces the
+    /// started game its control shows, and nothing else.
+    func testOnlyAGameDetailOnScreenAnnouncesAStartedGame() {
+        typealias OnScreen = GameControlOnScreen
+        let started = GameControlSlot.gameStarted(gameID: 8, plusN: 2, hasDot: true)
+        XCTAssertEqual(OnScreen.startedGameToAnnounce(started, isOnScreen: true), 8)
+        XCTAssertNil(OnScreen.startedGameToAnnounce(started, isOnScreen: false), "Off screen it says nothing.")
+        let others: [GameControlSlot?] = [.chip(gameID: 7, plusN: 0, hasDot: false), .gameOverCard(challengeID: 9, plusN: 0),
+                                          .base(plusN: 1), .dot, .inbox(count: 2), nil]
+        for slot in others {
+            XCTAssertNil(OnScreen.startedGameToAnnounce(slot, isOnScreen: true), "\(String(describing: slot))")
+            XCTAssertNil(OnScreen.startedGameToAnnounce(slot, isOnScreen: false), "\(String(describing: slot))")
+        }
+    }
+
     func testTheNativeLabelCarriesTheCountButNoTime() {
         for form in [GameControlForm.rail, .mac, .narrowTopBar] {
             let chip = Spoken(.chip(gameID: 7, plusN: 2, hasDot: false), form: form, name: "HarborMist",
