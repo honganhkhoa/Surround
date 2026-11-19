@@ -641,15 +641,17 @@ private struct ActivityListContent: View {
     }
 
     /// A challenge's row. The game-over card's offers Reject and Accept in a
-    /// game's popover, unless the challenge is unusual.
+    /// game's popover, unless the challenge is unusual, which on the card
+    /// includes an automatic handicap.
     private func challengeRow(_ challenge: OGSDirectChallenge, model: ActivityModel.Challenge,
                               itemID: String, after: String?, isGameOverCard: Bool = false) -> some View {
         let content = ActivityRowContents.challenge(challenge, isLive: model.isLive)
         let results = results
         let session = session
+        let isUnusual = isGameOverCard ? challenge.isUnusualOnGameOverCard : model.isUnusual
         return ActivityChallengeRow(
             itemID: itemID, challenge: challenge, content: content, density: density,
-            actionState: actionState(for: itemID, isUnusual: model.isUnusual, isGameOverCard: isGameOverCard),
+            actionState: actionState(for: itemID, isUnusual: isUnusual, isGameOverCard: isGameOverCard),
             entry: results.entries[itemID],
             focus: $voiceOverFocus,
             accept: {

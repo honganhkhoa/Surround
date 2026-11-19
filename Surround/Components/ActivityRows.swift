@@ -612,7 +612,8 @@ struct ActivityLiveGameRow: View {
 /// popover, takes Reject and Accept on their own line; an unusual one, or
 /// any other in a game's popover, shows its warnings and View, which opens
 /// the full card. The game-over card, which leads a finished game's
-/// popover, is the exception there: a usual one takes Reject and Accept.
+/// popover, is the exception there: a usual one takes Reject and Accept,
+/// and an automatic handicap counts as unusual.
 struct ActivityChallengeRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let itemID: String
@@ -633,6 +634,12 @@ struct ActivityChallengeRow: View {
 
     private var name: String { challenge.challenger?.username ?? "" }
 
+    /// The challenge has warnings to show: on the game-over card an
+    /// automatic handicap is one.
+    private var isUnusual: Bool {
+        isGameOverCard ? challenge.isUnusualOnGameOverCard : challenge.isUnusual
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
@@ -642,9 +649,9 @@ struct ActivityChallengeRow: View {
                 }
             }
             if !actionState.showsInlineAcceptAndReject {
-                if challenge.isUnusual {
+                if isUnusual {
                     VStack(alignment: .leading, spacing: 2) {
-                        ChallengeWarningLines(challenge: challenge)
+                        ChallengeWarningLines(challenge: challenge, namesAutomaticHandicap: isGameOverCard)
                     }
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Color(.systemOrange))

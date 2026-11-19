@@ -96,6 +96,9 @@ protocol OGSChallenge: Decodable, Hashable {
 
 extension OGSChallenge {
     var hasHandicap: Bool { game.handicap > 0 }
+    /// OGS chooses the handicap from the players' ranks: the default of its
+    /// web client's challenge form.
+    var hasAutomaticHandicap: Bool { game.handicap < 0 }
     var useCustomKomi: Bool {
         if let game = game as? OGSChallengeTemplate.GameDetail {
             if game.komiAuto == "automatic" {
@@ -106,7 +109,11 @@ extension OGSChallenge {
     }
     var unusualBoardSize: Bool { game.width != game.height || ![9, 13, 19].contains(game.width) }
     var isUnusual: Bool { hasHandicap || useCustomKomi || game.timeControl.system.isUnusual || unusualBoardSize }
-    
+    /// The game-over card's Accept needs no View, so there an automatic
+    /// handicap counts as unusual too, and the card shows it with View.
+    /// Activity's other rows keep it usual, as so many challenges have it.
+    var isUnusualOnGameOverCard: Bool { isUnusual || hasAutomaticHandicap }
+
     var rengo: Bool {
         return game.rengo ?? false
     }

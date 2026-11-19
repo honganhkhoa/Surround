@@ -160,4 +160,30 @@ final class GameOverCardRuleTests: XCTestCase {
         XCTAssertFalse(inline(copied), "An unusual card offers View.")
         XCTAssertTrue(inline(try challenge(95_005, after: game)), "A usual one offers Reject and Accept.")
     }
+
+    /// An automatic handicap is the default of OGS's challenge form, so
+    /// Activity's rows keep it usual. The card's Accept needs no View, so
+    /// there it counts as unusual: the card shows the handicap's warning
+    /// and offers View.
+    func testAnAutomaticHandicapIsUnusualOnTheCardAlone() throws {
+        let game = try ownGame()
+        var automatic = try challenge(95_004, after: game)
+        automatic.game.handicap = -1
+        XCTAssertTrue(automatic.hasAutomaticHandicap)
+        XCTAssertFalse(automatic.hasHandicap, "No warning names a count of stones.")
+        XCTAssertFalse(automatic.isUnusual, "Activity's rows keep it usual.")
+        XCTAssertTrue(automatic.isUnusualOnGameOverCard)
+        XCTAssertEqual(GameOverCardRule.challengeID(for: game, among: [automatic]), 95_004, "It still leads.")
+
+        let card = ActivityRowActionState(isUnusual: automatic.isUnusualOnGameOverCard, isInGamePopover: true,
+                                          isGameOverCard: true, isOffline: false, state: nil)
+        XCTAssertFalse(card.showsInlineAcceptAndReject, "The card offers View.")
+        let row = ActivityRowActionState(isUnusual: automatic.isUnusual, isInGamePopover: false,
+                                         isOffline: false, state: nil)
+        XCTAssertTrue(row.showsInlineAcceptAndReject, "Activity's sheet keeps Reject and Accept.")
+
+        let even = try challenge(95_005, after: game)
+        XCTAssertFalse(even.hasAutomaticHandicap)
+        XCTAssertFalse(even.isUnusualOnGameOverCard, "Without a handicap the card keeps Reject and Accept.")
+    }
 }

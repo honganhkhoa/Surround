@@ -784,9 +784,11 @@ struct ChallengeCell: View {
 }
 
 /// What makes a challenge unusual, one warning per line: the challenge card
-/// and Activity's rows show the same.
+/// and Activity's rows show the same. The game-over card also names an
+/// automatic handicap, which it counts as unusual.
 struct ChallengeWarningLines: View {
     let challenge: any OGSChallenge
+    var namesAutomaticHandicap = false
 
     var body: some View {
         if challenge.useCustomKomi {
@@ -794,6 +796,11 @@ struct ChallengeWarningLines: View {
         }
         if challenge.hasHandicap {
             Label("Has handicap: \(challenge.game.handicap)", systemImage: "exclamationmark.triangle.fill")
+        }
+        if namesAutomaticHandicap, challenge.hasAutomaticHandicap {
+            // "Handicap: Auto", as the challenge card's details say it.
+            Label(String(localized: "Handicap: ") + String(localized: "Auto"),
+                  systemImage: "exclamationmark.triangle.fill")
         }
         if challenge.game.timeControl.system.isUnusual {
             Label("Unusual time settings", systemImage: "exclamationmark.triangle.fill")
