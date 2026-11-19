@@ -1921,11 +1921,11 @@ private struct GameToolbarLayout: ViewModifier {
             let item = GameControlNativeItem(drawn, allowsPicker: allowsPicker, keepsPlace: keepsPlace)
             nativeBadge = item?.badge
             isShown = (item != nil && !zenMode) || isOpen
-            let label = GameControlAccessibility(drawn ?? .inbox(count: 0), form: form, allowsPicker: allowsPicker,
-                                                 name: name).label
+            let spoken = GameControlAccessibility(drawn ?? .inbox(count: 0), form: form, allowsPicker: allowsPicker,
+                                                  name: name)
             view = AnyView(GameControlNativeButton(
-                item: item ?? GameControlNativeItem(icon: .inbox, badge: .none), label: label,
-                isPresented: isPresented, popover: popover, openPopover: gameControl.openPopover,
+                item: item ?? GameControlNativeItem(icon: .inbox, badge: .none), label: spoken.label,
+                hint: spoken.hint, isPresented: isPresented, popover: popover, openPopover: gameControl.openPopover,
                 popoverAppeared: { nativeGameControlIdentity.popoverAppeared() },
                 popoverDisappeared: { nativeGameControlIdentity.popoverDisappeared() }
             ).id(nativeGameControlIdentity.id(showing: item?.badge, isPopoverOpen: isOpen)))

@@ -772,6 +772,25 @@ final class GameControlModelTests: XCTestCase {
         }
     }
 
+    /// The native items' hint, which their button applies, says that a tap
+    /// opens Activity in every state, the kept place's unbadged inbox glyph
+    /// too, as Zen's native item says that a tap switches.
+    func testTheNativeItemsHintThatATapOpensActivity() {
+        let slots: [GameControlSlot] = [.chip(gameID: 7, plusN: 2, hasDot: true), .gameStarted(gameID: 8, plusN: 0, hasDot: false),
+                                        .gameOverCard(challengeID: 9, plusN: 1), .base(plusN: 0), .base(plusN: 3), .dot,
+                                        .inbox(count: 0), .inbox(count: 3)]
+        for form in [GameControlForm.rail, .mac, .narrowTopBar] {
+            for slot in slots {
+                for allowsPicker in [true, false] {
+                    XCTAssertEqual(Spoken(slot, form: form, allowsPicker: allowsPicker, name: "HarborMist").hint,
+                                   "Opens Activity.", "\(form) \(slot) \(allowsPicker)")
+                }
+            }
+            XCTAssertEqual(Spoken(.chip(gameID: 7, plusN: 0, hasDot: false), form: form, isZen: true, name: "HarborMist").hint,
+                           "Switches to that game.", "\(form) in Zen")
+        }
+    }
+
     func testTheNativeLabelCarriesTheCountButNoTime() {
         for form in [GameControlForm.rail, .mac, .narrowTopBar] {
             let chip = Spoken(.chip(gameID: 7, plusN: 2, hasDot: false), form: form, name: "HarborMist",

@@ -473,11 +473,13 @@ private extension Color {
 /// the dot. A native item takes no hold, so a tap or a click opens the
 /// popover, which leads with what the chip would show. Its label carries
 /// the count but no time, so a tick never relabels it, and on the Mac it is
-/// also the tooltip. Game Detail keeps its identity while the popover's
-/// content is on screen (`GameControlNativeIdentity`).
+/// also the tooltip; its hint says that a tap opens Activity. Game Detail
+/// keeps its identity while the popover's content is on screen
+/// (`GameControlNativeIdentity`).
 struct GameControlNativeButton: View {
     let item: GameControlNativeItem
     let label: String
+    let hint: String?
     @Binding var isPresented: Bool
     let popover: AnyView
     let openPopover: () -> Void
@@ -499,6 +501,7 @@ struct GameControlNativeButton: View {
         #if targetEnvironment(macCatalyst)
         .help(Text(verbatim: label))
         #endif
+        .accessibilityHint(Text(verbatim: hint ?? ""))
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameActiveGamesButton)
         .popover(isPresented: $isPresented) {
             popover
