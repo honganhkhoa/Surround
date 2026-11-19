@@ -11,6 +11,8 @@
 //
 
 import XCTest
+import SwiftUI
+import UIKit
 
 final class GameControlModelTests: XCTestCase {
     private typealias Model = ActivityModel
@@ -785,8 +787,8 @@ final class GameControlModelTests: XCTestCase {
         XCTAssertEqual(corner(489, 541, top: 10, bottom: 10).corner, .circle(showsCountdown: false))
         // Portrait halves (11-inch, 13-inch, mini), a landscape third and
         // iPadOS 18.6's narrow Stage Manager window keep the circle and its
-        // countdown beside Exit; wider windows are regular and never reach
-        // the rule.
+        // countdown beside Exit. Wider windows are regular, with the layouts
+        // the next test reads.
         let besideExit: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
             (412, 1210, 0, 20), (511, 1376, 0, 20), (367, 1133, 0, 20), (400, 834, 0, 20), (456, 915, 24, 25),
         ]
@@ -804,6 +806,111 @@ final class GameControlModelTests: XCTestCase {
         XCTAssertEqual(Corner(contentExit: exit, countdownBelow: false, width: 600, column: 44,
                               occupied: clock(endingAt: lone.minX - 7.5)), .circle(showsCountdown: false),
                        "Then the column alone")
+    }
+
+    func testAtRegularWidthTheCircleBesideExitClearsTheLayoutTheContentDraws() {
+        typealias Corner = GameControlZenCorner
+        /// A Zen layout at regular width, as the game's content draws it in a
+        /// window whose content runs from `top` below the window's top to
+        /// `bottom` above its bottom: the board centred on the window's
+        /// middle, the actions' measured labels at `text`, two-line chips
+        /// that fit the familiar pair, spacious where no fold crosses the
+        /// content, and Exit 16 pt from the content's top and 24 from its
+        /// trailing edge, 16 in landscape, where the countdown hangs below.
+        func corner(_ window: CGSize, top: CGFloat = 0, bottom: CGFloat, text: DynamicTypeSize = .large,
+                    fold: CGRect? = nil) -> (corner: Corner?, exit: CGRect, plan: GameDetailLayoutPlan) {
+            let size = CGSize(width: window.width, height: window.height - top - bottom)
+            let landscape = window.width > window.height
+            let scale = min(UIFontMetrics(forTextStyle: .body).scaledValue(
+                for: 1, compatibleWith: UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(text))
+            ), 1.65)
+            let actions = GameControlRowMetrics(dynamicTypeSize: text, phase: .play,
+                                                localizedLabels: ["Pass", "Submit move", "Rematch", "Next (999+)"])
+            let plan = GameDetailLayoutPlan(size: size, compact: false, zen: true, analyze: false, chat: false,
+                                            hidesBoard: false, keyboard: false, accessibility: text.isAccessibilitySize,
+                                            foldsClock: text >= .xxxLarge, clockScale: scale,
+                                            actionSize: actions.horizontalSize, actionMetrics: actions,
+                                            panelDivision: fold, zenBoardCenterY: window.height / 2 - top,
+                                            narrowChipWidth: 156, spaciousNarrowChipWidth: 172)
+            let exit = CGRect(x: size.width - (landscape ? 16 : 24) - 44, y: 16, width: 44, height: 44)
+            let corner = Corner(contentExit: exit, countdownBelow: landscape, width: size.width,
+                                column: size.width - plan[.board].maxX,
+                                occupied: [plan[.clocks], plan[.board], plan[.actions]])
+            return (corner, exit, plan)
+        }
+        // An iPad window in portrait under about 900 pt tall puts the
+        // clocks at its content's top, where the countdown beside the circle
+        // reached over the white clock. The circle stays beside Exit
+        // without it, 30 pt clear of the clock.
+        let narrow = corner(CGSize(width: 680, height: 760), bottom: 10)
+        XCTAssertTrue(narrow.plan.spaciousCompactClocks)
+        XCTAssertEqual(narrow.plan[.clocks], CGRect(x: 160, y: 10, width: 360, height: 76))
+        XCTAssertEqual(narrow.plan[.board], CGRect(x: 54, y: 94, width: 572, height: 572))
+        XCTAssertTrue(Corner.besideExitFrame(narrow.exit, countdownBelow: false).intersects(narrow.plan[.clocks]))
+        XCTAssertEqual(narrow.corner, .besideExitAlone)
+        XCTAssertEqual(Corner.besideExitAloneFrame(narrow.exit).minX - narrow.plan[.clocks].maxX, 30)
+        let wider = corner(CGSize(width: 744, height: 800), bottom: 10)
+        XCTAssertEqual(wider.plan[.clocks], CGRect(x: 192, y: 10, width: 360, height: 76))
+        XCTAssertTrue(Corner.besideExitFrame(wider.exit, countdownBelow: false).intersects(wider.plan[.clocks]))
+        XCTAssertEqual(wider.corner, .besideExitAlone)
+        // Taller, the board's centring takes the clocks below Exit's band.
+        let taller = corner(CGSize(width: 680, height: 940), bottom: 10)
+        XCTAssertEqual(taller.plan[.clocks].minY, 70)
+        XCTAssertNil(taller.corner)
+        // At the largest text size the clocks cover the circle as well as its
+        // countdown in windows 680 to 768 pt wide: the circle never stays
+        // beside Exit, and at 680 pt nothing clears them.
+        for window in [CGSize(width: 680, height: 760), CGSize(width: 744, height: 800),
+                       CGSize(width: 768, height: 880)] {
+            let large = corner(window, bottom: 10, text: .accessibility5)
+            XCTAssertTrue(Corner.besideExitAloneFrame(large.exit).intersects(large.plan[.clocks]), "\(window)")
+            XCTAssertNotNil(large.corner, "\(window)")
+            XCTAssertNotEqual(large.corner, .besideExitAlone, "\(window)")
+        }
+        XCTAssertEqual(corner(CGSize(width: 680, height: 760), bottom: 10, text: .accessibility5).corner, .noRoom)
+
+        // Duo Open tall: 669 × 907 of content, 24 pt below the window's top,
+        // with the inactive fold across it, so the chips are the phone's own.
+        // At the default text size the clocks sit below Exit's band; from
+        // xxxLarge they reach into it, and with no column beside the board
+        // nothing clears them.
+        let duo = CGSize(width: 669, height: 951)
+        let fold = CGRect(x: 0, y: 431.5, width: 669, height: 40)
+        let open = corner(duo, top: 24, bottom: 20, fold: fold)
+        XCTAssertFalse(open.plan.spaciousCompactClocks)
+        XCTAssertEqual(open.plan[.clocks], CGRect(x: 174.5, y: 65, width: 320, height: 68))
+        XCTAssertNil(open.corner)
+        for text in [DynamicTypeSize.xxxLarge, .accessibility5] {
+            let large = corner(duo, top: 24, bottom: 20, text: text, fold: fold)
+            XCTAssertLessThan(large.plan[.clocks].minY, large.exit.maxY, "\(text)")
+            XCTAssertTrue(Corner.besideExitFrame(large.exit, countdownBelow: false).intersects(large.plan[.clocks]),
+                          "\(text)")
+            XCTAssertEqual(large.corner, .noRoom, "\(text)")
+        }
+        XCTAssertEqual(corner(duo, top: 24, bottom: 20).corner, .besideExitAlone,
+                       "Read without its fold, the layout would have the iPad's spacious chips at its top")
+
+        // Full-screen iPads keep the circle and its countdown beside Exit,
+        // also at the largest text size in portrait. In landscape there the
+        // 13-inch iPad's board reaches the countdown below the circle, which
+        // moves under Exit in the board's trailing column.
+        let fullScreen: [(CGSize, DynamicTypeSize)] = [
+            (CGSize(width: 820, height: 1180), .large), (CGSize(width: 1180, height: 820), .large),
+            (CGSize(width: 744, height: 1133), .large), (CGSize(width: 1133, height: 744), .large),
+            (CGSize(width: 834, height: 1210), .large), (CGSize(width: 1210, height: 834), .large),
+            (CGSize(width: 1032, height: 1376), .large), (CGSize(width: 1376, height: 1032), .large),
+            (CGSize(width: 820, height: 1180), .accessibility5), (CGSize(width: 744, height: 1133), .accessibility5),
+            (CGSize(width: 834, height: 1210), .accessibility5),
+        ]
+        for (window, text) in fullScreen {
+            XCTAssertNil(corner(window, bottom: 20, text: text).corner, "\(window) at \(text)")
+        }
+        let thirteen = corner(CGSize(width: 1376, height: 1032), bottom: 20, text: .accessibility5)
+        XCTAssertTrue(Corner.besideExitFrame(thirteen.exit, countdownBelow: true).intersects(thirteen.plan[.board]))
+        XCTAssertEqual(thirteen.corner, .circle(showsCountdown: true))
+        let moved = Corner.columnFrame(showsCountdown: true, width: 1376,
+                                       column: 1376 - thirteen.plan[.board].maxX, top: thirteen.exit.maxY + 8)
+        XCTAssertFalse(moved.intersects(thirteen.plan[.board]))
     }
 
     #if DEBUG

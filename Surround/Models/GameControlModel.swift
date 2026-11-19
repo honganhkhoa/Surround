@@ -1038,9 +1038,9 @@ extension GameControlAccessibility {
     }
 }
 
-// MARK: - Zen in compact layouts
+// MARK: - Zen by Exit
 
-/// Where compact Zen shows another live game on your move. In compact
+/// Where Zen shows another live game on your move, by Exit. In compact
 /// landscape Exit is a bar item and the board reaches the window's top, so
 /// the top-bar chip and Exit share one platter above the board's trailing
 /// column. Where that column is too narrow for the platter, the platter
@@ -1048,9 +1048,10 @@ extension GameControlAccessibility {
 /// in the column under Exit instead, the board keeping its size. It follows
 /// the column the Zen layout leaves beside the board, never the bar, so the
 /// bar's first Zen pass has it and it keeps for the pose: one control at a
-/// time. Where Exit is drawn in the game's content, as in an iPad's compact
-/// window, the circle beside Exit moves to the same column where it would
-/// reach over the clocks or the board, or stays beside Exit without its
+/// time. Where Exit is drawn in the game's content (an iPad, a regular-width
+/// phone, Duo Open), the circle beside Exit moves to the same column where it
+/// would reach over the clocks or the board, as in an iPad's compact window
+/// or a narrow one at regular width, or stays beside Exit without its
 /// countdown.
 enum GameControlZenCorner: Equatable {
     /// The top-bar chip before Exit, where their platter clears the board.
@@ -1099,13 +1100,13 @@ enum GameControlZenCorner: Equatable {
         showsCountdown ? circleWithCountdownWidth : circleAloneWidth
     }
 
-    /// Where Exit is drawn in the game's content, as in an iPad's compact
-    /// window: nil where the circle beside Exit, with its countdown, clears
-    /// the Zen layout's clocks, board and actions, so it stays there.
-    /// Elsewhere, as where the clocks sit above the board, the first of: the
-    /// circle with its countdown under Exit in the board's trailing column,
-    /// where that clears them too; the circle alone beside Exit, where it
-    /// keeps 8 pt clear of them; the circle alone in the column; no control.
+    /// Where Exit is drawn in the game's content: nil where the circle beside
+    /// Exit, with its countdown, clears the Zen layout's clocks, board and
+    /// actions, so it stays there. Elsewhere, as where the clocks reach into
+    /// Exit's band, the first of: the circle with its countdown under Exit in
+    /// the board's trailing column, where that clears them too; the circle
+    /// alone beside Exit, where it keeps 8 pt clear of them; the circle alone
+    /// in the column; no control.
     /// - Parameters:
     ///   - exit: Exit's frame, in the layout's coordinates.
     ///   - countdownBelow: Whether the countdown hangs below the circle

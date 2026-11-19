@@ -24,6 +24,10 @@ struct GameDetailView: View {
     @Environment(\.locale) private var locale
     /// The game content's clock scale, for the Zen layout it draws.
     @ScaledMetric(relativeTo: .body) private var clockScale: CGFloat = 1
+    /// How the game's content draws its board, for the same Zen layout.
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.displayScale) private var displayScale
+    @Setting(.showsBoardCoordinates) private var showsBoardCoordinates: Bool
     /// The window's width class and shape, measured at its root long before
     /// a game opens.
     @Environment(\.gameControlWindowClass) private var gameControlWindowClass
@@ -359,13 +363,14 @@ struct GameDetailView: View {
     /// Exit, and before it the circle for another live game on your move,
     /// which the toolbar reads for the game on screen. Where the circle there
     /// would reach over the clocks or the board, as in an iPad's compact
-    /// window, it sits under Exit in the board's trailing column instead, or
-    /// beside Exit without its countdown, or not at all. In compact
-    /// landscape, where Exit is a bar item, the circle alone, under Exit in
-    /// that column, where the chip and Exit would reach over the board.
-    @ViewBuilder private func zenExitOverlay(in size: CGSize) -> some View {
+    /// window or a narrow one at regular width, it sits under Exit in the
+    /// board's trailing column instead, or beside Exit without its
+    /// countdown, or not at all. In compact landscape, where Exit is a bar
+    /// item, the circle alone, under Exit in that column, where the chip and
+    /// Exit would reach over the board.
+    @ViewBuilder private func zenExitOverlay(in geometry: GeometryProxy) -> some View {
         if hidesZenChrome {
-            let corner = contentZenCorner(in: size)
+            let corner = contentZenCorner(in: geometry)
             // Each in the corner on its own: the overlay's implicit stack
             // would centre them on each other.
             ZStack(alignment: .topTrailing) {
@@ -478,16 +483,20 @@ struct GameDetailView: View {
                                   column: column, top: Self.compactLandscapeBarBottom + GameControlZenCorner.gapUnderExit)
     }
 
-    /// Zen's control where an iPad's compact window draws Exit in the game's
-    /// content: nil where the circle beside Exit clears the Zen layout's
-    /// clocks, board and actions, else the circle under Exit in the board's
-    /// trailing column, the circle alone beside Exit, or no control. From the
-    /// Zen layout the game's content draws at `size`, the content's own, in
+    /// Zen's control wherever the game's content draws Exit (an iPad, a
+    /// regular-width phone, Duo Open), except on Book's active fold, whose
+    /// board keeps clear of Exit's band and whose clocks sit in the other
+    /// pane: nil where the circle beside Exit clears the Zen layout's clocks,
+    /// board and actions, else the circle under Exit in the board's trailing
+    /// column, the circle alone beside Exit, or no control. From the Zen
+    /// layout the game's content draws in `geometry`, the content's own, in
     /// the same pass.
-    private func contentZenCorner(in size: CGSize) -> ZenCornerPlacement? {
-        guard zenMode, hidesZenChrome, compactLayout, UIDevice.current.userInterfaceIdiom == .pad,
+    private func contentZenCorner(in geometry: GeometryProxy) -> ZenCornerPlacement? {
+        guard zenMode, hidesZenChrome, !hasActiveVerticalDisplayDivision,
               let game = currentGame ?? departingGame else { return nil }
-        let plan = zenLayoutPlan(size: size, game: game)
+        let size = geometry.size
+        let plan = zenLayoutPlan(size: size, game: game, division: SingleGameView.activeDivision(in: geometry),
+                                 panelDivision: SingleGameView.availablePanelDivision(in: geometry))
         let column = max(0, size.width - plan[.board].maxX)
         let exit = CGRect(x: size.width - zenExitTrailing - 44, y: zenExitTop, width: 44, height: 44)
         guard let form = GameControlZenCorner(contentExit: exit, countdownBelow: zenCountdownPlacement == .below,
@@ -497,23 +506,42 @@ struct GameDetailView: View {
         return ZenCornerPlacement(form: form, column: column, top: exit.maxY + GameControlZenCorner.gapUnderExit)
     }
 
-    /// The compact Zen layout the game's content draws at `size`, from the
-    /// same inputs but the action row's offline label, which moves the board
-    /// only where that label doesn't fit beside it.
-    private func zenLayoutPlan(size: CGSize, game: Game) -> GameDetailLayoutPlan {
-        let actions = GameControlRowMetrics(dynamicTypeSize: dynamicTypeSize, locale: locale, phase: game.gamePhase)
+    /// The Zen layout the game's content draws at `size`, from the inputs
+    /// SingleGameView gives its plan that reach a Zen layout: the content's
+    /// width class, the display's fold (`division` where it divides the
+    /// scene, `panelDivision` divided or not), the clocks' and the actions'
+    /// measures with the action's offline label, and the board as the theme
+    /// draws it. The rest (identities, panels, the keyboard) Zen leaves out.
+    private func zenLayoutPlan(size: CGSize, game: Game, division: CGRect? = nil,
+                               panelDivision: CGRect? = nil) -> GameDetailLayoutPlan {
+        // Zen has no title slot, so with no clock in play the action reads
+        // Reconnecting… and its row reserves the label. The Mac's Zen keeps
+        // its bar and never draws this layout.
+        let relabels = GameConnectionPlacement(GameConnectionPlacement.Input(
+            game: game, panel: interaction.panel, restoresChatPanel: restoresChatPanel,
+            isVerticalToolbar: isVerticalToolbar, isZen: zenMode, isCatalyst: false
+        )).action == .relabelled
+        let actions = GameControlRowMetrics(dynamicTypeSize: dynamicTypeSize, locale: locale, phase: game.gamePhase,
+                                            relabelsOffline: relabels)
         let theme = SurroundTheme.current(storedID: gameThemeID)
         let scale = min(clockScale, 1.65)
         let lineWidth = GameDetailClockPair.compactLineWidth(game: game, scale: scale, theme: theme)
         let chipWidth = GameDetailClockPair.narrowChipWidth(game: game, scale: scale, theme: theme)
+        let spaciousChipWidth = GameDetailClockPair.narrowChipWidth(game: game, scale: scale, spacious: true,
+                                                                    theme: theme)
+        let board = BoardDepthPlacement(boardWidth: game.currentPosition.width,
+                                        boardHeight: game.currentPosition.height,
+                                        showsCoordinates: showsBoardCoordinates, displayScale: displayScale,
+                                        depth: theme.board(for: theme.colorScheme ?? colorScheme).boardDepth)
         let centerY = windowGeometry.map { $0.windowFrame.midY - $0.contentFrame.minY }
         return GameDetailLayoutPlan(
-            size: size, compact: true, zen: true, analyze: false, chat: false, hidesBoard: false, keyboard: false,
-            accessibility: dynamicTypeSize.isAccessibilitySize, foldsClock: dynamicTypeSize >= .xxxLarge,
-            clockScale: scale, actionSize: actions.horizontalSize, actionMetrics: actions,
+            size: size, compact: compactLayout, zen: true, analyze: false, chat: false, hidesBoard: false,
+            keyboard: false, accessibility: dynamicTypeSize.isAccessibilitySize,
+            foldsClock: dynamicTypeSize >= .xxxLarge, clockScale: scale, actionSize: actions.horizontalSize,
+            actionMetrics: actions, division: division, panelDivision: panelDivision,
             usesVerticalToolbar: isVerticalToolbar || (compactLandscape && verticalToolbarOutsideZen),
             zenBoardCenterY: centerY, compactClockLineWidth: lineWidth, narrowChipWidth: chipWidth,
-            chromeBandTop: chromeBandTop
+            spaciousNarrowChipWidth: spaciousChipWidth, chromeBandTop: chromeBandTop, boardDepth: board
         )
     }
 
@@ -1038,7 +1066,7 @@ struct GameDetailView: View {
             }
             .ignoresSafeArea(.container)
         }
-        .overlay(alignment: .topTrailing) { zenExitOverlay(in: geometry.size) }
+        .overlay(alignment: .topTrailing) { zenExitOverlay(in: geometry) }
         .overlay(alignment: .topLeading) { duoSidebarButton }
         .overlay(alignment: .topTrailing) { duoBackButton(in: geometry) }
         .sheet(isPresented: self.$showSettings) {

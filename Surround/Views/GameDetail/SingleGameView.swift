@@ -915,7 +915,9 @@ struct SingleGameView: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private func availablePanelDivision(in geometry: GeometryProxy) -> CGRect? {
+    /// The display's fold across the game's content, divided or not (Book and
+    /// Open). Game Detail reads it too, for the Zen layout drawn here.
+    static func availablePanelDivision(in geometry: GeometryProxy) -> CGRect? {
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
         if #available(iOS 27.1, *) {
             return geometry.reservedRegions(kind: .division, options: .includeInactive)
@@ -925,7 +927,8 @@ struct SingleGameView: View {
         return nil
     }
 
-    private func activeDivision(in geometry: GeometryProxy) -> CGRect? {
+    /// The fold where it divides the game's content (Book).
+    static func activeDivision(in geometry: GeometryProxy) -> CGRect? {
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
         if #available(iOS 27.1, *) {
             // ReservedRegion.frame already includes its interaction margins.
@@ -944,7 +947,7 @@ struct SingleGameView: View {
 
     private func columnIdentityStyle(in geometry: GeometryProxy) -> ColumnIdentityStyle {
         if compact { return .init(avatarSize: 40, padding: 5) }
-        if let division = activeDivision(in: geometry), division.width > division.height {
+        if let division = Self.activeDivision(in: geometry), division.width > division.height {
             return .init(avatarSize: 56, padding: 8)
         }
         return .init(avatarSize: 52, padding: 8)
@@ -976,7 +979,7 @@ struct SingleGameView: View {
             foldsClock: dynamicTypeSize >= .xxxLarge, clockScale: min(clockScale, 1.65),
             actionSize: actionMetrics.horizontalSize, actionMetrics: actionMetrics,
             composerHeight: chatComposerHeight, keyboardOverlap: keyboardOverlap,
-            division: activeDivision(in: geometry), panelDivision: availablePanelDivision(in: geometry),
+            division: Self.activeDivision(in: geometry), panelDivision: Self.availablePanelDivision(in: geometry),
             usesVerticalToolbar: isVerticalToolbar || verticalToolbarPose, preview: showsChatPreview,
             zenBoardCenterY: zenBoardCenterY,
             identityRowHeight: GameDetailPlayerIdentity.rowHeight(dynamicTypeSize: dynamicTypeSize),
@@ -985,7 +988,7 @@ struct SingleGameView: View {
                 dynamicTypeSize: dynamicTypeSize, avatarSize: columnStyle.avatarSize,
                 padding: columnStyle.padding),
             opponentSharesStatusWhenFolded: compact && UIDevice.current.userInterfaceIdiom == .pad
-                && availablePanelDivision(in: geometry) == nil,
+                && Self.availablePanelDivision(in: geometry) == nil,
             recoveryHeight: recoveryHeight,
             fullClockFooterWidth: GameDetailClockPair.fullFooterWidth(game: game, scale: min(clockScale, 1.65), theme: theme),
             compactClockLineWidth: GameDetailClockPair.compactLineWidth(game: game, scale: min(clockScale, 1.65), theme: theme),
