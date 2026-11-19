@@ -5,7 +5,7 @@ set -euo pipefail
 usage() {
   echo "Usage:" >&2
   echo "  $0 derived-data-path <simulator UDID>" >&2
-  echo "  $0 <build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|activity|game-control|composer|continuity> <simulator UDID> <result label>" >&2
+  echo "  $0 <build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|messages-3|messages-4|activity|game-control|composer|continuity> <simulator UDID> <result label>" >&2
 }
 
 if (( $# == 0 )); then
@@ -20,14 +20,14 @@ case "$phase" in
       exit 64
     fi
     ;;
-  build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|activity|game-control|composer|continuity)
+  build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|messages-3|messages-4|activity|game-control|composer|continuity)
     if (( $# != 3 )); then
       usage
       exit 64
     fi
     ;;
   *)
-    echo "Expected phase derived-data-path, build, preflight, main, main-1, main-2, main-3, profile, profile-1, profile-2, profile-3, messages, messages-1, messages-2, activity, game-control, composer, or continuity; received: $phase" >&2
+    echo "Expected phase derived-data-path, build, preflight, main, main-1, main-2, main-3, profile, profile-1, profile-2, profile-3, messages, messages-1, messages-2, messages-3, messages-4, activity, game-control, composer, or continuity; received: $phase" >&2
     exit 64
     ;;
 esac
@@ -191,12 +191,12 @@ readonly isolated_phase_deadline_seconds=$((41 * 60))
 readonly activity_phase_deadline_seconds=$((26 * 60))
 
 # The main, profile, and Messages phases each outgrew one CI step, so CI runs
-# main and profile in three parts and Messages in two. Of N parts, part K > 1 runs every
-# Nth test declaration of the phase's class, starting with the Kth (the
-# SurroundUITests class for main, less the tests main skips), plus, for main,
-# its whole classes listed above; part 1 runs the rest of the phase by skipping
-# exactly those, so a test this scan misses still runs in part 1. Alternating
-# declarations keeps the parts balanced as tests are added.
+# main and profile in three parts and Messages in four. Of N parts, part K > 1
+# runs every Nth test declaration of the phase's class, starting with the Kth
+# (the SurroundUITests class for main, less the tests main skips), plus, for
+# main, its whole classes listed above; part 1 runs the rest of the phase by
+# skipping exactly those, so a test this scan misses still runs in part 1.
+# Alternating declarations keeps the parts balanced as tests are added.
 part_test_names() {
   local source="$1" part="$2" part_count="$3"
   grep -Eo "^[[:space:]]*func[[:space:]]+test[[:alnum:]_]*[[:space:]]*\\([[:space:]]*\\)" "$source" \
@@ -316,7 +316,7 @@ case "$phase" in
       "TestResults/SurroundUITests-${result_label}-Profile.xcresult"
     ;;
 
-  main-1|main-2|main-3|profile-1|profile-2|profile-3|messages-1|messages-2)
+  main-1|main-2|main-3|profile-1|profile-2|profile-3|messages-1|messages-2|messages-3|messages-4)
     mkdir -p TestResults
     part="${phase##*-}"
     case "$phase" in
@@ -333,7 +333,7 @@ case "$phase" in
         part_result_name="Profile"
         ;;
       *)
-        part_count=2
+        part_count=4
         part_test_case="$messages_test_case"
         part_test_source="$messages_test_source"
         part_result_name="Messages"

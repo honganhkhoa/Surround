@@ -255,7 +255,7 @@ jobs:
 
   ipad-messages-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 165
+    timeout-minutes: 265
 
     steps:
       - uses: actions/checkout@v4
@@ -282,7 +282,7 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.simulator.outputs.id }}" iPad
 
-      - name: Run iPad Messages UI tests, part 1 of 2
+      - name: Run iPad Messages UI tests, part 1 of 4
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
@@ -290,12 +290,28 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh messages-1 \
             "${{ steps.simulator.outputs.id }}" iPad
 
-      - name: Run iPad Messages UI tests, part 2 of 2
+      - name: Run iPad Messages UI tests, part 2 of 4
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh messages-2 \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run iPad Messages UI tests, part 3 of 4
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh messages-3 \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run iPad Messages UI tests, part 4 of 4
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh messages-4 \
             "${{ steps.simulator.outputs.id }}" iPad
 
       - name: Run iPad Activity UI tests
@@ -558,7 +574,7 @@ jobs:
 
   minimum-ios-18-messages-ui-tests:
     runs-on: macos-15
-    timeout-minutes: 165
+    timeout-minutes: 265
 
     steps:
       - uses: actions/checkout@v4
@@ -591,7 +607,7 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Run iPad Messages UI tests on iPadOS 18, part 1 of 2
+      - name: Run iPad Messages UI tests on iPadOS 18, part 1 of 4
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
@@ -599,12 +615,28 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh messages-1 \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Run iPad Messages UI tests on iPadOS 18, part 2 of 2
+      - name: Run iPad Messages UI tests on iPadOS 18, part 2 of 4
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh messages-2 \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run iPad Messages UI tests on iPadOS 18, part 3 of 4
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh messages-3 \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run iPad Messages UI tests on iPadOS 18, part 4 of 4
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh messages-4 \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
       - name: Run iPad Activity UI tests on iPadOS 18
