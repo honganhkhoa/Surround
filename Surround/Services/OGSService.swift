@@ -2048,7 +2048,17 @@ class OGSService: ObservableObject {
                 return
             }
             do {
-                let ogsGame = try dictionaryDecoder.decode(OGSGame.self, from: gameData)
+                var ogsGame = try dictionaryDecoder.decode(OGSGame.self, from: gameData)
+                // A snapshot's clock stands as of the last move. As for a clock
+                // event, take off the time since then before the game shows it,
+                // unless the game is over, whose clock stays as it ended.
+                if ogsGame.outcome == nil {
+                    ogsGame.clock.calculateTimeLeft(
+                        with: ogsGame.timeControl.system,
+                        serverTimeOffset: self.drift - self.latency,
+                        pauseControl: ogsGame.pauseControl
+                    )
+                }
                 if gamesAwaitingAutoResignReset.remove(ogsGameId) != nil {
                     connectedGame.clearAllAutoResign()
                 }
@@ -2132,13 +2142,16 @@ class OGSService: ObservableObject {
                 do {
                     var clock = try dictionaryDecoder.decode(OGSClock.self, from: clockdata)
                     clock.keepAutoResign(from: connectedGame.clock)
-                    connectedGame.clock = clock
-                    if let pauseControl = connectedGame.clock?.pauseControl {
+                    if let pauseControl = clock.pauseControl {
                         connectedGame.pauseControl = pauseControl
                     }
                     if let timeControlSystem = connectedGame.gameData?.timeControl.system {
-                        connectedGame.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: self.drift - self.latency, pauseControl: connectedGame.pauseControl)
+                        clock.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: self.drift - self.latency, pauseControl: connectedGame.pauseControl)
                     }
+                    // One assignment, after the pause state: `$clock`
+                    // observers such as the voice countdown see only the
+                    // finished clock, never the raw decoded one.
+                    connectedGame.clock = clock
                     if let _ = self.activeGames[ogsGameId] {
                         // Trigger active games publisher to re-sort if necessary
                         self.activeGames[ogsGameId] = connectedGame
@@ -2718,9 +2731,12 @@ class OGSService: ObservableObject {
                         )
                     }
                     if let gameData = gameData["json"] as? [String: Any] {
-                        if let ogsGame = try? decoder.decode(OGSGame.self, from: gameData) {
+                        if var ogsGame = try? decoder.decode(OGSGame.self, from: gameData) {
+                            // Finish the clock before the game stores it, as
+                            // a socket snapshot does: observers such as the
+                            // voice countdown see only the time left now.
+                            ogsGame.clock.calculateTimeLeft(with: ogsGame.timeControl.system, serverTimeOffset: self.serverTimeOffset, pauseControl: ogsGame.pauseControl)
                             newActiveGames[gameId]?.gameData = ogsGame
-                            newActiveGames[gameId]?.clock?.calculateTimeLeft(with: ogsGame.timeControl.system, serverTimeOffset: self.serverTimeOffset, pauseControl: ogsGame.pauseControl)
                         }
                     }
                 }

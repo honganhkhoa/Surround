@@ -64,6 +64,14 @@ final class GameControlStateTests: XCTestCase {
         func playRefusal() { events.append("refusal") }
     }
 
+    private final class SpeechRecorder: CountdownSpeaking {
+        var spoken: [String] = []
+
+        func prepare() {}
+        func speak(_ text: String) { spoken.append(text) }
+        func stop() {}
+    }
+
     /// Counts what a board's stone sounds would play.
     private final class SoundCounter {
         var plays = 0
@@ -972,6 +980,7 @@ final class GameControlStateTests: XCTestCase {
         XCTAssertTrue(emptyGameState.submitMove(.placeStone(1, 2), game: emptyGame, using: service, reviewCoordinator: nil) {})
         drainMainQueue()
         XCTAssertEqual(emptyGameCommits, 0, "A game without data fails before anything is sent")
+        XCTAssertTrue(emptyGame.sentMoves.isEmpty)
         XCTAssertTrue(haptics.events.isEmpty)
     }
 
@@ -1049,6 +1058,7 @@ final class GameControlStateTests: XCTestCase {
 
         XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
         XCTAssertEqual(otherEvents, ["elsewhere"])
+        XCTAssertEqual(otherGame.sentMoves.count, 1, "Its countdown holds too")
         let gameID = try XCTUnwrap(game.ogsID)
         let echo = ["move_number": 1, "move": [2, 1, 1_000]] as [String: Any]
         socket.deliver("game/\(gameID)/move", echo)
@@ -1074,6 +1084,7 @@ final class GameControlStateTests: XCTestCase {
         try XCTUnwrap(socket.moveCallbacks.first)(nil, ["move": "illegal move"])
         drainMainQueue()
         XCTAssertEqual(otherEvents, ["withdrawn"])
+        XCTAssertTrue(otherGame.sentMoves.isEmpty)
     }
 
     func testLiveGamesTableStaysBoundedAsGamesComeAndGo() {
@@ -1128,10 +1139,13 @@ final class GameControlStateTests: XCTestCase {
         let state = GameControlState(haptics: HapticsRecorder())
 
         XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        let sentMoves = game.sentMoves
         // This window turns to another game. Its move has still gone to OGS.
         state.updateContext(gameID: .OGS(999), accountID: service.user?.id)
         drainMainQueue()
         XCTAssertEqual(events, ["committed"], "Another window on the game still expects the echo")
+        XCTAssertEqual(game.sentMoves, sentMoves)
+        XCTAssertEqual(sentMoves.count, 1)
 
         let gameID = try XCTUnwrap(game.ogsID)
         socket.deliver("game/\(gameID)/move", ["move_number": 1, "move": [2, 1, 1_000]] as [String: Any])
@@ -1149,6 +1163,287 @@ final class GameControlStateTests: XCTestCase {
         XCTAssertEqual(haptics.events, ["prepare", "prepare", "prepare"])
     }
 
+    @MainActor
+    func testVoiceCountdownSaysOnlyTheUsersOwnLastSeconds() throws {
+        let (game, service, _) = try liveMoveFixture(byoYomiPeriod: 5)
+        let speech = SpeechRecorder()
+        let announcer = VoiceCountdownAnnouncer(speaker: speech)
+        let userID = service.user?.id
+        // As the game screen listens: the game still holds the old clock.
+        let observation = game.$clock.dropFirst().sink {
+            announcer.clockChanged(to: $0, in: game, userID: userID)
+        }
+        defer { observation.cancel() }
+
+        game.clock = try byoYomiClock(for: game, toMove: .black, mainLeft: 3)
+        XCTAssertEqual(speech.spoken, ["3"])
+        // The clock that ends Black's turn still shows Black's main time.
+        // (A fresh overtime period is also a period's top, skipped anyway.)
+        game.clock = try byoYomiClock(for: game, toMove: .white, mainLeft: 8, lastMove: 2_000)
+        XCTAssertEqual(speech.spoken, ["3"], "The user's time left after their move is not said")
+        game.clock = try byoYomiClock(for: game, toMove: .white, mainLeft: 7, lastMove: 2_000)
+        XCTAssertEqual(speech.spoken, ["3"])
+    }
+
+    @MainActor
+    func testVoiceCountdownHoldsAfterACommitAndResumesAfterARefusal() throws {
+        let (game, service, socket) = try liveMoveFixture(byoYomiPeriod: 5)
+        let speech = SpeechRecorder()
+        var now = Date()
+        let announcer = VoiceCountdownAnnouncer(speaker: speech, now: { now })
+        let userID = service.user?.id
+        let observation = game.$clock.dropFirst().sink {
+            announcer.clockChanged(to: $0, in: game, userID: userID)
+        }
+        defer { observation.cancel() }
+        let state = GameControlState(haptics: HapticsRecorder())
+
+        XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        let committedAt = try XCTUnwrap(game.sentMoves.last?.date)
+        // Black's clock still ticks until OGS's turn-ending clock arrives.
+        for (offset, left) in [(0.2, 3.0), (0.6, 2.0)] as [(TimeInterval, Double)] {
+            now = committedAt.addingTimeInterval(offset)
+            game.clock = try byoYomiClock(for: game, toMove: .black, mainLeft: left)
+        }
+        XCTAssertEqual(speech.spoken, [], "Nothing is said right after a commit")
+
+        try XCTUnwrap(socket.moveCallbacks.first)(nil, ["error": "refused"])
+        drainMainQueue()
+        XCTAssertTrue(game.sentMoves.isEmpty)
+        now = committedAt.addingTimeInterval(0.8)
+        game.clock = try byoYomiClock(for: game, toMove: .black, mainLeft: 2)
+        XCTAssertEqual(speech.spoken, ["2"], "A refused move's turn goes on, and so does its count")
+    }
+
+    @MainActor
+    func testRefusalOfOneWindowsMoveKeepsTheOthersCountdownHeld() throws {
+        let payload = try liveGamePayload(byoYomiPeriod: 5)
+        let (game, service, _) = try openWindow(on: payload)
+        let (otherGame, otherService, otherSocket) = try openWindow(on: payload)
+        defer { withExtendedLifetime(otherService) {} }
+        let speech = SpeechRecorder()
+        var now = Date()
+        let announcer = VoiceCountdownAnnouncer(speaker: speech, now: { now })
+        let userID = service.user?.id
+        let observation = game.$clock.dropFirst().sink {
+            announcer.clockChanged(to: $0, in: game, userID: userID)
+        }
+        defer { observation.cancel() }
+        let state = GameControlState(haptics: HapticsRecorder())
+        let otherState = GameControlState(haptics: HapticsRecorder())
+
+        // Two windows send different stones for the turn, 50 ms apart, and
+        // OGS refuses the later one.
+        XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        let sentAt = try XCTUnwrap(game.sentMoves.first?.date)
+        XCTAssertTrue(otherState.submitMove(.placeStone(3, 3), game: otherGame, using: otherService,
+                                            reviewCoordinator: nil) {})
+        try XCTUnwrap(otherSocket.moveCallbacks.first)(nil, ["move": "illegal move"])
+        drainMainQueue()
+        XCTAssertEqual(game.sentMoves.count, 1, "This window's move is still on its way")
+
+        now = sentAt.addingTimeInterval(0.2)
+        game.clock = try byoYomiClock(for: game, toMove: .black, mainLeft: 3)
+        XCTAssertEqual(speech.spoken, [], "So its countdown holds")
+    }
+
+    @MainActor
+    func testVoiceCountdownResumesAfterTheHoldButNotOnceTheMoveIsApplied() throws {
+        let (game, service, socket) = try liveMoveFixture(byoYomiPeriod: 5)
+        let speech = SpeechRecorder()
+        var now = Date()
+        let announcer = VoiceCountdownAnnouncer(speaker: speech, now: { now })
+        let userID = service.user?.id
+        let observation = game.$clock.dropFirst().sink {
+            announcer.clockChanged(to: $0, in: game, userID: userID)
+        }
+        defer { observation.cancel() }
+        let state = GameControlState(haptics: HapticsRecorder())
+
+        XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        let committedAt = try XCTUnwrap(game.sentMoves.last?.date)
+        now = committedAt.addingTimeInterval(1.5)
+        game.clock = try byoYomiClock(for: game, toMove: .black, mainLeft: 3)
+        XCTAssertEqual(speech.spoken, ["3"], "OGS is slow and Black's clock is still running")
+
+        let gameID = try XCTUnwrap(game.ogsID)
+        socket.deliver("game/\(gameID)/move", ["move_number": 1, "move": [2, 1, 1_000]] as [String: Any])
+        now = committedAt.addingTimeInterval(1.8)
+        game.clock = try byoYomiClock(for: game, toMove: .black, mainLeft: 2)
+        XCTAssertEqual(speech.spoken, ["3"], "The move is applied, so this clock is out of date")
+    }
+
+    @MainActor
+    func testVoiceCountdownHoldEndsOnceTheBoardMovesOn() throws {
+        let (game, service, socket) = try liveMoveFixture(byoYomiPeriod: 5)
+        let speech = SpeechRecorder()
+        var now = Date()
+        let announcer = VoiceCountdownAnnouncer(speaker: speech, now: { now })
+        let userID = service.user?.id
+        let observation = game.$clock.dropFirst().sink {
+            announcer.clockChanged(to: $0, in: game, userID: userID)
+        }
+        defer { observation.cancel() }
+        let state = GameControlState(haptics: HapticsRecorder())
+
+        XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        let committedAt = try XCTUnwrap(game.sentMoves.last?.date)
+        // OGS echoes the move and an instant bot replies at once.
+        let gameID = try XCTUnwrap(game.ogsID)
+        socket.deliver("game/\(gameID)/move", ["move_number": 1, "move": [2, 1, 1_000]] as [String: Any])
+        socket.deliver("game/\(gameID)/move", ["move_number": 2, "move": [4, 4, 1_100]] as [String: Any])
+        now = committedAt.addingTimeInterval(0.3)
+        game.clock = try byoYomiClock(for: game, toMove: .black, mainLeft: 3, lastMove: 3_000)
+        XCTAssertEqual(speech.spoken, ["3"], "The next turn counts at once, within a second of the last move")
+    }
+
+    @MainActor
+    func testVoiceCountdownStaysQuietBeforeTheClockStartsAndAfterTheGameEnds() throws {
+        let (game, service, _) = try liveMoveFixture(byoYomiPeriod: 5)
+        let speech = SpeechRecorder()
+        let announcer = VoiceCountdownAnnouncer(speaker: speech)
+        let userID = service.user?.id
+        let observation = game.$clock.dropFirst().sink {
+            announcer.clockChanged(to: $0, in: game, userID: userID)
+        }
+        defer { observation.cancel() }
+
+        // Waiting for the first move, the time left stays as it is.
+        for _ in 0..<2 {
+            game.clock = try byoYomiClock(for: game, toMove: .black, mainLeft: 5, started: false)
+        }
+        XCTAssertEqual(speech.spoken, [])
+        game.clock = try byoYomiClock(for: game, toMove: .black, mainLeft: 4)
+        XCTAssertEqual(speech.spoken, ["4"])
+
+        // A finishing snapshot stores its clock before its phase.
+        game.gameData?.outcome = "Timeout"
+        game.clock = try byoYomiClock(for: game, toMove: .black, mainLeft: 3)
+        XCTAssertEqual(speech.spoken, ["4"])
+    }
+
+    @MainActor
+    func testVoiceCountdownCountsASnapshotsClockFromNow() throws {
+        var payload = try liveGamePayload(byoYomiPeriod: 5)
+        let (game, service, socket) = try openWindow(on: payload)
+        let speech = SpeechRecorder()
+        let announcer = VoiceCountdownAnnouncer(speaker: speech)
+        let userID = service.user?.id
+        let observation = game.$clock.dropFirst().sink {
+            announcer.clockChanged(to: $0, in: game, userID: userID)
+        }
+        defer { observation.cancel() }
+
+        // On reconnecting, the snapshot's clock shows Black's 8 s as of the
+        // last move, 5 s ago.
+        var clock = try XCTUnwrap(payload["clock"] as? [String: Any])
+        let time = ["thinking_time": 8, "periods": 5, "period_time": 5] as [String: Any]
+        clock["black_time"] = time
+        clock["white_time"] = time
+        clock["last_move"] = Date().timeIntervalSince1970 * 1_000 - 5_000
+        clock.removeValue(forKey: "expiration")
+        payload["clock"] = clock
+        let gameID = try XCTUnwrap(game.ogsID)
+        socket.deliver("game/\(gameID)/gamedata", payload)
+        XCTAssertEqual(speech.spoken, ["3"], "Not 8, the time left when the turn began")
+    }
+
+    @MainActor
+    func testVoiceCountdownCountsAnOverviewsClockFromNow() throws {
+        var payload = try liveGamePayload(byoYomiPeriod: 5)
+        let (game, service, _) = try openWindow(on: payload)
+        let speech = SpeechRecorder()
+        let announcer = VoiceCountdownAnnouncer(speaker: speech)
+        let userID = service.user?.id
+        let observation = game.$clock.dropFirst().sink {
+            announcer.clockChanged(to: $0, in: game, userID: userID)
+        }
+        defer { observation.cancel() }
+
+        // Back in the foreground, the overview's game data shows Black's 8 s
+        // as of the last move, 5 s ago.
+        var clock = try XCTUnwrap(payload["clock"] as? [String: Any])
+        let time = ["thinking_time": 8, "periods": 5, "period_time": 5] as [String: Any]
+        clock["black_time"] = time
+        clock["white_time"] = time
+        clock["last_move"] = Date().timeIntervalSince1970 * 1_000 - 5_000
+        clock.removeValue(forKey: "expiration")
+        payload["clock"] = clock
+        let gameID = try XCTUnwrap(game.ogsID)
+        service.processOverview(overview: ["active_games": [["id": gameID, "json": payload] as [String: Any]]])
+        XCTAssertEqual(speech.spoken, ["3"], "Not 8, the time left when the turn began")
+    }
+
+    @MainActor
+    func testVoiceCountdownSaysEachLostOneSecondPeriod() throws {
+        let (game, service, _) = try liveMoveFixture(byoYomiPeriod: 1)
+        let speech = SpeechRecorder()
+        let announcer = VoiceCountdownAnnouncer(speaker: speech)
+        let userID = service.user?.id
+        let observation = game.$clock.dropFirst().sink {
+            announcer.clockChanged(to: $0, in: game, userID: userID)
+        }
+        defer { observation.cancel() }
+
+        // Every overtime tick reads 1, the period's top. Each lost period is
+        // said all the same, and the turn's start is not.
+        for periodsLeft in [5, 4, 3, 2, 1] {
+            game.clock = try byoYomiClock(for: game, toMove: .black, periodLeft: 1,
+                                          periodsLeft: periodsLeft, periodTime: 1)
+        }
+        game.clock = try byoYomiClock(for: game, toMove: .black, periodLeft: 0, periodsLeft: 0, periodTime: 1)
+        XCTAssertEqual(speech.spoken, ["1", "1", "1", "1", "0"])
+    }
+
+    @MainActor
+    func testVoiceCountdownSkipsAByoYomiPeriodsTopAtTurnStart() throws {
+        let (game, service, _) = try liveMoveFixture(byoYomiPeriod: 5)
+        let speech = SpeechRecorder()
+        let announcer = VoiceCountdownAnnouncer(speaker: speech)
+        let userID = service.user?.id
+        let observation = game.$clock.dropFirst().sink {
+            announcer.clockChanged(to: $0, in: game, userID: userID)
+        }
+        defer { observation.cancel() }
+
+        // In overtime each turn starts at the full period, as OGS sends it.
+        for left in [5.0, 5.0, 4.0, 3.0] {
+            game.clock = try byoYomiClock(for: game, toMove: .black, periodLeft: left)
+        }
+        XCTAssertEqual(speech.spoken, ["4", "3"])
+        // A period running out mid-turn starts again from its top, said.
+        for left in [2.0, 1.0, 5.0, 4.0] {
+            game.clock = try byoYomiClock(for: game, toMove: .black, periodLeft: left)
+        }
+        XCTAssertEqual(speech.spoken, ["4", "3", "2", "1", "5", "4"])
+        // The next turn starts at the top again.
+        game.clock = try byoYomiClock(for: game, toMove: .white, periodLeft: 5, lastMove: 9_000)
+        for left in [5.0, 4.0] {
+            game.clock = try byoYomiClock(for: game, toMove: .black, periodLeft: left, lastMove: 12_000)
+        }
+        XCTAssertEqual(speech.spoken, ["4", "3", "2", "1", "5", "4", "4"])
+    }
+
+    /// The fixture's byo-yomi clock, with 5 s periods: the player to move
+    /// has `mainLeft` seconds of main time, or in overtime `periodLeft`.
+    private func byoYomiClock(
+        for game: Game, toMove color: StoneColor, mainLeft: Double = 0,
+        periodLeft: Double = 5, periodsLeft: Int = 5, periodTime: Double = 5,
+        lastMove: Double = 1_000, started: Bool = true
+    ) throws -> OGSClock {
+        let black = try XCTUnwrap(game.blackPlayer?.id)
+        let white = try XCTUnwrap(game.whitePlayer?.id)
+        let time = ThinkingTime(
+            thinkingTime: mainLeft, thinkingTimeLeft: mainLeft, periods: 5,
+            periodsLeft: periodsLeft, periodTime: periodTime, periodTimeLeft: periodLeft
+        )
+        return OGSClock(
+            blackTime: time, whiteTime: time, currentPlayerColor: color,
+            lastMoveTime: lastMove, started: started, currentPlayerId: color == .black ? black : white,
+            blackPlayerId: black, whitePlayerId: white
+        )
+    }
+
     /// A board's wiring of its stone sounds, as in SingleGameView.
     private func observeStoneSounds(of game: Game, counter: SoundCounter) -> [AnyCancellable] {
         let player = StonePlacementSoundPlayer(makePlayer: counter.makePlayer)
@@ -1158,14 +1453,15 @@ final class GameControlStateTests: XCTestCase {
         ]
     }
 
-    /// An empty live 9x9 game with Black, the signed-in user, to move.
+    /// An empty live 9x9 game with Black, the signed-in user, to move. With
+    /// a period, its clock is byo-yomi with 30 s of main time and 5 periods.
     @MainActor
-    private func liveMoveFixture() throws -> (Game, OGSService, MoveSocket) {
-        try openWindow(on: try liveGamePayload())
+    private func liveMoveFixture(byoYomiPeriod: Int? = nil) throws -> (Game, OGSService, MoveSocket) {
+        try openWindow(on: try liveGamePayload(byoYomiPeriod: byoYomiPeriod))
     }
 
     /// The fixture's game data: an empty live 9x9 game with Black to move.
-    private func liveGamePayload() throws -> [String: Any] {
+    private func liveGamePayload(byoYomiPeriod: Int? = nil) throws -> [String: Any] {
         let bundle = Bundle(for: GameControlStateTests.self)
         let url = try XCTUnwrap(bundle.url(forResource: "game-25076729", withExtension: "json"))
         var payload = try XCTUnwrap(
@@ -1178,6 +1474,12 @@ final class GameControlStateTests: XCTestCase {
         var clock = try XCTUnwrap(payload["clock"] as? [String: Any])
         clock["current_player"] = clock["black_player_id"]
         payload["clock"] = clock
+        if let byoYomiPeriod {
+            payload["time_control"] = [
+                "system": "byoyomi", "time_control": "byoyomi", "speed": "blitz",
+                "main_time": 30, "periods": 5, "period_time": byoYomiPeriod,
+            ] as [String: Any]
+        }
         return payload
     }
 

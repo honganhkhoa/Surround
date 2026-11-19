@@ -199,7 +199,9 @@ final class GameControlState: ObservableObject {
     /// everywhere, even after this screen has moved on. An answer lost with
     /// the connection or never received does neither, since OGS may have
     /// taken the move: the board settles it. Passes are sent without either.
-    /// Returns whether the request was sent.
+    /// Any move sent holds every window's voice countdown briefly, until
+    /// the board moves on or OGS refuses this request. Returns whether the
+    /// request was sent.
     @discardableResult
     func submitMove(
         _ move: Move,
@@ -274,12 +276,17 @@ final class GameControlState: ObservableObject {
         // command with not_sent when it is down; OGSService refuses a game
         // without data before sending. Commit only what can go out.
         guard sent, let answer, ogs.socketStatus == .connected, game.gameData != nil else { return sent }
+        game.recordSentMove(Game.SentMove(
+            id: requestID, fromMoveNumber: submittedPosition.lastMoveNumber, date: Date()
+        ))
         committed = game.commitMove(move, from: submittedPosition, id: requestID) != nil
         if committed {
             haptics.playCommit()
         }
         Self.whenRefused(answer, move: move, moveNumber: expectedMoveNumber,
                          from: submittedPosition, in: game) {
+            // A refused move's turn goes on, and so does its countdown.
+            game.clearSentMove(id: requestID)
             if committed {
                 game.withdrawMoveCommit(id: requestID)
             }

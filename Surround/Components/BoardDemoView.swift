@@ -153,7 +153,9 @@ struct BoardDemoView: View {
             self.game.clock?.calculateTimeLeft(with: timeControl.system, pauseControl: nil)
             timerCancellable = TimeUtilities.shared.timer.receive(on: RunLoop.main).sink { _ in
                 self.game.clock?.calculateTimeLeft(with: timeControl.system, pauseControl: nil)
-                if voiceCountdown, let time = game.clock?.currentPlayerColor == .black ? game.clock?.blackTime : game.clock?.whiteTime {
+                // A submitted move's clock is about to end its turn.
+                if voiceCountdown, !simulatingRequest,
+                   let time = game.clock?.currentPlayerColor == .black ? game.clock?.blackTime : game.clock?.whiteTime {
                     if let timeLeft = time.timeLeft {
                         if timeLeft <= 10 {
                             let utteranceString = "\(Int(timeLeft))"

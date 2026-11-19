@@ -86,6 +86,21 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         }
     }
 
+    /// A move the user sent, a pass included: its request, the move number
+    /// of the position it was sent from, and when.
+    struct SentMove: Equatable {
+        let id: UUID
+        let fromMoveNumber: Int
+        let date: Date
+    }
+
+    /// The user's sent moves that OGS has not refused, recorded in every
+    /// window's model of this game; windows can each send one for a turn.
+    /// While the board still shows the position one was sent from, the
+    /// voice countdown says nothing for a moment after it, as the clock that
+    /// ends the turn is still on its way.
+    private(set) var sentMoves: [SentMove] = []
+
     static func == (lhs: Game, rhs: Game) -> Bool {
         return lhs.ID == rhs.ID
     }
@@ -607,6 +622,23 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     func withdrawMoveCommit(id: UUID) {
         for game in [self] + otherWindowsGames {
             game.moveCommits.send(.withdrawn(id: id))
+        }
+    }
+
+    /// Records a move the user has just sent, a pass included, in every
+    /// window's model of this game.
+    func recordSentMove(_ sentMove: SentMove) {
+        for game in [self] + otherWindowsGames {
+            // Moves sent from earlier positions hold nothing any more.
+            game.sentMoves.removeAll { $0.fromMoveNumber < sentMove.fromMoveNumber }
+            game.sentMoves.append(sentMove)
+        }
+    }
+
+    /// OGS refused request `id`, so its hold ends; any other still holds.
+    func clearSentMove(id: UUID) {
+        for game in [self] + otherWindowsGames {
+            game.sentMoves.removeAll { $0.id == id }
         }
     }
     

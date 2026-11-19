@@ -1,5 +1,4 @@
 import SwiftUI
-import AVFoundation
 
 private func gameDetailProfileColor(_ player: OGSUser?, dark: Bool) -> Color {
     guard let player else { return .secondary }
@@ -2070,42 +2069,40 @@ struct GameDetailVoiceCountdown: ViewModifier {
     @ObservedObject var game: Game
     @EnvironmentObject private var ogs: OGSService
     @Setting(.voiceCountdown) private var voiceCountdown: Bool
-    @State private var synthesizer: AVSpeechSynthesizer?
-    @State private var lastValue: Int?
-    @State private var lastSpokenAt = Date.distantPast
+    @StateObject private var announcer = VoiceCountdownAnnouncer()
+    // A screen pushed over the game, or another tab, keeps this view and its
+    // clock subscription alive, so speech follows visibility, as the stone
+    // sounds do.
+    @State private var isVisible = false
 
     func body(content: Content) -> some View {
         content
-            .onAppear { updateSynthesizer() }
-            .onChange(of: voiceCountdown) { _, _ in updateSynthesizer() }
-            .onChange(of: game.ID) { _, _ in stop(); updateSynthesizer() }
-            .onChange(of: game.isUserPlaying) { _, _ in updateSynthesizer() }
+            .onAppear {
+                isVisible = true
+                updateSpeaker()
+            }
+            .onChange(of: voiceCountdown) { _, _ in updateSpeaker() }
+            .onChange(of: game.ID) { _, _ in announcer.stop(); updateSpeaker() }
+            .onChange(of: game.isUserPlaying) { _, _ in updateSpeaker() }
             .onChange(of: ogs.socketStatus) { _, status in
-                if status != .connected { stop() }
+                if status != .connected { announcer.stop() }
             }
-            .onDisappear { stop() }
+            .onDisappear {
+                isVisible = false
+                announcer.stop()
+            }
             .onReceive(game.$clock) { clock in
-                guard voiceCountdown, ogs.socketStatus == .connected, game.isUserTurn,
-                      game.pauseControl?.isPaused() != true, let clock else { return }
-                let time = game.userStoneColor == .black ? clock.blackTime : clock.whiteTime
-                guard let remaining = time.timeLeft, remaining.isFinite,
-                      remaining >= 0, remaining <= 10 else { return }
-                let value = Int(remaining)
-                guard value != lastValue || Date().timeIntervalSince(lastSpokenAt) >= 3 else { return }
-                updateSynthesizer()
-                lastValue = value
-                lastSpokenAt = Date()
-                synthesizer?.speak(AVSpeechUtterance(string: String(value)))
+                // Judge the delivered clock: the game still holds the last one.
+                guard isVisible, voiceCountdown, ogs.socketStatus == .connected else { return }
+                announcer.clockChanged(to: clock, in: game, userID: ogs.user?.id)
             }
     }
-    private func updateSynthesizer() {
-        if voiceCountdown && game.isUserPlaying {
-            if synthesizer == nil { synthesizer = AVSpeechSynthesizer() }
-        } else { stop() }
-    }
-    private func stop() {
-        synthesizer?.stopSpeaking(at: .immediate)
-        synthesizer = nil
-        lastValue = nil
+
+    private func updateSpeaker() {
+        if isVisible && voiceCountdown && game.isUserPlaying {
+            announcer.prepare()
+        } else {
+            announcer.stop()
+        }
     }
 }
