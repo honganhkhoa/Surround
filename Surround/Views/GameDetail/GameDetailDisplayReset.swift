@@ -21,6 +21,12 @@ import Foundation
 /// Keeping this separate from the view makes the rule directly testable in
 /// both directions.
 enum GameDetailDisplayReset {
+    /// Each game counts by `Game.resolvedSpeed`, so a game whose payload has
+    /// no speed tag counts by its clock, as the service sorts it.
+    static func restoresDisplayDefaults(from oldGame: Game, to newGame: Game) -> Bool {
+        restoresDisplayDefaults(from: oldGame.resolvedSpeed, to: newGame.resolvedSpeed)
+    }
+
     static func restoresDisplayDefaults(
         from oldSpeed: TimeControlSpeed?,
         to newSpeed: TimeControlSpeed?

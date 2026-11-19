@@ -533,13 +533,64 @@ final class AppRouteTests: XCTestCase {
                        "From one live game to another, Zen and the panels stay.")
     }
 
-    private func displayResetGame(_ id: Int, _ system: TimeControlSystem) throws -> Game {
+    /// OGS can send a game without its speed tag. Such a game counts by the
+    /// speed its clock gives on its board, as the service sorts it: from an
+    /// untagged live game to another live game Zen and the panels stay, and
+    /// from an untagged correspondence game to a live game they reset.
+    func testAGameWithoutASpeedTagCountsByItsClock() throws {
+        let untaggedLive = try displayResetGame(44, .ByoYomi(mainTime: 600, periods: 3, periodTime: 30), tagged: false)
+        let untaggedCorrespondence = try displayResetGame(45, .Simple(perMove: 86_400), tagged: false)
+        let live = try displayResetGame(42, .Fischer(initialTime: 1_800, timeIncrement: 30, maxTime: 1_800))
+        XCTAssertNil(untaggedLive.gameData?.timeControl.speed, "The payload has no speed tag.")
+        XCTAssertNil(untaggedCorrespondence.gameData?.timeControl.speed)
+        XCTAssertEqual(untaggedLive.resolvedSpeed, .live)
+        XCTAssertEqual(untaggedCorrespondence.resolvedSpeed, .correspondence)
+        XCTAssertEqual(live.resolvedSpeed, live.gameData?.timeControl.speed, "A tag is taken as it is.")
+
+        XCTAssertFalse(GameDetailDisplayReset.restoresDisplayDefaults(from: untaggedLive, to: live),
+                       "From one live game to another, Zen and the panels stay.")
+        XCTAssertFalse(GameDetailDisplayReset.restoresDisplayDefaults(from: live, to: untaggedLive))
+        XCTAssertTrue(GameDetailDisplayReset.restoresDisplayDefaults(from: untaggedCorrespondence, to: live),
+                      "From correspondence to live, Zen ends, and the panels and the compact Chat board return.")
+        XCTAssertTrue(GameDetailDisplayReset.restoresDisplayDefaults(from: untaggedLive, to: untaggedCorrespondence))
+    }
+
+    /// The picker lists the user's games at the speed of the game on screen.
+    /// For a game without a speed tag that speed is the one the service
+    /// sorted it by, so the picker lists the game's own list.
+    func testAGameWithoutASpeedTagHasTheSpeedOfTheListItIsIn() throws {
+        let untaggedLive = try displayResetGame(44, .ByoYomi(mainTime: 600, periods: 3, periodTime: 30), tagged: false)
+        let untaggedCorrespondence = try displayResetGame(45, .Simple(perMove: 86_400), tagged: false)
+        var state = OGSService.BootstrapState()
+        state.activeGames = [44: untaggedLive, 45: untaggedCorrespondence]
+        let suite = "com.honganhkhoa.Surround.AppRouteTests.\(UUID().uuidString)"
+        defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+        let service = OGSService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: OGSOfflineRejectingHTTPClient(), preferences: try XCTUnwrap(UserDefaults(suiteName: suite)),
+            ogsWebsocket: OGSOfflineNoOpWebsocket(), connectsAutomatically: false,
+            usesSurroundOverviewService: false, enablesAppSideEffects: false, startsTimers: false,
+            installsObservers: false, initialState: state
+        )
+        XCTAssertTrue(service.liveGames.contains { $0 === untaggedLive })
+        XCTAssertEqual(untaggedLive.resolvedSpeed?.isRealtime, true, "Its picker lists the live games.")
+        XCTAssertTrue(service.sortedActiveCorrespondenceGames.contains { $0 === untaggedCorrespondence })
+        XCTAssertEqual(untaggedCorrespondence.resolvedSpeed, .correspondence,
+                       "Its picker lists the correspondence games.")
+    }
+
+    /// The fixture's 9×9 game with `system`'s clock, and OGS's speed tag
+    /// unless `tagged` is false.
+    private func displayResetGame(_ id: Int, _ system: TimeControlSystem, tagged: Bool = true) throws -> Game {
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "game-27053412", withExtension: "json"))
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         var data = try decoder.decode(OGSGame.self, from: Data(contentsOf: url))
         data.gameId = id
         data.timeControl = system.timeControlObject
+        if !tagged {
+            data.timeControl.codingData.speed = nil
+        }
         return Game(ogsGame: data)
     }
 

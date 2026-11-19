@@ -753,7 +753,7 @@ struct GameDetailView: View {
     }
     
     func updateActiveGameList() {
-        if let gameSpeed = currentGame?.gameData?.timeControl.speed {
+        if let gameSpeed = currentGame?.resolvedSpeed {
             if gameSpeed == .correspondence {
                 if Set(self.activeGames.map { $0.ogsID }) == Set(ogs.sortedActiveCorrespondenceGames.map { $0.ogsID }) {
                     return
@@ -1126,10 +1126,7 @@ struct GameDetailView: View {
                 selectedConditionalVariation = nil
                 showSettings = false
                 closeGameControlPopover()
-                if GameDetailDisplayReset.restoresDisplayDefaults(
-                    from: oldGame.gameData?.timeControl.speed,
-                    to: newGame.gameData?.timeControl.speed
-                ) {
+                if GameDetailDisplayReset.restoresDisplayDefaults(from: oldGame, to: newGame) {
                     zenMode = false
                     interaction.resetPanels()
                     showsCompactChatBoard = true
