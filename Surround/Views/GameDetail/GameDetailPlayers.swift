@@ -304,8 +304,9 @@ enum GameDetailInlineChipDetail {
 struct GameDetailClockConnection: Equatable {
     /// The window has connected before, as its connection source records.
     var hasConnected = false
-    /// No clock is in play, and the window's status shows where the clocks
-    /// are (Chat, Analyze): one clock carries the mark.
+    /// No clock is in play, the window's status shows, and neither the title
+    /// slot's capsule nor the main action says so: one clock carries the
+    /// mark.
     var marksOneClock = false
 }
 

@@ -519,8 +519,9 @@ struct GameDetailView: View {
         // Reconnecting… and its row reserves the label. The Mac's Zen keeps
         // its bar and never draws this layout.
         let relabels = GameConnectionPlacement(GameConnectionPlacement.Input(
-            game: game, panel: interaction.panel, restoresChatPanel: restoresChatPanel,
-            isVerticalToolbar: isVerticalToolbar, isZen: zenMode, isCatalyst: false
+            game: game, blocksActions: gameControlState.blocksGameActions, panel: interaction.panel,
+            restoresChatPanel: restoresChatPanel, isVerticalToolbar: isVerticalToolbar, isZen: zenMode,
+            isCatalyst: false
         )).action == .relabelled
         let actions = GameControlRowMetrics(dynamicTypeSize: dynamicTypeSize, locale: locale, phase: game.gamePhase,
                                             relabelsOffline: relabels)
@@ -1680,11 +1681,15 @@ private struct GameToolbarLayout: ViewModifier {
     /// Where this game says the window's connection is down. Read from
     /// what this screen has before it draws, never from a rendered badge or
     /// the layout plan, so a game opened during an outage has its status in
-    /// its place from the first frame. The game's content reads the same.
+    /// its place from the first frame. The game's content reads the same,
+    /// and its chat preview, which the bar doesn't see: the preview moves
+    /// the mark only where the clocks are in the game's body, never the
+    /// bar's.
     private var connectionPlacement: GameConnectionPlacement {
         GameConnectionPlacement(GameConnectionPlacement.Input(
-            game: game, panel: interaction.panel, restoresChatPanel: restoresChatPanel,
-            isVerticalToolbar: isVerticalToolbar, isZen: zenMode, isCatalyst: Self.isCatalyst
+            game: game, blocksActions: gameControlState.blocksGameActions, panel: interaction.panel,
+            restoresChatPanel: restoresChatPanel, isVerticalToolbar: isVerticalToolbar, isZen: zenMode,
+            isCatalyst: Self.isCatalyst
         ))
     }
 

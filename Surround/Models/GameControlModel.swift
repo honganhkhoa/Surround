@@ -1447,10 +1447,11 @@ enum GameOverCardRule {
 
 /// Where a game says that the window's connection is down, from state Game
 /// Detail has before it draws: whether a clock is in play, the panel, the
-/// bar's form, the platform and whether the user plays. It reads nothing a
-/// layout reports, such as a rendered badge, the layout plan or a
-/// preference, so a game opened or switched to during an outage shows its
-/// status in its place from the first frame, and every later pass agrees.
+/// bar's form, the platform, whether the user plays and the action row's
+/// main action. It reads nothing a layout reports, such as a rendered badge,
+/// the layout plan or a preference, so a game opened or switched to during
+/// an outage shows its status in its place from the first frame, and every
+/// later pass agrees.
 ///
 /// - A clock in play: the to-move clock's mark, in every panel and form.
 /// - No clock in play, with a title slot: in Play the capsule in the title
@@ -1460,6 +1461,11 @@ enum GameOverCardRule {
 /// - The Mac never shows the capsule. Its game toolbar draws no title, so
 ///   a window subtitle would not show either: where iOS shows the capsule,
 ///   the Mac's main action reads "Reconnecting…" instead.
+/// - No clock in play, and neither the capsule nor a relabelled action
+///   shows: the mark on one clock. That is where Analyze or a chat preview
+///   takes the action row's place, and where its main action needs no
+///   connection: in stone removal once the user has accepted, after a Rengo
+///   game, in a game the user watches.
 ///
 /// A clock in play takes its mark at once from the socket, as the actions
 /// disable; the capsule, the one clock's mark and the relabel follow the
@@ -1484,6 +1490,13 @@ struct GameConnectionPlacement: Equatable {
         /// The user plays the game, so some of its actions need the
         /// connection.
         var userPlays: Bool
+        /// The action row's main action is one that needs the connection
+        /// (`mainActionNeedsConnection(game:blocksActions:)`), so a relabel
+        /// on it can say the outage.
+        var mainActionNeedsConnection: Bool
+        /// A chat message's position is on the board, which takes the action
+        /// row's place, as Analyze does.
+        var showsChatPreview = false
     }
 
     /// Where the clocks carry the mark.
@@ -1491,8 +1504,11 @@ struct GameConnectionPlacement: Equatable {
         case unchanged
         /// The to-move clock's mark, on every variant that shows it.
         case toMoveClock
-        /// No clock is in play: the mark on the one clock a single header
-        /// chip shows, wherever the layout puts it.
+        /// No clock is in play, and neither the capsule nor a relabelled
+        /// action says so: the mark on one clock, wherever the layout puts
+        /// it. It is the clock a single header chip shows: the user's own,
+        /// else the winner's, else Black's
+        /// (`GameDetailClockState.singleChipColor`).
         case oneClock
     }
 
@@ -1519,13 +1535,6 @@ struct GameConnectionPlacement: Equatable {
     init(_ input: Input) {
         let hasTitleSlot = !input.isVerticalToolbar && !input.isZen
         let panel: GameDetailPanel = input.panel == .playerInfo && input.restoresChatPanel ? .chat : input.panel
-        if input.hasClockInPlay {
-            clocks = .toMoveClock
-        } else if hasTitleSlot && panel != .playerInfo {
-            clocks = .oneClock
-        } else {
-            clocks = .unchanged
-        }
         let capsuleState = !input.hasClockInPlay && hasTitleSlot && panel == .playerInfo
         showsTitleCapsule = !input.isCatalyst && capsuleState
         if !input.userPlays {
@@ -1534,6 +1543,17 @@ struct GameConnectionPlacement: Equatable {
             action = .relabelled
         } else {
             action = .disabled
+        }
+        // Zen draws its action row whatever the panel; elsewhere Analyze and
+        // a chat preview take its place.
+        let drawsActionRow = input.isZen || (panel != .analyze && !input.showsChatPreview)
+        let relabelShows = action == .relabelled && input.mainActionNeedsConnection && drawsActionRow
+        if input.hasClockInPlay {
+            clocks = .toMoveClock
+        } else if showsTitleCapsule || relabelShows {
+            clocks = .unchanged
+        } else {
+            clocks = .oneClock
         }
     }
 }
@@ -1551,15 +1571,33 @@ extension ConnectionStatusModel.Status {
 }
 
 extension GameConnectionPlacement.Input {
-    /// Reads the clock and whether the user plays from `game`; the rest is
-    /// Game Detail's own state.
-    init(game: Game, panel: GameDetailPanel, restoresChatPanel: Bool, isVerticalToolbar: Bool,
-         isZen: Bool, isCatalyst: Bool) {
+    /// Reads the clock, whether the user plays and the main action from
+    /// `game`; the rest is Game Detail's own state.
+    /// - Parameter blocksActions: An action is sending, or a scoring change
+    ///   waits for its refresh (`GameControlState.blocksGameActions`).
+    init(game: Game, blocksActions: Bool, panel: GameDetailPanel, restoresChatPanel: Bool,
+         showsChatPreview: Bool = false, isVerticalToolbar: Bool, isZen: Bool, isCatalyst: Bool) {
         let hasClockInPlay = [StoneColor.black, .white].contains {
             GameDetailClockState(game: game, color: $0).isToMove
         }
         self.init(hasClockInPlay: hasClockInPlay, panel: panel, restoresChatPanel: restoresChatPanel,
                   isVerticalToolbar: isVerticalToolbar, isZen: isZen, isCatalyst: isCatalyst,
-                  userPlays: game.isUserPlaying)
+                  userPlays: game.isUserPlaying,
+                  mainActionNeedsConnection: Self.mainActionNeedsConnection(game: game, blocksActions: blocksActions),
+                  showsChatPreview: showsChatPreview)
+    }
+
+    /// Whether the action row's main action needs the connection where no
+    /// clock is in play: Rematch after a game the user played, or Accept
+    /// removed stones while the user's acceptance is due, as the row shows
+    /// them (`GameControlRow.mainActionButton`). The row shows neither while
+    /// an action is sending or a scoring change waits for its refresh
+    /// (`blocksActions`), nor over an estimate.
+    static func mainActionNeedsConnection(game: Game, blocksActions: Bool) -> Bool {
+        guard !blocksActions, game.currentPosition.estimatedScores == nil,
+              let userColor = game.userStoneColor else { return false }
+        if OGSChallengeTemplate.rematch(for: game) != nil { return true }
+        return game.isUserPlaying && game.gamePhase == .stoneRemoval
+            && game.removedStonesAccepted[userColor] != game.currentPosition.removedStones
     }
 }

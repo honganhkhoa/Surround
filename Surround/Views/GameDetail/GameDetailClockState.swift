@@ -12,7 +12,8 @@ struct GameDetailClockState {
     /// badge reads Connecting….
     var recoversConnection = true
     /// No clock is in play and the window's connection status shows: this
-    /// is the one clock that says so, in Chat or Analyze.
+    /// is the one clock that says so, where neither the title slot's capsule
+    /// nor the main action does (`GameConnectionPlacement`).
     var carriesConnectionStatus = false
 
     var clock: OGSClock? { clockOverride ?? game.clock }

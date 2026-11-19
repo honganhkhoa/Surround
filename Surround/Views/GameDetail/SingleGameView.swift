@@ -745,10 +745,12 @@ struct SingleGameView: View {
     }
 
     /// Where this game says the window's connection is down, by the rule the
-    /// toolbar follows, from the same inputs: never from what a layout drew.
+    /// toolbar follows, from the same inputs and the chat preview this view
+    /// keeps: never from what a layout drew.
     private var connectionPlacement: GameConnectionPlacement {
         GameConnectionPlacement(GameConnectionPlacement.Input(
-            game: game, panel: interaction.panel, restoresChatPanel: restoresChatPanel,
+            game: game, blocksActions: gameControlState.blocksGameActions, panel: interaction.panel,
+            restoresChatPanel: restoresChatPanel, showsChatPreview: showsChatPreview,
             isVerticalToolbar: isVerticalToolbar, isZen: zenMode, isCatalyst: Self.isCatalyst
         ))
     }
