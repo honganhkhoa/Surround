@@ -160,7 +160,9 @@ struct GameDetailView: View {
 
     /// The control's popover: at game over the game-over card, then the
     /// picker, above Activity's sections, at this game's place and with the
-    /// window's connection status.
+    /// window's connection status. Each opening's list is new content, so a
+    /// popover opened again while the last one closes never shows the last
+    /// list's results or records its actions against the last session.
     /// - Parameter cardChallengeID: The challenge of the card the control
     ///   shows, if any.
     private func gameControlPopoverContent(for game: Game, cardChallengeID: Int?) -> some View {
@@ -171,6 +173,7 @@ struct GameDetailView: View {
                 header: AnyView(gameControlPicker), switchGame: showGame, connection: connectionStatus
             )
         }
+        .id(gameControlPopover.listSessionID)
         .environmentObject(ogs)
         .environmentObject(nav)
         .frame(idealWidth: 400, idealHeight: 620)

@@ -146,6 +146,23 @@ final class GameControlPopoverTests: XCTestCase {
         XCTAssertEqual(popover.listSessionID, reopened, "The list keeps its session while the popover goes.")
     }
 
+    /// The popover's content takes the list's session as its identity. A
+    /// popover opened again, even while the last one is still closing, has
+    /// a new session, so its list is new: none of the last list's results,
+    /// and its actions go to the new session.
+    @MainActor
+    func testEachOpeningGivesTheListANewSession() throws {
+        let navigation = NavigationService()
+        var popover = GameControlPopover()
+        popover.open(at: .bottomBar, place: place, navigation: navigation)
+        let first = popover.listSessionID
+        popover.close(navigation: navigation)
+        XCTAssertEqual(popover.listSessionID, first, "Closing keeps the session while the popover goes.")
+        popover.open(at: .bottomBar, place: place, navigation: navigation)
+        XCTAssertNotEqual(popover.listSessionID, first, "Opened again at once, the list has a new session.")
+        XCTAssertEqual(popover.listSessionID, try XCTUnwrap(navigation.main.activity?.sessionID))
+    }
+
     /// Closing clears only this popover's request, and a request that goes or
     /// changes closes the popover.
     @MainActor
