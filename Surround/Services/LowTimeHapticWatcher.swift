@@ -12,11 +12,12 @@
 //  socket connected that both found the user's own clock running on their
 //  move, or in byo-yomi a first read on the opponent's move. So a window
 //  that opens with less time left, or whose socket was down, plays nothing.
-//  Each game plays it at most once. Nothing plays for the game on screen,
-//  under the moderator cover, with Settings › Haptics off or on the Mac,
-//  and AppAnnouncer plays one copy for every window, from the window the
-//  user is in. One per window, held by NavigationService; MainView attaches
-//  it. Main thread by convention, like its owner.
+//  A fall plays nothing for the game on screen, under the moderator cover or
+//  with Settings › Haptics off, and leaves the game to play at a later
+//  fall. Once its haptic has played, a game never plays again. Nothing
+//  plays on the Mac, and AppAnnouncer plays one copy for every window, from
+//  the window the user is in. One per window, held by NavigationService;
+//  MainView attaches it. Main thread by convention, like its owner.
 //
 
 import Combine
@@ -38,7 +39,7 @@ final class LowTimeHapticWatcher {
         #endif
     }
 
-    /// The games whose fall was seen, played or not, so none plays twice.
+    /// The games whose haptic played, so none plays twice.
     private(set) var doneGameIDs = Set<Int>()
     /// Each game's seconds to timeout at the last read, as `timeToCompare`
     /// gives them, kept only while the socket is connected.
@@ -71,21 +72,25 @@ final class LowTimeHapticWatcher {
         guard !isMac else { return }
         subscription = ticks.sink { [weak self, weak ogs] _ in
             guard let self, let ogs else { return }
-            let fallen = record(Self.liveGames(of: ogs), accountID: ogs.user?.id,
-                                isConnected: ogs.socketStatus == .connected)
-            // Each is done now, whether or not it plays.
-            guard !fallen.isEmpty, !isCovered(), preferences[.hapticsFeedback] != false else { return }
-            let onScreen = gamesOnScreen()
-            for gameID in fallen where !onScreen.contains(gameID) {
+            let playing = record(Self.liveGames(of: ogs), accountID: ogs.user?.id,
+                                 isConnected: ogs.socketStatus == .connected) { gameID in
+                !isCovered() && preferences[.hapticsFeedback] != false && !gamesOnScreen().contains(gameID)
+            }
+            for gameID in playing {
                 post(AppAnnouncement(.lowTime(gameID), audience: .frontmostWindow, haptic: .warning))
             }
         }
     }
 
-    /// One read of the user's live games. Returns the games that fell
-    /// through the threshold since the last read, which are done from now.
-    /// Another account starts over.
-    func record(_ games: [ActivityModel.LiveGame], accountID: Int?, isConnected: Bool) -> [Int] {
+    /// One read of the user's live games. Returns the games whose haptic
+    /// plays now: each fell through the threshold since the last read, and
+    /// `plays` lets it play. Those are done from now. A fall that doesn't
+    /// play keeps its time, so the next read isn't a fall too, and leaves
+    /// the game to play at a later one. Another account starts over.
+    /// - Parameter plays: Whether a game's fall can play now; by default
+    ///   every fall can.
+    func record(_ games: [ActivityModel.LiveGame], accountID: Int?, isConnected: Bool,
+                plays: (Int) -> Bool = { _ in true }) -> [Int] {
         if accountID != self.accountID {
             self.accountID = accountID
             doneGameIDs = []
@@ -98,18 +103,18 @@ final class LowTimeHapticWatcher {
         }
         let threshold = ActivityModel.lowTimeHapticThreshold
         var timeLeft = [Int: TimeInterval]()
-        var fallen = [Int]()
+        var playing = [Int]()
         for game in games where !doneGameIDs.contains(game.id) {
             guard let left = Self.timeToCompare(game) else { continue }
-            if let previous = lastTimeLeft[game.id], previous > threshold, left <= threshold {
+            if let previous = lastTimeLeft[game.id], previous > threshold, left <= threshold, plays(game.id) {
                 doneGameIDs.insert(game.id)
-                fallen.append(game.id)
+                playing.append(game.id)
             } else {
                 timeLeft[game.id] = left
             }
         }
         lastTimeLeft = timeLeft
-        return fallen
+        return playing
     }
 
     /// What a read compares with the threshold: the seconds to timeout while

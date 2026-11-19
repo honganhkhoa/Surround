@@ -7,8 +7,9 @@
 //  reads on the timer while it runs on their move with the socket
 //  connected. In byo-yomi only the last period counts: entering it with
 //  10 s or less is a fall, and so is a turn that starts in it. It never
-//  plays offline, under the moderator cover, for the game on screen, with
-//  Settings › Haptics off or on the Mac.
+//  plays offline or on the Mac. A fall under the moderator cover, for the
+//  game on screen or with Settings › Haptics off plays nothing and leaves
+//  the game to play at a later fall.
 //
 
 import Combine
@@ -103,6 +104,21 @@ final class LowTimeHapticWatcherTests: XCTestCase {
         XCTAssertEqual(read(12, 12, account: 6), [])
         XCTAssertEqual(watcher.doneGameIDs, [], "Another account starts over.")
         XCTAssertEqual(read(9, 9, account: 6), [1, 2])
+    }
+
+    func testAFallThatCantPlayLeavesTheGameForALaterOne() {
+        let watcher = LowTimeHapticWatcher()
+        func read(_ left: TimeInterval, plays: Bool = true) -> [Int] {
+            watcher.record([yourMove(1, left: left)], accountID: 5, isConnected: true) { _ in plays }
+        }
+        XCTAssertEqual(read(12, plays: false), [])
+        XCTAssertEqual(read(9, plays: false), [])
+        XCTAssertEqual(watcher.doneGameIDs, [], "A fall that can't play leaves the game undone.")
+        XCTAssertEqual(read(8), [], "It keeps its time, so the next read is no fall.")
+        XCTAssertEqual(read(12), [])
+        XCTAssertEqual(read(9), [1], "A later fall plays.")
+        XCTAssertEqual(read(12), [])
+        XCTAssertEqual(read(9), [], "Once per game.")
     }
 
     // MARK: Byo-yomi
@@ -381,16 +397,24 @@ final class LowTimeHapticWatcherTests: XCTestCase {
         XCTAssertEqual(window.watcher.doneGameIDs, [])
     }
 
+    /// The haptic HarborMist's game plays, once.
+    private let played = [AppAnnouncement(.lowTime(ID.harborMistGameID), audience: .frontmostWindow, haptic: .warning)]
+
     func testOnlyAnotherGameThanTheOneOnScreenPlays() throws {
         let watching = try window()
         watching.onScreen = [ID.harborMistGameID]
         watching.attach()
         watching.ticks(12, 9)
         XCTAssertEqual(watching.posted, [], "Its own clock is in front of the user.")
-        XCTAssertEqual(watching.watcher.doneGameIDs, [ID.harborMistGameID])
+        XCTAssertEqual(watching.watcher.doneGameIDs, [], "It hasn't played, so the game isn't done.")
         watching.onScreen = []
         watching.ticks(8, 3)
-        XCTAssertEqual(watching.posted, [], "Leaving it under 10 s plays nothing either.")
+        XCTAssertEqual(watching.posted, [], "Leaving it under 10 s plays nothing: that fall was seen.")
+        // The clock back above 10 s, as when the next turn starts in its 30 s period.
+        watching.ticks(12, 9)
+        XCTAssertEqual(watching.posted, played, "A later fall off screen plays.")
+        watching.ticks(12, 9)
+        XCTAssertEqual(watching.posted, played, "Once per game.")
 
         let elsewhere = try window()
         elsewhere.onScreen = [SurroundUITestContract.fixtureGameID]
@@ -399,28 +423,33 @@ final class LowTimeHapticWatcherTests: XCTestCase {
         XCTAssertEqual(elsewhere.posted.map(\.key), [.lowTime(ID.harborMistGameID)])
     }
 
-    func testUnderTheCoverTheGameIsDoneWithoutPlaying() throws {
+    func testUnderTheCoverAFallPlaysNothingAndALaterOneDoes() throws {
         let window = try window()
         window.isCovered = true
         window.attach()
         window.ticks(12, 9)
         XCTAssertEqual(window.posted, [])
-        XCTAssertEqual(window.watcher.doneGameIDs, [ID.harborMistGameID])
+        XCTAssertEqual(window.watcher.doneGameIDs, [])
         window.isCovered = false
         window.ticks(8, 3)
         XCTAssertEqual(window.posted, [], "The cover lowering doesn't play it late.")
+        window.ticks(12, 9)
+        XCTAssertEqual(window.posted, played, "A fall after the cover plays.")
+        XCTAssertEqual(window.watcher.doneGameIDs, [ID.harborMistGameID])
     }
 
-    func testSettingsHapticsOffSilencesIt() throws {
+    func testSettingsHapticsOffSilencesItUntilTheyAreOn() throws {
         let window = try window()
         window.preferences[.hapticsFeedback] = false
         window.attach()
         window.ticks(12, 9)
         XCTAssertEqual(window.posted, [])
-        XCTAssertEqual(window.watcher.doneGameIDs, [ID.harborMistGameID])
+        XCTAssertEqual(window.watcher.doneGameIDs, [])
         window.preferences[.hapticsFeedback] = true
         window.ticks(8, 3)
         XCTAssertEqual(window.posted, [], "Turning haptics on later doesn't play it late.")
+        window.ticks(12, 9)
+        XCTAssertEqual(window.posted, played, "A fall with haptics on plays.")
     }
 
     func testOfflineNothingPlays() throws {
