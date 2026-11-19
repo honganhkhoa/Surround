@@ -124,7 +124,7 @@ final class StonePlacementSoundTests: XCTestCase {
 
     func testPlacementStartsBeforeSeparateScheduledCaptureVoice() throws {
         let audio = AudioRecorder()
-        let player = StonePlacementSoundPlayer(makePlayer: audio.makePlayer)
+        let player = soundPlayer(audio)
         player.prepare(theme: .surroundStudio, enabled: true)
         XCTAssertEqual(audio.voices.count, 6, "Only placement clips are prepared initially")
         XCTAssertFalse(audio.voices.contains { $0.name.hasPrefix("StoneCapture-") })
@@ -144,7 +144,7 @@ final class StonePlacementSoundTests: XCTestCase {
     func testMuteThemeChangeAndDisappearanceCancelScheduledCapture() throws {
         for action in ["mute", "theme", "disappear"] {
             let audio = AudioRecorder()
-            let player = StonePlacementSoundPlayer(makePlayer: audio.makePlayer)
+            let player = soundPlayer(audio)
             player.play(move: try captureMove(count: 1), theme: .standard, enabled: true)
             let placement = try XCTUnwrap(audio.voices.first { $0.plays == 1 })
             let capture = try XCTUnwrap(audio.voices.first { !$0.scheduledTimes.isEmpty })
@@ -164,24 +164,123 @@ final class StonePlacementSoundTests: XCTestCase {
         XCTAssertTrue(mutedAudio.voices.isEmpty, "Muted moves must not decode or play audio")
     }
 
-    func testNextPlacementOrPassCancelsPreviousCaptureWithoutStackingVoices() throws {
+    func testNextPlacementOrPassLetsThePreviousSoundsFinish() throws {
         for isPass in [false, true] {
             let audio = AudioRecorder()
-            let player = StonePlacementSoundPlayer(makePlayer: audio.makePlayer)
+            let player = soundPlayer(audio)
             let first = try captureMove(count: 1)
             player.play(move: first, theme: .standard, enabled: true)
             let capture = try XCTUnwrap(audio.voices.first { !$0.scheduledTimes.isEmpty })
             let next = try first.after.makeMove(move: isPass ? .pass : .placeStone(2, 2))
             player.play(move: .init(before: first.after, after: next), theme: .standard, enabled: true)
-            XCTAssertEqual(capture.stops, 1)
+            XCTAssertEqual(capture.stops, 0, "A quick reply or a pass must not cut the capture it follows")
+            XCTAssertFalse(audio.actions.contains { $0.hasPrefix("stop:") }, "\(audio.actions)")
             XCTAssertEqual(audio.voices.reduce(0) { $0 + $1.scheduledTimes.count }, 1)
             XCTAssertEqual(audio.voices.reduce(0) { $0 + $1.plays }, isPass ? 1 : 2)
+            XCTAssertEqual(player.liveVoiceCount, isPass ? 2 : 3)
         }
+    }
+
+    func testSoundingCaptureOutlivesItsEvictedBankUntilItEnds() throws {
+        let audio = AudioRecorder(retainsVoices: false)
+        let player = soundPlayer(audio)
+        player.play(move: try captureMove(count: 1), theme: .standard, enabled: true)
+        let single = try XCTUnwrap(audio.voices.first { !$0.scheduledTimes.isEmpty }).name
+        // Two more capture sizes evict the single-stone bank while its clip is due.
+        player.play(move: try captureMove(count: 2), theme: .standard, enabled: true)
+        player.play(move: try captureMove(count: 4), theme: .standard, enabled: true)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("release:StoneCapture-standard-white-single-") }.count, 2,
+                       "The evicted bank's unused clips go")
+        XCTAssertTrue(audio.voices.contains { $0.name == single }, "Releasing a voice would stop it")
+        XCTAssertFalse(audio.actions.contains("stop:\(single)"))
+
+        audio.now += 1
+        player.play(move: try captureMove(count: 0), theme: .standard, enabled: true)
+        XCTAssertTrue(audio.actions.contains("release:\(single)"), "An ended voice is let go")
+        XCTAssertFalse(audio.actions.contains("stop:\(single)"), "It ended by itself")
+        XCTAssertEqual(player.liveVoiceCount, 1, "Only the newest placement is still sounding")
+    }
+
+    func testClipComingRoundWhileSoundingIsStoppedBeforeItRestarts() throws {
+        let audio = AudioRecorder()
+        let player = soundPlayer(audio)
+        // Three quick single captures, with no time passing, use each of the
+        // bank's three clips before any comes round again.
+        for _ in 0..<3 {
+            player.play(move: try captureMove(count: 1), theme: .standard, enabled: true)
+        }
+        XCTAssertEqual(Set(audio.actions.filter { $0.hasPrefix("schedule:") }).count, 3,
+                       "A quiet clip is chosen over one still sounding")
+        XCTAssertEqual(Set(audio.actions.filter { $0.hasPrefix("play:") }).count, 3)
+        XCTAssertFalse(audio.actions.contains { $0.hasPrefix("stop:") })
+
+        // Every clip is still sounding now: the one reused stops first, so its
+        // scheduled start waits for the delay instead of playing at once.
+        player.play(move: try captureMove(count: 1), theme: .standard, enabled: true)
+        let last = Array(audio.actions.suffix(4))
+        XCTAssertEqual(last.count, 4)
+        let placement = last[1].replacingOccurrences(of: "play:", with: "")
+        let capture = last[3].replacingOccurrences(of: "schedule:", with: "")
+        XCTAssertEqual(last, ["stop:\(placement)", "play:\(placement)", "stop:\(capture)", "schedule:\(capture)"])
+        XCTAssertEqual(player.liveVoiceCount, 6, "A restarted voice is listed once")
+    }
+
+    func testEndedVoicesStayEndedWhenTheAudioClockRestarts() throws {
+        let audio = AudioRecorder()
+        let player = soundPlayer(audio)
+        for _ in 0..<3 {
+            player.play(move: try captureMove(count: 1), theme: .standard, enabled: true)
+        }
+        // Every player falls idle, so the audio device's clock restarts from
+        // zero while the process clock moves on.
+        audio.now += 5
+        audio.deviceTime = 0.1
+        for _ in 0..<2 {
+            player.play(move: try captureMove(count: 1), theme: .standard, enabled: true)
+        }
+        XCTAssertFalse(audio.actions.contains { $0.hasPrefix("stop:") },
+                       "Finished clips are free, so no capture still playing is restarted")
+        XCTAssertEqual(player.liveVoiceCount, 4, "Only the two new placements and captures")
+        let delay = StonePlacementSoundPlayer.captureDelay
+        XCTAssertEqual(audio.voices.flatMap(\.scheduledTimes).filter { $0 < 1 }, [0.1 + delay, 0.1 + delay],
+                       "Starts are still scheduled on the device's clock")
+    }
+
+    func testLiveVoicesStayBoundedWhenMovesOutpaceTheirSounds() throws {
+        let audio = AudioRecorder(retainsVoices: false)
+        let player = soundPlayer(audio)
+        let limit = StonePlacementSoundPlayer.maximumLiveVoices
+        // Every move captures, each in a newly loaded bank, and no time passes,
+        // so no voice ends by itself.
+        for _ in 0..<10 {
+            for count in [1, 2, 4, 8] {
+                player.play(move: try captureMove(count: count), theme: .standard, enabled: true)
+                XCTAssertLessThanOrEqual(player.liveVoiceCount, limit)
+            }
+        }
+        XCTAssertEqual(player.liveVoiceCount, limit)
+        XCTAssertTrue(audio.actions.contains { $0.hasPrefix("stop:StoneCapture-") }, "The oldest voices stop")
+        // Six placement and six cached capture clips, plus at most the live voices.
+        XCTAssertLessThanOrEqual(audio.voices.count, 6 + 6 + limit)
+    }
+
+    func testResetStopsEveryLiveVoiceIncludingOnesOutlivingTheirBank() throws {
+        let audio = AudioRecorder(retainsVoices: false)
+        let player = soundPlayer(audio)
+        for count in [1, 2, 4] {
+            player.play(move: try captureMove(count: count), theme: .standard, enabled: true)
+        }
+        let started = audio.voices.filter { $0.plays + $0.scheduledTimes.count > 0 }
+        XCTAssertTrue(started.contains { $0.name.contains("-single-") }, "Its bank has been evicted")
+        XCTAssertEqual(started.count, player.liveVoiceCount)
+        player.reset()
+        XCTAssertTrue(started.allSatisfy { $0.stops == 1 }, "\(audio.actions)")
+        XCTAssertEqual(player.liveVoiceCount, 0)
     }
 
     func testCaptureCacheLoadsLazilyAndRetainsOnlyTwoRecentBanks() throws {
         let audio = AudioRecorder()
-        let player = StonePlacementSoundPlayer(makePlayer: audio.makePlayer)
+        let player = soundPlayer(audio)
         for count in [1, 2, 4] {
             player.play(move: try captureMove(count: count), theme: .standard, enabled: true)
         }
@@ -198,7 +297,7 @@ final class StonePlacementSoundTests: XCTestCase {
 
     func testBothPrisonerDeltasAreConsideredAndCaptureOverlapIsBounded() throws {
         let audio = AudioRecorder()
-        let player = StonePlacementSoundPlayer(makePlayer: audio.makePlayer)
+        let player = soundPlayer(audio)
         let move = try captureMove(count: 1)
         move.after.captures[.white] = 8
         XCTAssertEqual(StonePlacementSoundPlayer.captures(after: move.before, in: move.after), [
@@ -233,6 +332,11 @@ final class StonePlacementSoundTests: XCTestCase {
         return result
     }
 
+    /// A player whose clock is the recorder's.
+    private func soundPlayer(_ audio: AudioRecorder) -> StonePlacementSoundPlayer {
+        StonePlacementSoundPlayer(makePlayer: audio.makePlayer, uptime: { audio.now })
+    }
+
     /// Audio-driver fixtures isolate sequencing from the rules tests above.
     private func captureMove(count: Int) throws -> Game.AppliedMove {
         let before = BoardPosition(width: 9, height: 9)
@@ -242,28 +346,57 @@ final class StonePlacementSoundTests: XCTestCase {
     }
 
     private final class AudioRecorder {
-        var voices: [Voice] = []
+        private struct WeakVoice {
+            weak var voice: Voice?
+        }
+
+        /// The process clock, which the player times voices by.
+        var now: TimeInterval = 42
+        /// The audio device's clock, which schedules starts. It follows the
+        /// process clock unless set, as when it restarts from zero.
+        var deviceTime: TimeInterval?
         var actions: [String] = []
+        private let retainsVoices: Bool
+        private var retained: [Voice] = []
+        private var created: [WeakVoice] = []
+
+        /// Without retaining voices, only the player under test keeps them,
+        /// and each records when it is released.
+        init(retainsVoices: Bool = true) {
+            self.retainsVoices = retainsVoices
+        }
+
+        /// Every voice still allocated, in the order it was made.
+        var voices: [Voice] { created.compactMap(\.voice) }
 
         func makePlayer(_ name: String) -> StoneSoundPlaying? {
-            let voice = Voice(name: name) { [weak self] action in self?.actions.append(action) }
-            voices.append(voice)
+            let voice = Voice(name: name, recorder: self)
+            created.append(WeakVoice(voice: voice))
+            if retainsVoices { retained.append(voice) }
             return voice
         }
     }
 
     private final class Voice: StoneSoundPlaying {
         let name: String
-        let record: (String) -> Void
+        private weak var recorder: AudioRecorder?
         var currentTime: TimeInterval = 7
-        let deviceCurrentTime: TimeInterval = 42
+        var deviceCurrentTime: TimeInterval { recorder?.deviceTime ?? recorder?.now ?? 0 }
+        let duration: TimeInterval
         var plays = 0
         var scheduledTimes: [TimeInterval] = []
         var stops = 0
 
-        init(name: String, record: @escaping (String) -> Void) {
+        init(name: String, recorder: AudioRecorder) {
             self.name = name
-            self.record = record
+            self.recorder = recorder
+            duration = name.hasPrefix("StoneCapture-") ? 0.5 : 0.2
+        }
+
+        deinit { record("release:\(name)") }
+
+        private func record(_ action: String) {
+            recorder?.actions.append(action)
         }
 
         func prepareToPlay() -> Bool { true }

@@ -25,7 +25,7 @@ final class GameReplayTests: XCTestCase {
         XCTAssertEqual(events.first?.after.lastMoveColor, .black)
 
         let passed = try game.makeMove(move: .pass)
-        XCTAssertEqual(events.count, 2, "Passes are moves, allowing sound consumers to stop pending capture tails")
+        XCTAssertEqual(events.count, 2, "A pass is a move too, though it plays nothing and leaves earlier sounds playing")
         XCTAssertTrue(events.last?.before === placed)
         XCTAssertTrue(events.last?.after === passed)
         XCTAssertEqual(events.last?.after.lastMove, .pass)
