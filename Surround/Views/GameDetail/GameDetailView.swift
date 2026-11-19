@@ -1914,8 +1914,8 @@ private struct GameToolbarLayout: ViewModifier {
         let isShown: Bool
         var nativeBadge: GameControlNativeItem.Badge?
         if form.isNative {
-            let item = GameControlNativeItem(drawn, allowsPicker: allowsPicker,
-                                             keepsPlace: placement == .railSeparated)
+            let keepsPlace = GameControlNativeItem.keepsPlace(at: placement, isSignedIn: ogs.isLoggedIn)
+            let item = GameControlNativeItem(drawn, allowsPicker: allowsPicker, keepsPlace: keepsPlace)
             nativeBadge = item?.badge
             isShown = (item != nil && !zenMode) || isOpen
             let label = GameControlAccessibility(drawn ?? .inbox(count: 0), form: form, allowsPicker: allowsPicker,

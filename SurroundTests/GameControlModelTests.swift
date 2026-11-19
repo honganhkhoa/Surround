@@ -487,6 +487,21 @@ final class GameControlModelTests: XCTestCase {
         XCTAssertEqual(GameControlIcon.inbox.systemName, "tray")
     }
 
+    /// With no slot only the Duo's wide rail keeps the item, so the pill
+    /// beside it stays put, and only while the user is signed in: signed out
+    /// nothing can wait, so no item opens a popover with nothing in it.
+    func testOnlyTheDuosWideRailKeepsThePlaceAndOnlySignedIn() {
+        typealias Item = GameControlNativeItem
+        let placements: [GameActiveGamesPlacement] = [.rail, .railSeparated, .bottomBar, .topBarBeforeModes,
+                                                      .topBarAfterModes]
+        for placement in placements {
+            XCTAssertEqual(Item.keepsPlace(at: placement, isSignedIn: true), placement == .railSeparated, "\(placement)")
+            XCTAssertFalse(Item.keepsPlace(at: placement, isSignedIn: false), "Signed out: \(placement)")
+        }
+        XCTAssertNil(Item(nil, allowsPicker: false, keepsPlace: Item.keepsPlace(at: .railSeparated, isSignedIn: false)),
+                     "Signed out the wide rail shows no item.")
+    }
+
     private func zenInput() -> Model.Input {
         var input = Model.Input()
         input.liveGames = [yourMove(1), yourMove(2, left: 100), yourMove(3, left: 50)]
@@ -1119,12 +1134,19 @@ final class GameControlModelTests: XCTestCase {
         XCTAssertEqual(slot(), .base(plusN: 1), "Game over releases what waited, read from the game itself.")
     }
 
+    /// Signed out there is no slot, and no item keeps its place, not even
+    /// on the Duo's wide rail.
     func testSignedOutThereIsNoSlot() throws {
         let window = try openWindow(.several)
         window.ogs.user = nil
+        window.ogs.isLoggedIn = false
+        let keepsPlace = GameControlNativeItem.keepsPlace(at: .railSeparated, isSignedIn: window.ogs.isLoggedIn)
         for context in [Context.home, Context(isZen: true), Context(allowsPicker: false)] {
-            XCTAssertNil(GameControlSlot(ogs: window.ogs, showing: window.game, context: context,
-                                         startedGames: window.seed.startedGames, now: clock.now), "\(context)")
+            let slot = GameControlSlot(ogs: window.ogs, showing: window.game, context: context,
+                                       startedGames: window.seed.startedGames, now: clock.now)
+            XCTAssertNil(slot, "\(context)")
+            XCTAssertNil(GameControlNativeItem(slot, allowsPicker: context.allowsPicker, keepsPlace: keepsPlace),
+                         "\(context)")
         }
     }
     #endif
