@@ -823,15 +823,93 @@ struct GameControlInteraction: Equatable {
         offersOpenActivity = hold == .openPopover && tap != .openPopover
     }
 
-    /// A press in a custom form that ends `duration` after it began,
-    /// whatever took the touch on the way. A release 0.5 s or more after the
-    /// press began never switches: it opens the popover as a hold would,
-    /// unless a hold already fired, and then it does nothing more. So when
-    /// something else takes the hold, as the Large Content Viewer does at
-    /// accessibility sizes, the worst case is the popover, not a switch.
+    /// A press in a custom form that ends `duration` after it began. A
+    /// release 0.5 s or more after the press began never switches: it opens
+    /// the popover as a hold would, unless a hold already fired, and then it
+    /// does nothing more. So a press whose hold didn't fire still never
+    /// switches games, as long as the button saw it begin.
     func release(after duration: TimeInterval, holdFired: Bool) -> GameControlAction {
         if holdFired { return .none }
         return duration >= Self.holdDuration ? hold : tap
+    }
+}
+
+/// When the current press on a custom item began, and whether its hold
+/// fired: what `GameControlInteraction.release(after:holdFired:)` needs. A
+/// reference, so a press redraws nothing. Some presses end without the
+/// release: a hold that opened the popover can end off the item, and so can
+/// a short press dragged off it. Neither may reach a later release whose
+/// press the button style never saw, as when a press begins and ends within
+/// one update. So a hold's press is cleared when its popover closes, and a
+/// press shorter than a hold is cleared a main-queue turn after it stops
+/// showing as pressed, unless a release ended it first, as a tap's does. A
+/// longer press stays until its release, so that release never switches
+/// games.
+final class GameControlPress {
+    /// A press older than this was never released on the item, as one
+    /// dragged away from it; it can't be the one a tap ends.
+    private static let longestPress: TimeInterval = 60
+    private var began: TimeInterval?
+    private var holdFired = false
+    /// Goes up whenever a press is cleared, so a clear meant for one press
+    /// never reaches the next.
+    private var generation = 0
+    private let now: () -> TimeInterval
+    private let nextTurn: (@escaping () -> Void) -> Void
+
+    /// - Parameters:
+    ///   - now: Monotonic seconds, replaceable for tests.
+    ///   - nextTurn: Runs its work a main-queue turn later, replaceable for
+    ///     tests.
+    init(now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+         nextTurn: @escaping (@escaping () -> Void) -> Void = { DispatchQueue.main.async(execute: $0) }) {
+        self.now = now
+        self.nextTurn = nextTurn
+    }
+
+    /// The button style shows the item pressed.
+    func begin() {
+        clear()
+        began = now()
+    }
+
+    /// The hold fired; the release that ends it then does nothing more.
+    func hold() {
+        if began == nil { began = now() - GameControlInteraction.holdDuration }
+        holdFired = true
+    }
+
+    /// The button style no longer shows the item pressed. A press shorter
+    /// than a hold that no release ends within this main-queue turn was
+    /// dragged off the item, so it is cleared then.
+    func end() {
+        guard let began, !holdFired, now() - began < GameControlInteraction.holdDuration else { return }
+        let press = generation
+        nextTurn { [weak self] in
+            guard let self, self.generation == press, !self.holdFired else { return }
+            self.clear()
+        }
+    }
+
+    /// The item's popover closed. A hold that opened it has ended by now,
+    /// whether or not its release reached the item.
+    func popoverClosed() {
+        if holdFired { clear() }
+    }
+
+    /// The press that a release ends: how long it lasted and whether its
+    /// hold fired. A release whose press was never seen counts as a tap.
+    func release() -> (duration: TimeInterval, holdFired: Bool) {
+        defer { clear() }
+        let time = now()
+        guard let began, time - began < Self.longestPress else { return (0, false) }
+        return (time - began, holdFired)
+    }
+
+    private func clear() {
+        began = nil
+        holdFired = false
+        generation += 1
     }
 }
 

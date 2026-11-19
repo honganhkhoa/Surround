@@ -49,6 +49,18 @@ struct GameControlItemModel {
     var openPopover: () -> Void
     /// Zen's control, whose tap shows the chip's game and nothing else.
     var isZen = false
+    /// The item's popover is open, as its bar item says. A hold that opened
+    /// it has ended when it closes.
+    var isPopoverPresented = false
+}
+
+extension GameControlItemModel {
+    /// The model with its bar item's popover state.
+    func withPopoverPresented(_ isPresented: Bool) -> Self {
+        var model = self
+        model.isPopoverPresented = isPresented
+        return model
+    }
 }
 
 /// The control in the bottom bar: a custom view, 160 pt wide at most.
@@ -58,7 +70,7 @@ struct GameControlBottomBarItem: View {
     let popover: AnyView
 
     var body: some View {
-        GameControlCustomItem(form: .bottomBar, model: model)
+        GameControlCustomItem(form: .bottomBar, model: model.withPopoverPresented(isPresented))
             .popover(isPresented: $isPresented) {
                 popover.presentationCompactAdaptation(.popover)
             }
@@ -74,7 +86,7 @@ struct GameControlTopBarItem: View {
     let popover: AnyView
 
     var body: some View {
-        GameControlCustomItem(form: .topBar, model: model)
+        GameControlCustomItem(form: .topBar, model: model.withPopoverPresented(isPresented))
             .popover(isPresented: $isPresented) {
                 popover.presentationCompactAdaptation(.popover)
             }
@@ -155,8 +167,7 @@ private struct GameControlIconButton: View {
 /// A custom item's button, and the Zen circle's: a tap does the state's tap
 /// and a touch and hold opens the popover, or in Zen does nothing. Its press
 /// timing keeps a release 0.5 s or more after the press began from ever
-/// switching games, whatever took the touch on the way, as the Large Content
-/// Viewer does at accessibility sizes.
+/// switching games, even where the hold didn't fire.
 private struct GameControlButton<Label: View>: View {
     let face: GameControlFace
     let model: GameControlItemModel
@@ -171,11 +182,14 @@ private struct GameControlButton<Label: View>: View {
         } label: {
             label()
         }
-        .buttonStyle(GameControlPressStyle(onPress: press.begin))
+        .buttonStyle(GameControlPressStyle(onPress: press.begin, onEnd: press.end))
         .simultaneousGesture(LongPressGesture(minimumDuration: GameControlInteraction.holdDuration).onEnded { _ in
             press.hold()
             perform(face.interaction.hold)
         })
+        .onChange(of: model.isPopoverPresented) { _, isPresented in
+            if !isPresented { press.popoverClosed() }
+        }
         .accessibilityLabel(Text(verbatim: accessibility.label))
         .accessibilityValue(Text(verbatim: accessibility.value ?? ""))
         .accessibilityHint(Text(verbatim: accessibility.hint ?? ""))
@@ -208,49 +222,18 @@ extension GameControlButton where Label == GameControlFaceView {
     }
 }
 
-/// When the current press on a custom item began, and whether its hold
-/// fired. A reference, so a press redraws nothing.
-private final class GameControlPress {
-    /// A press older than this was never released on the item, as one
-    /// dragged away from it; it can't be the one a tap ends.
-    private static let longestPress: TimeInterval = 60
-    private var began: TimeInterval?
-    private var holdFired = false
-
-    private var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
-
-    func begin() {
-        began = now
-        holdFired = false
-    }
-
-    /// The hold fired; the release that ends it then does nothing more.
-    func hold() {
-        if began == nil { began = now - GameControlInteraction.holdDuration }
-        holdFired = true
-    }
-
-    /// The press that a release ends: how long it lasted and whether its
-    /// hold fired. A release whose press was never seen counts as a tap.
-    func release() -> (duration: TimeInterval, holdFired: Bool) {
-        defer {
-            began = nil
-            holdFired = false
-        }
-        guard let began, now - began < Self.longestPress else { return (0, false) }
-        return (now - began, holdFired)
-    }
-}
-
-/// Reports each press as it begins, and dims the item while it is pressed.
+/// Reports each press as it begins and as it stops showing, and dims the
+/// item while it is pressed.
 private struct GameControlPressStyle: ButtonStyle {
     let onPress: () -> Void
+    let onEnd: () -> Void
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(configuration.isPressed ? 0.6 : 1)
             .onChange(of: configuration.isPressed) { wasPressed, isPressed in
                 if isPressed && !wasPressed { onPress() }
+                if wasPressed && !isPressed { onEnd() }
             }
     }
 }

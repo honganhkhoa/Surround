@@ -574,6 +574,98 @@ final class GameControlModelTests: XCTestCase {
         }
     }
 
+    /// A press on the chip, on a clock the test moves, whose main-queue
+    /// turns the test runs.
+    private final class Press {
+        var now: TimeInterval = 1_000
+        private var turn = [() -> Void]()
+        private(set) lazy var press = GameControlPress(now: { [unowned self] in self.now },
+                                                       nextTurn: { [unowned self] in self.turn.append($0) })
+
+        /// The main queue's next turn.
+        func nextTurn() {
+            let work = turn
+            turn = []
+            work.forEach { $0() }
+        }
+
+        /// What the chip does for a release now.
+        func release() -> GameControlAction {
+            let release = press.release()
+            return Interaction(.chip(gameID: 7, plusN: 0, hasDot: false), form: .bottomBar)
+                .release(after: release.duration, holdFired: release.holdFired)
+        }
+    }
+
+    func testAHoldsPressEndsWhenItsPopoverCloses() {
+        let chip = Press()
+        chip.press.begin()
+        chip.now += 0.5
+        chip.press.hold()
+        chip.now += 2.5
+        XCTAssertEqual(chip.release(), .none, "Released on the item, the hold's own release does nothing more.")
+        chip.press.end()
+        chip.nextTurn()
+
+        // A hold dragged off the item: no release comes.
+        chip.press.begin()
+        chip.now += 0.5
+        chip.press.hold()
+        chip.now += 0.7
+        chip.press.end()
+        chip.nextTurn()
+        chip.now += 4
+        chip.press.popoverClosed()
+        XCTAssertEqual(chip.release(), .show(gameID: 7),
+                       "A release whose press wasn't seen, after the popover closed, is a tap.")
+    }
+
+    func testAShortPressThatEndsWithoutAReleaseIsClearedAMainQueueTurnLater() {
+        let chip = Press()
+        chip.press.begin()
+        chip.now += 0.2
+        chip.press.end()
+        chip.nextTurn()
+        chip.now += 5
+        XCTAssertEqual(chip.release(), .show(gameID: 7),
+                       "After a press dragged off the item, a release whose press wasn't seen is a tap.")
+
+        chip.press.begin()
+        chip.now += 0.1
+        XCTAssertEqual(chip.release(), .show(gameID: 7), "A tap releases before it stops showing as pressed.")
+        chip.press.end()
+        chip.nextTurn()
+        chip.press.begin()
+        chip.now += 0.1
+        chip.press.end()
+        XCTAssertEqual(chip.release(), .show(gameID: 7), "A release in the same turn still ends its press first.")
+        chip.press.begin()
+        chip.nextTurn()
+        chip.now += 0.6
+        XCTAssertEqual(chip.release(), .openPopover, "The earlier press's clear leaves the next press alone.")
+
+        chip.press.begin()
+        chip.now += 0.2
+        chip.press.popoverClosed()
+        chip.now += 0.4
+        XCTAssertEqual(chip.release(), .openPopover, "A popover closing ends only a hold's press.")
+    }
+
+    func testAPressAsLongAsAHoldStaysUntilItsRelease() {
+        let chip = Press()
+        chip.press.begin()
+        chip.now += 0.5
+        chip.press.end()
+        chip.nextTurn()
+        chip.now += 2.5
+        XCTAssertEqual(chip.release(), .openPopover,
+                       "Half a second or more, it stays after it stops showing as pressed; its release opens the popover.")
+
+        chip.press.begin()
+        chip.now += 61
+        XCTAssertEqual(chip.release(), .show(gameID: 7), "A press older than a minute was never released on the item.")
+    }
+
     // MARK: VoiceOver
 
     private typealias Spoken = GameControlAccessibility
