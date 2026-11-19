@@ -821,21 +821,35 @@ final class GameControlDeadlines: ObservableObject {
 
 // MARK: - The Large Content Viewer
 
-/// Takes the Large Content Viewer off the bar's host of a custom item. At
-/// accessibility text sizes the bar gives that host a viewer interaction,
-/// which takes a touch and hold for its own enlarged copy of the item and
-/// turns the release into a tap, which on the chip is a switch. The
-/// control's popover is its large view instead. When it enters a window,
-/// and whenever the text size changes, the guard looks from its own view up
-/// to the enclosing bar and removes every viewer interaction on the way.
-/// If the bar ever gives one back first, press timing still keeps the long
-/// press from switching games.
+/// Takes the Large Content Viewer off the bar's host of a custom item while
+/// the item is in a window. At accessibility text sizes the bar gives that
+/// host a viewer interaction, which takes a touch and hold for its own
+/// enlarged copy of the item and turns the release into a tap, which on the
+/// chip is a switch. The control's popover is its large view instead. When
+/// it enters a window, and whenever the text size changes, the guard looks
+/// from its own view up to the enclosing bar and removes every viewer
+/// interaction on the way. It stops before the bar's own views, which serve
+/// the bar's other items, also after Back. When it leaves the window it
+/// adds each back, so a host the bar reuses for another item keeps its
+/// viewer, unless another custom item's guard is inside that host by then,
+/// which gives it back in turn. If the bar ever gives one back first, a
+/// hold switches games again: the viewer takes the touch before the button
+/// sees a press, and its release reaches the chip as a tap.
 private struct GameControlLargeContentViewerGuard: UIViewRepresentable {
     func makeUIView(context: Context) -> GuardView { GuardView() }
 
     func updateUIView(_ view: GuardView, context: Context) {}
 
     final class GuardView: UIView {
+        /// A viewer interaction the guard removed, and the view it was on.
+        private struct Removed {
+            weak var view: UIView?
+            let interaction: UILargeContentViewerInteraction
+        }
+
+        /// What it removed and gives back when it leaves the window.
+        private var removed = [Removed]()
+
         init() {
             super.init(frame: .zero)
             isUserInteractionEnabled = false
@@ -853,6 +867,8 @@ private struct GameControlLargeContentViewerGuard: UIViewRepresentable {
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
+            // What it took in the window it left goes back first.
+            restoreViewers()
             removeViewers()
         }
 
@@ -869,16 +885,45 @@ private struct GameControlLargeContentViewerGuard: UIViewRepresentable {
             guard window != nil else { return }
             var ancestor = superview
             while let view = ancestor, !(view is UIWindow) {
-                for interaction in view.interactions where interaction is UILargeContentViewerInteraction {
+                let name = String(describing: type(of: view))
+                if name.contains("Toolbar") || name.contains("NavigationBar") { return }
+                for case let interaction as UILargeContentViewerInteraction in view.interactions {
                     view.removeInteraction(interaction)
+                    removed.append(Removed(view: view, interaction: interaction))
                     #if DEBUG && MAIN_APP
                     GameControlLog.record("removed the Large Content Viewer from \(type(of: view))")
                     #endif
                 }
-                let name = String(describing: type(of: view))
-                if name.contains("Toolbar") || name.contains("NavigationBar") { return }
                 ancestor = view.superview
             }
+        }
+
+        private func restoreViewers() {
+            let records = removed
+            removed = []
+            for record in records {
+                guard let view = record.view else { continue }
+                if let heir = Self.guardView(in: view, otherThan: self) {
+                    heir.removed.append(record)
+                    #if DEBUG && MAIN_APP
+                    GameControlLog.record("left the Large Content Viewer off \(type(of: view)) for the item in it")
+                    #endif
+                } else if !view.interactions.contains(where: { $0 is UILargeContentViewerInteraction }) {
+                    view.addInteraction(record.interaction)
+                    #if DEBUG && MAIN_APP
+                    GameControlLog.record("restored the Large Content Viewer to \(type(of: view))")
+                    #endif
+                }
+            }
+        }
+
+        /// Another guard in a window inside `view`.
+        private static func guardView(in view: UIView, otherThan excluded: GuardView) -> GuardView? {
+            for subview in view.subviews {
+                if let found = subview as? GuardView, found !== excluded, found.window != nil { return found }
+                if let found = guardView(in: subview, otherThan: excluded) { return found }
+            }
+            return nil
         }
     }
 }
