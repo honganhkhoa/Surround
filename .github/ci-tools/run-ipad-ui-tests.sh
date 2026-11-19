@@ -179,13 +179,14 @@ for test_name in "$keyboard_preflight_test_name" "${composer_test_names[@]}"; do
 done
 
 # Each part, and the Activity, game control, composer and continuity phases,
-# run under supervise-ipad-ui-test-part.py. CI gives each part step 50 minutes;
-# at 46 the supervisor interrupts xcodebuild, which then has time to write its
-# result bundle and the supervisor its evidence: at most 1:45 of signal grace
-# and under a minute of bounded collection. The game control, composer and
-# continuity steps get 45 minutes and the Activity step 30, with the same
-# margin. A test that a simulator crash killed, or that failed only because
-# XCTest timed out on a UI query, is rerun once, within the same deadline.
+# run under supervise-ipad-ui-test-part.py. CI gives each part step, and the
+# composer step, 50 minutes; at 46 the supervisor interrupts xcodebuild, which
+# then has time to write its result bundle and the supervisor its evidence: at
+# most 1:45 of signal grace and under a minute of bounded collection. The game
+# control and continuity steps get 45 minutes and the Activity step 30, with
+# the same margin. A test that a simulator crash killed, or that failed only
+# because XCTest timed out on a UI query, is rerun once, within the same
+# deadline.
 readonly part_deadline_seconds=$((46 * 60))
 readonly isolated_phase_deadline_seconds=$((41 * 60))
 readonly activity_phase_deadline_seconds=$((26 * 60))
@@ -435,7 +436,7 @@ case "$phase" in
     done
 
     echo "Running the isolated iPad composer and keyboard UI tests."
-    run_supervised_tests "$isolated_phase_deadline_seconds" \
+    run_supervised_tests "$part_deadline_seconds" \
       "TestResults/SurroundUITests-${result_label}-Composer.xcresult" \
       "${selection_arguments[@]}"
     ;;

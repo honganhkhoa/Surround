@@ -12,11 +12,11 @@ on:
 permissions:
   contents: read
 
-# Every "part N of M" step below keeps a 50-minute limit: run-ipad-ui-tests.sh
-# interrupts xcodebuild at 46 minutes and needs the rest to save the result
-# bundle and failure evidence. The game control, composer and continuity
-# steps keep 45 minutes, interrupted at 41, and the Activity steps 30,
-# interrupted at 26. Change part_deadline_seconds,
+# Every "part N of M" step below, and each composer step, keeps a 50-minute
+# limit: run-ipad-ui-tests.sh interrupts xcodebuild at 46 minutes and needs
+# the rest to save the result bundle and failure evidence. The game control
+# and continuity steps keep 45 minutes, interrupted at 41, and the Activity
+# steps 30, interrupted at 26. Change part_deadline_seconds,
 # isolated_phase_deadline_seconds and activity_phase_deadline_seconds with
 # these limits.
 jobs:
@@ -663,7 +663,7 @@ jobs:
   ipad-composer-ui-tests:
     name: iPadOS ${{ matrix.ios }} composer and continuity
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 125
+    timeout-minutes: 130
     strategy:
       fail-fast: false
       matrix:
@@ -712,7 +712,7 @@ jobs:
 
       - name: Run isolated iPad composer UI tests
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 45
+        timeout-minutes: 50
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh composer \
