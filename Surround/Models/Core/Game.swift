@@ -21,8 +21,70 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
 
     /// Successful incremental main-line moves only. Snapshot reconstruction,
     /// analysis, undo and scoring can change positions without replaying audio.
-    /// Passthrough delivery also keeps a newly opened game silent.
+    /// Passthrough delivery also keeps a newly opened game silent. The user's
+    /// own stone sounds earlier, on `moveCommits`, and each board skips the
+    /// matching move here, OGS's echo of it.
     let moveApplied = PassthroughSubject<AppliedMove, Never>()
+
+    enum MoveCommit {
+        /// A stone placement this client has just sent, under its request's
+        /// ID, with the position it leads to under this game's rules.
+        case committed(AppliedMove, id: UUID)
+        /// The same, sent from another window on this game. That window
+        /// plays it, so a board here only skips its own echo.
+        case committedElsewhere(AppliedMove, id: UUID)
+        /// OGS refused the request with this ID, so no echo of it is coming.
+        /// Any other commit still waits, the same stone sent from another
+        /// window among them.
+        case withdrawn(id: UUID)
+    }
+
+    /// The user's own stone placements, as they are sent rather than when
+    /// OGS echoes them a round trip later. Every board showing this game
+    /// hears them, as it hears `moveApplied`, and so do the other windows'
+    /// models of the same game for the same account. Passes are not
+    /// announced.
+    let moveCommits = PassthroughSubject<MoveCommit, Never>()
+
+    private struct WeakGame {
+        weak var game: Game?
+    }
+
+    /// Each window has its own OGSService, socket and Game, so one game can
+    /// have a model in every window. Main thread only.
+    private static var liveGames: [GameID: [WeakGame]] = [:]
+    private static var liveGamesAtLastSweep = 0
+
+    /// Lists this model among the windows' live models of its game, so
+    /// commits made in another window reach it.
+    func joinLiveGames() {
+        var games = Self.liveGames[self.ID, default: []].filter { $0.game != nil }
+        if !games.contains(where: { $0.game === self }) {
+            games.append(WeakGame(game: self))
+        }
+        Self.liveGames[self.ID] = games
+        // Games whose models have all gone, as the public games list cycles,
+        // leave in one sweep once the table has doubled since the last, so
+        // an overview refresh that rejoins every game stays linear.
+        if Self.liveGames.count > 2 * Self.liveGamesAtLastSweep + 16 {
+            Self.liveGames = Self.liveGames.compactMapValues { entries -> [WeakGame]? in
+                let live = entries.filter { $0.game != nil }
+                return live.isEmpty ? nil : live
+            }
+            Self.liveGamesAtLastSweep = Self.liveGames.count
+        }
+    }
+
+    /// The games that some window's model still shows.
+    static var liveGameIDs: Set<GameID> { Set(liveGames.keys) }
+
+    /// The other windows' models of this game, signed in to the same account.
+    private var otherWindowsGames: [Game] {
+        guard let accountID = ogs?.user?.id else { return [] }
+        return Self.liveGames[self.ID, default: []].compactMap(\.game).filter {
+            $0 !== self && $0.ogs?.user?.id == accountID
+        }
+    }
 
     static func == (lhs: Game, rhs: Game) -> Bool {
         return lhs.ID == rhs.ID
@@ -495,34 +557,57 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             .sink { [weak self] in self?.objectWillChange.send() }
     }
     
+    /// The position `move` leads to from `fromPosition` under this game's
+    /// rules, free handicap placement and self-capture included, without
+    /// registering it or announcing it.
+    func position(after move: Move, from fromPosition: BoardPosition) throws -> BoardPosition {
+        if let handicap = gameData?.handicap,
+           gameData?.freeHandicapPlacement ?? false,
+           fromPosition.lastMoveNumber < handicap - 1 {
+            return try fromPosition.makeHandicapPlacement(move: move)
+        }
+        return try fromPosition.makeMove(move: move, allowsSelfCapture: gameData?.allowSelfCapture ?? false)
+    }
+
     @discardableResult
     func makeMove(move: Move, fromAnalyticsPosition: BoardPosition? = nil) throws -> BoardPosition {
         let fromPosition = fromAnalyticsPosition ?? self.currentPosition
-        var newPosition: BoardPosition? = nil
-        if let handicap = gameData?.handicap {
-            if gameData?.freeHandicapPlacement ?? false {
-                if fromPosition.lastMoveNumber < handicap - 1 {
-                    newPosition = try fromPosition.makeHandicapPlacement(move: move)
-                }
-            }
+        let newPosition = try position(after: move, from: fromPosition)
+        if fromPosition === currentPosition && fromAnalyticsPosition == nil {
+            let registeredPosition = self.moveTree.register(newPosition: newPosition, fromPosition: self.currentPosition, mainBranch: true)
+            self.currentPosition = registeredPosition
+            self.undoRequest = nil
+            moveApplied.send(AppliedMove(before: fromPosition, after: registeredPosition))
+            return registeredPosition
         }
-        if newPosition == nil {
-            newPosition = try fromPosition.makeMove(move: move, allowsSelfCapture: gameData?.allowSelfCapture ?? false)
+        if fromPosition === fromAnalyticsPosition {
+            return self.moveTree.register(newPosition: newPosition, fromPosition: fromPosition, mainBranch: false)
         }
-        if let newPosition = newPosition {
-            if fromPosition === currentPosition && fromAnalyticsPosition == nil {
-                let registeredPosition = self.moveTree.register(newPosition: newPosition, fromPosition: self.currentPosition, mainBranch: true)
-                self.currentPosition = registeredPosition
-                self.undoRequest = nil
-                moveApplied.send(AppliedMove(before: fromPosition, after: registeredPosition))
-                return registeredPosition
-            }
-            if fromPosition === fromAnalyticsPosition {
-                return self.moveTree.register(newPosition: newPosition, fromPosition: fromPosition, mainBranch: false)
-            }
+        return newPosition
+    }
+
+    /// Announces a move the user has just sent from `position`, under its
+    /// request's ID, before OGS echoes it. A stone placement goes out on
+    /// `moveCommits` with the position it leads to, which is returned. A
+    /// pass, or a move these rules refuse, announces nothing and returns nil.
+    @discardableResult
+    func commitMove(_ move: Move, from position: BoardPosition, id: UUID) -> AppliedMove? {
+        guard case .placeStone = move,
+              let after = try? self.position(after: move, from: position) else { return nil }
+        let committed = AppliedMove(before: position, after: after)
+        moveCommits.send(.committed(committed, id: id))
+        for game in otherWindowsGames {
+            game.moveCommits.send(.committedElsewhere(committed, id: id))
         }
-        
-        return newPosition!
+        return committed
+    }
+
+    /// OGS refused request `id`, committed in this window or another, so no
+    /// echo of it is coming.
+    func withdrawMoveCommit(id: UUID) {
+        for game in [self] + otherWindowsGames {
+            game.moveCommits.send(.withdrawn(id: id))
+        }
     }
     
     func undoMove(numbered moveNumber: Int) {

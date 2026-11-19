@@ -278,6 +278,197 @@ final class StonePlacementSoundTests: XCTestCase {
         XCTAssertEqual(player.liveVoiceCount, 0)
     }
 
+    func testCommittedStonePlaysAtOnceAndItsEchoPlaysNothing() throws {
+        let audio = AudioRecorder()
+        let player = soundPlayer(audio)
+        player.playCommitted(move: try captureMove(count: 2), id: UUID(), theme: .standard, enabled: true)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("play:") }.count, 1)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("schedule:") }.count, 1, "Its capture plays locally")
+
+        // OGS echoes the same stone in new position objects.
+        player.play(move: try captureMove(count: 2), theme: .standard, enabled: true)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("play:") || $0.hasPrefix("schedule:") }.count, 2)
+        XCTAssertFalse(audio.actions.contains { $0.hasPrefix("stop:") })
+
+        player.play(move: try captureMove(count: 2), theme: .standard, enabled: true)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("play:") }.count, 2, "Only the one echo is skipped")
+    }
+
+    func testRefusedCommitStopsItsCaptureStillDueButNotEarlierSounds() throws {
+        let audio = AudioRecorder()
+        let player = soundPlayer(audio)
+        player.play(move: try captureMove(count: 4), theme: .standard, enabled: true)
+        let earlier = try XCTUnwrap(audio.voices.first { !$0.scheduledTimes.isEmpty })
+        let refusedID = UUID()
+        player.playCommitted(move: try captureMove(count: 1), id: refusedID, theme: .standard, enabled: true)
+        let committed = try XCTUnwrap(audio.voices.first { !$0.scheduledTimes.isEmpty && $0 !== earlier })
+
+        player.play(commit: .withdrawn(id: refusedID), theme: .standard, enabled: true)
+        XCTAssertEqual(committed.stops, 1, "A refused capture must not follow the error")
+        XCTAssertEqual(earlier.stops, 0, "An earlier move's capture plays on")
+        XCTAssertEqual(audio.voices.filter { $0.name.hasPrefix("StoneSound-") }.reduce(0) { $0 + $1.stops }, 0,
+                       "The clicks have already sounded")
+        XCTAssertEqual(player.liveVoiceCount, 3)
+    }
+
+    func testStonePlayedInAnotherWindowIsOnlyExpected() throws {
+        let audio = AudioRecorder()
+        let player = soundPlayer(audio)
+        player.play(commit: .committedElsewhere(try captureMove(count: 2), id: UUID()), theme: .standard, enabled: true)
+        XCTAssertFalse(audio.actions.contains { $0.hasPrefix("play:") || $0.hasPrefix("schedule:") },
+                       "The window that sent the stone plays it")
+        player.play(move: try captureMove(count: 2), theme: .standard, enabled: true)
+        XCTAssertFalse(audio.actions.contains { $0.hasPrefix("play:") || $0.hasPrefix("schedule:") },
+                       "So this window's echo plays nothing either")
+        player.play(move: try captureMove(count: 2), theme: .standard, enabled: true)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("play:") }.count, 1)
+    }
+
+    func testWindowOneMoveBehindKeepsExpectingTheStoneSentElsewhere() throws {
+        let audio = AudioRecorder()
+        let player = soundPlayer(audio)
+        let empty = BoardPosition(width: 9, height: 9)
+        let opponent = try empty.makeMove(move: .placeStone(0, 0))
+        let sent = try opponent.makeMove(move: .placeStone(4, 4))
+        // Another window has move 1 and sends move 2; this one has neither yet.
+        player.play(commit: .committedElsewhere(.init(before: opponent, after: sent), id: UUID()),
+                    theme: .standard, enabled: true)
+        player.play(move: .init(before: empty, after: opponent), theme: .standard, enabled: true)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("play:") }.count, 1, "The earlier move plays")
+        let echoParent = try empty.makeMove(move: .placeStone(0, 0))
+        let echo = try echoParent.makeMove(move: .placeStone(4, 4))
+        player.play(move: .init(before: echoParent, after: echo), theme: .standard, enabled: true)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("play:") }.count, 1, "And the sent stone's echo still does not")
+    }
+
+    func testOverlappingCommitsAreSettledEachOnItsOwn() throws {
+        let empty = BoardPosition(width: 9, height: 9)
+        let first = try empty.makeMove(move: .placeStone(0, 0))
+        first.captures[.black] = 1
+        let second = try empty.makeMove(move: .placeStone(4, 4))
+        second.captures[.black] = 1
+        // Two windows each sent a stone for the same turn. This one sent the
+        // second, and OGS takes the first.
+        let audio = AudioRecorder()
+        let player = soundPlayer(audio)
+        let secondID = UUID()
+        player.play(commit: .committedElsewhere(.init(before: empty, after: first), id: UUID()),
+                    theme: .standard, enabled: true)
+        player.play(commit: .committed(.init(before: empty, after: second), id: secondID), theme: .standard, enabled: true)
+        let ownCapture = try XCTUnwrap(audio.voices.first { !$0.scheduledTimes.isEmpty })
+        let accepted = try empty.makeMove(move: .placeStone(0, 0))
+        accepted.captures[.black] = 1
+        player.play(move: .init(before: empty, after: accepted), theme: .standard, enabled: true)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("play:") }.count, 1, "The accepted stone's echo plays nothing")
+        XCTAssertEqual(ownCapture.stops, 1, "This window's stone lost the turn, so its capture stops")
+        // The second stone's refusal settles only its own commit.
+        player.play(commit: .withdrawn(id: secondID), theme: .standard, enabled: true)
+        let next = try accepted.makeMove(move: .placeStone(2, 2))
+        player.play(move: .init(before: accepted, after: next), theme: .standard, enabled: true)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("play:") }.count, 2)
+    }
+
+    func testStoneShownByASnapshotKeepsItsCaptureWhenTheNextMoveComes() throws {
+        for snapshotShowsIt in [true, false] {
+            let audio = AudioRecorder()
+            let player = soundPlayer(audio)
+            let committed = try captureMove(count: 1)
+            player.playCommitted(move: committed, id: UUID(), theme: .standard, enabled: true)
+            let capture = try XCTUnwrap(audio.voices.first { !$0.scheduledTimes.isEmpty })
+            // A snapshot, not an echo, brings the board up to date, and the
+            // opponent passes before the capture is due.
+            let snapshot = try committed.before.makeMove(move: .placeStone(snapshotShowsIt ? 0 : 6, 0))
+            let pass = try snapshot.makeMove(move: .pass)
+            player.play(move: .init(before: snapshot, after: pass), theme: .standard, enabled: true)
+            XCTAssertEqual(capture.stops, snapshotShowsIt ? 0 : 1,
+                           snapshotShowsIt ? "OGS took the stone, so its capture plays" : "Another stone took its place")
+        }
+    }
+
+    func testRefusingOneOfTwoRequestsForTheSameStoneKeepsTheOtherWaiting() throws {
+        let audio = AudioRecorder()
+        let player = soundPlayer(audio)
+        let otherID = UUID()
+        // This window and another sent the same stone.
+        player.play(commit: .committed(try captureMove(count: 1), id: UUID()), theme: .standard, enabled: true)
+        player.play(commit: .committedElsewhere(try captureMove(count: 1), id: otherID), theme: .standard, enabled: true)
+        let capture = try XCTUnwrap(audio.voices.first { !$0.scheduledTimes.isEmpty })
+        // OGS refuses the other window's copy, then echoes this one.
+        player.play(commit: .withdrawn(id: otherID), theme: .standard, enabled: true)
+        XCTAssertEqual(capture.stops, 0, "This window's request still waits")
+        player.play(move: try captureMove(count: 1), theme: .standard, enabled: true)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("play:") }.count, 1, "The echo plays nothing again")
+    }
+
+    func testEveryRequestForOneTurnWaits() throws {
+        let audio = AudioRecorder()
+        let player = soundPlayer(audio)
+        let empty = BoardPosition(width: 9, height: 9)
+        // Five requests for one turn, this window's first.
+        for row in 0..<5 {
+            let stone = try empty.makeMove(move: .placeStone(row, 0))
+            let move = Game.AppliedMove(before: empty, after: stone)
+            let commit: Game.MoveCommit = row == 0
+                ? .committed(move, id: UUID()) : .committedElsewhere(move, id: UUID())
+            player.play(commit: commit, theme: .standard, enabled: true)
+        }
+        // OGS takes the oldest.
+        let accepted = try empty.makeMove(move: .placeStone(0, 0))
+        player.play(move: .init(before: empty, after: accepted), theme: .standard, enabled: true)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("play:") }.count, 1, "Its echo plays nothing")
+    }
+
+    func testBoardShowingTheStoneBeforeItsMoveEventKeepsTheEchoSilent() throws {
+        let audio = AudioRecorder()
+        let player = soundPlayer(audio)
+        let committed = try captureMove(count: 1)
+        player.playCommitted(move: committed, id: UUID(), theme: .standard, enabled: true)
+        // A game screen hears the new board just before the move event.
+        let echo = try committed.before.makeMove(move: .placeStone(0, 0))
+        player.boardChanged(to: echo)
+        player.play(move: .init(before: committed.before, after: echo), theme: .standard, enabled: true)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("play:") }.count, 1)
+        XCTAssertFalse(audio.actions.contains { $0.hasPrefix("stop:") })
+    }
+
+    func testUndoneStoneLetsItsReplayFromAnotherClientPlay() throws {
+        let audio = AudioRecorder()
+        let player = soundPlayer(audio)
+        let committed = try captureMove(count: 0)
+        player.playCommitted(move: committed, id: UUID(), theme: .standard, enabled: true)
+        // A snapshot shows the stone before any echo, then an undo takes it back.
+        player.boardChanged(to: try committed.before.makeMove(move: .placeStone(0, 0)))
+        player.boardChanged(to: committed.before)
+        // The same stone, played again from another client, is a new move.
+        let replay = try committed.before.makeMove(move: .placeStone(0, 0))
+        player.play(move: .init(before: committed.before, after: replay), theme: .standard, enabled: true)
+        XCTAssertEqual(audio.actions.filter { $0.hasPrefix("play:") }.count, 2)
+    }
+
+    func testWithdrawnResetOrSupersededCommitLeavesNoStaleMatch() throws {
+        for action in ["withdraw", "reset", "other move"] {
+            let audio = AudioRecorder()
+            let player = soundPlayer(audio)
+            let committed = try captureMove(count: 1)
+            let committedID = UUID()
+            player.playCommitted(move: committed, id: committedID, theme: .standard, enabled: true)
+            switch action {
+            case "withdraw":
+                player.play(commit: .withdrawn(id: committedID), theme: .standard, enabled: true)
+            case "reset":
+                player.reset()
+            default:
+                // Another stone with the committed one's number plays and
+                // uses up the commit.
+                let other = try committed.before.makeMove(move: .placeStone(4, 4))
+                player.play(move: .init(before: committed.before, after: other), theme: .standard, enabled: true)
+            }
+            player.play(move: try captureMove(count: 1), theme: .standard, enabled: true)
+            XCTAssertEqual(audio.actions.filter { $0.hasPrefix("play:") }.count,
+                           action == "other move" ? 3 : 2, action)
+        }
+    }
+
     func testCaptureCacheLoadsLazilyAndRetainsOnlyTwoRecentBanks() throws {
         let audio = AudioRecorder()
         let player = soundPlayer(audio)

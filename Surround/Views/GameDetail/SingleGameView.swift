@@ -1157,6 +1157,8 @@ struct SingleGameView: View {
     private var observedGameContent: some View {
         presentedGameContent
         .onReceive(game.$currentPosition) { [game] newPosition in
+            // Snapshots and undo change the board without a move.
+            stoneSoundPlayer.boardChanged(to: newPosition)
             self.pendingMove = nil
             self.pendingPosition = nil
             if !gameControlState.requiresScoringRefresh {
@@ -1169,6 +1171,10 @@ struct SingleGameView: View {
         }
         .onReceive(game.moveApplied) { move in
             stoneSoundPlayer.play(move: move, theme: theme,
+                                  enabled: soundOnStonePlacement && isVisibleForAppReview)
+        }
+        .onReceive(game.moveCommits) { commit in
+            stoneSoundPlayer.play(commit: commit, theme: theme,
                                   enabled: soundOnStonePlacement && isVisibleForAppReview)
         }
         .onAppear {
@@ -1323,6 +1329,9 @@ struct SingleGameView: View {
             updateReviewGameObservation()
         }
         .onChange(of: ogs.user?.id) { _, _ in
+            // As with a new game, the old account's sounds and commit go.
+            stoneSoundPlayer.reset()
+            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement && isVisibleForAppReview)
             chatSession.reset()
             conditionalMoveRequest.updateContext(gameID: game.ID, accountID: ogs.user?.id)
             showingConditionalMoveSubmissionError = false

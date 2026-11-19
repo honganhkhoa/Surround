@@ -78,6 +78,42 @@ final class StonePlacementSoundPlayer: ObservableObject {
         let endTime: TimeInterval
     }
 
+    /// A stone the user committed, kept until the board settles it. The echo
+    /// is a new position object, so it is matched by value.
+    private struct CommittedStone: Equatable {
+        let moveNumber: Int
+        let move: Move?
+        let color: StoneColor?
+
+        init(_ position: BoardPosition) {
+            moveNumber = position.lastMoveNumber
+            move = position.lastMove
+            color = position.lastMoveColor
+        }
+
+        /// Whether `position` has this stone as its move with this number.
+        func isOnBoard(in position: BoardPosition) -> Bool {
+            var current: BoardPosition? = position
+            while let earlier = current, earlier.lastMoveNumber > moveNumber {
+                current = earlier.previousPosition
+            }
+            return current.map { CommittedStone($0) == self } ?? false
+        }
+    }
+
+    /// A request waiting for OGS. Windows can each send a move for one
+    /// turn, even the same stone, so several can wait at once, and each is
+    /// settled on its own.
+    private struct PendingStone {
+        let id: UUID
+        let stone: CommittedStone
+        /// Its capture, which must not follow a refusal. None when another
+        /// window played the stone.
+        let captureVoices: [StoneSoundPlaying]
+        /// The board has shown the stone, as a snapshot can before its echo.
+        var isConfirmed = false
+    }
+
     private let makePlayer: (String) -> StoneSoundPlaying?
     private let uptime: () -> TimeInterval
     private var theme: SurroundTheme?
@@ -90,6 +126,7 @@ final class StonePlacementSoundPlayer: ObservableObject {
     // Separate from the banks: a capture still sounding when the cache
     // evicts its bank keeps playing to its end.
     private var liveVoices: [LiveVoice] = []
+    private var pendingStones: [PendingStone] = []
 
     /// Voices started and not yet ended or stopped.
     var liveVoiceCount: Int { liveVoices.count }
@@ -117,8 +154,9 @@ final class StonePlacementSoundPlayer: ObservableObject {
     }
 
     /// A structural guard for one placement, not proof of a live update. The
-    /// views feed this player Game.moveApplied, which excludes snapshots,
-    /// analysis and undo even when their reconstructed boards look adjacent.
+    /// views feed this player Game.moveApplied and the user's own commits on
+    /// Game.moveCommits, which exclude snapshots, analysis and undo even when
+    /// their reconstructed boards look adjacent.
     static func placedStoneColor(after previous: BoardPosition, in position: BoardPosition) -> StoneColor? {
         guard case .placeStone = position.lastMove,
               position.lastMoveNumber == previous.lastMoveNumber + 1,
@@ -146,7 +184,9 @@ final class StonePlacementSoundPlayer: ObservableObject {
             return
         }
         guard self.theme != theme else { return }
-        reset()
+        // A first theme has nothing to stop. A commit another window sent
+        // while this board was off screen still waits for its echo.
+        if self.theme != nil { reset() }
         self.theme = theme
         for color: StoneColor in [.black, .white] {
             placementBanks[color] = Bank(players: Self.variations.compactMap { variation in
@@ -158,11 +198,97 @@ final class StonePlacementSoundPlayer: ObservableObject {
         }
     }
 
+    /// Plays the user's own stone as it is committed, a round trip before
+    /// OGS echoes it, and its capture locally. The matching echo then plays
+    /// nothing; any other move plays as usual.
+    func playCommitted(move: Game.AppliedMove, id: UUID, theme: SurroundTheme, enabled: Bool) {
+        let captureVoices = startSounds(for: move, theme: theme, enabled: enabled)
+        addPendingStone(for: move, id: id, captureVoices: captureVoices)
+    }
+
+    /// OGS refused request `id`, so a later move with its number plays. Its
+    /// click has sounded, but a capture still due is stopped. Other
+    /// requests, the same stone sent from another window among them, wait on.
+    func forgetCommittedMove(id: UUID) {
+        settle(pendingStones.filter { $0.id == id }, accepted: false)
+    }
+
+    /// Expects the echo of a stone that another window has played.
+    func expectEcho(of move: Game.AppliedMove, id: UUID) {
+        addPendingStone(for: move, id: id, captureVoices: [])
+    }
+
+    /// Follows `Game.moveCommits`.
+    func play(commit: Game.MoveCommit, theme: SurroundTheme, enabled: Bool) {
+        switch commit {
+        case .committed(let move, let id):
+            playCommitted(move: move, id: id, theme: theme, enabled: enabled)
+        case .committedElsewhere(let move, let id):
+            expectEcho(of: move, id: id)
+        case .withdrawn(let id):
+            forgetCommittedMove(id: id)
+        }
+    }
+
+    /// Follows the board through changes that are not moves, such as a
+    /// snapshot or an undo. A stone the board shows is confirmed: its echo
+    /// stays silent and its capture plays on. One that the board shows no
+    /// longer was undone, so a later stone there plays.
+    func boardChanged(to position: BoardPosition) {
+        for pending in pendingStones {
+            if pending.stone.moveNumber <= position.lastMoveNumber {
+                if pending.stone.isOnBoard(in: position) {
+                    if let index = pendingStones.firstIndex(where: { $0.id == pending.id }) {
+                        pendingStones[index].isConfirmed = true
+                    }
+                } else {
+                    settle([pending], accepted: false)
+                }
+            } else if pending.isConfirmed {
+                pendingStones.removeAll { $0.id == pending.id }
+            }
+        }
+    }
+
     func play(move: Game.AppliedMove, theme: SurroundTheme, enabled: Bool) {
+        guard enabled else {
+            reset()
+            return
+        }
+        // A request this move answers is settled; one with a later number is
+        // left for its own echo, which a window one move behind sees later.
+        let answered = pendingStones.filter { $0.stone.moveNumber <= move.after.lastMoveNumber }
+        let echo = answered.contains { $0.stone == CommittedStone(move.after) }
+        for pending in answered {
+            // A snapshot may already have shown the stone, so a later move
+            // confirms it; otherwise another move took its place.
+            settle([pending], accepted: pending.stone.isOnBoard(in: move.after))
+        }
+        // The echo of a stone already played: neither its placement nor its
+        // capture plays again.
+        guard !echo else { return }
+        startSounds(for: move, theme: theme, enabled: true)
+    }
+
+    func reset() {
+        pendingStones = []
+        liveVoices.forEach { $0.player.stop() }
+        liveVoices.removeAll()
+        placementBanks.removeAll()
+        captureBanks.removeAll()
+        captureBankOrder.removeAll()
+        fallbackPlayer = nil
+        theme = nil
+    }
+
+    /// Starts a move's placement and capture, returning the capture voices.
+    @discardableResult
+    private func startSounds(for move: Game.AppliedMove, theme: SurroundTheme,
+                             enabled: Bool) -> [StoneSoundPlaying] {
         prepare(theme: theme, enabled: enabled)
         // Earlier voices keep playing: a pass or a quick reply must not cut
         // the capture it follows, or the capturing stone's own click.
-        guard enabled, let color = Self.placedStoneColor(after: move.before, in: move.after) else { return }
+        guard enabled, let color = Self.placedStoneColor(after: move.before, in: move.after) else { return [] }
 
         // Prepare any newly needed capture bank before starting the sequence,
         // so decoding does not stretch the gap after the placement transient.
@@ -179,16 +305,32 @@ final class StonePlacementSoundPlayer: ObservableObject {
         for player in capturePlayers {
             start(player, after: Self.captureDelay)
         }
+        return capturePlayers
     }
 
-    func reset() {
-        liveVoices.forEach { $0.player.stop() }
-        liveVoices.removeAll()
-        placementBanks.removeAll()
-        captureBanks.removeAll()
-        captureBankOrder.removeAll()
-        fallbackPlayer = nil
-        theme = nil
+    private func addPendingStone(for move: Game.AppliedMove, id: UUID, captureVoices: [StoneSoundPlaying]) {
+        guard Self.placedStoneColor(after: move.before, in: move.after) != nil else { return }
+        let stone = CommittedStone(move.after)
+        // A request for a later turn means the board moved on from earlier
+        // ones without their echoes; it shows whether each was taken. So
+        // only one turn's requests ever wait.
+        for pending in pendingStones where pending.stone.moveNumber < stone.moveNumber {
+            settle([pending], accepted: pending.stone.isOnBoard(in: move.before))
+        }
+        pendingStones.append(PendingStone(id: id, stone: stone, captureVoices: captureVoices))
+    }
+
+    /// Settles requests: an accepted one keeps its capture playing, a
+    /// refused or replaced one stops it if it is still due.
+    private func settle(_ stones: [PendingStone], accepted: Bool) {
+        for pending in stones {
+            pendingStones.removeAll { $0.id == pending.id }
+            guard !accepted else { continue }
+            for voice in pending.captureVoices where isSounding(voice) {
+                voice.stop()
+                liveVoices.removeAll { $0.player === voice }
+            }
+        }
     }
 
     /// Whether a voice that was started, or is scheduled, has yet to end.

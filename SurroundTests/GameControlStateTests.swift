@@ -27,6 +27,63 @@ final class GameControlStateTests: XCTestCase {
         }
     }
 
+    /// Keeps each `game/move` and its callback, so a test can answer it.
+    private final class MoveSocket: OGSWebsocketProtocol {
+        var serverEventCallback: ((String, Any?) -> Void)?
+        var onConnectTasks: [() -> Void] = []
+        var onStatusChanged: (() -> Void)?
+        var authenticationConfigProvider: () -> OGSUIConfig? = { nil }
+        var authenticated = true
+        var opened = true
+        var status = OGSWebsocketStatus.connected
+        var drift = 0.0
+        var latency = 0.0
+        var moves: [Any?] = []
+        var moveCallbacks: [OGSWebsocketResultCallback] = []
+
+        func connect() {}
+        func close() {}
+        func reconnectIfNeeded() {}
+        func closeThenReconnect() {}
+        func emit(command: String, data: Any?, resultCallback: OGSWebsocketResultCallback?) {
+            guard command == "game/move" else { return }
+            moves.append(data)
+            if let resultCallback { moveCallbacks.append(resultCallback) }
+        }
+
+        func deliver(_ name: String, _ data: Any?) {
+            serverEventCallback?(name, data)
+        }
+    }
+
+    /// Counts what a board's stone sounds would play.
+    private final class SoundCounter {
+        var plays = 0
+        var schedules = 0
+
+        func makePlayer(_ name: String) -> StoneSoundPlaying? { CountedVoice(counter: self) }
+    }
+
+    private final class CountedVoice: StoneSoundPlaying {
+        private let counter: SoundCounter
+        var currentTime: TimeInterval = 0
+        let deviceCurrentTime: TimeInterval = 0
+        let duration: TimeInterval = 0.2
+
+        init(counter: SoundCounter) { self.counter = counter }
+
+        func prepareToPlay() -> Bool { true }
+        func play() -> Bool {
+            counter.plays += 1
+            return true
+        }
+        func play(atTime time: TimeInterval) -> Bool {
+            counter.schedules += 1
+            return true
+        }
+        func stop() {}
+    }
+
     private enum Failure: Error {
         case rejected
     }
@@ -819,6 +876,311 @@ final class GameControlStateTests: XCTestCase {
             XCTAssertEqual(game.currentPosition.removedStones, expected)
             XCTAssertTrue(selected.isEmpty)
         }
+    }
+
+    @MainActor
+    func testSubmittedStoneSoundsAtCommitAndItsEchoPlaysNothing() throws {
+        let (game, service, socket) = try liveMoveFixture()
+        let sounds = SoundCounter()
+        let observation = observeStoneSounds(of: game, counter: sounds)
+        defer { observation.forEach { $0.cancel() } }
+        let state = GameControlState()
+
+        XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        XCTAssertEqual(socket.moves.count, 1)
+        XCTAssertEqual(sounds.plays, 1, "The stone sounds as it is sent, not a round trip later")
+
+        let gameID = try XCTUnwrap(game.ogsID)
+        socket.deliver("game/\(gameID)/move", ["move_number": 1, "move": [2, 1, 1_000]] as [String: Any])
+        XCTAssertEqual(game.currentPosition.lastMove, .placeStone(1, 2))
+        XCTAssertEqual(sounds.plays, 1, "OGS's echo plays nothing again")
+        XCTAssertEqual(sounds.schedules, 0)
+    }
+
+    @MainActor
+    func testRefusedStoneIsWithdrawnSoNothingStaleSilencesTheNextMove() throws {
+        let (game, service, socket) = try liveMoveFixture()
+        let sounds = SoundCounter()
+        var events = [String]()
+        let observation = observeStoneSounds(of: game, counter: sounds) + [
+            game.moveCommits.sink { commit in
+                switch commit {
+                case .committed: events.append("committed")
+                case .committedElsewhere: events.append("elsewhere")
+                case .withdrawn: events.append("withdrawn")
+                }
+            },
+        ]
+        defer { observation.forEach { $0.cancel() } }
+        let state = GameControlState()
+
+        XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        try XCTUnwrap(socket.moveCallbacks.first)(nil, ["error": "refused"])
+        drainMainQueue()
+        XCTAssertFalse(state.isBusy)
+        XCTAssertEqual(events, ["committed", "withdrawn"])
+
+        // Even the same stone, arriving later as a move, sounds again.
+        let gameID = try XCTUnwrap(game.ogsID)
+        socket.deliver("game/\(gameID)/move", ["move_number": 1, "move": [2, 1, 1_000]] as [String: Any])
+        XCTAssertEqual(sounds.plays, 2)
+    }
+
+    @MainActor
+    func testPassesAndMovesSentWhileOfflineCommitNothing() throws {
+        let (game, service, socket) = try liveMoveFixture()
+        var commits = 0
+        let observation = game.moveCommits.sink { _ in commits += 1 }
+        defer { observation.cancel() }
+        let state = GameControlState()
+
+        XCTAssertTrue(state.submitMove(.pass, game: game, using: service, reviewCoordinator: nil) {})
+        XCTAssertEqual(commits, 0, "A pass stays silent")
+        try XCTUnwrap(socket.moveCallbacks.first)(nil, ["error": "refused"])
+        drainMainQueue()
+        XCTAssertEqual(commits, 0, "Nothing was committed, so nothing is withdrawn")
+
+        socket.status = .reconnecting
+        socket.onStatusChanged?()
+        drainMainQueue()
+        XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        XCTAssertEqual(commits, 0, "A socket that is down fails the move with not_sent")
+
+        socket.status = .connected
+        socket.onStatusChanged?()
+        drainMainQueue()
+        let emptyGame = Game(width: 9, height: 9, blackName: "black", whiteName: "white", gameId: .OGS(3))
+        var emptyGameCommits = 0
+        let emptyObservation = emptyGame.moveCommits.sink { _ in emptyGameCommits += 1 }
+        defer { emptyObservation.cancel() }
+        let emptyGameState = GameControlState()
+        XCTAssertTrue(emptyGameState.submitMove(.placeStone(1, 2), game: emptyGame, using: service, reviewCoordinator: nil) {})
+        drainMainQueue()
+        XCTAssertEqual(emptyGameCommits, 0, "A game without data fails before anything is sent")
+    }
+
+    @MainActor
+    func testAnswerLostAfterTheEchoIsNoRefusal() throws {
+        let (game, service, socket) = try liveMoveFixture()
+        let sounds = SoundCounter()
+        var withdrawals = 0
+        let observation = observeStoneSounds(of: game, counter: sounds) + [
+            game.moveCommits.sink { if case .withdrawn = $0 { withdrawals += 1 } },
+        ]
+        defer { observation.forEach { $0.cancel() } }
+        let state = GameControlState()
+
+        XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        // OGS takes the move and echoes it, then the socket drops before its answer.
+        let gameID = try XCTUnwrap(game.ogsID)
+        socket.deliver("game/\(gameID)/move", ["move_number": 1, "move": [2, 1, 1_000]] as [String: Any])
+        try XCTUnwrap(socket.moveCallbacks.first)(nil, ["connection": "WebSocket connection closed"])
+        drainMainQueue()
+        XCTAssertFalse(state.isBusy)
+        XCTAssertEqual(withdrawals, 0)
+        XCTAssertEqual(sounds.plays, 1)
+    }
+
+    @MainActor
+    func testUnansweredMoveKeepsItsCommitForALateEcho() throws {
+        let (game, service, socket) = try liveMoveFixture()
+        let sounds = SoundCounter()
+        var withdrawals = 0
+        let observation = observeStoneSounds(of: game, counter: sounds) + [
+            game.moveCommits.sink { if case .withdrawn = $0 { withdrawals += 1 } },
+        ]
+        defer { observation.forEach { $0.cancel() } }
+        let state = GameControlState()
+
+        XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        try XCTUnwrap(socket.moveCallbacks.first)(nil, ["timeout": "No WebSocket response received within 30 seconds"])
+        drainMainQueue()
+        XCTAssertFalse(state.isBusy, "The controls are free again")
+        XCTAssertEqual(withdrawals, 0, "OGS may have taken the move")
+
+        let gameID = try XCTUnwrap(game.ogsID)
+        socket.deliver("game/\(gameID)/move", ["move_number": 1, "move": [2, 1, 1_000]] as [String: Any])
+        XCTAssertEqual(sounds.plays, 1, "The late echo does not click again")
+    }
+
+    @MainActor
+    func testCommitInOneWindowReachesTheOtherWindowsModel() throws {
+        let payload = try liveGamePayload()
+        let (game, service, socket) = try openWindow(on: payload)
+        // Each scene keeps its own service, as OGSService.instances does.
+        let (otherGame, otherService, otherSocket) = try openWindow(on: payload)
+        defer { withExtendedLifetime(otherService) {} }
+        XCTAssertFalse(game === otherGame, "Each window has its own model")
+        let sounds = SoundCounter()
+        let otherSounds = SoundCounter()
+        var otherEvents = [String]()
+        let observation = observeStoneSounds(of: game, counter: sounds)
+            + observeStoneSounds(of: otherGame, counter: otherSounds) + [
+                otherGame.moveCommits.sink { commit in
+                    switch commit {
+                    case .committed: otherEvents.append("committed")
+                    case .committedElsewhere: otherEvents.append("elsewhere")
+                    case .withdrawn: otherEvents.append("withdrawn")
+                    }
+                },
+            ]
+        defer { observation.forEach { $0.cancel() } }
+        let state = GameControlState()
+
+        XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        XCTAssertEqual(otherEvents, ["elsewhere"])
+        let gameID = try XCTUnwrap(game.ogsID)
+        let echo = ["move_number": 1, "move": [2, 1, 1_000]] as [String: Any]
+        socket.deliver("game/\(gameID)/move", echo)
+        otherSocket.deliver("game/\(gameID)/move", echo)
+        XCTAssertEqual(sounds.plays, 1, "The window that sent the stone plays it")
+        XCTAssertEqual(otherSounds.plays, 0, "And the other window's echo stays silent")
+    }
+
+    @MainActor
+    func testRefusalReachesTheOtherWindowsModel() throws {
+        let payload = try liveGamePayload()
+        let (game, service, socket) = try openWindow(on: payload)
+        let (otherGame, otherService, _) = try openWindow(on: payload)
+        defer { withExtendedLifetime(otherService) {} }
+        var otherEvents = [String]()
+        let observation = otherGame.moveCommits.sink { commit in
+            if case .withdrawn = commit { otherEvents.append("withdrawn") }
+        }
+        defer { observation.cancel() }
+        let state = GameControlState()
+
+        XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        try XCTUnwrap(socket.moveCallbacks.first)(nil, ["move": "illegal move"])
+        drainMainQueue()
+        XCTAssertEqual(otherEvents, ["withdrawn"])
+    }
+
+    func testLiveGamesTableStaysBoundedAsGamesComeAndGo() {
+        // As the public games list cycles, models come and go.
+        for index in 0..<300 {
+            Game(width: 9, height: 9, blackName: "black", whiteName: "white", gameId: .OGS(980_000 + index))
+                .joinLiveGames()
+        }
+        let kept = Game(width: 9, height: 9, blackName: "black", whiteName: "white", gameId: .OGS(987_002))
+        kept.joinLiveGames()
+        XCTAssertTrue(Game.liveGameIDs.contains(kept.ID))
+        XCTAssertFalse(Game.liveGameIDs.contains(.OGS(980_000)), "Games whose models have gone are swept")
+        XCTAssertLessThan(Game.liveGameIDs.count, 40)
+    }
+
+    @MainActor
+    func testRefusalAfterTheSendingScreenMovesOnStillReachesTheOtherWindow() throws {
+        let payload = try liveGamePayload()
+        let (game, service, socket) = try openWindow(on: payload)
+        let (otherGame, otherService, _) = try openWindow(on: payload)
+        defer { withExtendedLifetime(otherService) {} }
+        var otherEvents = [String]()
+        let observation = otherGame.moveCommits.sink { commit in
+            if case .withdrawn = commit { otherEvents.append("withdrawn") }
+        }
+        defer { observation.cancel() }
+        let state = GameControlState()
+
+        XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        // The sending window turns to another game before OGS answers.
+        state.updateContext(gameID: .OGS(999), accountID: service.user?.id)
+        try XCTUnwrap(socket.moveCallbacks.first)(nil, ["move": "illegal move"])
+        drainMainQueue()
+        XCTAssertEqual(otherEvents, ["withdrawn"], "The other window does not keep waiting for an echo")
+    }
+
+    @MainActor
+    func testLeavingTheGameKeepsTheCommitForItsEcho() throws {
+        let (game, service, socket) = try liveMoveFixture()
+        let sounds = SoundCounter()
+        var events = [String]()
+        let observation = observeStoneSounds(of: game, counter: sounds) + [
+            game.moveCommits.sink { commit in
+                switch commit {
+                case .committed: events.append("committed")
+                case .committedElsewhere: events.append("elsewhere")
+                case .withdrawn: events.append("withdrawn")
+                }
+            },
+        ]
+        defer { observation.forEach { $0.cancel() } }
+        let state = GameControlState()
+
+        XCTAssertTrue(state.submitMove(.placeStone(1, 2), game: game, using: service, reviewCoordinator: nil) {})
+        // This window turns to another game. Its move has still gone to OGS.
+        state.updateContext(gameID: .OGS(999), accountID: service.user?.id)
+        drainMainQueue()
+        XCTAssertEqual(events, ["committed"], "Another window on the game still expects the echo")
+
+        let gameID = try XCTUnwrap(game.ogsID)
+        socket.deliver("game/\(gameID)/move", ["move_number": 1, "move": [2, 1, 1_000]] as [String: Any])
+        XCTAssertEqual(sounds.plays, 1, "So it plays nothing again there")
+    }
+
+    /// A board's wiring of its stone sounds, as in SingleGameView.
+    private func observeStoneSounds(of game: Game, counter: SoundCounter) -> [AnyCancellable] {
+        let player = StonePlacementSoundPlayer(makePlayer: counter.makePlayer)
+        return [
+            game.moveApplied.sink { player.play(move: $0, theme: .standard, enabled: true) },
+            game.moveCommits.sink { player.play(commit: $0, theme: .standard, enabled: true) },
+        ]
+    }
+
+    /// An empty live 9x9 game with Black, the signed-in user, to move.
+    @MainActor
+    private func liveMoveFixture() throws -> (Game, OGSService, MoveSocket) {
+        try openWindow(on: try liveGamePayload())
+    }
+
+    /// The fixture's game data: an empty live 9x9 game with Black to move.
+    private func liveGamePayload() throws -> [String: Any] {
+        let bundle = Bundle(for: GameControlStateTests.self)
+        let url = try XCTUnwrap(bundle.url(forResource: "game-25076729", withExtension: "json"))
+        var payload = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        )
+        payload["moves"] = [Any]()
+        payload["phase"] = "play"
+        payload["outcome"] = NSNull()
+        payload["winner"] = NSNull()
+        var clock = try XCTUnwrap(payload["clock"] as? [String: Any])
+        clock["current_player"] = clock["black_player_id"]
+        payload["clock"] = clock
+        return payload
+    }
+
+    /// One window on the game: its own service and socket, as each scene
+    /// has, signed in as Black, with its own model of the game.
+    @MainActor
+    private func openWindow(on payload: [String: Any]) throws -> (Game, OGSService, MoveSocket) {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let game = Game(ogsGame: try decoder.decode(
+            OGSGame.self, from: JSONSerialization.data(withJSONObject: payload)
+        ))
+        let socket = MoveSocket()
+        let suite = "com.honganhkhoa.Surround.MoveCommitTests.\(UUID().uuidString)"
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
+        addTeardownBlock {
+            preferences.removePersistentDomain(forName: suite)
+            socket.serverEventCallback = nil
+            socket.onStatusChanged = nil
+        }
+        var initial = OGSService.BootstrapState()
+        initial.user = game.blackPlayer
+        initial.isLoggedIn = true
+        initial.socketStatus = .connected
+        let service = OGSService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: OGSOfflineRejectingHTTPClient(), preferences: preferences,
+            ogsWebsocket: socket, connectsAutomatically: false,
+            installsObservers: false, initialState: initial
+        )
+        game.ogs = service
+        service.connect(to: game, owner: .explicit(UUID()))
+        XCTAssertTrue(game.isUserTurn)
+        return (game, service, socket)
     }
 
     @MainActor

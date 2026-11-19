@@ -48,6 +48,10 @@ struct BoardDemoView: View {
     
     func submitMove(move: Move) {
         simulatingRequest = true
+        // As in a game, the stone sounds as it is submitted, and the move
+        // applied after the simulated request below plays nothing again.
+        let requestID = UUID()
+        let committed = game.commitMove(move, from: game.currentPosition, id: requestID)
         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .milliseconds(300))) {
             do {
                 try game.makeMove(move: move)
@@ -61,7 +65,11 @@ struct BoardDemoView: View {
                     clock.currentPlayerColor = game.currentPosition.nextToMove
                     game.clock = clock
                 }
-            } catch {}
+            } catch {
+                if committed != nil {
+                    game.withdrawMoveCommit(id: requestID)
+                }
+            }
             pendingMove = nil
             pendingPosition = nil
             simulatingRequest = false
@@ -107,7 +115,9 @@ struct BoardDemoView: View {
             BoardView(
                 boardPosition: game.currentPosition,
                 showsCoordinate: showsBoardCoordinates,
-                playable: true,
+                // A second stone during the simulated request would commit
+                // over the first, so its applied move would sound again.
+                playable: !simulatingRequest,
                 newMove: $pendingMove,
                 newPosition: $pendingPosition
             )
@@ -120,6 +130,10 @@ struct BoardDemoView: View {
         }
         .onReceive(game.moveApplied) { move in
             stoneSoundPlayer.play(move: move, theme: theme,
+                                  enabled: soundOnStonePlacement && isVisibleForStoneSounds)
+        }
+        .onReceive(game.moveCommits) { commit in
+            stoneSoundPlayer.play(commit: commit, theme: theme,
                                   enabled: soundOnStonePlacement && isVisibleForStoneSounds)
         }
         .onAppear {

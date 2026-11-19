@@ -130,6 +130,10 @@ enum OGSServiceError: Error {
     case conditionalMovesUpdateInterrupted
 }
 
+/// A move whose answer never came: the connection dropped, or the wait timed
+/// out, after it was sent. OGS may have taken it, and even echoed it.
+struct OGSMoveUnansweredError: Error {}
+
 /// The server rejected a PM or it failed locally before a WebSocket frame was sent.
 /// Connection failures and missing acknowledgements remain delivery-uncertain.
 enum OGSPrivateMessageSendError: Error {
@@ -4158,6 +4162,8 @@ class OGSService: ObservableObject {
         }
         connectIfReady(gameID: ogsID)
         let canonicalGame = desiredGameConnections[ogsID]?.game ?? game
+        // Other windows' models of this game hear the moves committed here.
+        canonicalGame.joinLiveGames()
         // A game opened while the socket is down freezes at its known clock.
         freezeClockIfDisconnected(canonicalGame)
         return canonicalGame
@@ -4439,6 +4445,11 @@ class OGSService: ObservableObject {
             }
             self.ogsWebsocket.emit(command: "game/move", data: ["game_id": gameId, "move": move.toOGSString()]) { _, error in
                 if let error {
+                    if error["not_sent"] == nil, error["encoding"] == nil,
+                       error["connection"] != nil || error["timeout"] != nil {
+                        promise(.failure(OGSMoveUnansweredError()))
+                        return
+                    }
                     let message = error.map { "\($0.key): \($0.value)" }.joined(separator: ", ")
                     promise(.failure(OGSServiceError.loginError(error: message)))
                 } else {

@@ -56,6 +56,56 @@ final class GameReplayTests: XCTestCase {
         XCTAssertEqual(events.count, 1)
     }
 
+    func testCommittedStoneMatchesItsEchoUnderTheGamesRulesWithoutRegistering() throws {
+        typealias Capture = StonePlacementSoundPlayer.Capture
+        let cases: [(name: String, setup: [Move], move: Move, captures: [Capture])] = [
+            ("capture", [.placeStone(0, 1), .placeStone(0, 0)], .placeStone(1, 0),
+             [Capture(color: .white, count: 1, tier: .single)]),
+            ("self-capture", [.placeStone(4, 4), .placeStone(0, 1), .placeStone(4, 6), .placeStone(1, 0)],
+             .placeStone(0, 0), [Capture(color: .black, count: 1, tier: .single)]),
+            ("free handicap", [], .placeStone(2, 2), []),
+        ]
+        for testCase in cases {
+            var data = try loadGameFixture(id: 25_076_729)
+            data.moves = []
+            data.allowSelfCapture = testCase.name == "self-capture"
+            data.handicap = testCase.name == "free handicap" ? 2 : 0
+            data.freeHandicapPlacement = testCase.name == "free handicap"
+            let game = Game(ogsGame: data)
+            for move in testCase.setup {
+                try game.makeMove(move: move)
+            }
+            var applied = [Game.AppliedMove]()
+            var commits = 0
+            let subscriptions = [
+                game.moveApplied.sink { applied.append($0) },
+                game.moveCommits.sink { _ in commits += 1 },
+            ]
+            defer { subscriptions.forEach { $0.cancel() } }
+
+            let before = game.currentPosition
+            XCTAssertNil(game.commitMove(.pass, from: before, id: UUID()), "A pass is not announced: \(testCase.name)")
+            let committed = try XCTUnwrap(game.commitMove(testCase.move, from: before, id: UUID()), testCase.name)
+            XCTAssertEqual(commits, 1, testCase.name)
+            XCTAssertTrue(game.currentPosition === before, "Committing registers nothing: \(testCase.name)")
+            XCTAssertFalse(game.moveTree.contains(committed.after), testCase.name)
+            XCTAssertTrue((game.moveTree.nextPositionsByPosition[ObjectIdentifier(before)] ?? []).isEmpty,
+                          testCase.name)
+            XCTAssertTrue(applied.isEmpty, testCase.name)
+
+            try game.makeMove(move: testCase.move)
+            let echo = try XCTUnwrap(applied.first, testCase.name)
+            XCTAssertEqual(StonePlacementSoundPlayer.captures(after: committed.before, in: committed.after),
+                           testCase.captures, testCase.name)
+            XCTAssertEqual(StonePlacementSoundPlayer.captures(after: echo.before, in: echo.after),
+                           testCase.captures, testCase.name)
+            XCTAssertEqual(StonePlacementSoundPlayer.placedStoneColor(after: committed.before, in: committed.after),
+                           .black, testCase.name)
+            XCTAssertEqual(committed.after.nextToMove, echo.after.nextToMove, testCase.name)
+            XCTAssertTrue(committed.after.hasTheSamePosition(with: echo.after), testCase.name)
+        }
+    }
+
     func testMoveAppliedIgnoresOneMoveReconnectAndCatchUpSnapshots() throws {
         let fullSnapshot = try loadGameFixture(id: 25_076_729)
         var snapshot = fullSnapshot

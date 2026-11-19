@@ -189,19 +189,31 @@ final class GameControlState: ObservableObject {
         completedRequest?.cancellable?.cancel()
     }
 
+    /// The one path for Submit, auto-submit and a confirmed pass. Once the
+    /// request goes out on a connected socket, a stone placement is
+    /// committed under the request's own ID: boards in every window play it
+    /// at once and skip OGS's echo of it. A refusal withdraws just this
+    /// commit everywhere, even after this screen has moved on. An answer
+    /// lost with the connection or never received does not, since OGS may
+    /// have taken the move: the board settles it. Passes are not committed.
+    /// Returns whether the request was sent.
+    @discardableResult
     func submitMove(
         _ move: Move,
         game: Game,
         using ogs: OGSService,
         reviewCoordinator: AppReviewCoordinator?,
         onConfirmed: @escaping () -> Void
-    ) {
+    ) -> Bool {
         let userID = ogs.user?.id
         let submittedPosition = game.currentPosition
         let expectedMoveNumber = submittedPosition.lastMoveNumber + 1
         var reviewSubmission: AppReviewSubmission?
+        var answer: AnyPublisher<Void, Error>?
+        var committed = false
+        let requestID = UUID()
 
-        performRequest(
+        let sent = performRequest(
             gameID: game.ID,
             accountID: userID,
             publisher: {
@@ -215,7 +227,9 @@ final class GameControlState: ObservableObject {
                             == .correspondence
                     )
                 }
-                return ogs.submitMove(move: move, forGame: game)
+                let submission = ogs.submitMove(move: move, forGame: game)
+                answer = submission
+                return submission
                     .zip(game.$currentPosition.filter {
                         $0.lastMoveNumber != submittedPosition.lastMoveNumber
                     }.setFailureType(to: Error.self))
@@ -247,6 +261,56 @@ final class GameControlState: ObservableObject {
                 }
             }
         )
+        // The socket sends on its own queue after this returns, and fails a
+        // command with not_sent when it is down; OGSService refuses a game
+        // without data before sending. Commit only what can go out.
+        guard sent, let answer, ogs.socketStatus == .connected, game.gameData != nil else { return sent }
+        committed = game.commitMove(move, from: submittedPosition, id: requestID) != nil
+        Self.whenRefused(answer, move: move, moveNumber: expectedMoveNumber,
+                         from: submittedPosition, in: game) {
+            if committed {
+                game.withdrawMoveCommit(id: requestID)
+            }
+        }
+        return sent
+    }
+
+    /// Whether a failed submission means OGS did not take the move. An
+    /// answer lost with the connection, or never received, can follow a
+    /// move OGS took and even echoed, so it is no refusal, and nor is any
+    /// failure once the board shows the move.
+    static func wasRefused(_ error: Error, move: Move, moveNumber: Int,
+                           from position: BoardPosition, in game: Game) -> Bool {
+        if error is OGSMoveUnansweredError { return false }
+        return !AppReviewGameActivity.confirmsSubmittedMove(
+            move, moveNumber: moveNumber, from: position, in: game.currentPosition
+        )
+    }
+
+    /// Answers that a screen may no longer wait for: leaving it cancels its
+    /// request, but every window's record of the move follows OGS's answer.
+    private static var refusalWatchers: [UUID: AnyCancellable] = [:]
+
+    /// Runs `onRefusal` if OGS refuses the move, whatever the screen that
+    /// sent it has done since. The socket fails an answer that never comes
+    /// within its timeout, so each watcher ends.
+    private static func whenRefused(
+        _ answer: AnyPublisher<Void, Error>, move: Move, moveNumber: Int,
+        from position: BoardPosition, in game: Game, onRefusal: @escaping () -> Void
+    ) {
+        let watcherID = UUID()
+        var finished = false
+        let watcher = answer.sink { completion in
+            finished = true
+            refusalWatchers[watcherID] = nil
+            if case .failure(let error) = completion,
+               wasRefused(error, move: move, moveNumber: moveNumber, from: position, in: game) {
+                onRefusal()
+            }
+        } receiveValue: { _ in }
+        if !finished {
+            refusalWatchers[watcherID] = watcher
+        }
     }
 
     func toggleRemovedStones(
