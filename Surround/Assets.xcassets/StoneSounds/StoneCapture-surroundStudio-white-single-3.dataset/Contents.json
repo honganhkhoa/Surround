@@ -1,9 +1,9 @@
 {
   "data": [
     {
-      "filename": "capture.wav",
+      "filename": "capture.flac",
       "idiom": "universal",
-      "universal-type-identifier": "com.microsoft.waveform-audio"
+      "universal-type-identifier": "org.xiph.flac"
     }
   ],
   "info": {

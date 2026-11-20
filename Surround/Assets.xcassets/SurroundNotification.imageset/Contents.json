@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-02-16 at 17.26.22.png",
+      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-02-16 at 17.26.22.jpg",
       "idiom" : "universal",
       "scale" : "1x"
     },
@@ -12,7 +12,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-02-16 at 17.24.55.png",
+      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-02-16 at 17.24.55.jpg",
       "idiom" : "universal",
       "scale" : "1x"
     },
@@ -45,7 +45,7 @@
       "scale" : "3x"
     },
     {
-      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-02-16 at 17.20.14.png",
+      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-02-16 at 17.20.14.jpg",
       "idiom" : "universal",
       "locale" : "vi",
       "scale" : "1x"
@@ -57,7 +57,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-02-16 at 17.22.54.png",
+      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-02-16 at 17.22.54.jpg",
       "idiom" : "universal",
       "locale" : "vi",
       "scale" : "1x"
@@ -95,7 +95,7 @@
       "scale" : "3x"
     },
     {
-      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-08-04 at 10.40.35.png",
+      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-08-04 at 10.40.35.jpg",
       "idiom" : "universal",
       "locale" : "fr",
       "scale" : "1x"
@@ -107,7 +107,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-08-04 at 10.41.37.png",
+      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-08-04 at 10.41.37.jpg",
       "idiom" : "universal",
       "locale" : "fr",
       "scale" : "1x"
@@ -145,7 +145,7 @@
       "scale" : "3x"
     },
     {
-      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-08-04 at 10.36.21.png",
+      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-08-04 at 10.36.21.jpg",
       "idiom" : "universal",
       "locale" : "ja",
       "scale" : "1x"
@@ -157,7 +157,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-08-04 at 10.37.22.png",
+      "filename" : "Simulator Screenshot - iPhone 15 Pro - 2024-08-04 at 10.37.22.jpg",
       "idiom" : "universal",
       "locale" : "ja",
       "scale" : "1x"
@@ -195,7 +195,7 @@
       "scale" : "3x"
     },
     {
-      "filename" : "SurroundNotification-ko-light.png",
+      "filename" : "SurroundNotification-ko-light.jpg",
       "idiom" : "universal",
       "locale" : "ko",
       "scale" : "1x"
@@ -207,7 +207,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "SurroundNotification-ko-dark.png",
+      "filename" : "SurroundNotification-ko-dark.jpg",
       "idiom" : "universal",
       "locale" : "ko",
       "scale" : "1x"
@@ -245,7 +245,7 @@
       "scale" : "3x"
     },
     {
-      "filename" : "SurroundNotification-zh-Hans-light.png",
+      "filename" : "SurroundNotification-zh-Hans-light.jpg",
       "idiom" : "universal",
       "locale" : "zh-Hans",
       "scale" : "1x"
@@ -257,7 +257,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "SurroundNotification-zh-Hans-dark.png",
+      "filename" : "SurroundNotification-zh-Hans-dark.jpg",
       "idiom" : "universal",
       "locale" : "zh-Hans",
       "scale" : "1x"
@@ -295,7 +295,7 @@
       "scale" : "3x"
     },
     {
-      "filename" : "SurroundNotification-zh-Hant-light.png",
+      "filename" : "SurroundNotification-zh-Hant-light.jpg",
       "idiom" : "universal",
       "locale" : "zh-Hant",
       "scale" : "1x"
@@ -307,7 +307,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "SurroundNotification-zh-Hant-dark.png",
+      "filename" : "SurroundNotification-zh-Hant-dark.jpg",
       "idiom" : "universal",
       "locale" : "zh-Hant",
       "scale" : "1x"
@@ -345,7 +345,7 @@
       "scale" : "3x"
     },
     {
-      "filename" : "SurroundNotification-de-light.png",
+      "filename" : "SurroundNotification-de-light.jpg",
       "idiom" : "universal",
       "locale" : "de",
       "scale" : "1x"
@@ -357,7 +357,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "SurroundNotification-de-dark.png",
+      "filename" : "SurroundNotification-de-dark.jpg",
       "idiom" : "universal",
       "locale" : "de",
       "scale" : "1x"
@@ -395,7 +395,7 @@
       "scale" : "3x"
     },
     {
-      "filename" : "SurroundNotification-th-light.png",
+      "filename" : "SurroundNotification-th-light.jpg",
       "idiom" : "universal",
       "locale" : "th",
       "scale" : "1x"
@@ -407,7 +407,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "SurroundNotification-th-dark.png",
+      "filename" : "SurroundNotification-th-dark.jpg",
       "idiom" : "universal",
       "locale" : "th",
       "scale" : "1x"
