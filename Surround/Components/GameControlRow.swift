@@ -83,8 +83,8 @@ private struct GameControlGlass<Surface: Shape>: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if theme.isFlowingInk || theme == .paperBlossoms {
-            // Matte paper controls keep their pigment independent of scenery.
+        if theme.isFlowingInk || theme == .paperBlossoms || theme == .whittledWoodland {
+            // Matte controls keep their pigment independent of scenery.
             content
                 .background(prominent ? prominentFill : theme.panel, in: shape)
                 .overlay {
@@ -256,7 +256,7 @@ struct GameControlRow: View {
     }
 
     private var moreForeground: Color {
-        if theme.isFlowingInk || theme == .paperBlossoms { return theme.homeActionForeground }
+        if theme.isFlowingInk || theme == .paperBlossoms || theme == .whittledWoodland { return theme.homeActionForeground }
         guard theme == .nightGarden || theme == .christmasKeepsakes || theme == .sakuraStream else {
             return theme == .feltMeadow ? theme.foreground : .accentColor
         }

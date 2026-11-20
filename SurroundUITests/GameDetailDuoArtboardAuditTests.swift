@@ -572,6 +572,10 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         auditThemeStates(theme: "feltMeadow", suffix: "-felt-meadow-night", appearance: "dark")
     }
 
+    func testWhittledWoodlandThemeStates() {
+        auditThemeStates(theme: "whittledWoodland", suffix: "-whittled-woodland", appearance: "light")
+    }
+
     func testSakuraStreamThemeStates() {
         auditThemeStates(theme: "sakuraStream", suffix: "-sakura-stream", appearance: "light")
     }

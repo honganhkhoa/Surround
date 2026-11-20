@@ -413,7 +413,7 @@ struct BoardDepth: Equatable {
     static let porcelainCornerFraction: CGFloat = 0.015
 
     enum EdgeStyle: Equatable {
-        case cut, frosted, rolledTin, porcelain
+        case cut, frosted, rolledTin, porcelain, whittled
     }
 
     var upperFace: Color
@@ -482,6 +482,8 @@ struct BoardDepthGeometry: Equatable {
             self.cornerRadius = min(radius, self.cellSize * 0.45)
         case .frosted:
             self.cornerRadius = min(thickness * 2.8, self.cellSize * 0.45)
+        case .whittled:
+            self.cornerRadius = min(thickness * 1.6, self.cellSize * 0.42)
         default:
             self.cornerRadius = min(thickness * 0.65, self.cellSize / 4)
         }
@@ -668,7 +670,7 @@ struct StoneMarkerText: View, Equatable {
 }
 
 enum BoardGridStyle: Equatable {
-    case straight, ragged, stitched, engraved
+    case straight, ragged, stitched, engraved, incised
 
     func usesEngraving(at cellSize: CGFloat) -> Bool {
         self == .engraved && usesDetailedStoneRendering(at: cellSize)

@@ -395,6 +395,7 @@ private struct GameDetailClockCard: View {
             || ((showsStatus || state.showsConnectionMark) && (style != .inline || inlineDetail == .full))
     }
     private var clockCornerRadius: CGFloat { spaciousCompact ? 14 : 12 }
+    private var compactWoodClock: Bool { theme == .whittledWoodland && style == .compact }
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: clockCornerRadius) }
     private var compactPaperCorner: Bool { style != .full }
     private var compactNightGardenPane: Bool {
@@ -446,7 +447,7 @@ private struct GameDetailClockCard: View {
         if state.reconnecting {
             // Reconnecting has replaced the undo label; its badge pigment
             // is too dark as text on night slate or charcoal felt clocks.
-            return theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || (theme == .surroundStudio && colorScheme == .dark)
+            return theme.isFlowingInk || theme.usesCustomDetailTint || (theme == .surroundStudio && colorScheme == .dark)
                 ? foreground : badgeBackground
         }
         return theme.clockUndoAccent(color, scheme: colorScheme)
@@ -488,7 +489,7 @@ private struct GameDetailClockCard: View {
                 .modifier(GameDetailClearGlass(shape: shape,
                                                enabled: !theme.isFlowingInk && theme != .feltMeadow
                                                    && theme != .paperBlossoms && theme != .christmasKeepsakes && theme != .frostPine
-                                                   && theme != .nightGarden
+                                                   && theme != .nightGarden && theme != .whittledWoodland
                                                    && (theme != .sakuraStream || style != .inline)
                                                    && !reduceTransparency
                                                    && (!theme.usesLightSceneSurfaces || contrast != .increased),
@@ -634,7 +635,9 @@ private struct GameDetailClockCard: View {
     }
 
     @ViewBuilder private var surface: some View {
-        if theme == .frostPine {
+        if theme == .whittledWoodland {
+            WhittledWoodlandControlSurface(color: color, cornerRadius: clockCornerRadius)
+        } else if theme == .frostPine {
             FrostPineWoodPlateSurface(color: color, cornerRadius: clockCornerRadius, role: .clock,
                                      compact: style == .inline)
         } else if theme == .paperBlossoms {
@@ -673,7 +676,7 @@ private struct GameDetailClockCard: View {
     // compositor cannot cover them.
     private var clockOutline: some View {
         ZStack {
-            if theme.isFlowingInk || theme == .paperBlossoms {
+            if theme.isFlowingInk || theme == .paperBlossoms || theme == .whittledWoodland {
                 GameDetailMatteClockOutline(color: color, isRunning: state.running,
                                            isWarning: state.suddenDeath,
                                            cornerRadius: clockCornerRadius, paperCompact: compactPaperCorner)
@@ -734,7 +737,10 @@ private struct GameDetailClockCard: View {
             // A full card can contain a header and two metadata lines. Eight
             // points per edge made SwiftUI shrink the 30pt countdown to fit its
             // 96pt surface; four preserves the type size and centered content.
-            .padding(.vertical, 4)
+            // The compact wood block stands above a lower bevel. Center
+            // the three live rows on its face so the footer clears the inlay.
+            .padding(.top, compactWoodClock ? 1 : 4)
+            .padding(.bottom, compactWoodClock ? 6 : 4)
         }
     }
 
@@ -1005,7 +1011,7 @@ private struct GameDetailClockCard: View {
             Spacer(minLength: 0)
             if mirrored { compactKomi } else { statusBadgeSlot }
         }
-        .frame(height: 18 * scale)
+        .frame(height: (compactWoodClock ? 16 : 18) * scale)
     }
 
     private var scoreValue: Text {
@@ -1314,7 +1320,9 @@ struct GameDetailPlayerIdentity: View {
             }
         }
         .background {
-            if theme == .frostPine {
+            if theme == .whittledWoodland {
+                WhittledWoodlandControlSurface(color: color, cornerRadius: chipCornerRadius, isIdentity: true)
+            } else if theme == .frostPine {
                 FrostPineWoodPlateSurface(color: color, cornerRadius: chipCornerRadius, role: .player,
                                          compact: navigationHeader || compactHeader || avatarOnly || compactColumn)
             } else if theme == .paperBlossoms {
@@ -1528,7 +1536,7 @@ struct GameDetailPlayerIdentity: View {
                         .font(.footnote).foregroundStyle(secondaryColor).fixedSize()
                 }
             }
-            .padding(.trailing, 6)
+            .padding(theme == .whittledWoodland && !avatarLeads ? .leading : .trailing, 6)
         } else {
             stackedIdentityText
         }
@@ -1595,13 +1603,27 @@ struct GameDetailPlayerIdentity: View {
         let size: CGFloat = vertical ? columnAvatarSize : (compactHeader ? 32 : (accessibleRow ? 44 : 40))
         return ZStack {
             if game.rengo, team.count > 1 {
-                GameDetailAvatar(player: team[1], size: size)
-                    .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(roleColor(team[1]), lineWidth: 2) }
+                framedAvatar(team[1], size: size)
                     .offset(x: -6, y: -4)
             }
-            GameDetailAvatar(player: player, size: size)
-                .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(nameColor, lineWidth: 2) }
+            framedAvatar(player, size: size)
         }.frame(width: game.rengo ? size + 6 : size, height: size)
+    }
+
+    private func framedAvatar(_ player: OGSUser?, size: CGFloat) -> some View {
+        let rim = RoundedRectangle(cornerRadius: 6)
+        return GameDetailAvatar(player: player, size: size)
+            .overlay {
+                if theme == .whittledWoodland && contrast != .increased {
+                    // The top wall of the recess is in shadow; its lower lip catches light.
+                    rim.inset(by: -0.75)
+                        .strokeBorder(LinearGradient(colors: [.black.opacity(0.8), .black.opacity(0.55),
+                                                              .white.opacity(color == .black ? 0.28 : 0.6)],
+                                                     startPoint: .top, endPoint: .bottom), lineWidth: 2)
+                } else {
+                    rim.strokeBorder(roleColor(player), lineWidth: 2)
+                }
+            }
     }
 
     @ViewBuilder private func profilePart<Content: View>(isAvatar: Bool, @ViewBuilder content: () -> Content) -> some View {

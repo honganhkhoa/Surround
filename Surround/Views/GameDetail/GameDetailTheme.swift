@@ -18,6 +18,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     case flowingInkJadePlain
     case flowingInkPlain
     case sakuraStream
+    case whittledWoodland
 
     var id: Self { self }
 
@@ -100,6 +101,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         case .nebulaPearl: String(localized: "Nebula & Pearl", comment: "Theme name: a cosmic nebula, dark glass stones and luminous pearls. Use a short, natural title naming the nebula and pearl.")
         case .rakedGarden: String(localized: "Raked Garden", comment: "Theme name: a Japanese dry landscape garden with raked sand, basalt and jade stones. Use a short, natural garden title; the sand pattern is visible in the preview.")
         case .surroundStudio: "Surround Studio"
+        case .whittledWoodland: String(localized: "Whittled Woodland", comment: "Theme name: a miniature woodland carved by hand, with a maple board and walnut and birch stones.")
         case .sakuraStream: String(localized: "Sakura Stream", comment: "Theme name: a clear stream beside cherry blossoms, with ivory ceramic and pale pink porcelain. Use a short, natural title preserving the cherry-blossom and stream imagery.")
         case .frostPine: String(localized: "Frost & Pine", comment: "Theme name: frost crystals and pine branches. Preserve the winter frost and pine imagery in a short title.")
         case .feltMeadow: String(localized: "Felt Meadow", comment: "Theme name: a meadow crafted from soft wool felt. Felt is the textile material, not the past tense of feel. Use a short, natural title.")
@@ -119,7 +121,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
             nil
-        case .standard, .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream: nil
+        case .standard, .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland: nil
         case .nebulaPearl: .dark
         }
     }
@@ -127,6 +129,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     /// Resolve image grading alongside the board palette. The image references
     /// stay cached, so an appearance change does not decode or regenerate art.
     func board(for scheme: ColorScheme) -> BoardAppearance {
+        if self == .whittledWoodland { return WhittledWoodland.board(for: scheme) }
         if self == .sakuraStream, scheme == .dark {
             var night = board
             // Evening illumination keeps the ceramic light enough to separate
@@ -383,6 +386,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
 
     var board: BoardAppearance {
         switch self {
+        case .whittledWoodland: return WhittledWoodland.board(for: .light)
         case .sakuraStream:
             return BoardAppearance(
                 boardColor: Color(themeHex: 0xF2E7D7),
@@ -1449,6 +1453,94 @@ private enum FeltMeadowColors {
     static let lightOrdinary = adaptive(0x245382, 0x223F5E)
 }
 
+// MARK: - Whittled Woodland
+
+private final class WhittledWoodland {
+    private init() {}
+    private static let bundle = Bundle(for: WhittledWoodland.self)
+    private static let mapleGrain = UIImage(named: "WhittledWoodlandBoard", in: bundle, compatibleWith: nil)
+        .map { BoardTexture(image: $0, mapping: .board) }
+    private static let stones: StoneImages? = {
+        guard let black = UIImage(named: "WhittledWoodlandBlackStone", in: bundle, compatibleWith: nil),
+              let white = UIImage(named: "WhittledWoodlandWhiteStone", in: bundle, compatibleWith: nil) else { return nil }
+        return StoneImages(black: [black], white: [white])
+    }()
+
+    static func board(for scheme: ColorScheme) -> BoardAppearance {
+        let night = scheme == .dark
+        let maple = Color(themeHex: night ? 0xB28D67 : 0xE2B27C)
+        let bark = Color(themeHex: 0x442D1E)
+        let label = Color(themeHex: 0x332014)
+        let cream = Color(themeHex: 0xFFF5DF)
+        let creek = Color(themeHex: 0x123A41)
+        let moss = Color(themeHex: 0x263C22)
+        let red = Color(themeHex: 0x631F25)
+        var grain = mapleGrain
+        var cutouts = stones
+        if night {
+            grain?.tint = Color(themeHex: 0xC8C0B2)
+            cutouts?.tint = Color(themeHex: 0xE8E1D4)
+        }
+        return BoardAppearance(
+            boardColor: maple, compactBoardColor: maple, boardEdge: bark,
+            boardTexture: grain, boardBevel: true,
+            boardDepth: BoardDepth(
+                upperFace: Color(themeHex: night ? 0x9E7952 : 0xC9965D),
+                lowerFace: Color(themeHex: night ? 0x65482E : 0x996535),
+                highlight: Color(themeHex: night ? 0xD4B594 : 0xFFE0B1),
+                shade: Color(themeHex: 0x684327), shadow: Color(themeHex: 0x372216).opacity(0.40),
+                thicknessRatio: 0.014, maximumThickness: 8, edgeStyle: .whittled),
+            gridStyle: .incised, stoneImages: cutouts, imageStoneShadow: .raised,
+            gridColor: bark, coordinateColor: label,
+            black: StonePalette(
+                highlight: Color(themeHex: 0x73533C), shade: Color(themeHex: 0x29180E),
+                flat: Color(themeHex: night ? 0x382619 : 0x493121), outline: bark,
+                lastMove: cream, label: cream, detailedMarkerCasing: Color(themeHex: 0x29180E)),
+            white: StonePalette(
+                highlight: cream, shade: Color(themeHex: 0xC5A783),
+                flat: Color(themeHex: night ? 0xDFCFB7 : 0xF4E2C5), outline: bark,
+                lastMove: bark, label: bark, detailedMarkerCasing: cream),
+            emptyPointMarker: label, markOutline: bark, dameColor: Color(themeHex: 0x573315),
+            highlightColor: creek, highlightCasing: cream,
+            crosshair: .init(valid: moss, invalid: red, removal: creek), crosshairWidth: 1.5,
+            removeMark: red, restoreMark: moss, removalMarkCasing: cream, removedStoneOutline: bark)
+    }
+
+    private static func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {
+        Color(uiColor: UIColor { traits in
+            UIColor(Color(themeHex: traits.userInterfaceStyle == .dark ? dark : light))
+        })
+    }
+
+    static let page = adaptive(0xE5C59F, 0x292219)
+    static let panel = adaptive(0xF9ECD9, 0x352C21)
+    static let foreground = adaptive(0x35271A, 0xF7EAD6)
+    static let detailSecondary = adaptive(0x604B38, 0xD8C5AF)
+    static let panelBorder = adaptive(0x7D654A, 0xC7AC8C)
+    static let walnut = adaptive(0x463020, 0x39291E)
+    static let birch = adaptive(0xF5E3C8, 0xD8C6AD)
+    static let action = adaptive(0x485032, 0x485335)
+    static let chatBubble = adaptive(0xEDDBBE, 0x463C2C)
+    static let selection = adaptive(0x374826, 0xD5DFA5)
+    static let conditional = adaptive(0x74451E, 0xEAC59A)
+    static let cream = adaptive(0xFFF5E2, 0xF4E7D2)
+    static let keyline = adaptive(0xFFF5E2, 0x201A13)
+    static let idle = adaptive(0xDAC3A6, 0x594938)
+    static let blackSurfaceTop = adaptive(0x523926, 0x473325)
+    static let blackSurfaceBottom = adaptive(0x352318, 0x2E2118)
+    static let whiteSurfaceTop = adaptive(0xEBD6B6, 0xCAB69B)
+    static let whiteSurfaceBottom = adaptive(0xFBEBD4, 0xE6D4BC)
+    static let whiteForeground = adaptive(0x39281C, 0x32251B)
+    static let blackAccent = adaptive(0xEBC48F, 0xE8C499)
+    static let whiteAccent = adaptive(0x634022, 0x4C321D)
+    static let turnOutline = adaptive(0x5A633F, 0xBCC992)
+    static let turnGlow = adaptive(0x8E9F63, 0xA3B380)
+    static let blackBorder = adaptive(0xE3C7A1, 0xD8BD9C)
+    static let whiteBorder = adaptive(0x846443, 0x765A3C)
+    static let blackSecondary = adaptive(0xEEDBBD, 0xE6D2B5)
+    static let whiteSecondary = adaptive(0x513B29, 0x493425)
+}
+
 // MARK: - Game Detail surfaces
 
 extension SurroundTheme {
@@ -1467,6 +1559,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.page
         case .christmasKeepsakes: ChristmasKeepsakesColors.page
         case .paperBlossoms: PaperBlossomsColors.page
+        case .whittledWoodland: WhittledWoodland.page
         }
     }
 
@@ -1484,6 +1577,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.panel
         case .christmasKeepsakes: ChristmasKeepsakesColors.panel
         case .paperBlossoms: PaperBlossomsColors.panel
+        case .whittledWoodland: WhittledWoodland.panel
         }
     }
 
@@ -1500,6 +1594,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.foreground
         case .christmasKeepsakes: ChristmasKeepsakesColors.foreground
         case .paperBlossoms: PaperBlossomsColors.foreground
+        case .whittledWoodland: WhittledWoodland.foreground
         }
     }
 
@@ -1514,6 +1609,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.detailSecondary
         case .christmasKeepsakes: ChristmasKeepsakesColors.detailSecondary
         case .paperBlossoms: PaperBlossomsColors.detailSecondary
+        case .whittledWoodland: WhittledWoodland.detailSecondary
         default: .secondary
         }
     }
@@ -1537,6 +1633,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.panelBorder.opacity(0.28)
         case .christmasKeepsakes: ChristmasKeepsakesColors.panelBorder.opacity(0.28)
         case .paperBlossoms: PaperBlossomsColors.panelBorder.opacity(0.28)
+        case .whittledWoodland: WhittledWoodland.panelBorder.opacity(0.28)
         }
     }
 
@@ -1551,11 +1648,11 @@ extension SurroundTheme {
     /// Native glass is available to the scene's controls. Frost clocks/chips
     /// use pine plates and Christmas uses painted ornaments; their main actions
     /// keep glass.
-    var usesGlassControls: Bool { self != .standard && self != .feltMeadow && self != .paperBlossoms && !isFlowingInk }
+    var usesGlassControls: Bool { self != .standard && self != .feltMeadow && self != .paperBlossoms && self != .whittledWoodland && !isFlowingInk }
 
     /// The natural scenes use their own foregrounds, translucent pigment
     /// on older systems, and opaque controls under Increase Contrast.
-    var usesLightSceneSurfaces: Bool { isFlowingInk || self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream }
+    var usesLightSceneSurfaces: Bool { isFlowingInk || self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream || self == .whittledWoodland }
 
     /// Tinted Liquid Glass for a player's clock, in the stone's color.
     /// Light stones use a strong tint to preserve their material color over
@@ -1583,6 +1680,8 @@ extension SurroundTheme {
             color == .black ? ChristmasKeepsakesColors.blackGlass.opacity(0.82) : ChristmasKeepsakesColors.whiteGlass.opacity(0.84)
         case .paperBlossoms:
             color == .black ? PaperBlossomsColors.blackGlass.opacity(0.82) : PaperBlossomsColors.whiteGlass.opacity(0.84)
+        case .whittledWoodland:
+            clockSolidSurface(color)
         }
     }
 
@@ -1611,6 +1710,8 @@ extension SurroundTheme {
             color == .black ? ChristmasKeepsakesColors.blackGlass.opacity(0.86) : ChristmasKeepsakesColors.whiteIdentityGlass.opacity(0.90)
         case .paperBlossoms:
             color == .black ? PaperBlossomsColors.blackGlass.opacity(0.86) : PaperBlossomsColors.whiteIdentityGlass.opacity(0.90)
+        case .whittledWoodland:
+            clockSolidSurface(color)
         }
     }
 
@@ -1630,6 +1731,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.action
         case .christmasKeepsakes: ChristmasKeepsakesColors.action
         case .paperBlossoms: PaperBlossomsColors.action
+        case .whittledWoodland: WhittledWoodland.action
         }
     }
 
@@ -1642,7 +1744,7 @@ extension SurroundTheme {
         case .nightGarden: actionTint?.opacity(0.86)
         case .sakuraStream: actionTint?.opacity(0.86)
         case .christmasKeepsakes: actionTint?.opacity(0.86)
-        case .paperBlossoms: actionTint?.opacity(0.86)
+        case .paperBlossoms, .whittledWoodland: actionTint?.opacity(0.86)
         case .rakedGarden: actionTint?.opacity(0.88)
         default: actionTint
         }
@@ -1659,6 +1761,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.selection
         case .christmasKeepsakes: ChristmasKeepsakesColors.selection
         case .paperBlossoms: PaperBlossomsColors.selection
+        case .whittledWoodland: WhittledWoodland.selection
         default: Color(uiColor: .systemIndigo)
         }
     }
@@ -1678,6 +1781,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.chatBubble
         case .christmasKeepsakes: ChristmasKeepsakesColors.chatBubble
         case .paperBlossoms: PaperBlossomsColors.chatBubble
+        case .whittledWoodland: WhittledWoodland.chatBubble
         }
     }
 }
@@ -1701,6 +1805,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.selection
         case .christmasKeepsakes: ChristmasKeepsakesColors.selection
         case .paperBlossoms: PaperBlossomsColors.selection
+        case .whittledWoodland: WhittledWoodland.selection
         }
     }
 
@@ -1720,6 +1825,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.conditional
         case .christmasKeepsakes: ChristmasKeepsakesColors.conditional
         case .paperBlossoms: PaperBlossomsColors.conditional
+        case .whittledWoodland: WhittledWoodland.conditional
         }
     }
 
@@ -1739,6 +1845,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.keyline
         case .christmasKeepsakes: ChristmasKeepsakesColors.keyline
         case .paperBlossoms: PaperBlossomsColors.keyline
+        case .whittledWoodland: WhittledWoodland.keyline
         }
     }
 
@@ -1757,6 +1864,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.treeGuide.opacity(0.24)
         case .christmasKeepsakes: ChristmasKeepsakesColors.treeGuide.opacity(0.24)
         case .paperBlossoms: PaperBlossomsColors.treeGuide.opacity(0.24)
+        case .whittledWoodland: WhittledWoodland.panelBorder.opacity(0.24)
         }
     }
 
@@ -1775,6 +1883,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.selection
         case .christmasKeepsakes: ChristmasKeepsakesColors.selection
         case .paperBlossoms: PaperBlossomsColors.selection
+        case .whittledWoodland: WhittledWoodland.selection
         }
     }
 
@@ -1786,7 +1895,7 @@ extension SurroundTheme {
             nil
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xB7A4FF).opacity(0.85)
-        case .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream: nil
+        case .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland: nil
         }
     }
 
@@ -1805,6 +1914,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.conditional
         case .christmasKeepsakes: ChristmasKeepsakesColors.conditional
         case .paperBlossoms: PaperBlossomsColors.conditional
+        case .whittledWoodland: WhittledWoodland.conditional
         }
     }
 
@@ -1823,6 +1933,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.idle
         case .christmasKeepsakes: ChristmasKeepsakesColors.idle
         case .paperBlossoms: PaperBlossomsColors.idle
+        case .whittledWoodland: WhittledWoodland.idle
         }
     }
 }
@@ -1918,6 +2029,9 @@ extension SurroundTheme {
             }
             return [.init(color: PaperBlossomsColors.whiteSurfaceTop, location: 0),
                     .init(color: PaperBlossomsColors.whiteSurfaceBottom, location: 1)]
+        case .whittledWoodland:
+            let surfaces = identityChipColors(color)
+            return [.init(color: surfaces[0], location: 0), .init(color: surfaces[1], location: 1)]
         }
     }
 
@@ -1936,6 +2050,7 @@ extension SurroundTheme {
         case .sakuraStream: color == .black ? SakuraStreamColors.blackSolid : SakuraStreamColors.whiteGlass
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.blackSolid : ChristmasKeepsakesColors.whiteGlass
         case .paperBlossoms: color == .black ? PaperBlossomsColors.blackSolid : PaperBlossomsColors.whiteGlass
+        case .whittledWoodland: color == .black ? WhittledWoodland.walnut : WhittledWoodland.birch
         }
     }
 
@@ -1953,6 +2068,7 @@ extension SurroundTheme {
         case .sakuraStream: color == .black ? SakuraStreamColors.cream : SakuraStreamColors.whiteForeground
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.cream : ChristmasKeepsakesColors.whiteForeground
         case .paperBlossoms: color == .black ? PaperBlossomsColors.cream : PaperBlossomsColors.whiteForeground
+        case .whittledWoodland: color == .black ? WhittledWoodland.cream : WhittledWoodland.whiteForeground
         }
     }
 
@@ -1973,6 +2089,14 @@ extension SurroundTheme {
         case .sakuraStream: color == .black ? SakuraStreamColors.blackAccent : SakuraStreamColors.whiteAccent
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.blackAccent : ChristmasKeepsakesColors.whiteAccent
         case .paperBlossoms: color == .black ? PaperBlossomsColors.blackAccent : PaperBlossomsColors.whiteAccent
+        case .whittledWoodland: color == .black ? WhittledWoodland.blackAccent : WhittledWoodland.whiteAccent
+        }
+    }
+
+    private var usesWarmClockStatusColors: Bool {
+        switch self {
+        case .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland: true
+        default: false
         }
     }
 
@@ -1980,7 +2104,8 @@ extension SurroundTheme {
     /// Pale night clocks need deeper red; dark clocks use brighter coral.
     func clockSuddenDeathAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark, color == .white { return Color(themeHex: 0x7D293B) }
-        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream { return Color(themeHex: color == .white ? 0x7D293B : 0xFFB5AF) }
+        if self == .whittledWoodland, color == .white { return Color(themeHex: 0x6E2130) }
+        if usesWarmClockStatusColors { return Color(themeHex: color == .white ? 0x7D293B : 0xFFB5AF) }
         if self == .feltMeadow {
             return Color(themeHex: color == .white ? 0x7D2D2D : 0xFFADA1)
         }
@@ -2000,7 +2125,7 @@ extension SurroundTheme {
     /// The warning badge uses a solid pigment beneath its white text.
     func clockSuddenDeathBadge(scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark { return Color(themeHex: 0x8B3449) }
-        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream { return Color(themeHex: 0x8B3449) }
+        if usesWarmClockStatusColors { return Color(themeHex: 0x8B3449) }
         if self == .frostPine { return Color(themeHex: 0x913748) }
         if self == .feltMeadow { return Color(themeHex: 0x8B3434) }
         if self == .surroundStudio, scheme == .dark {
@@ -2012,7 +2137,7 @@ extension SurroundTheme {
     /// Scoring acceptance remains green, with a deeper pigment on night ivory.
     func clockAgreementAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark, color == .white { return Color(themeHex: 0x284B31) }
-        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream { return Color(themeHex: color == .white ? 0x284B31 : 0xBDDEA9) }
+        if usesWarmClockStatusColors { return Color(themeHex: color == .white ? 0x284B31 : 0xBDDEA9) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xBCE7B8 : 0x254C30)
         }
@@ -2029,7 +2154,8 @@ extension SurroundTheme {
     /// The auto-resign countdown and disconnected label share an amber accent.
     func clockDisconnectedAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark, color == .white { return Color(themeHex: 0x633D15) }
-        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
+        if self == .whittledWoodland, color == .white { return Color(themeHex: 0x552F12) }
+        if usesWarmClockStatusColors { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xF2D09C : 0x603814)
         }
@@ -2048,7 +2174,7 @@ extension SurroundTheme {
         if isFlowingInk, scheme == .dark {
             return Color(themeHex: color == .black ? 0xE8C891 : 0x6B431C)
         }
-        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
+        if usesWarmClockStatusColors { return clockDisconnectedAccent(color, scheme: scheme) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xF2D09C : 0x603814)
         }
@@ -2064,7 +2190,7 @@ extension SurroundTheme {
     /// The full undo badge needs its own darker amber beneath white text.
     func clockUndoBadge(scheme: ColorScheme) -> Color {
         if isFlowingInk, scheme == .dark { return Color(themeHex: 0x795022) }
-        if self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream { return Color(themeHex: 0x79501F) }
+        if usesWarmClockStatusColors { return Color(themeHex: 0x79501F) }
         if self == .frostPine { return Color(themeHex: 0x795022) }
         if self == .feltMeadow { return Color(themeHex: 0x73511E) }
         if self == .surroundStudio, scheme == .dark {
@@ -2093,6 +2219,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.turnOutline
         case .christmasKeepsakes: ChristmasKeepsakesColors.turnOutline
         case .paperBlossoms: PaperBlossomsColors.turnOutline
+        case .whittledWoodland: WhittledWoodland.turnOutline
         }
     }
 
@@ -2111,6 +2238,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.turnGlow
         case .christmasKeepsakes: ChristmasKeepsakesColors.turnGlow
         case .paperBlossoms: PaperBlossomsColors.turnGlow
+        case .whittledWoodland: WhittledWoodland.turnGlow
         }
     }
 
@@ -2131,6 +2259,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.action
         case .christmasKeepsakes: ChristmasKeepsakesColors.action
         case .paperBlossoms: PaperBlossomsColors.action
+        case .whittledWoodland: WhittledWoodland.action
         }
     }
 
@@ -2178,6 +2307,10 @@ extension SurroundTheme {
             color == .black
                 ? [PaperBlossomsColors.blackSurfaceTop, PaperBlossomsColors.blackSurfaceBottom]
                 : [PaperBlossomsColors.whiteSurfaceTop, PaperBlossomsColors.whiteSurfaceBottom]
+        case .whittledWoodland:
+            color == .black
+                ? [WhittledWoodland.blackSurfaceTop, WhittledWoodland.blackSurfaceBottom]
+                : [WhittledWoodland.whiteSurfaceTop, WhittledWoodland.whiteSurfaceBottom]
         }
     }
 
@@ -2219,6 +2352,10 @@ extension SurroundTheme {
             color == .black
                 ? PaperBlossomsColors.blackBorder.opacity(0.3)
                 : PaperBlossomsColors.whiteBorder.opacity(0.35)
+        case .whittledWoodland:
+            color == .black
+                ? WhittledWoodland.blackBorder.opacity(0.3)
+                : WhittledWoodland.whiteBorder.opacity(0.35)
         }
     }
 
@@ -2236,6 +2373,7 @@ extension SurroundTheme {
         case .sakuraStream: color == .black ? SakuraStreamColors.cream : SakuraStreamColors.whiteForeground
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.cream : ChristmasKeepsakesColors.whiteForeground
         case .paperBlossoms: color == .black ? PaperBlossomsColors.cream : PaperBlossomsColors.whiteForeground
+        case .whittledWoodland: color == .black ? WhittledWoodland.cream : WhittledWoodland.whiteForeground
         }
     }
 
@@ -2263,6 +2401,8 @@ extension SurroundTheme {
             color == .black ? ChristmasKeepsakesColors.blackSecondary : ChristmasKeepsakesColors.whiteSecondary
         case .paperBlossoms:
             color == .black ? PaperBlossomsColors.blackSecondary : PaperBlossomsColors.whiteSecondary
+        case .whittledWoodland:
+            color == .black ? WhittledWoodland.blackSecondary : WhittledWoodland.whiteSecondary
         }
     }
 
@@ -2272,6 +2412,14 @@ extension SurroundTheme {
         guard usesLightSceneSurfaces else { return nil }
         let darkSurface = color == .black
         if isFlowingInk, !flowingInkUsesColor { return identityForeground(color) }
+        if self == .whittledWoodland && !darkSurface {
+            // Birch's darker grain crosses the live name in both appearances.
+            if player.isOGSModerator || player.isOGSAdmin { return Color(themeHex: 0x522B64) }
+            if player.isOGSProfessional { return Color(themeHex: 0x1D4626) }
+            if player.isOGSSupporter { return Color(themeHex: 0x693611) }
+            if player.isBot == true || player.uiClass?.contains("bot") == true { return identitySecondary(color) }
+            return Color(themeHex: 0x17416B)
+        }
         if self == .rakedGarden {
             if player.isOGSModerator || player.isOGSAdmin {
                 return darkSurface ? RakedGardenColors.darkModerator : RakedGardenColors.lightModerator
@@ -2413,6 +2561,7 @@ extension SurroundTheme {
         case .sakuraStream: SakuraStreamColors.conditional
         case .christmasKeepsakes: ChristmasKeepsakesColors.conditional
         case .paperBlossoms: PaperBlossomsColors.selection
+        case .whittledWoodland: WhittledWoodland.selection
         default: actionTint ?? .accentColor
         }
     }
@@ -3053,7 +3202,7 @@ private struct GameDetailThemeModifier: ViewModifier {
             .environment(\.boardAppearance, theme.board(for: theme.colorScheme ?? systemColorScheme))
             .environment(\.colorScheme, theme.colorScheme ?? systemColorScheme)
             .foregroundColor(theme.usesLightSceneSurfaces ? theme.foreground : nil)
-            .modifier(GameDetailLegacyTint(color: (theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream) ? theme.foreground : .accentColor))
+            .modifier(GameDetailLegacyTint(color: (theme.isFlowingInk || theme.usesCustomDetailTint) ? theme.foreground : .accentColor))
             .toolbarColorScheme(theme.colorScheme, for: .navigationBar, .bottomBar)
             .background(WindowInterfaceStyle(colorScheme: ownsWindow ? theme.colorScheme : nil))
     }
@@ -3065,6 +3214,16 @@ extension View {
     /// appearance also reaches screens, sheets and bars outside this view.
     func surroundWindowAppearance(_ colorScheme: ColorScheme?) -> some View {
         background(WindowInterfaceStyle(colorScheme: colorScheme))
+    }
+}
+
+extension SurroundTheme {
+    /// Themes with their own readable ink for unselected toolbar symbols and detail text.
+    var usesCustomDetailTint: Bool {
+        switch self {
+        case .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland: true
+        default: false
+        }
     }
 }
 
@@ -3644,6 +3803,7 @@ struct GameDetailMatteClockOutline: View {
     var isWarning = false
     var cornerRadius: CGFloat = 12
     var paperCompact = false
+    var shallowWoodCut = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.surroundTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
@@ -3652,12 +3812,17 @@ struct GameDetailMatteClockOutline: View {
     var body: some View {
         let increased = contrast == .increased
         let foreground = theme.clockForeground(color, scheme: colorScheme)
-        let runningInk = theme == .paperBlossoms
+        let runningInk = theme == .paperBlossoms || theme == .whittledWoodland
             ? (isWarning ? theme.clockSuddenDeathAccent(color, scheme: colorScheme) : theme.clockAccent(color))
             : foreground
         let ink = isRunning ? runningInk : foreground.opacity(increased ? 0.5 : 0.22)
         let width: CGFloat = isRunning ? (increased ? 4 : 3) : (increased ? 2 : 1)
-        if theme == .paperBlossoms {
+        if theme == .whittledWoodland {
+            if isRunning || increased {
+                WhittledWoodlandControlShape(cornerRadius: cornerRadius, isIdentity: shallowWoodCut, faceOnly: true)
+                    .strokeBorder(ink, lineWidth: isRunning && increased ? 3 : 1.5)
+            }
+        } else if theme == .paperBlossoms {
             PaperBlossomsControlShape(cornerRadius: cornerRadius, compact: paperCompact,
                                       faceOnly: true, folded: !increased && !reduceTransparency)
                 .strokeBorder(ink, lineWidth: width)
@@ -3692,7 +3857,7 @@ struct GameDetailSecondaryText: ViewModifier {
     @Environment(\.surroundTheme) private var theme
 
     @ViewBuilder func body(content: Content) -> some View {
-        if theme.isFlowingInk || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream {
+        if theme.isFlowingInk || theme.usesCustomDetailTint {
             content.foregroundStyle(theme.detailSecondaryForeground)
         } else {
             content.foregroundStyle(.secondary)
@@ -3725,7 +3890,7 @@ struct ThemeStatusBarContrast: View {
         return switch theme {
         case .nightGarden: 0.8
         case .flowingInk, .flowingInkJade: 0.85
-        case .rakedGarden, .frostPine, .surroundStudio, .paperBlossoms, .sakuraStream: 0.55
+        case .rakedGarden, .frostPine, .surroundStudio, .paperBlossoms, .sakuraStream, .whittledWoodland: 0.55
         default: 0
         }
     }
@@ -3845,6 +4010,8 @@ struct GameDetailBackdrop: View {
             RakedGardenScene(scheme: colorScheme)
         case .surroundStudio:
             SurroundStudioScene(scheme: colorScheme)
+        case .whittledWoodland:
+            WhittledWoodlandScene(scheme: colorScheme)
         case .feltMeadow:
             FeltMeadowScene(scheme: colorScheme)
         case .nightGarden:
@@ -3857,6 +4024,239 @@ struct GameDetailBackdrop: View {
             FrostPineScene(scheme: colorScheme)
         case .sakuraStream:
             SakuraStreamScene(scheme: colorScheme, boards: sakuraBoards)
+        }
+    }
+}
+
+/// The diorama is fixed to the window. Chat, Analyze and the two Book panes
+/// can change the board's frame without moving the trees or the stream.
+private struct WhittledWoodlandScene: View {
+    let scheme: ColorScheme
+
+    var body: some View {
+        GeometryReader { geometry in
+            let size = geometry.size
+            let asset = size.width > size.height ? "WhittledWoodlandSceneLandscape" : "WhittledWoodlandScenePortrait"
+            let ground = SurroundTheme.whittledWoodland.pageBackground
+            ZStack {
+                ground
+                Image(decorative: asset)
+                    .resizable()
+                    .scaledToFill()
+                    .saturation(scheme == .dark ? 0.76 : 1)
+                    .colorMultiply(scheme == .dark ? Color(themeHex: 0x857F75) : .white)
+                if #unavailable(iOS 26.0, macCatalyst 26.0) {
+                    VStack(spacing: 0) {
+                        LinearGradient(colors: [ground, ground.opacity(0.88), .clear],
+                                       startPoint: .top, endPoint: .bottom)
+                            .frame(height: min(96, size.height * 0.23))
+                        Spacer(minLength: 0)
+                        LinearGradient(colors: [.clear, ground.opacity(0.88), ground],
+                                       startPoint: .top, endPoint: .bottom)
+                            .frame(height: min(84, size.height * 0.2))
+                    }
+                }
+            }
+            .frame(width: size.width, height: size.height)
+            .clipped()
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// All three contours follow the same knife strokes, including the running-clock inlay.
+struct WhittledWoodlandControlShape: InsettableShape {
+    let cornerRadius: CGFloat
+    var isIdentity = false
+    var faceOnly = false
+    private(set) var insetAmount: CGFloat = 0
+
+    // For each side, mark where a fresh knife stroke starts, how far it cuts
+    // into the edge, and how strongly its plane faces the upper-left light.
+    // Clockwise from the upper-left end of the top edge.
+    private static let cuts: [[(start: CGFloat, bite: CGFloat, light: Double)]] = [
+        [(0, 0, 0.37), (0.19, 0.72, 0.19), (0.48, 0.16, 0.48), (0.79, 0.56, 0.27)],
+        [(0, 0, 0.17)],
+        [(0, 0, -0.16), (0.56, 0.72, -0.29)],
+        [(0, 0, -0.12)],
+        [(0, 0, -0.21), (0.23, 0.80, 0.10), (0.44, 0.04, -0.16), (0.73, 0.92, 0.16)],
+        [(0, 0, -0.05)],
+        [(0, 0, 0.16), (0.42, 0.64, 0.28)],
+        [(0, 0, 0.50)]
+    ]
+
+    fileprivate struct Plane {
+        let start: CGPoint
+        let light: Double
+        let showsEndGrain: Bool
+    }
+
+    fileprivate func planes(in rect: CGRect, aboveWall: Bool = false) -> [Plane] {
+        let shortSide = min(rect.width, rect.height)
+        guard shortSide > 0 else { return [] }
+        // Below the full clock height the end grain stays visible without
+        // pushing the face lip into the clock's third line.
+        let fullDepth = isIdentity ? 0 : min(1, max(0, (shortSide - 68) / 18))
+        let shoulder = min(2.7, shortSide * (isIdentity ? 0.032 : 0.040)) + 2.2 * fullDepth
+        let wall = min(1.8, shortSide * (isIdentity ? 0.018 : 0.024)) + 1.4 * fullDepth
+        let raised = aboveWall || faceOnly
+        let inset = insetAmount + (faceOnly ? shoulder : 0)
+        let left = rect.minX + inset + (raised ? wall * 0.23 : 0), right = rect.maxX - inset
+        let top = rect.minY + inset
+        let bottom = rect.maxY - inset - (raised ? wall : 0)
+        guard right > left, bottom > top else { return [] }
+        let outerCut = min(cornerRadius, shortSide * (isIdentity ? 0.13 : 0.16))
+        let cut = max(0, min((right - left) * 0.22, (bottom - top) * 0.23, outerCut - inset * 0.52))
+        let corners = [
+            CGPoint(x: left + cut * 1.35, y: top), CGPoint(x: right - cut * 0.90, y: top),
+            CGPoint(x: right, y: top + cut * 1.00), CGPoint(x: right, y: bottom - cut * 1.22),
+            CGPoint(x: right - cut * 1.32, y: bottom), CGPoint(x: left + cut * 1.02, y: bottom),
+            CGPoint(x: left, y: bottom - cut * 0.88), CGPoint(x: left, y: top + cut * 0.81)
+        ]
+        let relief = faceOnly ? min(1.45, shoulder * 0.45) : min(0.95, shortSide * 0.012)
+        var planes = [Plane]()
+        for (edge, cuts) in Self.cuts.enumerated() {
+            let a = corners[edge], b = corners[(edge + 1) % corners.count]
+            let dx = b.x - a.x, dy = b.y - a.y
+            let length = max(1, hypot(dx, dy))
+            for cut in cuts {
+                let displacement = cut.bite * relief / length
+                let p = CGPoint(x: a.x + dx * cut.start - dy * displacement,
+                                y: a.y + dy * cut.start + dx * displacement)
+                planes.append(Plane(start: p, light: cut.light, showsEndGrain: edge == 3))
+            }
+        }
+        return planes
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let vertices = planes(in: rect).map(\.start)
+        guard !vertices.isEmpty else { return Path() }
+        let ease = min(cornerRadius * (isIdentity ? 0.61 : 0.48), min(rect.width, rect.height) * 0.11)
+        func tangent(from corner: CGPoint, toward next: CGPoint) -> CGPoint {
+            let dx = next.x - corner.x, dy = next.y - corner.y
+            let fraction = min(0.34, ease / max(1, hypot(dx, dy)))
+            return CGPoint(x: corner.x + dx * fraction, y: corner.y + dy * fraction)
+        }
+        return Path { path in
+            for i in vertices.indices {
+                let corner = vertices[i]
+                let previous = vertices[(i + vertices.count - 1) % vertices.count]
+                let next = vertices[(i + 1) % vertices.count]
+                let start = tangent(from: corner, toward: previous)
+                if i == 0 { path.move(to: start) } else { path.addLine(to: start) }
+                path.addQuadCurve(to: tangent(from: corner, toward: next), control: corner)
+            }
+            path.closeSubpath()
+        }
+    }
+
+    fileprivate static func polygon(_ vertices: [CGPoint]) -> Path {
+        Path { path in
+            path.addLines(vertices)
+            path.closeSubpath()
+        }
+    }
+
+    func inset(by amount: CGFloat) -> Self {
+        var shape = self
+        shape.insetAmount += amount
+        return shape
+    }
+}
+
+/// Straight grain runs across the face and shows through the knife planes.
+/// Clocks are thick blocks; identity tags are smaller, thinner offcuts.
+struct WhittledWoodlandControlSurface: View {
+    let color: StoneColor
+    let cornerRadius: CGFloat
+    var isIdentity = false
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    private static let walnut = UIImage(named: "WhittledWoodlandWalnutFace", in: Bundle(for: WhittledWoodland.self), compatibleWith: nil)
+    private static let birch = UIImage(named: "WhittledWoodlandBirchFace", in: Bundle(for: WhittledWoodland.self), compatibleWith: nil)
+
+    var body: some View {
+        let theme = SurroundTheme.whittledWoodland
+        let shape = WhittledWoodlandControlShape(cornerRadius: cornerRadius, isIdentity: isIdentity)
+        let simplified = reduceTransparency || contrast == .increased
+        let image = color == .black ? Self.walnut : Self.birch
+        shape.fill(theme.clockSolidSurface(color))
+            .shadow(color: Color(themeHex: 0x47250D).opacity(simplified ? 0 : 0.51),
+                    radius: isIdentity ? 1.5 : 2.6, x: isIdentity ? 0 : -0.3, y: isIdentity ? 1.6 : 3.2)
+            .overlay {
+                if simplified {
+                    shape.strokeBorder(theme.identityChipBorder(color), lineWidth: contrast == .increased ? 2 : 1)
+                } else {
+                    Canvas { context, size in
+                        let bounds = CGRect(origin: .zero, size: size)
+                        let outer = shape.planes(in: bounds)
+                        guard !outer.isEmpty else { return }
+                        context.clip(to: shape.path(in: bounds))
+                        if let image {
+                            // Preserve the fibers' proportions on tall side columns and thin inline clocks.
+                            let scale = max(size.width / image.size.width, size.height / image.size.height)
+                            let width = image.size.width * scale, height = image.size.height * scale
+                            context.draw(Image(uiImage: image),
+                                         in: CGRect(x: (size.width - width) * 0.5, y: (size.height - height) * 0.5,
+                                                    width: width, height: height))
+                        }
+                        if scheme == .dark {
+                            context.fill(Path(bounds), with: .color(Color(themeHex: 0x291C17)
+                                .opacity(color == .black ? 0.23 : 0.07)))
+                        }
+                        let shoulder = shape.planes(in: bounds, aboveWall: true).map(\.start)
+                        var faceShape = shape
+                        faceShape.faceOnly = true
+                        let face = faceShape.planes(in: bounds).map(\.start)
+                        guard shoulder.count == outer.count, face.count == outer.count else { return }
+                        drawCarving(in: context, outer: outer, shoulder: shoulder, face: face)
+                    }
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    private func drawCarving(in context: GraphicsContext, outer: [WhittledWoodlandControlShape.Plane],
+                             shoulder: [CGPoint], face: [CGPoint]) {
+        let light = Color(themeHex: color == .black ? 0xE5B884 : 0xFFF3D6)
+        let shade = Color(themeHex: color == .black ? 0x180E0B : 0x855A36)
+        let endGrain = Color(themeHex: color == .black ? 0xA7784B : 0xC48F5C)
+        for edge in outer.indices {
+            let next = (edge + 1) % outer.count
+            let cut = WhittledWoodlandControlShape.polygon([shoulder[edge], shoulder[next], face[next], face[edge]])
+            let strength = outer[edge].light
+            context.fill(cut, with: .color((strength > 0 ? light : shade).opacity(abs(strength))))
+            if outer[edge].showsEndGrain {
+                // The exposed sawn end grain stays in one corner, clear of labels.
+                context.fill(cut, with: .color(endGrain.opacity(0.74)))
+                var fibers = context
+                fibers.clip(to: cut)
+                let area = cut.boundingRect
+                var lines = Path()
+                let spacing = max(0.9, area.height * 0.12)
+                for offset in stride(from: -area.height, through: area.width + area.height, by: spacing) {
+                    let x = area.minX + offset
+                    lines.move(to: CGPoint(x: x, y: area.maxY))
+                    lines.addQuadCurve(to: CGPoint(x: x + area.height * 0.77, y: area.minY),
+                                       control: CGPoint(x: x + area.height * 0.52, y: area.midY))
+                }
+                fibers.stroke(lines, with: .color(shade.opacity(0.62)), lineWidth: 0.4)
+            } else {
+                // Broad cuts change angle along the grain. Keep their variation
+                // confined to the shoulder, even on the shortest folded clock.
+                let at: CGFloat = edge.isMultiple(of: 2) ? 0.37 : 0.63
+                let a = face[edge], b = face[next]
+                let joint = CGPoint(x: a.x + (b.x - a.x) * at, y: a.y + (b.y - a.y) * at)
+                let facet = WhittledWoodlandControlShape.polygon([shoulder[edge], shoulder[next], joint])
+                context.fill(facet, with: .color((edge.isMultiple(of: 2) ? light : shade).opacity(0.14)))
+            }
+            let wall = WhittledWoodlandControlShape.polygon([shoulder[edge], shoulder[next], outer[next].start, outer[edge].start])
+            context.fill(wall, with: .color(shade.opacity(color == .black ? 0.63 : 0.49)))
         }
     }
 }

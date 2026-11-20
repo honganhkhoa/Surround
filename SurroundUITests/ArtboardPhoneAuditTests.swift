@@ -980,6 +980,21 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         }
     }
 
+    func testWhittledWoodlandThemeStates() throws {
+        try auditThemeStates(theme: "whittledWoodland", title: "Whittled Woodland",
+                             suffix: "-whittled-woodland", appearance: .light)
+    }
+
+    func testWhittledWoodlandThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "whittledWoodland", title: "Whittled Woodland",
+                                 suffix: "-whittled-woodland", appearance: .light)
+    }
+
+    func testWhittledWoodlandThemeScoring() throws {
+        try auditThemeScoring(theme: "whittledWoodland", title: "Whittled Woodland",
+                              suffix: "-whittled-woodland-night", appearance: .dark)
+    }
+
     func testSakuraStreamThemeStates() throws {
         try auditThemeStates(theme: "sakuraStream", title: "Sakura Stream",
                              suffix: "-sakura-stream", appearance: .light)

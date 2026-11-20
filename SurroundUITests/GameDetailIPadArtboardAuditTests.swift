@@ -637,6 +637,21 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                                appearance: .dark)
     }
 
+    func testWhittledWoodlandThemeOrientations() {
+        auditThemeOrientations(theme: "whittledWoodland", title: "Whittled Woodland",
+                               suffix: "-whittled-woodland", appearance: .light)
+    }
+
+    func testWhittledWoodlandThemePanels() {
+        auditThemePanels(theme: "whittledWoodland", title: "Whittled Woodland",
+                         suffix: "-whittled-woodland-night", appearance: .dark)
+    }
+
+    func testWhittledWoodlandThemeNarrowWindow() {
+        auditNarrowNativeWindowArtboard(theme: "whittledWoodland", suffix: "-whittled-woodland",
+                                        appearance: .light)
+    }
+
     func testSakuraStreamThemeOrientations() {
         auditThemeOrientations(theme: "sakuraStream", title: "Sakura Stream",
                                suffix: "-sakura-stream", appearance: .light)

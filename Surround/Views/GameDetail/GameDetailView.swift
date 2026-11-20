@@ -1546,7 +1546,7 @@ private struct GameToolbarLayout: ViewModifier {
         }
         .toggleStyle(.button)
         .labelStyle(.iconOnly)
-        .modifier(GameDetailLegacyTint(color: (theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream) && !analyzingIsPresented
+        .modifier(GameDetailLegacyTint(color: theme.usesCustomDetailTint && !analyzingIsPresented
             ? theme.foreground : .accentColor))
         .accessibilityIdentifier(
             compact
@@ -2154,7 +2154,7 @@ private struct GameToolbarChatButton: View {
     private var iconColor: Color {
         if isSelected { return colorScheme == .dark ? .black : .white }
         if #available(iOS 26.0, macCatalyst 26.0, *) { return .primary }
-        return (theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream) ? theme.foreground : .accentColor
+        return theme.usesCustomDetailTint ? theme.foreground : .accentColor
     }
 
     var body: some View {

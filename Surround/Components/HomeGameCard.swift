@@ -223,7 +223,9 @@ struct HomeClockChip<Leading: View>: View {
         .padding(.horizontal, size.padding)
         .frame(minHeight: size.minHeight)
         .background {
-            if theme == .feltMeadow {
+            if theme == .whittledWoodland {
+                WhittledWoodlandControlSurface(color: color, cornerRadius: size.radius, isIdentity: true)
+            } else if theme == .feltMeadow {
                 FeltControlSurface(color: color, shape: shape)
             } else if theme == .christmasKeepsakes {
                 ChristmasOrnamentSurface(color: color, role: .clock, compact: true)
@@ -261,7 +263,10 @@ struct HomeClockChip<Leading: View>: View {
     /// Strokes, not blurred shadows: a list of rows must scroll smoothly.
     @ViewBuilder
     private var ring: some View {
-        if theme == .nightGarden {
+        if theme == .whittledWoodland {
+            GameDetailMatteClockOutline(color: color, isRunning: state.running || lowOnTime,
+                                        isWarning: warning, cornerRadius: size.radius, shallowWoodCut: true)
+        } else if theme == .nightGarden {
             if state.running || lowOnTime || contrast == .increased {
                 let outline = NightGardenPaneOutline(compact: true)
                 let ringColor = warning ? warningColor
@@ -275,10 +280,11 @@ struct HomeClockChip<Leading: View>: View {
                     }
             }
         } else if state.running || lowOnTime {
+            let usesSideInk = theme == .paperBlossoms
             let ringColor = warning ? warningColor
-                : (theme == .paperBlossoms ? theme.clockAccent(color) : theme.turnOutline(scheme: colorScheme))
+                : (usesSideInk ? theme.clockAccent(color) : theme.turnOutline(scheme: colorScheme))
             let glowColor = warning ? warningColor : theme.turnGlow
-            shape.strokeBorder(ringColor, lineWidth: theme == .paperBlossoms ? 3 : 1)
+            shape.strokeBorder(ringColor, lineWidth: usesSideInk ? 3 : 1)
                 .background {
                     shape.inset(by: -2.5).stroke(glowColor.opacity(colorScheme == .dark ? 0.5 : 0.4), lineWidth: 3)
                 }

@@ -65,7 +65,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
     }
 
     /// The themes a Debug build offers, in the pickers' order.
-    private let debugThemes = ["standard", "surroundStudio", "rakedGarden", "nebulaPearl", "frostPine", "feltMeadow", "nightGarden", "christmasKeepsakes", "paperBlossoms", "flowingInk", "sakuraStream"]
+    private let debugThemes = ["standard", "surroundStudio", "rakedGarden", "nebulaPearl", "frostPine", "feltMeadow", "nightGarden", "christmasKeepsakes", "paperBlossoms", "flowingInk", "sakuraStream", "whittledWoodland"]
 
     /// Every tile's preview keeps the full width of its column, whatever
     /// height the picker's host can give: a host shorter than the picker
@@ -182,6 +182,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(themeOption("flowingInk", in: app).exists, "Flowing Ink has one picker tile for its four modes.")
         XCTAssertTrue(themeOption("paperBlossoms", in: app).exists, "Debug builds offer Paper Blossoms.")
         XCTAssertTrue(themeOption("sakuraStream", in: app).exists, "Debug builds offer Sakura Stream.")
+        XCTAssertTrue(themeOption("whittledWoodland", in: app).exists, "Debug builds offer Whittled Woodland.")
         #endif
 
         // Settings has one picker; its screen identifier spans several elements.
@@ -229,6 +230,11 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         XCTAssertFalse(app.segmentedControls[ID.themeScope].exists,
                        "Where the theme applies stays a Settings choice.")
         keepScreenshot("Game Options – Surround Studio chosen", in: app)
+        #if DEBUG
+        let woodland = themeOption("whittledWoodland", in: app)
+        tap(woodland, description: "Choose Whittled Woodland for this game", in: app)
+        assertSelected(woodland, true)
+        #endif
     }
 
     func testFlowingInkToolbarCyclesAndRetainsTheSelectedVariant() throws {

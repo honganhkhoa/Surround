@@ -239,6 +239,22 @@ struct Goban: View {
                         color: appearance.gridColor
                     ).equatable()
                 }
+                if appearance.gridStyle == .incised {
+                    // The far wall of a knife-cut groove catches the light.
+                    // Its dark core and hoshi use the exact native paths below.
+                    Canvas { context, _ in
+                        guard usesDetailedStoneRendering(at: size) else { return }
+                        let grid = EngravedGridGeometry(width: width, height: height, cellSize: size)
+                        let offset = min(0.8, size * 0.024)
+                        let lip = appearance.boardDepth?.highlight ?? .white
+                        context.translateBy(x: offset, y: offset)
+                        context.stroke(grid.innerPath, with: .color(lip), lineWidth: 0.72 * appearance.gridLineScale)
+                        context.stroke(grid.outlinePath, with: .color(lip), lineWidth: appearance.gridLineScale)
+                    }
+                    .animation(nil, value: usesDetailedStoneRendering(at: size))
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                }
                 Group {
                     Path { path in
                         for i in 1..<height-1 {
@@ -649,6 +665,91 @@ private struct BoardBorder: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// Shallow knife cuts along the maple edge. The irregular inner line stays
+/// inside the empty half-cell margin, including on rectangular boards.
+private struct WhittledBoardRim: View {
+    let material: BoardDepth
+    let geometry: BoardDepthGeometry
+    let columns: Int
+    let rows: Int
+
+    var body: some View {
+        Canvas { context, size in
+            let depth = geometry.thickness
+            let height = size.height - depth
+            guard depth > 0, size.width > 0, height > 0,
+                  usesDetailedStoneRendering(at: geometry.cellSize) else { return }
+            let width = min(depth * 1.35, geometry.cellSize * 0.36)
+            let face = CGRect(x: 0, y: 0, width: size.width, height: height)
+            var bevel = context
+            bevel.clip(to: Path(roundedRect: face, cornerRadius: geometry.cornerRadius))
+            let corners = [CGPoint.zero, CGPoint(x: face.maxX, y: 0),
+                           CGPoint(x: face.maxX, y: face.maxY), CGPoint(x: 0, y: face.maxY)]
+            for (side, corner) in corners.enumerated() {
+                var edge = bevel
+                edge.translateBy(x: corner.x, y: corner.y)
+                edge.rotate(by: .degrees(Double(side) * 90))
+                let horizontal = side.isMultiple(of: 2)
+                cut(edge, length: horizontal ? face.width : face.height, width: width,
+                    count: horizontal ? columns : rows, side: side)
+            }
+            // The blade leaves a second plane on the front wall. Clip to
+            // the same silhouette as the slab that casts the board shadow.
+            var wall = context
+            wall.clip(to: Path(roundedRect: CGRect(origin: .zero, size: size),
+                               cornerRadius: geometry.cornerRadius))
+            wall.translateBy(x: 0, y: height)
+            cut(wall, length: face.width, width: depth, count: columns, side: 4)
+        }
+        .padding(.bottom, -geometry.thickness)
+        .animation(nil, value: usesDetailedStoneRendering(at: geometry.cellSize))
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func cut(_ context: GraphicsContext, length: CGFloat, width: CGFloat, count: Int, side: Int) {
+        let count = max(2, count)
+        let step = length / CGFloat(count)
+        let wall = side == 4
+        let cornerInset = wall ? 0 : width
+        let facingLight = side == 0 || side == 3
+        // Positions belong to the cuts, so they stay put as the board resizes.
+        func sample(_ index: Int, _ channel: Int) -> CGFloat {
+            var bits = UInt32(truncatingIfNeeded: (index + 1) * 68_917 + side * 92_821 + channel * 31_337)
+            bits ^= bits >> 16
+            bits &*= 0x7FEB_352D
+            bits ^= bits >> 15
+            return CGFloat(bits & 0xFFFF) / 65_535
+        }
+        func points(_ index: Int) -> (outer: CGPoint, inner: CGPoint) {
+            let end = index == 0 || index == count
+            let fraction = CGFloat(index) / CGFloat(count)
+            let outerX = fraction * length + (end ? 0 : (sample(index, 0) - 0.5) * step * 0.55)
+            let innerX = cornerInset + fraction * (length - 2 * cornerInset)
+                + (end ? 0 : (sample(index, 1) - 0.5) * step * 0.64)
+            let innerY = end || wall ? width : width * (0.48 + 0.52 * sample(index, 2))
+            return (CGPoint(x: outerX, y: 0), CGPoint(x: innerX, y: innerY))
+        }
+        func triangle(_ a: CGPoint, _ b: CGPoint, _ c: CGPoint, _ pigment: Color) {
+            var path = Path()
+            path.move(to: a)
+            path.addLine(to: b)
+            path.addLine(to: c)
+            path.closeSubpath()
+            context.fill(path, with: .color(pigment))
+        }
+        var start = points(0)
+        for index in 0..<count {
+            let next = points(index + 1)
+            let pigment = facingLight ? material.highlight : material.shade
+            let strength = Double(sample(index, 3))
+            triangle(start.outer, next.outer, next.inner, pigment.opacity(0.23 + strength * 0.53))
+            triangle(start.outer, next.inner, start.inner, pigment.opacity(0.08 + strength * 0.38))
+            start = next
+        }
     }
 }
 
@@ -1778,7 +1879,8 @@ struct BoardView: View {
                             if let texture = appearance.boardTexture {
                                 BoardTextureImage(texture: texture, lifted: false, boardSize: geometry.size)
                                     .overlay {
-                                        if appearance.boardBevel && appearance.boardDepth?.edgeStyle != .rolledTin {
+                                        if appearance.boardBevel && appearance.boardDepth?.edgeStyle != .rolledTin
+                                            && appearance.boardDepth?.edgeStyle != .whittled {
                                             // Lift the existing mineral detail only in the margin,
                                             // fading before the outer grid line half a cell in.
                                             let fade = 0.45 / (max(width, height) + (showsCoordinate ? 1 : 0))
@@ -1825,7 +1927,7 @@ struct BoardView: View {
                                         .opacity(padded ? 1 : 0)
                                         .animation(nil, value: padded)
                                 }
-                                if appearance.boardBevel {
+                                if appearance.boardBevel && appearance.boardDepth?.edgeStyle != .whittled {
                                     Group {
                                         if let depth = appearance.boardDepth, depth.edgeStyle == .frosted {
                                             FrostedBoardEdge(material: depth, cellSize: depthGeometry.cellSize,
@@ -1875,6 +1977,13 @@ struct BoardView: View {
                                     .shadow(color: .black.opacity(detailed && appearance.castsBoardShadow ? (appearance.boardBevel ? 0.55 : 0.33) : 0),
                                             radius: appearance.boardBevel ? 10 : 2,
                                             y: appearance.boardBevel ? 6 : 0)
+                            }
+                        }
+                        .overlay {
+                            if let depth = appearance.boardDepth, depth.edgeStyle == .whittled {
+                                WhittledBoardRim(material: depth, geometry: depthGeometry,
+                                                columns: boardPosition.width, rows: boardPosition.height)
+                                    .opacity(detailed ? 1 : 0)
                             }
                         }
                         .animation(nil, value: padded)

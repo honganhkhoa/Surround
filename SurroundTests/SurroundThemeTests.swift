@@ -1588,6 +1588,141 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    func testWhittledWoodlandUsesCarvedMapleAndReadableWoodenPieces() throws {
+        let theme = SurroundTheme.whittledWoodland
+        XCTAssertTrue(theme.isDebugOnly)
+        XCTAssertNil(theme.colorScheme)
+        let day = theme.board(for: .light)
+        let night = theme.board(for: .dark)
+        XCTAssertEqual(day.boardDepth?.thicknessRatio, night.boardDepth?.thicknessRatio)
+        XCTAssertEqual(day.boardDepth?.maximumThickness, night.boardDepth?.maximumThickness)
+        XCTAssertNotEqual(day.compactBoardColor, night.compactBoardColor)
+        for scheme: ColorScheme in [.light, .dark] {
+            let board = theme.board(for: scheme)
+            let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+            XCTAssertEqual(board.gridStyle, .incised)
+            XCTAssertEqual(try XCTUnwrap(board.boardDepth).edgeStyle, .whittled)
+            XCTAssertNotNil(board.boardTexture)
+            let images = try XCTUnwrap(board.stoneImages)
+            XCTAssertFalse(images.black.isEmpty)
+            XCTAssertFalse(images.white.isEmpty)
+            XCTAssertGreaterThan(contrast(board.black.flat, board.white.flat, style: style), 7)
+            XCTAssertGreaterThan(contrast(theme.detailSecondaryForeground, theme.panel, style: style), 4.5)
+            try assertNightControlFallbacksKeepReadableTextAndRoles(theme, scheme: scheme)
+        }
+    }
+
+    @MainActor
+    func testWhittledWoodlandClockAndPlayerHaveDistinctDepthAndReadableWoodFaces() throws {
+        let theme = SurroundTheme.whittledWoodland
+        let bundle = Bundle(for: Self.self)
+        for name in ["WhittledWoodlandWalnutFace", "WhittledWoodlandBirchFace"] {
+            XCTAssertNotNil(UIImage(named: name, in: bundle, compatibleWith: nil)?.cgImage, name)
+        }
+        let players = [OGSUser(username: "ordinary", id: 1),
+                       OGSUser(username: "supporter", id: 2, supporter: true),
+                       OGSUser(username: "moderator", id: 3, isModerator: true),
+                       OGSUser(username: "professional", id: 4, professional: true)]
+        for size in [CGSize(width: 184, height: 86), CGSize(width: 92, height: 62)] {
+            let rect = CGRect(origin: .zero, size: size)
+            let clock = WhittledWoodlandControlShape(cornerRadius: 12, isIdentity: false, faceOnly: true)
+            let chip = WhittledWoodlandControlShape(cornerRadius: 12, isIdentity: true, faceOnly: true)
+            XCTAssertGreaterThan(chip.path(in: rect).boundingRect.height, clock.path(in: rect).boundingRect.height,
+                                 "At a common footprint the clock reserves a deeper bevel than the name plaque")
+        }
+        let cases: [(size: CGSize, identity: Bool)] = [
+            (CGSize(width: 184, height: 86), false), (CGSize(width: 92, height: 116), false),
+            (CGSize(width: 158, height: 50), true), (CGSize(width: 82, height: 28), true)
+        ]
+        for scheme: ColorScheme in [.light, .dark] {
+            let style: UIUserInterfaceStyle = scheme == .light ? .light : .dark
+            for sample in cases {
+                for color: StoneColor in [.black, .white] {
+                    let image = try nativeMaterialPixels(
+                        WhittledWoodlandControlSurface(color: color, cornerRadius: 12, isIdentity: sample.identity)
+                            .frame(width: sample.size.width, height: sample.size.height)
+                            .environment(\.colorScheme, scheme), scale: 2)
+                    let inks: [(String, Color)] = sample.identity
+                        ? [("name", theme.identityForeground(color)), ("rank", theme.identitySecondary(color))]
+                            + players.map { ($0.username, theme.roleColor(for: $0, on: color)) }
+                        : [("time", theme.clockForeground(color, scheme: scheme)), ("turn", theme.clockAccent(color)),
+                           ("sudden death", theme.clockSuddenDeathAccent(color, scheme: scheme)),
+                           ("agreement", theme.clockAgreementAccent(color, scheme: scheme)),
+                           ("disconnected", theme.clockDisconnectedAccent(color, scheme: scheme)),
+                           ("undo", theme.clockUndoAccent(color, scheme: scheme))]
+                    let detail = "\(scheme) \(color) \(sample)"
+                    XCTAssertLessThan(image.pixels[3], 80, "The actual plaque has a cut corner: \(detail)")
+                    var levels = Set<UInt8>()
+                    var minimum = 1.0, maximum = 0.0
+                    // Sample the real central face on which names and times sit.
+                    for y in stride(from: image.height / 4, to: 3 * image.height / 4, by: 4) {
+                        for x in stride(from: image.width / 4, to: 3 * image.width / 4, by: 4) {
+                            let i = (y * image.width + x) * 4
+                            let pixel = Color(.sRGB, red: Double(image.pixels[i]) / 255,
+                                              green: Double(image.pixels[i + 1]) / 255,
+                                              blue: Double(image.pixels[i + 2]) / 255)
+                            let value = luminance(pixel)
+                            minimum = min(minimum, value)
+                            maximum = max(maximum, value)
+                            levels.insert(image.pixels[i])
+                        }
+                    }
+                    XCTAssertGreaterThan(levels.count, 3, "The material has visible wood tones: \(detail)")
+                    for (label, ink) in inks {
+                        let value = luminance(ink, style: style)
+                        let ratio = color == .black ? (value + 0.05) / (maximum + 0.05)
+                            : (minimum + 0.05) / (value + 0.05)
+                        XCTAssertGreaterThanOrEqual(ratio, 4.5, "\(label) on the actual wood face: \(detail)")
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testWhittledWoodlandRunningInlayFollowsTheCarvedClockFace() throws {
+        let theme = SurroundTheme.whittledWoodland
+        let sizes: [(CGSize, CGFloat, Bool)] = [
+            (CGSize(width: 180, height: 86), 2, false), (CGSize(width: 88, height: 30), 3, false),
+            (CGSize(width: 88, height: 30), 3, true)
+        ]
+        for (size, scale, shallow) in sizes {
+            let contour = try nativeMaterialPixelsUsingDirectContext(
+                WhittledWoodlandControlShape(cornerRadius: 12, isIdentity: shallow, faceOnly: true)
+                    .strokeBorder(.white, lineWidth: 3)
+                    .frame(width: size.width, height: size.height), scale: scale)
+            for scheme: ColorScheme in [.light, .dark] {
+                for side: StoneColor in [.black, .white] {
+                    var normalRing: [UInt8] = []
+                    for (running, warning) in [(false, false), (true, false), (true, true)] {
+                        let ring = try nativeMaterialPixelsUsingDirectContext(
+                            GameDetailMatteClockOutline(color: side, isRunning: running, isWarning: warning,
+                                                       cornerRadius: 12, shallowWoodCut: shallow)
+                                .frame(width: size.width, height: size.height)
+                                .environment(\.surroundTheme, theme)
+                                .environment(\.colorScheme, scheme), scale: scale)
+                        let solid = stride(from: 3, to: ring.pixels.count, by: 4).filter { ring.pixels[$0] > 245 }
+                        let detail = "\(size) \(side) \(scheme)"
+                        if running {
+                            XCTAssertGreaterThan(solid.count, Int((size.width + size.height) * scale),
+                                                 "The running clock must show a continuous visible inlay: \(detail)")
+                            if warning {
+                                XCTAssertNotEqual(ring.pixels, normalRing, "Sudden death uses warning ink: \(detail)")
+                            } else {
+                                normalRing = ring.pixels
+                            }
+                            let outside = solid.filter { contour.pixels[$0] < 16 }.count
+                            XCTAssertLessThanOrEqual(outside, solid.count / 100,
+                                                     "The inlay must follow the faceted inner lip: \(detail)")
+                        } else {
+                            XCTAssertTrue(solid.isEmpty, "The idle clock leaves its wood bevel unpainted: \(detail)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     func testPaperBlossomsKeepsPaperAndFoldedStonesReadableInBothAppearances() throws {
         let theme = SurroundTheme.paperBlossoms
         XCTAssertTrue(theme.isDebugOnly)
@@ -2808,6 +2943,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "christmasKeepsakes"), .christmasKeepsakes)
         XCTAssertEqual(SurroundTheme.current(storedID: "paperBlossoms"), .paperBlossoms)
         XCTAssertEqual(SurroundTheme.current(storedID: "sakuraStream"), .sakuraStream)
+        XCTAssertEqual(SurroundTheme.current(storedID: "whittledWoodland"), .whittledWoodland)
         #else
         XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl"), .nebulaPearl)
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .rakedGarden)
@@ -2818,6 +2954,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "christmasKeepsakes"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "paperBlossoms"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "sakuraStream"), .standard)
+        XCTAssertEqual(SurroundTheme.current(storedID: "whittledWoodland"), .standard)
         #endif
     }
 
@@ -2826,7 +2963,7 @@ final class SurroundThemeTests: XCTestCase {
     func testPickersOfferTheReleasedThemesFirst() {
         XCTAssertEqual(SurroundTheme.released, [.standard, .surroundStudio, .rakedGarden, .nebulaPearl])
         let unreleased: [SurroundTheme] = [.frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes,
-                                          .paperBlossoms, .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain, .sakuraStream]
+                                          .paperBlossoms, .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain, .sakuraStream, .whittledWoodland]
         XCTAssertEqual(SurroundTheme.allCases.filter(\.isDebugOnly), unreleased)
         #if DEBUG
         XCTAssertEqual(SurroundTheme.available, SurroundTheme.released + unreleased)
@@ -4035,7 +4172,7 @@ final class SurroundThemeTests: XCTestCase {
                 XCTAssertGreaterThan(contrast(theme.clockAccent(color), surface, style: style), 4.5)
                 XCTAssertGreaterThanOrEqual(
                     contrast(theme.clockSuddenDeathAccent(color, scheme: scheme), surface, style: style), 4.5)
-                if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream {
+                if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland {
                     for (state, accent) in [
                         ("Accepted", theme.clockAgreementAccent(color, scheme: scheme)),
                         ("Disconnected", theme.clockDisconnectedAccent(color, scheme: scheme)),
@@ -4058,7 +4195,7 @@ final class SurroundThemeTests: XCTestCase {
         }
         XCTAssertGreaterThan(contrast(.white, try XCTUnwrap(theme.actionTint), style: style), 4.5)
         XCTAssertGreaterThan(contrast(.white, theme.statusBadge, style: style), 4.5)
-        if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream {
+        if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland {
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockUndoBadge(scheme: scheme), style: style), 4.5,
                                        "The Undo badge keeps its white text readable")
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockSuddenDeathBadge(scheme: scheme), style: style), 4.5,
