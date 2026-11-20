@@ -137,12 +137,9 @@ final class StonePlacementSoundPlayer: ObservableObject {
         self.uptime = uptime
     }
 
-    /// Folded paper shares the soft felt bank; visual presentations need not
-    /// duplicate audio assets merely to preserve their material character.
+    /// All Flowing Ink presentations use Classic's sound bank.
     private static func soundTheme(for theme: SurroundTheme) -> SurroundTheme {
-        if theme == .whittledWoodland { return .surroundStudio }
-        if theme.isFlowingInk || theme == .sakuraStream { return .standard }
-        return theme == .paperBlossoms ? .feltMeadow : theme
+        theme.isFlowingInk ? .standard : theme
     }
 
     static func assetName(theme: SurroundTheme, color: StoneColor, variation: Int) -> String {
