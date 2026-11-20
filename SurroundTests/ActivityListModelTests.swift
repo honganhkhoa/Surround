@@ -167,6 +167,55 @@ final class ActivityListModelTests: XCTestCase {
         XCTAssertEqual(rows, [["waiting-open-5", "waiting-open-6", "waiting-open-7", "waiting-open-4"]])
     }
 
+    func testTheCardsChallengeStaysOutOfChallengesReceivedWithItsResolvedRow() {
+        func ids(_ list: [Item], _ resolved: [ActivityResolvedRow] = []) -> [[String]] {
+            Sections.sections(list: list, resolved: resolved, excluding: ["challenge-95004"]).map { $0.rows.map(\.id) }
+        }
+        XCTAssertEqual(ids([game(1), challenge(95_001), challenge(95_004)]), [["game-1"], ["challenge-95001"]])
+        let accepted = resolved("challenge-95004", after: "challenge-95001", section: .challengesReceived)
+        XCTAssertEqual(ids([challenge(95_001), challenge(95_004)], [accepted]), [["challenge-95001"]],
+                       "The card shows its result, never this section.")
+        XCTAssertEqual(ids([challenge(95_001)], [accepted]), [["challenge-95001"]],
+                       "Once OGS drops it, its resolved row stays out too.")
+        XCTAssertEqual(ids([challenge(95_004)], [accepted]), [], "A section left empty doesn't show.")
+        let later = resolved("challenge-95006", after: "challenge-95004", section: .challengesReceived)
+        XCTAssertEqual(ids([challenge(95_001)], [later]), [["challenge-95006", "challenge-95001"]],
+                       "A row that followed it leads its section.")
+        XCTAssertEqual(rowIDs([challenge(95_004)], [accepted]), [["challenge-95004"]], "Nothing is left out unasked.")
+    }
+
+    func testTheCardLeadsWithItsChallengeThenTheRowTheUserResolved() {
+        var card = ActivityGameOverCard()
+        let listed = [challenge(95_001), challenge(95_004)]
+        XCTAssertNil(card.row(showing: nil, listed: listed, resolved: []), "No card until the control shows one.")
+        XCTAssertEqual(card.row(showing: 95_004, listed: listed, resolved: []), .item(challenge(95_004)),
+                       "The control's card leads from the list's first pass.")
+        card.remember(95_004)
+        let rejected = resolved("challenge-95004", after: nil, section: .challengesReceived)
+        XCTAssertEqual(card.row(showing: nil, listed: listed, resolved: [rejected]), .item(challenge(95_004)),
+                       "While the challenge is listed, its own row shows the result.")
+        XCTAssertEqual(card.row(showing: nil, listed: [challenge(95_001)], resolved: [rejected]), .resolved(rejected),
+                       "Once it has gone, its resolved row keeps the card's place, though the control moved on.")
+        XCTAssertNil(card.row(showing: nil, listed: [challenge(95_001)], resolved: []),
+                     "Gone with nothing to show, as when its sender withdraws it, there is no card.")
+        XCTAssertEqual(ActivityGameOverCard.itemID(95_004), challenge(95_004).id)
+    }
+
+    func testTheFirstCardStaysWhileItHasARow() {
+        var card = ActivityGameOverCard()
+        card.remember(95_004)
+        card.remember(nil)
+        card.remember(95_006)
+        card.remember(95_004)
+        XCTAssertEqual(card.shownChallengeIDs, [95_004, 95_006], "Each card counts once, in the order shown.")
+        XCTAssertEqual(card.row(showing: 95_006, listed: [challenge(95_004), challenge(95_006)], resolved: []),
+                       .item(challenge(95_004)), "A newer card waits until the list opens again, so rows don't move.")
+        let accepted = resolved("challenge-95004", after: nil, section: .challengesReceived)
+        XCTAssertEqual(card.row(showing: 95_006, listed: [challenge(95_006)], resolved: [accepted]), .resolved(accepted))
+        XCTAssertEqual(card.row(showing: 95_006, listed: [challenge(95_006)], resolved: []), .item(challenge(95_006)),
+                       "Once the first has nothing to show, the next leads.")
+    }
+
     // MARK: Presentation
 
     func testAGameAlwaysUsesAPopoverAndCompactRootsUseTheSheet() {
@@ -476,5 +525,40 @@ final class ActivityListModelTests: XCTestCase {
                        "A fresh request from a player whose earlier one has a result shows as a request.")
         XCTAssertEqual(Order.merge(live: [912_001], resolved: [(id: 912_001, after: nil)]), [912_001],
                        "It keeps the request's place.")
+    }
+}
+
+/// The game-over card is the one row of a game's popover with inline Reject
+/// and Accept. A row's other rules are in ActivityListModelTests.
+final class ActivityRowActionStateTests: XCTestCase {
+    private func state(unusual: Bool = false, inGame: Bool = true, card: Bool = false, offline: Bool = false,
+                       _ action: ActivityActionState? = nil) -> ActivityRowActionState {
+        ActivityRowActionState(isUnusual: unusual, isInGamePopover: inGame, isGameOverCard: card,
+                               isOffline: offline, state: action)
+    }
+
+    func testTheGameOverCardIsTheOnlyInlineAcceptInGamePopovers() {
+        XCTAssertFalse(state().showsInlineAcceptAndReject, "A challenge row in a game's popover offers View.")
+        XCTAssertTrue(state(card: true).showsInlineAcceptAndReject)
+        XCTAssertFalse(state(unusual: true, card: true).showsInlineAcceptAndReject, "An unusual card offers View.")
+        XCTAssertTrue(state(inGame: false).showsInlineAcceptAndReject, "Outside a game nothing changes.")
+        XCTAssertFalse(state(unusual: true, inGame: false).showsInlineAcceptAndReject)
+        XCTAssertEqual(state(), ActivityRowActionState(isUnusual: false, isInGamePopover: true, isOffline: false,
+                                                       state: nil), "Rows that aren't the card read as before.")
+    }
+
+    func testTheCardsActionsDimOfflineAndWhilePending() {
+        let offline = state(card: true, offline: true)
+        for control in [ActivityRowActionState.Control.accept, .reject, .retry] {
+            XCTAssertFalse(offline.isEnabled(control), "\(control)")
+            XCTAssertEqual(offline.accessibilityValue(control), "Reconnecting…", "\(control)")
+        }
+        XCTAssertTrue(offline.isEnabled(.view))
+        XCTAssertTrue(offline.isEnabled(.openGame), "Open game works offline.")
+
+        let pending = state(card: true, .pending(since: 10))
+        XCTAssertFalse(pending.isEnabled(.accept))
+        XCTAssertFalse(pending.isEnabled(.reject))
+        XCTAssertTrue(state(card: true, .succeeded(.gameStarted(gameID: 5))).isEnabled(.openGame))
     }
 }

@@ -429,6 +429,60 @@ final class AppAnnouncerTests: XCTestCase {
         XCTAssertEqual(output.spoken, ["Withdrawn", "Couldn’t withdraw"])
     }
 
+    // MARK: Low time and the connection
+
+    func testLowTimeAndConnectionKeysNameTheirEvent() {
+        typealias Key = AppAnnouncement.Key
+        XCTAssertEqual(Key.lowTime(901).rawValue, "low-time.901")
+        XCTAssertEqual(Key.lowTime(901), .lowTime(901), "Every window's copy of one game's fall is one event.")
+        XCTAssertNotEqual(Key.lowTime(901), .lowTime(902))
+        XCTAssertNotEqual(Key.lowTime(901), .gameStarted(901))
+        let changes: [ConnectionStatusModel.Announcement] = [.reconnecting, .unreachable, .connected]
+        XCTAssertEqual(changes.map { Key.connection($0).rawValue },
+                       ["connection.reconnecting", "connection.unreachable", "connection.connected"])
+        XCTAssertEqual(Set(changes.map(Key.connection)).count, 3, "Each change is its own event.")
+    }
+
+    func testEachConnectionChangeIsSaidForTheWindowInFrontWithConnectedAtLowPriority() {
+        typealias Change = ConnectionStatusModel.Announcement
+        XCTAssertEqual(Change.reconnecting.appAnnouncement, AppAnnouncement(
+            .connection(.reconnecting), audience: .frontmostWindow, speech: "Reconnecting to OGS"))
+        XCTAssertEqual(Change.unreachable.appAnnouncement, AppAnnouncement(
+            .connection(.unreachable), audience: .frontmostWindow, speech: "Can’t reach OGS"))
+        XCTAssertEqual(Change.connected.appAnnouncement, AppAnnouncement(
+            .connection(.connected), audience: .frontmostWindow, speech: "Connected", priority: .low))
+
+        let clock = Clock(), output = Output()
+        let announcer = makeAnnouncer(clock, scenes(open: [windowA], frontmost: windowA), output)
+        for change in [Change.reconnecting, .unreachable, .connected] {
+            XCTAssertEqual(announcer.post(change.appAnnouncement, from: windowA), .posted)
+            clock.now += 1
+        }
+        XCTAssertEqual(output.events, [
+            .speech("Reconnecting to OGS", .normal), .speech("Can’t reach OGS", .normal), .speech("Connected", .low),
+        ])
+    }
+
+    func testTwoWindowsCopiesOfAFallOrAnOutageAreFeltAndSaidOnce() {
+        let clock = Clock(), output = Output()
+        let front = scenes(open: [windowA, windowB], frontmost: windowA)
+        let announcer = makeAnnouncer(clock, front, output)
+        let fall = AppAnnouncement(.lowTime(901), audience: .frontmostWindow, haptic: .warning)
+        XCTAssertEqual(announcer.post(fall, from: windowB), .notFrontmost, "Both windows' clocks fall together.")
+        XCTAssertEqual(announcer.post(fall, from: windowA), .posted)
+        front.frontmostWindow = windowB
+        clock.now += 1
+        XCTAssertEqual(announcer.post(fall, from: windowB), .duplicate,
+                       "A window a tick behind, now in front, doesn't play it again.")
+
+        let outage = ConnectionStatusModel.Announcement.reconnecting.appAnnouncement
+        XCTAssertEqual(announcer.post(outage, from: windowB), .posted)
+        front.frontmostWindow = windowA
+        clock.now += 0.5
+        XCTAssertEqual(announcer.post(outage, from: windowA), .duplicate, "One network, one outage.")
+        XCTAssertEqual(output.events, [.haptic(.warning), .speech("Reconnecting to OGS", .normal)])
+    }
+
     func testEachNavigationServiceIsItsOwnWindow() {
         let first = NavigationService(), second = NavigationService()
         XCTAssertNotEqual(first.announcerWindow, second.announcerWindow)

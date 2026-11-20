@@ -47,12 +47,25 @@ struct GameDetailClockPair: View {
     var onTapBeforeDetails: (() -> Bool)? = nil
     var blocksGameActions = false
     var showsStatus = true
+    /// What the window's connection source adds to the socket's own state.
+    var connection = GameDetailClockConnection()
     @EnvironmentObject private var ogs: OGSService
 
     /// The game's one disconnect snapshot (OGSService), shared by the body
     /// and header pairs, so remounting a pair never shows a later local tick.
     private var disconnectedClock: OGSClock? {
         ogs.socketStatus == .connected ? nil : game.disconnectedClock
+    }
+
+    private var recoversConnection: Bool {
+        GameDetailClockState.recoversConnection(hasConnected: connection.hasConnected, socket: ogs.socketStatus)
+    }
+
+    /// With no clock in play, the clock a single chip shows carries the
+    /// window's status, wherever the layout puts the pair.
+    private func carriesConnectionStatus(_ color: StoneColor) -> Bool {
+        connection.marksOneClock
+            && color == GameDetailClockState.singleChipColor(game: game, clock: disconnectedClock)
     }
 
     private var layout: AnyLayout {
@@ -147,6 +160,8 @@ struct GameDetailClockPair: View {
                             cardWidth: cardWidth,
                             clockOverride: disconnectedClock,
                             isConnected: ogs.socketStatus == .connected,
+                            recoversConnection: recoversConnection,
+                            carriesConnectionStatus: carriesConnectionStatus(color),
                             mirrored: !currentOnly && !stacked && color != topLeftPlayerColor,
                             showsRoleName: showsRoleNames,
                             revealsBothClocks: currentOnly,
@@ -283,48 +298,15 @@ enum GameDetailInlineChipDetail {
     case full, withoutStatusLabel, countdownOnly
 }
 
-private struct GameDetailNotificationContextKey: EnvironmentKey {
-    static let defaultValue: UUID? = nil
-}
-
-extension EnvironmentValues {
-    /// The visible Game Detail's notification context (NavigationService),
-    /// shared by its content and its native toolbar items.
-    var gameDetailNotificationContextID: UUID? {
-        get { self[GameDetailNotificationContextKey.self] }
-        set { self[GameDetailNotificationContextKey.self] = newValue }
-    }
-}
-
-/// Registers a Reconnecting… badge while it is actually on screen: mounted,
-/// in a slot the layout shows, and in the chip variant the title slot chose.
-/// The banner reads these only for a Game Detail context that is visible.
-private struct GameDetailReconnectingBadgeReport: ViewModifier {
-    let isShown: Bool
-    @Environment(\.gameDetailNotificationContextID) private var contextID
-    @Environment(\.gameDetailSlotVisible) private var slotVisible
-    @EnvironmentObject private var nav: NavigationService
-    @State private var badgeID = UUID()
-    @State private var context: UUID?
-
-    private var reports: Bool { isShown && slotVisible }
-
-    private func report(_ shown: Bool) {
-        if let context, context != contextID {
-            nav.setGameDetailReconnectingBadge(badgeID, context: context, shown: false)
-        }
-        context = contextID
-        guard let contextID else { return }
-        nav.setGameDetailReconnectingBadge(badgeID, context: contextID, shown: shown)
-    }
-
-    func body(content: Content) -> some View {
-        content
-            .onAppear { report(reports) }
-            .onDisappear { report(false) }
-            .onChange(of: reports) { _, shown in report(shown) }
-            .onChange(of: contextID) { _, _ in report(reports) }
-    }
+/// What a clock pair says about the window's connection, besides the
+/// socket's own state, which marks the to-move clock in play at once.
+struct GameDetailClockConnection: Equatable {
+    /// The window has connected before, as its connection source records.
+    var hasConnected = false
+    /// No clock is in play, the window's status shows, and neither the title
+    /// slot's capsule nor the main action says so: one clock carries the
+    /// mark.
+    var marksOneClock = false
 }
 
 private struct GameDetailClockUndoAnchor: PreferenceKey {
@@ -350,6 +332,8 @@ private struct GameDetailClockCard: View {
     var cardWidth: CGFloat = .infinity
     var clockOverride: OGSClock?
     var isConnected: Bool
+    var recoversConnection: Bool
+    var carriesConnectionStatus = false
     var mirrored: Bool
     var showsRoleName: Bool
     var revealsBothClocks = false
@@ -369,7 +353,7 @@ private struct GameDetailClockCard: View {
 
     private var state: GameDetailClockState {
         .init(game: game, color: color, clockOverride: clockOverride, isConnected: isConnected,
-              recoversConnection: ogs.socketStatus == .reconnecting)
+              recoversConnection: recoversConnection, carriesConnectionStatus: carriesConnectionStatus)
     }
     private var foreground: Color {
         theme.clockForeground(color, scheme: colorScheme)
@@ -405,8 +389,10 @@ private struct GameDetailClockCard: View {
     /// A narrow title chip can drop its turn label; the outline still shows the turn.
     private var displaysStatus: Bool {
         // An estimate stays readable when a title chip drops its turn label
-        // or time metadata to fit the navigation bar.
-        state.showsEstimateBadge || (showsStatus && (style != .inline || inlineDetail == .full))
+        // or time metadata to fit the navigation bar. A lost connection shows
+        // on chips that hide every other status too (Analyze's).
+        state.showsEstimateBadge
+            || ((showsStatus || state.showsConnectionMark) && (style != .inline || inlineDetail == .full))
     }
     private var clockCornerRadius: CGFloat { spaciousCompact ? 14 : 12 }
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: clockCornerRadius) }
@@ -441,7 +427,7 @@ private struct GameDetailClockCard: View {
         displaysStatus && isConnected && (state.canAnswerUndo || state.canWithdrawUndo)
     }
     private var badgeBackground: Color {
-        if state.reconnecting { return theme.statusBadge }
+        if state.showsConnectionMark { return theme.statusBadge }
         if state.ownsUndoRequest { return theme.clockUndoBadge(scheme: colorScheme) }
         if state.showsEstimateBadge { return Color(white: 0.25) }
         if state.passed || (state.notStarted && !state.firstMoveDeadline) {
@@ -575,9 +561,22 @@ private struct GameDetailClockCard: View {
     private var statusBadgeSlot: some View {
         statusBadge.opacity(hasUndoMenu ? 0 : 1)
             .anchorPreference(key: GameDetailClockUndoAnchor.self, value: .bounds) { $0 }
-            // The app's connection banner gives way only to a rendered badge.
-            .modifier(GameDetailReconnectingBadgeReport(
-                isShown: state.reconnecting && !badgeTitle.isEmpty))
+    }
+
+    /// A lost connection on a chip with no room for its label: the badge's
+    /// spinner alone, in the chip's own text colour. It takes width only
+    /// while the clock carries the mark, so a connected chip's layout
+    /// doesn't change.
+    private var connectionSpinner: some View {
+        ProgressView().controlSize(.mini).tint(foreground).accessibilityHidden(true)
+    }
+
+    /// The mark of a clock that carries the window's status while no clock
+    /// is in play: the badge where the chip shows status, else its spinner.
+    @ViewBuilder private var idleConnectionMark: some View {
+        if state.carriesConnectionStatus {
+            if displaysStatus { statusBadgeSlot } else { connectionSpinner }
+        }
     }
 
     @ViewBuilder private var statusBadge: some View {
@@ -585,8 +584,8 @@ private struct GameDetailClockCard: View {
             if style == .inline {
                 HStack(spacing: 4) {
                     Rectangle().fill(foreground.opacity(0.3)).frame(width: 1, height: 12 * scale)
-                    if state.reconnecting {
-                        ProgressView().controlSize(.mini)
+                    if state.showsConnectionMark {
+                        ProgressView().controlSize(.mini).tint(inlineStatusForeground)
                     } else if state.ownsUndoRequest {
                         Image(systemName: "arrow.uturn.left")
                     } else if state.showsEstimateBadge {
@@ -600,7 +599,7 @@ private struct GameDetailClockCard: View {
                 .lineLimit(1).minimumScaleFactor(0.7)
             } else {
             HStack(spacing: 3) {
-                if state.reconnecting {
+                if state.showsConnectionMark {
                     ProgressView().controlSize(.mini).tint(.white)
                 } else if state.ownsUndoRequest {
                     Image(systemName: "arrow.uturn.left").font(.system(size: 10 * scale))
@@ -748,8 +747,10 @@ private struct GameDetailClockCard: View {
                 if !state.accepted, let expiration = state.clock?.timeUntilExpiration {
                     Text(timeString(timeLeft: expiration)).font(detailFont.monospacedDigit())
                 }
+                idleConnectionMark
             } else if state.isFinished {
                 Text(state.resultTitle).font(mainFont)
+                idleConnectionMark
             } else if let deadline = state.autoResign {
                 Image(systemName: "bolt.slash")
                     .foregroundStyle(disconnectedColor)
@@ -762,6 +763,8 @@ private struct GameDetailClockCard: View {
                         Text("Disconnected").font(detailFont)
                             .foregroundStyle(disconnectedColor)
                     }
+                } else if state.reconnecting {
+                    connectionSpinner
                 }
             } else if state.canShowTimer {
                 TimerView(timeControl: state.valueTimeControl,
@@ -850,6 +853,10 @@ private struct GameDetailClockCard: View {
             // A status label replaces the running hourglass. Showing both
             // needlessly shrinks the countdown inside a narrow matched chip.
             statusBadgeSlot
+        } else if state.reconnecting {
+            // Every variant carries a lost connection, the smallest as the
+            // badge's spinner beside the countdown.
+            connectionSpinner
         } else if state.paused || inlineDetail == .full {
             // A chip fitted to its slot reserves no hidden hourglass. While
             // paused, only the side to move shows the pause glyph.
@@ -886,7 +893,11 @@ private struct GameDetailClockCard: View {
 
     @ViewBuilder private var clockIndicator: some View {
         if state.isScoring {
-            if state.accepted {
+            if state.carriesConnectionStatus {
+                // The window's status takes the badge's place, which holds
+                // the scoring state while connected; VoiceOver keeps both.
+                idleConnectionMark
+            } else if state.accepted {
                 Label("Accepted", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(agreementColor)
             } else if let expiration = state.clock?.timeUntilExpiration {

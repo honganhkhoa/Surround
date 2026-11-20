@@ -24,7 +24,7 @@ final class GameDetailZenChromeUITests: SurroundJourneyUITestCase {
             expected: expected,
             message: "Configure an ordinary iPhone with regular width in landscape, such as iPhone Max."
         ) else { return }
-        try assertZenRoundTrip(in: app)
+        try assertZenRoundTrip(in: app, countdownBesideCircle: false)
     }
 
     func testDuoOpenTallZenReclaimsNavigationBand() throws {
@@ -52,7 +52,7 @@ final class GameDetailZenChromeUITests: SurroundJourneyUITestCase {
             expected: expected,
             message: "Configure Duo Open tall with regular width and no active fold division."
         ) else { return }
-        try assertZenRoundTrip(in: app)
+        try assertZenRoundTrip(in: app, countdownBesideCircle: true)
     }
 
     func testDuoBookWideZenHidesNavigationChrome() throws {
@@ -76,7 +76,7 @@ final class GameDetailZenChromeUITests: SurroundJourneyUITestCase {
             expected: expected,
             message: "Configure Duo Book wide with regular width and an active vertical fold division."
         ) else { return }
-        try assertZenRoundTrip(in: app, normallyHidesNavigationBar: true)
+        try assertZenRoundTrip(in: app, normallyHidesNavigationBar: true, countdownBesideCircle: true)
     }
 
     private func requireSupportedPhone(expected: Bool) throws -> Bool {
@@ -142,7 +142,8 @@ final class GameDetailZenChromeUITests: SurroundJourneyUITestCase {
     }
 
     private func assertZenRoundTrip(in app: XCUIApplication,
-                                    normallyHidesNavigationBar: Bool = false) throws {
+                                    normallyHidesNavigationBar: Bool = false,
+                                    countdownBesideCircle: Bool) throws {
         let board = element(ID.gameBoard, in: app)
         let boardValue = try XCTUnwrap(board.value as? String)
         let before = try settledContentFrame(in: app)
@@ -162,6 +163,7 @@ final class GameDetailZenChromeUITests: SurroundJourneyUITestCase {
 
         activateZenControl(ID.gameZenEnter, in: app)
         assertZenChrome(in: app)
+        assertZenCircle(in: app, countdownBesideCircle: countdownBesideCircle)
         let zenFrame = try settledContentFrame(in: app)
         print("[ZenNavigationBand] before=\(before);navigationBar=\(String(describing: navigationFrame));zen=\(zenFrame);window=\(String(describing: nativeWindowFrame(in: app)))")
         // Hiding just the Sidebar item would leave the empty navigation band.
@@ -215,6 +217,31 @@ final class GameDetailZenChromeUITests: SurroundJourneyUITestCase {
         for identifier in ["game.clock.black", "game.clock.white"] {
             XCTAssertFalse(exit.frame.intersects(element(identifier, in: app).frame),
                            "Exit Zen stays clear of both clocks.")
+        }
+    }
+
+    /// The design fixture's other two live games are on your move, so Zen
+    /// shows the circle for one of them before Exit: clear of Exit, the board
+    /// and both clocks. Where the countdown sits beside the circle, in
+    /// portrait-shaped layouts and Book wide's pane, it stays inside Exit's
+    /// 44 pt band.
+    private func assertZenCircle(in app: XCUIApplication, countdownBesideCircle: Bool) {
+        let exit = element(ID.gameZenExit, in: app, matching: .button)
+        let circle = element(ID.gameZenControl, in: app, matching: .button)
+        XCTAssertTrue(waitUntilHittable(circle, timeout: 10), "Zen shows another live game on your move.")
+        let frame = circle.frame
+        print("[ZenCircle] circle=\(frame);exit=\(exit.frame);board=\(element(ID.gameBoard, in: app).frame)")
+        XCTAssertLessThanOrEqual(frame.maxX, exit.frame.minX + 1, "The circle sits before Exit.")
+        XCTAssertFalse(frame.intersects(exit.frame), "The circle clears Exit.")
+        XCTAssertEqual(frame.minY, exit.frame.minY, accuracy: 1, "The circle shares Exit's top.")
+        XCTAssertFalse(frame.intersects(element(ID.gameBoard, in: app).frame), "The circle stays clear of the board.")
+        for identifier in ["game.clock.black", "game.clock.white"] {
+            XCTAssertFalse(frame.intersects(element(identifier, in: app).frame),
+                           "The circle stays clear of both clocks.")
+        }
+        if countdownBesideCircle {
+            XCTAssertLessThanOrEqual(frame.maxY, exit.frame.maxY + 1,
+                                     "Beside the circle, the countdown stays inside Exit's band.")
         }
     }
 

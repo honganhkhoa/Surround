@@ -19,7 +19,12 @@ struct SingleGameView: View {
     var chromeBandTop: CGFloat? = nil
     /// The pose uses the vertical toolbar, also in Zen where it is turned off.
     var verticalToolbarPose = false
-    
+    /// The window's connection status, for what the game says while it is
+    /// down: the one clock's mark with no clock in play, and the action.
+    @ObservedObject var connection = ConnectionStatusSource.neverOffline
+    /// A remembered Chat panel opens once Game Detail has measured its width.
+    var restoresChatPanel = false
+
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject private var stackRouter: StackRouter
     @EnvironmentObject private var navigation: NavigationService
@@ -732,11 +737,52 @@ struct SingleGameView: View {
         !zenMode && interaction.isChatVisible
     }
 
+    // MARK: Connection status
+
+    private static var isCatalyst: Bool {
+        #if targetEnvironment(macCatalyst)
+        true
+        #else
+        false
+        #endif
+    }
+
+    /// Where this game says the window's connection is down, by the rule the
+    /// toolbar follows, from the same inputs and the chat preview this view
+    /// keeps: never from what a layout drew.
+    private var connectionPlacement: GameConnectionPlacement {
+        GameConnectionPlacement(GameConnectionPlacement.Input(
+            game: game, blocksActions: gameControlState.blocksGameActions, panel: interaction.panel,
+            restoresChatPanel: restoresChatPanel, showsChatPreview: showsChatPreview,
+            isVerticalToolbar: isVerticalToolbar, isZen: zenMode, isCatalyst: Self.isCatalyst
+        ))
+    }
+
+    /// What the body's clocks add to the socket's own state.
+    private var clockConnection: GameDetailClockConnection {
+        GameDetailClockConnection(
+            hasConnected: connection.hasConnected,
+            marksOneClock: connectionPlacement.clocks == .oneClock && connection.status.showsInGame
+        )
+    }
+
+    private func actionRow(horizontal: Bool = true, columnRow: Bool = false, wrapsMainAction: Bool = false,
+                           alignsControlsToBottom: Bool = false, alignsControlsToLeading: Bool = false,
+                           alignsMoreToTrailing: Bool = false) -> GameControlRow {
+        GameControlRow(game: game, state: gameControlState,
+                       horizontal: horizontal, columnRow: columnRow, wrapsMainAction: wrapsMainAction,
+                       alignsControlsToBottom: alignsControlsToBottom,
+                       alignsControlsToLeading: alignsControlsToLeading,
+                       alignsMoreToTrailing: alignsMoreToTrailing,
+                       pendingMove: $pendingMove, pendingPosition: $pendingPosition,
+                       goToNextGame: goToNextGame, stoneRemovalOption: $stoneRemovalOption,
+                       connectionAction: connectionPlacement.action,
+                       connectionStatusShows: connection.status.showsInGame)
+    }
+
 
     private var gameActions: GameControlRow {
-        GameControlRow(game: game, state: gameControlState,
-                       pendingMove: $pendingMove, pendingPosition: $pendingPosition,
-                       goToNextGame: goToNextGame, stoneRemovalOption: $stoneRemovalOption)
+        actionRow()
     }
 
     private var recoveryHeight: CGFloat {
@@ -771,15 +817,12 @@ struct SingleGameView: View {
         // 15 Pro: "Submit move" left it 105 of its 110 pt).
         return layout {
             if !showsAnalysisPanel && !showsChatPreview {
-                GameControlRow(game: game, state: gameControlState,
-                               horizontal: !plan.verticalActions || plan.horizontalActionsInColumn,
-                               columnRow: plan.columnActionRow,
-                               wrapsMainAction: plan.wrapsMainAction,
-                               alignsControlsToBottom: zenMode,
-                               alignsControlsToLeading: plan.horizontalActionsInColumn,
-                               alignsMoreToTrailing: plan.trailsMoreInColumn,
-                               pendingMove: $pendingMove, pendingPosition: $pendingPosition,
-                               goToNextGame: goToNextGame, stoneRemovalOption: $stoneRemovalOption)
+                actionRow(horizontal: !plan.verticalActions || plan.horizontalActionsInColumn,
+                          columnRow: plan.columnActionRow,
+                          wrapsMainAction: plan.wrapsMainAction,
+                          alignsControlsToBottom: zenMode,
+                          alignsControlsToLeading: plan.horizontalActionsInColumn,
+                          alignsMoreToTrailing: plan.trailsMoreInColumn)
                     .layoutPriority(stacksCorner ? 1 : 0)
             }
             if !plan.hidesActionIdentity {
@@ -877,7 +920,9 @@ struct SingleGameView: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private func availablePanelDivision(in geometry: GeometryProxy) -> CGRect? {
+    /// The display's fold across the game's content, divided or not (Book and
+    /// Open). Game Detail reads it too, for the Zen layout drawn here.
+    static func availablePanelDivision(in geometry: GeometryProxy) -> CGRect? {
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
         if #available(iOS 27.1, *) {
             return geometry.reservedRegions(kind: .division, options: .includeInactive)
@@ -887,7 +932,8 @@ struct SingleGameView: View {
         return nil
     }
 
-    private func activeDivision(in geometry: GeometryProxy) -> CGRect? {
+    /// The fold where it divides the game's content (Book).
+    static func activeDivision(in geometry: GeometryProxy) -> CGRect? {
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
         if #available(iOS 27.1, *) {
             // ReservedRegion.frame already includes its interaction margins.
@@ -906,7 +952,7 @@ struct SingleGameView: View {
 
     private func columnIdentityStyle(in geometry: GeometryProxy) -> ColumnIdentityStyle {
         if compact { return .init(avatarSize: 40, padding: 5) }
-        if let division = activeDivision(in: geometry), division.width > division.height {
+        if let division = Self.activeDivision(in: geometry), division.width > division.height {
             return .init(avatarSize: 56, padding: 8)
         }
         return .init(avatarSize: 52, padding: 8)
@@ -916,7 +962,8 @@ struct SingleGameView: View {
                             analyze: Bool? = nil, chat: Bool? = nil,
                             zen: Bool? = nil) -> GameDetailLayoutPlan {
         let actionMetrics = GameControlRowMetrics(dynamicTypeSize: dynamicTypeSize, locale: locale,
-                                                 phase: game.gamePhase)
+                                                 phase: game.gamePhase,
+                                                 relabelsOffline: connectionPlacement.action == .relabelled)
         // v149: the Duo Closed landscape column's detail lines, measured for
         // the values the cards show (the disconnect snapshot while offline).
         let connected = ogs.socketStatus == .connected
@@ -937,7 +984,7 @@ struct SingleGameView: View {
             foldsClock: dynamicTypeSize >= .xxxLarge, clockScale: min(clockScale, 1.65),
             actionSize: actionMetrics.horizontalSize, actionMetrics: actionMetrics,
             composerHeight: chatComposerHeight, keyboardOverlap: keyboardOverlap,
-            division: activeDivision(in: geometry), panelDivision: availablePanelDivision(in: geometry),
+            division: Self.activeDivision(in: geometry), panelDivision: Self.availablePanelDivision(in: geometry),
             usesVerticalToolbar: isVerticalToolbar || verticalToolbarPose, preview: showsChatPreview,
             zenBoardCenterY: zenBoardCenterY,
             identityRowHeight: GameDetailPlayerIdentity.rowHeight(dynamicTypeSize: dynamicTypeSize),
@@ -946,7 +993,7 @@ struct SingleGameView: View {
                 dynamicTypeSize: dynamicTypeSize, avatarSize: columnStyle.avatarSize,
                 padding: columnStyle.padding),
             opponentSharesStatusWhenFolded: compact && UIDevice.current.userInterfaceIdiom == .pad
-                && availablePanelDivision(in: geometry) == nil,
+                && Self.availablePanelDivision(in: geometry) == nil,
             recoveryHeight: recoveryHeight,
             fullClockFooterWidth: GameDetailClockPair.fullFooterWidth(game: game, scale: min(clockScale, 1.65), theme: theme),
             compactClockLineWidth: GameDetailClockPair.compactLineWidth(game: game, scale: min(clockScale, 1.65), theme: theme),
@@ -1022,7 +1069,7 @@ struct SingleGameView: View {
                                     fullCardScale: plan.fullClockScale,
                                     showsRoleNames: plan.hidesIdentity && !zenMode && dynamicTypeSize.isAccessibilitySize,
                                     blocksGameActions: gameControlState.blocksGameActions,
-                                    showsStatus: true)
+                                    showsStatus: true, connection: clockConnection)
                     .gameDetailSlot(.clocks, plan: plan)
                 recoveryBanner.gameDetailSlot(.status, plan: plan).zIndex(2)
                 HStack(spacing: 12) {

@@ -274,29 +274,32 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
     /// The state's only live waiting item is the sent rematch, which OGS
     /// can withdraw; `waiting`'s live search would keep the pill, since the
     /// socket never confirms a cancel offline.
-    func testTheWaitingPillOpensAPopoverInAGame() {
+    /// In a game, the in-game control opens Activity as a popover, which
+    /// stays once the item it was opened for resolves. The finished game's
+    /// control leads with the rematch card; the sent rematch waits below.
+    func testTheControlOpensAPopoverInAGame() {
         let sentID = "waiting-sent-\(FixtureID.rematchSentChallengeID)"
         let app = launch(.rematchBothAsked, actions: .succeed)
         tap(ID.homeGame(baseGameID), in: app)
         element(ID.gameDetail(baseGameID), in: app)
-        let pill = element(ID.waitingBanner, in: app)
-        tap(pill, description: "The waiting pill", in: app)
+        XCTAssertTrue(pollUntil(timeout: 10) { !query(ID.waitingBanner, in: app).exists },
+                      "A game shows no waiting pill")
+        _ = openGameControlPopover(in: app)
         let popover = app.popovers.firstMatch
-        XCTAssertTrue(popover.waitForExistence(timeout: 10), "In a game, the waiting pill opens a popover")
+        XCTAssertTrue(popover.waitForExistence(timeout: 10), "In a game, the control opens a popover")
         element(ID.activityList, in: app)
-        keepScreenshot("Activity – a game's popover from the waiting pill", in: app)
+        keepScreenshot("Activity – a game's popover from the control", in: app)
 
         tap(ID.activityRow(sentID, .withdraw), in: app, matching: .button)
         XCTAssertTrue(waitForLabel("Withdrawn", of: query(ID.activityRowResult(sentID), in: app)),
                       "The rematch is withdrawn")
-        XCTAssertTrue(waitForAbsence(pill, timeout: stateSettleTimeout), "With nothing live waiting, the pill goes")
-        XCTAssertTrue(staysPresent(popover), "The popover stays after its pill goes")
+        XCTAssertTrue(staysPresent(popover), "The popover stays after the waiting item resolves")
         XCTAssertTrue(query(ID.activityList, in: app).exists && query(ID.activityRowResult(sentID), in: app).exists,
                       "The list stays with its result")
-        keepScreenshot("Activity – the popover after its pill went", in: app)
+        keepScreenshot("Activity – the popover after the waiting item resolved", in: app)
     }
 
-    /// As the waiting pill's journey: the sent rematch is the one search
+    /// As the control's journey: the sent rematch is the one search
     /// that can be withdrawn offline.
     func testRegularWidthIsAPopoverFromTheSearchingCard() throws {
         try XCTSkipIf(isPhone, "iPad only: at compact width Home's card opens the sheet.")

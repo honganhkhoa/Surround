@@ -8,6 +8,9 @@
 import SwiftUI
 import Combine
 
+/// The picker of the user's games at the shown game's speed, the shown game
+/// ringed. It has no heading of its own: in the in-game control's popover it
+/// sits above Activity's sections, whose Live games already says what it is.
 struct ActiveGamesCarousel: View {
     var currentGame: Binding<Game?>
     @Namespace var selectingGame
@@ -20,6 +23,9 @@ struct ActiveGamesCarousel: View {
     var selectionRingPadding: CGFloat = 5.0
     var padding: CGFloat = 5.0
     var onSelectGame: (() -> Void)?
+    /// Shows a picked game, as its Game Detail switches games. Without it
+    /// the picker sets `currentGame` itself.
+    var switchGame: ((Game) -> Void)?
 
     func gameCell(game: Game) -> some View {
         ActiveGamePopoverEntry(
@@ -31,8 +37,12 @@ struct ActiveGamesCarousel: View {
         ) {
             withAnimation {
                 discardNextScrollTarget = true
-                currentGame.wrappedValue = game
-                scrollTarget = currentGame.wrappedValue?.ID
+                if let switchGame {
+                    switchGame(game)
+                } else {
+                    currentGame.wrappedValue = game
+                }
+                scrollTarget = game.ID
             }
             onSelectGame?()
         }
@@ -67,6 +77,8 @@ struct ActiveGamesCarousel: View {
             }
         }
         .frame(height: cellSize + selectionRingPadding * 2 + padding * 2)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("Active games"))
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel)
         .onReceive(renderedCurrentGameCollected) { rendered in
             if rendered.allSatisfy({ !$0 }) {

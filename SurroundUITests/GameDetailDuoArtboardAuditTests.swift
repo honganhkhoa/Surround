@@ -829,17 +829,27 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         capture(pose.zenArtboard, in: app)
     }
 
-    /// v148: where the app's connection banner lands in this pose, in stone
-    /// removal with the socket down (logged with any clock or board it
-    /// covers), and that Play's Reconnecting… badge stands in for it.
-    func testConnectionBannerPlacement() {
-        let app = launchScene(.activeGameBoard, artboard: pose.playArtboard,
-                              clock: "stone-removal", socketDown: true)
+    /// Where this pose says the window's connection is down. Its toolbar is
+    /// vertical, or its bar hidden, so it has no title slot: in stone removal
+    /// Accept is disabled and reads Reconnecting… (where it shows, with its
+    /// frames and any clock or board logged), and no capsule shows; in Play
+    /// the running clock carries the mark. Stone removal uses artboard 64,
+    /// whose player hasn't accepted yet, as the phone's audits do; the pose's
+    /// own artboard has accepted, so it offers Next.
+    func testConnectionStatusPlacement() {
+        let app = launchScene(.activeGameBoard, artboard: 64, socketDown: true)
         if pose == .closedLandscape { Thread.sleep(forTimeInterval: 5) }
-        let banner = app.descendants(matching: .any).matching(identifier: ID.connectionBanner).firstMatch
-        XCTAssertTrue(banner.waitForExistence(timeout: 10), "Stone removal shows the app's connection banner")
-        attachState("duo-\(pose.rawValue)-connection-banner", in: app)
-        recordConnectionBannerPlacement("duo-\(pose.rawValue)-stone-removal", in: app)
+        let accept = app.buttons["Accept"].firstMatch
+        XCTAssertTrue(accept.waitForExistence(timeout: 10), "Stone removal shows Accept")
+        XCTAssertFalse(accept.isEnabled, "Accept is disabled while disconnected")
+        XCTAssertTrue(pollUntil(timeout: 10) { accept.value as? String == "Reconnecting…" },
+                      "Once the window's status shows, VoiceOver hears why Accept waits")
+        Thread.sleep(forTimeInterval: 1)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: ID.gameConnectionStatus).firstMatch.exists,
+                       "No title slot, so no capsule")
+        print("[ConnectionStatus] duo \(pose.rawValue) accept label=\(accept.label) texts=\(accept.staticTexts.allElementsBoundByIndex.map(\.label))")
+        attachState("duo-\(pose.rawValue)-connection-status", in: app)
+        recordConnectionStatusPlacement("duo-\(pose.rawValue)-stone-removal", in: app)
         app.terminate()
 
         let play = launchScene(.activeGameBoard, artboard: pose.playArtboard, socketDown: true)
@@ -848,10 +858,10 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         }.filter { $0.exists }.map { $0.value as? String ?? "" } }
         XCTAssertTrue(pollUntil(timeout: 10) { values().contains { $0.hasPrefix("Reconnecting…") } },
                       "The running clock shows Reconnecting…: \(values())")
-        Thread.sleep(forTimeInterval: 1)
-        let playBanner = play.descendants(matching: .any).matching(identifier: ID.connectionBanner).firstMatch
-        XCTAssertFalse(playBanner.exists, "Play: only the badge shows")
-        recordConnectionBannerPlacement("duo-\(pose.rawValue)-play-badge", in: play)
+        Thread.sleep(forTimeInterval: 2.5)
+        XCTAssertFalse(play.descendants(matching: .any).matching(identifier: ID.gameConnectionStatus).firstMatch.exists,
+                       "Play: only the clock's mark")
+        recordConnectionStatusPlacement("duo-\(pose.rawValue)-play-mark", in: play)
     }
 
     /// v148: the wide poses' own Back sits on the vertical bar's centre line,

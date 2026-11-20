@@ -331,6 +331,148 @@ final class ActivityModelTests: XCTestCase {
         XCTAssertNil(Model.gameControl(input))
     }
 
+    // MARK: The in-game control's context
+
+    private typealias Context = Model.GameControlContext
+
+    func testTheOneArgumentFormIsHomesRouteOutsideZen() {
+        XCTAssertEqual(Context.home, Context(allowsPicker: true, isZen: false, cardChallengeID: nil))
+        let places: [Model.Place] = [
+            .game(id: 3, isOwnGame: true, isLive: true, isOver: false),
+            .game(id: 90, isOwnGame: true, isLive: false, isOver: false),
+            .game(id: 3, isOwnGame: true, isLive: true, isOver: true),
+            .game(id: 500, isOwnGame: false, isLive: true, isOver: false),
+        ]
+        for liveGames in [[yourMove(3)], [yourMove(1), yourMove(3)]] {
+            for place in places {
+                var input = Model.Input()
+                input.liveGames = liveGames
+                input.challengesReceived = [Model.Challenge(id: 9, isLive: false)]
+                input.place = place
+                XCTAssertEqual(Model.gameControl(input), Model.gameControl(input, context: .home), "\(place)")
+            }
+        }
+    }
+
+    func testWithoutThePickerYourGameShowsTheInbox() {
+        let noPicker = Context(allowsPicker: false)
+        var input = Model.Input()
+        input.place = .game(id: 90, isOwnGame: true, isLive: false, isOver: false)
+        XCTAssertEqual(Model.gameControl(input), .base(plusN: 0))
+        XCTAssertNil(Model.gameControl(input, context: noPicker), "The inbox hides at 0.")
+
+        input.challengesReceived = [Model.Challenge(id: 9, isLive: false)]
+        input.conversations = [unread(30)]
+        XCTAssertEqual(Model.gameControl(input, context: noPicker), .inbox(count: 2))
+        input.place = .game(id: 90, isOwnGame: true, isLive: true, isOver: true)
+        XCTAssertEqual(Model.gameControl(input, context: noPicker), .inbox(count: 2), "Your finished game too.")
+
+        input.place = .game(id: 90, isOwnGame: true, isLive: true, isOver: false)
+        XCTAssertEqual(Model.gameControl(input, context: noPicker), .dot, "While you play live, what waits is a dot.")
+        input.challengesReceived = []
+        input.conversations = []
+        XCTAssertNil(Model.gameControl(input, context: noPicker), "No base form without the picker.")
+    }
+
+    func testTheChipOutranksTheInboxAndTheCard() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1)]
+        input.challengesReceived = [Model.Challenge(id: 9, isLive: true)]
+        input.place = .game(id: 90, isOwnGame: true, isLive: false, isOver: false)
+        XCTAssertEqual(Model.gameControl(input, context: Context(allowsPicker: false)),
+                       .chip(yourMove(1), plusN: 1, hasDot: false), "The most urgent thing shows on any route.")
+
+        input.place = .game(id: 3, isOwnGame: true, isLive: true, isOver: true)
+        XCTAssertEqual(Model.gameControl(input, context: Context(cardChallengeID: 9)),
+                       .chip(yourMove(1), plusN: 1, hasDot: false), "The card's challenge counts in +N meanwhile.")
+    }
+
+    func testZenShowsOnlyAnotherLiveGameOnYourMove() {
+        let zen = Context(isZen: true)
+        var input = Model.Input()
+        input.liveGames = [yourMove(1, left: 200), yourMove(2, left: 100), theirMove(7), yourMove(3)]
+        input.challengesReceived = [Model.Challenge(id: 9, isLive: true)]
+        input.conversations = [unread(30)]
+        input.startedGames = [7: 1_000]
+        input.now = 1_005
+        input.place = .game(id: 3, isOwnGame: true, isLive: true, isOver: false)
+        XCTAssertEqual(Model.gameControl(input, context: zen), .chip(yourMove(2, left: 100), plusN: 0, hasDot: false),
+                       "Least time first, with no +N and no dot, ahead of the game that started.")
+
+        input.liveGames = [theirMove(7), yourMove(3)]
+        XCTAssertEqual(Model.gameControl(input), .gameStarted(theirMove(7), plusN: 0, hasDot: true))
+        XCTAssertNil(Model.gameControl(input, context: zen), "No started game, dot, base or inbox in Zen.")
+
+        input.place = .game(id: 3, isOwnGame: true, isLive: true, isOver: true)
+        input.liveGames = [yourMove(1)]
+        XCTAssertEqual(Model.gameControl(input, context: Context(isZen: true, cardChallengeID: 9)),
+                       .chip(yourMove(1), plusN: 0, hasDot: false))
+        input.liveGames = []
+        XCTAssertNil(Model.gameControl(input, context: Context(isZen: true, cardChallengeID: 9)), "Zen hides the card.")
+    }
+
+    func testAStartedGameOutsideLivePlayCountsEverythingThatWaits() {
+        var input = Model.Input()
+        input.liveGames = [theirMove(7)]
+        input.startedGames = [7: 1_000]
+        input.now = 1_010
+        input.challengesReceived = [Model.Challenge(id: 9, isLive: false)]
+        input.conversations = [unread(30)]
+        input.place = .game(id: 90, isOwnGame: true, isLive: false, isOver: false)
+        XCTAssertEqual(Model.gameControl(input), .gameStarted(theirMove(7), plusN: 2, hasDot: false))
+        input.place = .game(id: 500, isOwnGame: false, isLive: true, isOver: false)
+        XCTAssertEqual(Model.gameControl(input), .gameStarted(theirMove(7), plusN: 2, hasDot: false),
+                       "In a game you watch too.")
+    }
+
+    func testPlusNBeyondAStartedGameCountsYourOtherLiveGamesOnYourMove() {
+        var input = Model.Input()
+        input.liveGames = [theirMove(7), yourMove(1), yourMove(2)]
+        input.startedGames = [7: 1_000]
+        input.now = 1_010
+        input.conversations = [unread(30)]
+        input.place = .game(id: 90, isOwnGame: true, isLive: false, isOver: false)
+        XCTAssertEqual(Model.gameControl(input), .gameStarted(theirMove(7), plusN: 3, hasDot: false),
+                       "Both games on your move and the conversation.")
+
+        input.place = .game(id: 2, isOwnGame: true, isLive: true, isOver: false)
+        XCTAssertEqual(Model.gameControl(input), .gameStarted(theirMove(7), plusN: 1, hasDot: true),
+                       "While you play live, the other game on your move still counts; the conversation is a dot.")
+    }
+
+    func testTheChipShowsInGamesYouOnlyWatch() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1), yourMove(2, left: 100)]
+        input.conversations = [unread(30)]
+        input.place = .game(id: 500, isOwnGame: false, isLive: true, isOver: false)
+        XCTAssertEqual(Model.gameControl(input), .chip(yourMove(2, left: 100), plusN: 2, hasDot: false),
+                       "Watching isn't playing: the other game and the conversation count.")
+        XCTAssertEqual(Model.gameControl(input, context: Context(allowsPicker: false)),
+                       .chip(yourMove(2, left: 100), plusN: 2, hasDot: false), "On a route without the picker too.")
+    }
+
+    func testYourFinishedGameLeadsWithTheCardWhileItsChallengeWaits() {
+        let card = Context(cardChallengeID: 9)
+        var input = Model.Input()
+        input.challengesReceived = [Model.Challenge(id: 9, isLive: true), Model.Challenge(id: 8, isLive: false)]
+        input.conversations = [unread(30)]
+        input.place = .game(id: 3, isOwnGame: true, isLive: true, isOver: true)
+        XCTAssertEqual(Model.gameControl(input, context: card), .gameOverCard(challengeID: 9, plusN: 2),
+                       "+N counts the other challenge and the conversation.")
+        XCTAssertEqual(Model.gameControl(input, context: Context(allowsPicker: false, cardChallengeID: 9)),
+                       .gameOverCard(challengeID: 9, plusN: 2), "The card needs no picker.")
+        XCTAssertEqual(Model.gameControl(input), .base(plusN: 3), "Without a card, game over releases what waited.")
+
+        input.challengesReceived.removeFirst()
+        XCTAssertEqual(Model.gameControl(input, context: card), .base(plusN: 2), "Its challenge has gone.")
+
+        input.challengesReceived = [Model.Challenge(id: 9, isLive: true)]
+        input.place = .game(id: 3, isOwnGame: true, isLive: true, isOver: false)
+        XCTAssertEqual(Model.gameControl(input, context: card), .dot, "Only a finished game has the card.")
+        input.place = .game(id: 3, isOwnGame: false, isLive: true, isOver: true)
+        XCTAssertEqual(Model.gameControl(input, context: card), .inbox(count: 2), "Nor does a game you watched.")
+    }
+
     // MARK: Reading a game
 
     private func game(_ system: TimeControlSystem) throws -> Game {

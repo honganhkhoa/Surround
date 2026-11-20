@@ -55,6 +55,8 @@ enum ActivityFixtures {
     enum LaunchError: Error, Equatable, CustomStringConvertible {
         case missingValue(String), unknownState(String), unknownClock(String), unknownConnection(String)
         case cannotCombine(String)
+        /// A state that only does what it's for with other flags.
+        case stateNeeds(String, String)
 
         var description: String {
             switch self {
@@ -64,6 +66,7 @@ enum ActivityFixtures {
             case .unknownClock(let raw): "Unknown Activity clock '\(raw)'. Use frozen or running."
             case .unknownConnection(let raw): "Unknown Activity connection '\(raw)'. Use online or offline."
             case .cannotCombine(let flag): "\(Contract.activityStateLaunchArgument) can't be combined with \(flag)."
+            case .stateNeeds(let state, let flags): "The Activity state \(state) needs \(flags)."
             }
         }
     }
@@ -106,8 +109,14 @@ enum ActivityFixtures {
         if let flag = conflictingArguments.first(where: { arguments.contains($0) }) {
             throw LaunchError.cannotCombine(flag)
         }
-        if isFrozen, arguments.contains(Contract.fixtureClockTicksLaunchArgument) {
+        let ticks = arguments.contains(Contract.fixtureClockTicksLaunchArgument)
+        if isFrozen, ticks {
             throw LaunchError.cannotCombine(Contract.fixtureClockTicksLaunchArgument)
+        }
+        // HarborMist's clock crosses 10 s only while it runs and ticks.
+        if state == .lowTimeCrossing, isFrozen || !ticks {
+            throw LaunchError.stateNeeds(raw, "\(Contract.activityClockLaunchArgument) running and "
+                                         + Contract.fixtureClockTicksLaunchArgument)
         }
         return Launch(state: state, clock: Clock(reference: reference.rounded(.down), isFrozen: isFrozen),
                       connection: connection)
@@ -126,8 +135,10 @@ enum ActivityFixtures {
         case .liveYourMove: build.baseGame(.liveTheirMove); build.harborMist(.yourMove)
         case .liveTheirMove: build.baseGame(.correspondenceTheirMove); build.harborMist(.theirMove)
         case .lowTime: build.baseGame(.liveTheirMove); build.harborMist(.lastPeriod)
+        case .lowTimeCrossing: build.baseGame(.liveTheirMove); build.harborMist(.lastPeriodAboveTen)
         case .stoneRemoval: build.baseGame(.liveTheirMove); build.stoneRemoval()
         case .gameStarted: build.baseGame(.liveTheirMove); build.startedGame()
+        case .gameStartedCorrespondence: build.baseGame(.correspondenceTheirMove); build.startedGame()
         case .challengeReceived: build.baseGame(.liveTheirMove); build.receive(.usual)
         case .unusualChallenge: build.baseGame(.liveTheirMove); build.receive(.unusual)
         case .searching: build.baseGame(.correspondenceTheirMove); build.quickMatch(.live)
@@ -145,6 +156,7 @@ enum ActivityFixtures {
         case .superchat: build.baseGame(.liveTheirMove); build.harborMist(.yourMove); build.moderatorMessage()
         case .rematchOffered: build.baseGame(.finished); build.receive(.rematch)
         case .rematchBothAsked: build.baseGame(.finished); build.receive(.rematch); build.send(.rematch)
+        case .unusualRematch: build.baseGame(.finished); build.receive(.unusualRematch)
         }
         state = build.state
         return build.seed
@@ -209,6 +221,35 @@ enum ActivityFixtures {
         superchatPayload(for: user, enable: enable, moderator: user)
     }
 
+    /// CedarWave's live challenge in `challenge-received`, which the in-game
+    /// control's state cycle also sends in the live-banner fixture.
+    static func usualChallenge(to user: OGSUser) -> OGSDirectChallenge {
+        direct(ID.usualChallengeID, from: Cast.cedarWave, to: user, Builder.liveByoyomi, ranked: true)
+    }
+
+    /// A direct challenge built on the sample one. Its game, which OGS
+    /// makes with the challenge, is `gameID`, by default `id + 10_000`.
+    private static func direct(_ id: Int, from challenger: OGSUser, to challenged: OGSUser,
+                               _ system: TimeControlSystem, ranked: Bool, rules: OGSRule = .japanese,
+                               komi: Double? = 6.5, gameID: Int? = nil) -> OGSDirectChallenge {
+        var challenge = OGSChallengeSampleData.sampleChallenge
+        challenge.id = id
+        challenge.challenger = challenger
+        challenge.challenged = challenged
+        challenge.game.id = gameID ?? id + 10_000
+        challenge.game.name = "Friendly Match"
+        challenge.game.width = 19
+        challenge.game.height = 19
+        challenge.game.ranked = ranked
+        challenge.game.isPrivate = false
+        challenge.game.handicap = 0
+        challenge.game.komi = komi
+        challenge.game.rules = rules
+        challenge.game.disableAnalysis = false
+        challenge.game.timeControl = system.timeControlObject
+        return challenge
+    }
+
     /// Names, ids and ranks as AppStoreScreenshotProfileData's in
     /// OGSService+Fixtures.swift, plus the design fixture's tenuki_tom.
     enum Cast {
@@ -246,8 +287,8 @@ enum ActivityFixtures {
                                                               maxTime: 604_800)
 
         enum BaseRole { case liveTheirMove, correspondenceTheirMove, finished }
-        enum Turn { case yourMove, theirMove, lastPeriod }
-        enum Received { case usual, unusual, correspondence, rematch }
+        enum Turn { case yourMove, theirMove, lastPeriod, lastPeriodAboveTen }
+        enum Received { case usual, unusual, correspondence, rematch, unusualRematch }
         enum Sent { case quietPine, rematch }
         enum Search { case live, correspondence }
 
@@ -295,6 +336,9 @@ enum ActivityFixtures {
             case .lastPeriod:    // 22 s into the last 30 s period: 0:08 left
                 addGame(id, vs: Cast.harborMist, Self.liveByoyomi, toMove: .white,
                         black: byoyomi(0, periods: 3), white: byoyomi(0, periods: 1), thinking: 22)
+            case .lastPeriodAboveTen:   // 18 s into the last period: 0:12, so it falls through 10 s 2 s later
+                addGame(id, vs: Cast.harborMist, Self.liveByoyomi, toMove: .white,
+                        black: byoyomi(0, periods: 3), white: byoyomi(0, periods: 1), thinking: 18)
             }
         }
 
@@ -314,11 +358,12 @@ enum ActivityFixtures {
                     thinking: 0, emptyBoard: true, settings: challenge.game)
         }
 
-        /// A stone removal the user hasn't accepted.
+        /// A stone removal MapleRidge has accepted and the user hasn't, so
+        /// the game offers Accept. Scoring found no dead stones.
         mutating func stoneRemoval() {
             addGame(ID.stoneRemovalGameID, vs: Cast.mapleRidge, Self.liveByoyomi, toMove: .white,
                     black: byoyomi(130, periods: 5), white: byoyomi(210, periods: 5), thinking: 0,
-                    phase: .stoneRemoval)
+                    phase: .stoneRemoval, removed: "")
         }
 
         /// Your move in three: 22h 19m, 2d 3h, and 1d 2h paused for the weekend.
@@ -336,16 +381,20 @@ enum ActivityFixtures {
             let challenge: OGSDirectChallenge
             switch kind {
             case .usual:
-                challenge = direct(ID.usualChallengeID, from: Cast.cedarWave, to: user, Self.liveByoyomi, ranked: true)
+                challenge = ActivityFixtures.usualChallenge(to: user)
             case .unusual:   // 0.5 komi under Japanese rules is custom komi (OGSChallenge.useCustomKomi)
                 challenge = direct(ID.unusualChallengeID, from: Cast.jadeLantern, to: user,
                                    .ByoYomi(mainTime: 300, periods: 3, periodTime: 20), ranked: false, komi: 0.5)
             case .correspondence:
                 challenge = direct(ID.correspondenceChallengeID, from: Cast.cedarWave, to: user,
                                    Self.correspondence, ranked: true)
-            case .rematch:
+            case .rematch, .unusualRematch:
+                // Sent after 26268404 ended, so its game is the newer one. The
+                // unusual one asks for 0.5 komi, custom under 26268404's rules.
                 challenge = direct(ID.rematchChallengeID, from: template.players.black, to: user, Self.liveFischer,
-                                   ranked: template.ranked, rules: template.rules, komi: nil)
+                                   ranked: template.ranked, rules: template.rules,
+                                   komi: kind == .unusualRematch ? 0.5 : nil,
+                                   gameID: ID.rematchGameID(ID.rematchChallengeID))
                 seed.challengeNotificationTimes[challenge.id] = clock.ago(20)
             }
             state.challengesReceived.append(challenge)
@@ -359,7 +408,8 @@ enum ActivityFixtures {
                 seed.firstSeen["sent-\(challenge.id)"] = clock.ago(45)
             case .rematch:       // sent from 26268404's Rematch button 30 s ago
                 challenge = direct(ID.rematchSentChallengeID, from: user, to: template.players.black,
-                                   Self.liveFischer, ranked: template.ranked, rules: template.rules, komi: nil)
+                                   Self.liveFischer, ranked: template.ranked, rules: template.rules, komi: nil,
+                                   gameID: ID.rematchGameID(ID.rematchSentChallengeID))
                 seed.firstSeen["sent-\(challenge.id)"] = clock.ago(30)
                 seed.rematchSourceGameIDs[challenge.id] = Contract.fixtureGameID
             }
@@ -426,25 +476,11 @@ enum ActivityFixtures {
                 id: "activity-fixture-\(peer.id)", message: text, timestamp: clock.ago(seconds))))
         }
 
-        /// A direct challenge built on the sample one.
         private func direct(_ id: Int, from challenger: OGSUser, to challenged: OGSUser, _ system: TimeControlSystem,
-                            ranked: Bool, rules: OGSRule = .japanese, komi: Double? = 6.5) -> OGSDirectChallenge {
-            var challenge = OGSChallengeSampleData.sampleChallenge
-            challenge.id = id
-            challenge.challenger = challenger
-            challenge.challenged = challenged
-            challenge.game.id = id + 10_000
-            challenge.game.name = "Friendly Match"
-            challenge.game.width = 19
-            challenge.game.height = 19
-            challenge.game.ranked = ranked
-            challenge.game.isPrivate = false
-            challenge.game.handicap = 0
-            challenge.game.komi = komi
-            challenge.game.rules = rules
-            challenge.game.disableAnalysis = false
-            challenge.game.timeControl = system.timeControlObject
-            return challenge
+                            ranked: Bool, rules: OGSRule = .japanese, komi: Double? = 6.5,
+                            gameID: Int? = nil) -> OGSDirectChallenge {
+            ActivityFixtures.direct(id, from: challenger, to: challenged, system, ranked: ranked, rules: rules,
+                                    komi: komi, gameID: gameID)
         }
 
         private func fischer(_ seconds: TimeInterval) -> ThinkingTime {
@@ -476,18 +512,24 @@ enum ActivityFixtures {
         /// A started clock as OGS sends it: `toMove` has thought `thinking` seconds
         /// since the last move; `black` and `white` are the times at that move.
         /// `settings`, from the challenge an empty board came from, replace the
-        /// template's board, rules and komi.
+        /// template's board, rules and komi. `removed`, in stone removal, is the
+        /// removal the opponent, Black, has accepted and the user hasn't.
         private mutating func addGame(
             _ id: Int, vs opponent: OGSUser?, _ system: TimeControlSystem, toMove: StoneColor,
             black: ThinkingTime, white: ThinkingTime, thinking: TimeInterval,
             phase: OGSGamePhase = .play, paused: Bool = false, emptyBoard: Bool = false,
-            settings: (any OGSChallengeGameDetail)? = nil
+            settings: (any OGSChallengeGameDetail)? = nil, removed: String? = nil
         ) {
             var data = template
             data.gameId = id
             if let opponent {
                 data.players.black = opponent
                 data.blackPlayerId = opponent.id
+            }
+            if let removed {
+                data.removed = removed
+                data.players.black.acceptedStones = removed
+                data.players.white.acceptedStones = nil
             }
             data.timeControl = system.timeControlObject
             data.phase = phase

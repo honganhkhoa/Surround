@@ -1275,6 +1275,60 @@ class OGSService: ObservableObject {
         return gameID
     }
     #endif
+    #if DEBUG && MAIN_APP
+    /// The Debug connection commands and the in-game control's state cycle
+    /// (SuperchatDebugCommands.swift, OGSService+Fixtures.swift): this
+    /// window's socket goes down, which freezes the clocks of the games it
+    /// shows, or comes back, as a lost and restored connection would.
+    func setSocketStatusForUITests(_ status: OGSWebsocketStatus) {
+        guard socketStatus != status else { return }
+        socketStatus = status
+    }
+
+    /// The state cycle's turns: `gameID`'s move goes to the user or to the
+    /// opponent, as if the other side had just moved. Each side keeps the
+    /// time it had, the side to move starts its turn at `now`, in
+    /// milliseconds, and the games are sorted again as OGS's update would.
+    func setTurnForUITests(gameID: Int, userToMove: Bool, now: Double = Date().timeIntervalSince1970 * 1_000) {
+        guard let game = activeGames[gameID], var clock = game.clock, let user,
+              let userColor = game.stoneColor(of: user),
+              let system = game.gameData?.timeControl.system else { return }
+        let toMove = userToMove ? userColor : userColor.opponentColor()
+        guard clock.currentPlayerColor != toMove else { return }
+        clock.calculateTimeLeft(with: system, pauseControl: game.pauseControl, now: now)
+        var moved = toMove == .black ? clock.whiteTime : clock.blackTime
+        moved.thinkingTime = moved.thinkingTimeLeft ?? moved.thinkingTime
+        var next = toMove == .black ? clock.blackTime : clock.whiteTime
+        next.thinkingTime = next.thinkingTimeLeft ?? next.thinkingTime
+        next.thinkingTimeLeft = next.thinkingTime
+        clock.blackTime = toMove == .black ? next : moved
+        clock.whiteTime = toMove == .black ? moved : next
+        clock.currentPlayerColor = toMove
+        clock.currentPlayerId = clock.nextPlayerId(with: toMove)
+        clock.lastMoveTime = now
+        if case .ByoYomi = system {
+            clock.expiration = nil
+            clock.timeUntilExpiration = nil
+        } else {
+            clock.expiration = now + (next.thinkingTime ?? 0) * 1_000
+            clock.timeUntilExpiration = next.thinkingTime
+        }
+        game.clock = clock
+        sortActiveGames(activeGames: activeGames.values)
+    }
+
+    /// The state cycle's received challenge: it arrives, as OGS's
+    /// notification of it would add it, and later goes.
+    func receiveChallengeForUITests(_ challenge: OGSDirectChallenge) {
+        guard !challengesReceived.contains(where: { $0.id == challenge.id }) else { return }
+        challengesReceived.append(challenge)
+    }
+
+    func removeReceivedChallengeForUITests(id: Int) {
+        guard challengesReceived.contains(where: { $0.id == id }) else { return }
+        challengesReceived.removeAll { $0.id == id }
+    }
+    #endif
     @Published private(set) public var hostingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
     @Published private(set) public var participatingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
     
@@ -1283,6 +1337,10 @@ class OGSService: ObservableObject {
     }
 
     @Published private(set) public var isLoadingOverview = true
+    /// How many overviews the service has applied, so a follower can tell a
+    /// load that listed the user's games from one that failed. A bootstrap
+    /// state that isn't loading counts as one.
+    @Published private(set) var appliedOverviewCount = 0
     
     private var openChallengeById: [Int: OGSSeekgraphChallenge] = [:]
     @Published private(set) public var eligibleOpenChallengeById: [Int: OGSSeekgraphChallenge] = [:]
@@ -1478,6 +1536,9 @@ class OGSService: ObservableObject {
         isLoggedIn = state.isLoggedIn
         socketStatus = state.socketStatus
         isLoadingOverview = state.isLoadingOverview
+        // A state that isn't loading is complete, with no transport to load
+        // it: it stands for a load that applied its overview.
+        appliedOverviewCount = state.isLoadingOverview ? 0 : 1
         activeGames = state.activeGames
         publicGames = state.publicGames
         sortedPublicGames = state.sortedPublicGames
@@ -2815,6 +2876,7 @@ class OGSService: ObservableObject {
             }
         }
         processOverview(overview: overviewValue)
+        appliedOverviewCount += 1
     }
 
     /// Direct, error-propagating overview refresh used by live integration tests.

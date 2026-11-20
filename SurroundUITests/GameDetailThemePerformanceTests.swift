@@ -237,9 +237,11 @@ final class GameDetailThemePerformanceTests: SurroundJourneyUITestCase {
         } else {
             arguments += [SurroundUITestContract.themeLaunchArgument, theme]
         }
+        #if DEBUG
         if ticksClocks {
             arguments.append(SurroundUITestContract.fixtureClockTicksLaunchArgument)
         }
+        #endif
         if let homeLayout {
             arguments += [SurroundUITestContract.homeDisplayModeLaunchArgument, homeLayout]
         }

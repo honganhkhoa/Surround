@@ -32,6 +32,39 @@ final class GameControlRowMetricsTests: XCTestCase {
         XCTAssertEqual(scoring.fitsColumn(at: 104), expected.fitsColumn(at: 104))
     }
 
+    /// Where the main action reads "Reconnecting…" while the connection is
+    /// down (no title slot, no clock in play), the row reserves that label
+    /// too, so the pill doesn't grow when it relabels. Every other row keeps
+    /// its phase's reservation, so its pill doesn't change.
+    func testReconnectingIsReservedOnlyWhereTheActionRelabels() {
+        let cases: [(OGSGamePhase, [String])] = [
+            (.stoneRemoval, ["Accept removed stones", "Clear estimates"]),
+            (.finished, ["Pass", "Submit move", "Rematch", "Next (999+)"]),
+        ]
+        for (phase, labels) in cases {
+            for size: DynamicTypeSize in [.large, .accessibility3] {
+                let plain = GameControlRowMetrics(dynamicTypeSize: size, locale: locale, phase: phase)
+                let expectedPlain = GameControlRowMetrics(dynamicTypeSize: size, locale: locale, localizedLabels: labels)
+                XCTAssertEqual(plain.horizontalSize, expectedPlain.horizontalSize, "\(phase) \(size)")
+                XCTAssertEqual(plain.rowHeight(at: 160), expectedPlain.rowHeight(at: 160), "\(phase) \(size)")
+
+                let relabelling = GameControlRowMetrics(dynamicTypeSize: size, locale: locale, phase: phase,
+                                                        relabelsOffline: true)
+                let expected = GameControlRowMetrics(dynamicTypeSize: size, locale: locale,
+                                                     localizedLabels: labels + ["Reconnecting…"])
+                XCTAssertEqual(relabelling.horizontalSize, expected.horizontalSize, "\(phase) \(size)")
+                XCTAssertEqual(relabelling.rowHeight(at: 160), expected.rowHeight(at: 160), "\(phase) \(size)")
+                XCTAssertEqual(relabelling.columnRowHeight(width: 126), expected.columnRowHeight(width: 126),
+                               "\(phase) \(size)")
+            }
+        }
+        // A label narrower than "Reconnecting…" widens only the relabelling row.
+        let short = GameControlRowMetrics(dynamicTypeSize: .large, locale: locale, localizedLabels: ["Pass"])
+        let shortRelabelling = GameControlRowMetrics(dynamicTypeSize: .large, locale: locale,
+                                                     localizedLabels: ["Pass"], relabelsOffline: true)
+        XCTAssertGreaterThan(shortRelabelling.horizontalSize.width, short.horizontalSize.width)
+    }
+
     func testNameBorrowsOnlyUnusedReservationBeforeActionShrinks() {
         let metrics = GameControlRowMetrics(dynamicTypeSize: .large, locale: locale)
         let actionWidth: CGFloat = 64

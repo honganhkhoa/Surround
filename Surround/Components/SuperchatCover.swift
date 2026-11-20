@@ -20,7 +20,8 @@ extension NavigationService {
     }
 }
 
-/// Mounts the cover in a window's root, around MainView.
+/// Mounts the cover in a window's root, around MainView and inside the
+/// root's `ConnectionStatusHost`, whose source the cover shares.
 struct SuperchatCoverMount: ViewModifier {
     let ogs: OGSService
     let nav: NavigationService
@@ -34,6 +35,10 @@ struct SuperchatCoverMount: ViewModifier {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.surroundAllowsLocalPersistence) private var allowsLocalPersistence
     @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
+    /// The window's source, the same for the window's life. Shared, so an
+    /// outage that already shows in the window shows at once on the cover,
+    /// and a Retry through it restarts the cover's wait too.
+    @Environment(\.connectionStatus) private var connection
     /// Only the cover state. Observing `ogs` itself would replace the
     /// cover's root view on every socket event.
     @State private var cover: SuperchatCover?
@@ -69,15 +74,17 @@ struct SuperchatCoverMount: ViewModifier {
                     didLower: { DispatchQueue.main.async { nav.replayHeldNavigation() } }
                 ) {
                     if let cover, let accountID = ogs.superchatCoverAccountID {
+                        // Every root hosts a source around this mount; without
+                        // one the cover would show no outage.
                         SuperchatCoverView(cover: cover, accountID: accountID, store: store, ogs: ogs,
-                                           path: allowsRemoteActivity
-                                               ? SystemNetworkPathMonitor.shared : ConstantNetworkPath.satisfied,
-                                           isFrontmost: isFrontmost)
+                                           connection: connection ?? .neverOffline, isFrontmost: isFrontmost)
                             .environmentObject(ogs)
                             .environmentObject(nav)
                             // Its own hosting window gets no SwiftUI environment:
                             // forward what MainView's hosted tabs get, except the
-                            // color scheme, which the cover sets itself.
+                            // color scheme, which the cover sets itself, and the
+                            // window's width class, which nothing on it reads.
+                            .environment(\.connectionStatus, connection)
                             .environment(\.openURL, openURL)
                             .environment(\.locale, locale)
                             .environment(\.layoutDirection, layoutDirection)
@@ -129,7 +136,9 @@ struct SuperchatCoverView: View {
     let isFrontmost: () -> Bool
 
     @EnvironmentObject private var context: SceneCoverContext
-    @StateObject private var connection: ConnectionStatusSource
+    /// The window's source. Its root says when the window is on screen; the
+    /// cover never does.
+    @ObservedObject private var connection: ConnectionStatusSource
     @State private var selectedModeratorID: Int?
     /// The rise whose reply focus was asked for, or skipped (compact height,
     /// a stale window). Each rise asks once, so a chip switch or a rotation
@@ -138,7 +147,6 @@ struct SuperchatCoverView: View {
     @AccessibilityFocusState private var endCardFocused: Bool
     @Environment(\.displayScale) private var displayScale
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// The two settings Home reads, so the live games' clocks match Home's.
     @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
@@ -147,22 +155,13 @@ struct SuperchatCoverView: View {
     private var themeAppliesToWholeApp = true
 
     init(cover: SuperchatCover, accountID: Int, store: SuperchatStore, ogs: OGSService,
-         path: NetworkPathMonitoring, isFrontmost: @escaping () -> Bool) {
+         connection: ConnectionStatusSource, isFrontmost: @escaping () -> Bool) {
         self.cover = cover
         self.accountID = accountID
         self.store = store
         _ogs = ObservedObject(wrappedValue: ogs)
+        _connection = ObservedObject(wrappedValue: connection)
         self.isFrontmost = isFrontmost
-        _connection = StateObject(wrappedValue: {
-            let source = ConnectionStatusSource(ogs: ogs, path: path)
-            // The content exists only while its window is covered, so it is
-            // on screen from its first frame (the change handler in `body`
-            // corrects this in the background). Knowing the status before
-            // that frame keeps a window that opens with no network from
-            // focusing a field it disables a moment later.
-            source.setVisible(true)
-            return source
-        }())
     }
 
     private var presentation: SuperchatCoverPresentation? {
@@ -211,9 +210,6 @@ struct SuperchatCoverView: View {
         .accessibilityIdentifier(ID.superchatCover)
         .modifier(WholeAppThemeAppearance())
         .modifier(FixtureColorScheme(colorScheme: SurroundApp.fixtureColorScheme))
-        .onChange(of: context.isRaised && scenePhase != .background, initial: true) { _, visible in
-            connection.setVisible(visible)
-        }
         .onChange(of: context.raiseCount, initial: true) { _, count in
             // The composer gets this rise's request in the update that runs
             // this; from the next update on it is nil for the rest of the rise.

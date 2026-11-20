@@ -212,12 +212,47 @@ struct GameControlRow: View {
     var pendingPosition: Binding<BoardPosition?> = .constant(nil)
     var goToNextGame: (() -> ())?
     var stoneRemovalOption: Binding<StoneRemovalOption> = .constant(.toggleGroup)
+    /// What the actions that need the connection show while it is down, by
+    /// the game's connection placement.
+    var connectionAction = GameConnectionPlacement.Action.disabled
+    /// The window's connection status shows: Reconnecting… or Can’t reach OGS.
+    var connectionStatusShows = false
 
     @Setting(.autoSubmitForLiveGames) var autoSubmitForLiveGames: Bool
     @Setting(.autoSubmitForCorrespondenceGames) var autoSubmitForCorrespondenceGames: Bool
 
     private var blocksGameActions: Bool {
         state.blocksGameActions || ogs.socketStatus != .connected
+    }
+
+    /// VoiceOver hears why an action that needs the connection waits.
+    private var waitsForConnection: Bool {
+        connectionAction != .none && connectionStatusShows
+    }
+
+    /// Where nothing else in the game says the connection is down (no title
+    /// slot, no clock in play), the main action reads Reconnecting… instead.
+    private var relabelsMainAction: Bool {
+        connectionAction == .relabelled && connectionStatusShows
+    }
+
+    /// An action that needs the connection: disabled at once while the
+    /// socket is down, in every layout. While the window's status shows it
+    /// says Reconnecting…, as its VoiceOver value, or in place of its name
+    /// where the game relabels it; VoiceOver keeps the name.
+    private func connectionGatedButton(_ name: Text, perform: @escaping () -> Void) -> some View {
+        Button(action: perform) {
+            if relabelsMainAction {
+                // One word: in the Duo's narrow column it shrinks to fit a
+                // line rather than breaking mid-word.
+                Text("Reconnecting…").lineLimit(1).minimumScaleFactor(0.5)
+            } else {
+                name
+            }
+        }
+        .disabled(blocksGameActions)
+        .accessibilityLabel(name)
+        .accessibilityValue(waitsForConnection ? Text("Reconnecting…") : Text(verbatim: ""))
     }
 
     private var moreForeground: Color {
@@ -439,7 +474,7 @@ struct GameControlRow: View {
                                     .minimumScaleFactor(0.7)
                             }
                         } else if let rematch = rematchChallenge {
-                            Button("Rematch") {
+                            connectionGatedButton(Text("Rematch")) {
                                 state.presentRematch(
                                     rematch, gameID: game.ID,
                                     accountID: ogs.user?.id
@@ -451,22 +486,16 @@ struct GameControlRow: View {
                         } else if isUserTurnToPlay {
                             if let pendingMove = pendingMove.wrappedValue {
                                 if !game.hasCurrentUndoRequest {
-                                    Button(action: { submitMove(move: pendingMove)}) {
-                                        Text("Submit move")
-                                    }
-                                    .disabled(blocksGameActions)
+                                    connectionGatedButton(Text("Submit move")) { submitMove(move: pendingMove) }
                                 }
                             } else if !isHandicapPlacement {
-                                Button(action: { confirm(.pass) }) {
-                                    Text("Pass")
-                                }
-                                .disabled(blocksGameActions)
+                                connectionGatedButton(Text("Pass")) { confirm(.pass) }
                             }
                         } else if userNeedsToAcceptStoneRemoval {
-                            Button(action: { acceptRemovedStones() }) {
-                                Text("Accept removed stones", comment: "Displayed next to Stone Removal Phase - keep short. eg: 'Accept'")
+                            connectionGatedButton(Text("Accept removed stones",
+                                                       comment: "Displayed next to Stone Removal Phase - keep short. eg: 'Accept'")) {
+                                acceptRemovedStones()
                             }
-                            .disabled(blocksGameActions)
                         } else if game.isUserPlaying {
                             if let goToNextGame, let gamesWaiting = nextGameCount {
                                 Button(action: goToNextGame) {
@@ -497,7 +526,7 @@ struct GameControlRow: View {
     
     private var metrics: GameControlRowMetrics {
         GameControlRowMetrics(dynamicTypeSize: dynamicTypeSize, locale: locale,
-                              phase: game.gamePhase)
+                              phase: game.gamePhase, relabelsOffline: connectionAction == .relabelled)
     }
 
     /// The adaptive layout owns this banner's slot, so recovery cannot resize

@@ -698,29 +698,4 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         XCTAssertEqual(app.state, .runningForeground, "Scrolling Home keeps Surround in front", file: file, line: line)
         return newGame.frame.minY < before - 1
     }
-
-    /// Resizes the real iPad window with its native grabber, as the
-    /// narrow-window artboard audit does: never an injected viewport.
-    private func resizeWindow(to size: CGSize, in app: XCUIApplication) -> CGRect {
-        let window = app.windows.firstMatch
-        let grabber = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
-            .withOffset(CGVector(dx: -3, dy: -3))
-        grabber.press(forDuration: 0.8, thenDragTo: window.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: size.width, dy: size.height)))
-        Thread.sleep(forTimeInterval: 1.5)
-        // Floating windows resize about their center: halve each correction.
-        func delta(_ difference: CGFloat) -> CGFloat {
-            abs(difference) > 1 ? difference / 2 + (difference > 0 ? 8 : -8) : 0
-        }
-        for _ in 0..<6 {
-            let current = window.frame
-            guard abs(current.width - size.width) > 1 || abs(current.height - size.height) > 1 else { break }
-            let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
-                .withOffset(CGVector(dx: -3, dy: -3))
-            corner.press(forDuration: 0.8, thenDragTo: corner.withOffset(
-                CGVector(dx: delta(size.width - current.width), dy: delta(size.height - current.height))))
-            Thread.sleep(forTimeInterval: 0.8)
-        }
-        return window.frame
-    }
 }

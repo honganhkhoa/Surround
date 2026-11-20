@@ -92,7 +92,8 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
 
     func testOfflineTheCoverStaysWithReconnecting() {
         // The offline root's network path is always satisfied, so
-        // "Reconnecting…" shows 2 s after the rise (ConnectionStatusModel).
+        // "Reconnecting…" shows 2 s after the window opens, here covered: the
+        // cover shares the window's source (ConnectionStatusModel).
         var app = launchCovered([SurroundUITestContract.activityConnectionLaunchArgument,
                                  SurroundUITestContract.ActivityFixtureConnection.offline.rawValue])
         let launched = Date()
@@ -870,7 +871,8 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
 
     private func returnToActiveGames(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let back = app.navigationBars.buttons.matching(NSPredicate(
-            format: "identifier == %@ OR label == %@", "BackButton", "Active games"
+            format: "identifier == %@ OR (identifier != %@ AND label == %@)",
+            "BackButton", ID.gameActiveGamesButton, "Active games"
         )).firstMatch
         tap(back, description: "Back to Active games", in: app, file: file, line: line)
         XCTAssertTrue(app.navigationBars["Active games"].waitForExistence(timeout: 10), file: file, line: line)
@@ -878,28 +880,10 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
                       "Back leaves the game", file: file, line: line)
     }
 
-    /// Game Detail's Active games, from its toolbar or the bar's overflow.
+    /// Game Detail's in-game control's popover. The control is the chip for
+    /// the live game on your move, so a touch and hold opens it.
     private func openActiveGames(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        let direct = app.buttons.matching(identifier: ID.gameActiveGamesButton).firstMatch
-        let overflow = app.buttons.matching(NSPredicate(
-            format: "identifier IN %@ OR label == %@",
-            ["OverflowBarButtonItem", "BottomOverflowBarButtonItem", "More"], "More"
-        )).firstMatch
-        XCTAssertTrue(pollUntil(timeout: 10) { direct.exists || overflow.isHittable },
-                      "Expected Active games or its toolbar overflow", file: file, line: line)
-        if direct.exists {
-            if UIDevice.current.userInterfaceIdiom == .phone {
-                // iOS 27 can leave the hidden tab bar's frame over this bottom
-                // item, so tap its center rather than wait for hittability.
-                activate(direct, at: CGVector(dx: 0.5, dy: 0.5))
-            } else {
-                tap(direct, description: "Active games", in: app, file: file, line: line)
-            }
-        } else {
-            tap(overflow, description: "The game toolbar's overflow", in: app, file: file, line: line)
-            tap(requiredMenuButton(ID.gameActiveGamesButton, title: "Active games", in: app, file: file, line: line),
-                description: "Active games in the overflow", in: app, file: file, line: line)
-        }
+        openGameControlPopover(in: app, file: file, line: line)
     }
 
     /// The system share sheet's Copy action, which a link always offers.

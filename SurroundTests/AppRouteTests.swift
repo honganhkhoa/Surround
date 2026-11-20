@@ -381,13 +381,62 @@ final class AppRouteTests: XCTestCase {
         navigation.openActivity(source: .homeSearching, anchor: pill, horizontalSizeClass: .compact)
         navigation.moveActivityAnchor(to: moved, from: .homeSearching)
         XCTAssertEqual(navigation.main.activity?.anchor, pill, "A sheet has nothing to follow.")
+
+        let game = ActivityModel.Place.game(id: 42, isOwnGame: true, isLive: false, isOver: false)
+        navigation.main.activity = ActivityRequest(source: .gameControl, style: .popover, place: game)
+        navigation.moveActivityAnchor(to: moved, from: .gameControl)
+        XCTAssertEqual(navigation.main.activity?.anchor, .zero,
+                       "The in-game control's popover hangs from the control, so nothing moves it.")
+    }
+
+    /// Every game Activity opens closes the iPad's account sheet, as a game
+    /// in the Profile sheet can open its control's popover there. A live
+    /// Accept, the correspondence row, Open game and a game opened from a
+    /// profile the list pushed all open through `openGame`. Under the
+    /// moderator cover the sheet waits with the open.
+    @MainActor
+    func testEveryGameActivityOpensClosesTheAccountSheet() throws {
+        let navigation = NavigationService()
+        navigation.main.rootView = .publicGames
+        navigation.main.accountSheet = .profile
+        navigation.home.showingNewGameView = true
+        navigation.openGame(42, closesNewGame: true)
+        XCTAssertNil(navigation.main.accountSheet, "The account sheet closes.")
+        XCTAssertFalse(navigation.home.showingNewGameView)
+        XCTAssertEqual(navigation.main.rootView, .home)
+        XCTAssertEqual(navigation.pendingGameOpen?.ogsGameID, 42)
+
+        navigation.main.accountSheet = .settings
+        navigation.home.showingNewGameView = true
+        navigation.openGame(43, closesNewGame: false)
+        XCTAssertNil(navigation.main.accountSheet, "Whichever account sheet is up.")
+        XCTAssertTrue(navigation.home.showingNewGameView, "New game stays unless asked.")
+        XCTAssertEqual(navigation.pendingGameOpen?.ogsGameID, 43)
+
+        let cover = Cover()
+        let covered = window(store: SuperchatStore(preferences: nil), cover: cover)
+        covered.main.accountSheet = .profile
+        covered.openGame(44, closesNewGame: false)
+        XCTAssertEqual(covered.main.accountSheet, .profile, "Under the cover the sheet waits with the open.")
+        XCTAssertNil(covered.pendingGameOpen)
+        cover.isRaised = false
+        covered.replayHeldNavigation()
+        XCTAssertNil(covered.main.accountSheet, "The replayed open closes it.")
+        XCTAssertEqual(covered.pendingGameOpen?.ogsGameID, 44)
+
+        let plain = NavigationService()
+        plain.main.accountSheet = .profile
+        plain.requestGameOpen(try XCTUnwrap(AppRoute(rootView: .home, ogsGameID: 45)))
+        XCTAssertEqual(plain.main.accountSheet, .profile, "Other internal opens keep the navigation they own.")
     }
 
     // MARK: - Game detail display reset
 
     func testCrossingTheSpeedBoundaryRestoresDisplayDefaults() {
-        // The live-game banner and resolved routes are the only ways to jump
-        // between speed classes, and both start again from the full game view.
+        // The in-game control's chip, its Zen circle and its popover's live
+        // rows switch between speed classes in place, as the live-game banner
+        // and resolved routes jump between them; each starts again from the
+        // full game view.
         XCTAssertTrue(
             GameDetailDisplayReset.restoresDisplayDefaults(
                 from: .correspondence,
@@ -418,7 +467,9 @@ final class AppRouteTests: XCTestCase {
 
     func testSwitchingInsideOneSpeedClassKeepsDisplayChoices() {
         // These are the carousel and Next game, which never leave their speed
-        // class. A browsing session there keeps what the player chose.
+        // class, and the in-game control's switches from one live game to
+        // another, in Zen too. A browsing session there keeps what the player
+        // chose.
         XCTAssertFalse(
             GameDetailDisplayReset.restoresDisplayDefaults(
                 from: .correspondence,
@@ -451,6 +502,96 @@ final class AppRouteTests: XCTestCase {
         XCTAssertFalse(
             GameDetailDisplayReset.restoresDisplayDefaults(from: nil, to: nil)
         )
+    }
+
+    /// The in-game control switches games in place on Home's route, across
+    /// speed classes too: in a correspondence game its chip, or in Zen its
+    /// circle, shows another live game on your move. Zen ends there, and the
+    /// panels and the compact Chat board return; from one live game to
+    /// another they stay.
+    @MainActor
+    func testASwitchInPlaceFromCorrespondenceToLiveRestoresDisplayDefaults() throws {
+        let navigation = NavigationService()
+        let correspondence = try displayResetGame(41, .Simple(perMove: 86_400))
+        let live = try displayResetGame(42, .ByoYomi(mainTime: 600, periods: 3, periodTime: 30))
+        let otherLive = try displayResetGame(43, .Fischer(initialTime: 1_800, timeIncrement: 30, maxTime: 1_800))
+        navigation.home.activeGame = correspondence
+        let rule = GameControlSwitch(route: .homeGame, allowsActiveGamesCarousel: true)
+        let speed = { (game: Game) in game.gameData?.timeControl.speed }
+        var shown = correspondence
+        XCTAssertEqual(speed(correspondence), .correspondence)
+
+        rule.perform(live, navigation: navigation) { shown = $0 }
+        XCTAssertTrue(shown === live, "The switch happens in place.")
+        XCTAssertEqual(speed(live)?.isRealtime, true)
+        XCTAssertTrue(GameDetailDisplayReset.restoresDisplayDefaults(from: speed(correspondence), to: speed(shown)),
+                      "From correspondence to live, Zen ends, and the panels and the compact Chat board return.")
+
+        rule.perform(otherLive, navigation: navigation) { shown = $0 }
+        XCTAssertTrue(shown === otherLive)
+        XCTAssertFalse(GameDetailDisplayReset.restoresDisplayDefaults(from: speed(live), to: speed(shown)),
+                       "From one live game to another, Zen and the panels stay.")
+    }
+
+    /// OGS can send a game without its speed tag. Such a game counts by the
+    /// speed its clock gives on its board, as the service sorts it: from an
+    /// untagged live game to another live game Zen and the panels stay, and
+    /// from an untagged correspondence game to a live game they reset.
+    func testAGameWithoutASpeedTagCountsByItsClock() throws {
+        let untaggedLive = try displayResetGame(44, .ByoYomi(mainTime: 600, periods: 3, periodTime: 30), tagged: false)
+        let untaggedCorrespondence = try displayResetGame(45, .Simple(perMove: 86_400), tagged: false)
+        let live = try displayResetGame(42, .Fischer(initialTime: 1_800, timeIncrement: 30, maxTime: 1_800))
+        XCTAssertNil(untaggedLive.gameData?.timeControl.speed, "The payload has no speed tag.")
+        XCTAssertNil(untaggedCorrespondence.gameData?.timeControl.speed)
+        XCTAssertEqual(untaggedLive.resolvedSpeed, .live)
+        XCTAssertEqual(untaggedCorrespondence.resolvedSpeed, .correspondence)
+        XCTAssertEqual(live.resolvedSpeed, live.gameData?.timeControl.speed, "A tag is taken as it is.")
+
+        XCTAssertFalse(GameDetailDisplayReset.restoresDisplayDefaults(from: untaggedLive, to: live),
+                       "From one live game to another, Zen and the panels stay.")
+        XCTAssertFalse(GameDetailDisplayReset.restoresDisplayDefaults(from: live, to: untaggedLive))
+        XCTAssertTrue(GameDetailDisplayReset.restoresDisplayDefaults(from: untaggedCorrespondence, to: live),
+                      "From correspondence to live, Zen ends, and the panels and the compact Chat board return.")
+        XCTAssertTrue(GameDetailDisplayReset.restoresDisplayDefaults(from: untaggedLive, to: untaggedCorrespondence))
+    }
+
+    /// The picker lists the user's games at the speed of the game on screen.
+    /// For a game without a speed tag that speed is the one the service
+    /// sorted it by, so the picker lists the game's own list.
+    func testAGameWithoutASpeedTagHasTheSpeedOfTheListItIsIn() throws {
+        let untaggedLive = try displayResetGame(44, .ByoYomi(mainTime: 600, periods: 3, periodTime: 30), tagged: false)
+        let untaggedCorrespondence = try displayResetGame(45, .Simple(perMove: 86_400), tagged: false)
+        var state = OGSService.BootstrapState()
+        state.activeGames = [44: untaggedLive, 45: untaggedCorrespondence]
+        let suite = "com.honganhkhoa.Surround.AppRouteTests.\(UUID().uuidString)"
+        defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+        let service = OGSService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: OGSOfflineRejectingHTTPClient(), preferences: try XCTUnwrap(UserDefaults(suiteName: suite)),
+            ogsWebsocket: OGSOfflineNoOpWebsocket(), connectsAutomatically: false,
+            usesSurroundOverviewService: false, enablesAppSideEffects: false, startsTimers: false,
+            installsObservers: false, initialState: state
+        )
+        XCTAssertTrue(service.liveGames.contains { $0 === untaggedLive })
+        XCTAssertEqual(untaggedLive.resolvedSpeed?.isRealtime, true, "Its picker lists the live games.")
+        XCTAssertTrue(service.sortedActiveCorrespondenceGames.contains { $0 === untaggedCorrespondence })
+        XCTAssertEqual(untaggedCorrespondence.resolvedSpeed, .correspondence,
+                       "Its picker lists the correspondence games.")
+    }
+
+    /// The fixture's 9×9 game with `system`'s clock, and OGS's speed tag
+    /// unless `tagged` is false.
+    private func displayResetGame(_ id: Int, _ system: TimeControlSystem, tagged: Bool = true) throws -> Game {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "game-27053412", withExtension: "json"))
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        var data = try decoder.decode(OGSGame.self, from: Data(contentsOf: url))
+        data.gameId = id
+        data.timeControl = system.timeControlObject
+        if !tagged {
+            data.timeControl.codingData.speed = nil
+        }
+        return Game(ogsGame: data)
     }
 
     @MainActor

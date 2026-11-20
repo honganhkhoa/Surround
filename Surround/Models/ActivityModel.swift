@@ -4,8 +4,8 @@
 //
 //  What the Activity surfaces show: the bar on root screens, the in-game
 //  control and the Activity list. `ActivityModel.snapshot(_:)` and
-//  `ActivityModel.gameControl(_:)` are pure functions of one window's state,
-//  so the design's rules can be tested without a socket.
+//  `ActivityModel.gameControl(_:context:)` are pure functions of one window's
+//  state, so the design's rules can be tested without a socket.
 //  `ActivityModel.Input(ogs:place:...)` reads that state from an `OGSService`.
 //
 
@@ -159,12 +159,33 @@ enum ActivityModel {
         /// Another live game on your move: the chip, with +N beyond it.
         /// While you play live, challenges and messages are only a dot.
         case chip(LiveGame, plusN: Int, hasDot: Bool)
+        /// Your finished game, whose popover leads with the challenge from
+        /// its opponent that `GameOverCardRule` chose. +N counts what else
+        /// waits.
+        case gameOverCard(challengeID: Int, plusN: Int)
         /// Today's Active games button, with +N.
         case base(plusN: Int)
         /// While you play live, challenges and messages wait as a dot.
         case dot
-        /// A game the user doesn't play: the inbox glyph and its count.
+        /// A game the user doesn't play, or one of theirs on a route without
+        /// the picker: the inbox glyph and its count.
         case inbox(count: Int)
+    }
+
+    /// What the in-game control knows of its Game Detail beyond the
+    /// window's state.
+    struct GameControlContext: Equatable {
+        /// The route has the picker of same-speed games and switches games
+        /// in place (`GameControlSwitch`). Without it your own game shows
+        /// the inbox, as a game you don't play does.
+        var allowsPicker = true
+        /// Zen shows only another live game on your move.
+        var isZen = false
+        /// The challenge the game-over card shows (`GameOverCardRule`).
+        var cardChallengeID: Int?
+
+        /// Home's route outside Zen, with no card.
+        static let home = GameControlContext()
     }
 
     // MARK: - Rules
@@ -175,6 +196,10 @@ enum ActivityModel {
     /// Under this many seconds to timeout is low time, on any clock but
     /// byo-yomi, where only the last period is.
     static let lowTimeThreshold: TimeInterval = 30
+    /// One warning haptic when another of your live games, on your move,
+    /// falls through this many seconds to timeout (LowTimeHapticWatcher).
+    /// In byo-yomi that is the last period's last seconds.
+    static let lowTimeHapticThreshold: TimeInterval = 10
     /// How many read conversations follow the unread ones in the list.
     static let recentConversationLimit = 3
 
@@ -289,10 +314,34 @@ enum ActivityModel {
         return Snapshot(list: list, lead: lead, plusN: plusN, lowTimeGameIDs: lowTime)
     }
 
+    /// The in-game control on Home's route outside Zen, with no card.
     static func gameControl(_ input: Input) -> GameControl? {
+        gameControl(input, context: .home)
+    }
+
+    /// The in-game control for the game `input.place` shows; nil where the
+    /// slot hides. The first rule that applies wins:
+    /// 1. In Zen, only the first other live game on your move, as the chip
+    ///    with no +N and no dot.
+    /// 2. A live game that started elsewhere.
+    /// 3. Another live game on your move, in any game: the chip.
+    /// 4. Your finished game with the card's challenge.
+    /// 5. A game you don't play: the inbox.
+    /// 6. Your unfinished live game: the dot when anything waits, otherwise
+    ///    the base form where the route has the picker.
+    /// 7. Otherwise the base form with +N where the route has the picker,
+    ///    and the inbox where it doesn't.
+    ///
+    /// The inbox hides at 0. While you play live, other live games on your
+    /// move still add to +N beside a chip or a started game; challenges and
+    /// messages become the dot.
+    static func gameControl(_ input: Input, context: GameControlContext) -> GameControl? {
         guard case let .game(id, isOwnGame, isLive, isOver) = input.place else { return nil }
         let others = sortedLiveGames(input.liveGames.filter { $0.id != id })
         let othersOnYourMove = others.filter(\.isYourMove)
+        if context.isZen {
+            return othersOnYourMove.first.map { GameControl.chip($0, plusN: 0, hasDot: false) }
+        }
         let waitingCount = input.challengesReceived.count + input.conversations.filter(\.isUnread).count
         let playsLive = isOwnGame && isLive && !isOver
 
@@ -302,6 +351,7 @@ enum ActivityModel {
             let games = othersOnYourMove.filter { $0.id != shown.id }.count
             return playsLive ? (games, waitingCount > 0) : (games + waitingCount, false)
         }
+        let inbox: GameControl? = waitingCount > 0 ? .inbox(count: waitingCount) : nil
 
         // The game on screen counts for low time, but never as the one that
         // started elsewhere.
@@ -313,13 +363,20 @@ enum ActivityModel {
             let extra = beyond(chip)
             return .chip(chip, plusN: extra.plusN, hasDot: extra.hasDot)
         }
-        guard isOwnGame else {
-            return waitingCount > 0 ? .inbox(count: waitingCount) : nil
+        // Only while the card's challenge still waits. Game over releases
+        // what waited, so everything else counts.
+        if isOwnGame, isOver, let card = context.cardChallengeID,
+           input.challengesReceived.contains(where: { $0.id == card }) {
+            return .gameOverCard(challengeID: card, plusN: waitingCount - 1)
         }
+        guard isOwnGame else { return inbox }
         if playsLive {
-            return waitingCount > 0 ? .dot : .base(plusN: 0)
+            if waitingCount > 0 {
+                return .dot
+            }
+            return context.allowsPicker ? .base(plusN: 0) : nil
         }
-        return .base(plusN: waitingCount)
+        return context.allowsPicker ? .base(plusN: waitingCount) : inbox
     }
 
     /// Live once OGS tags it, or from its clock and board size when the tag

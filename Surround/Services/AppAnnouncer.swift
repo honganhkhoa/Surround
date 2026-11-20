@@ -100,6 +100,24 @@ extension AppAnnouncement.Key {
         Self("game.started.\(gameID)")
     }
 
+    /// One of the user's live games reached its last seconds on their move
+    /// (LowTimeHapticWatcher). Every window's service ticks the game's
+    /// clock, so every window sees it.
+    static func lowTime(_ gameID: Int) -> Self {
+        Self("low-time.\(gameID)")
+    }
+
+    /// A window's connection to OGS, as its source reports it once per
+    /// outage. Windows share the device's network, so they often report the
+    /// same change together.
+    static func connection(_ change: ConnectionStatusModel.Announcement) -> Self {
+        switch change {
+        case .reconnecting: Self("connection.reconnecting")
+        case .unreachable: Self("connection.unreachable")
+        case .connected: Self("connection.connected")
+        }
+    }
+
     /// A cover lifted because every superchat ended while Surround wasn't
     /// listening; every window hears it from the store.
     static func superchatLifted(_ accountID: Int) -> Self { Self("superchat.lifted.\(accountID)") }

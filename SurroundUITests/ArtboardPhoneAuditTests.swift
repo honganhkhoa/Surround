@@ -1322,12 +1322,12 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
 
         tap(ID.gameZenEnter, in: app, matching: .button)
         element(ID.gameZenExit, in: app, matching: .button)
-        let banner = element(ID.liveGameBanner, in: app, matching: .button)
-        keepScreenshot("live-banner-visible-in-correspondence-zen", in: app)
-        tap(banner, description: "Open active live game from Zen", in: app)
+        let zenControl = element(ID.gameZenControl, in: app, matching: .button)
+        XCTAssertTrue(waitUntilHittable(zenControl, timeout: 10), "Zen shows the live game on your move")
+        keepScreenshot("zen-control-in-correspondence-zen", in: app)
+        activate(zenControl, at: CGVector(dx: 0.5, dy: 0.5))
 
         element(ID.gameDetail(SurroundUITestContract.fixtureGameID), in: app)
-        XCTAssertFalse(banner.exists, "The live-game banner must disappear on the live board.")
         XCTAssertFalse(app.buttons[ID.gameZenExit].exists,
                        "Switching from correspondence to live must leave Zen mode.")
         XCTAssertFalse(app.descendants(matching: .any)
@@ -1335,7 +1335,7 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
                        "The correspondence carousel must not remain on the live game.")
         XCTAssertFalse(app.navigationBars.buttons["Close"].exists,
                        "The live game must use the existing navigation stack.")
-        keepScreenshot("live-banner-opens-live-game-outside-zen", in: app)
+        keepScreenshot("zen-control-opens-live-game-outside-zen", in: app)
     }
 
     func testPhoneZen() {
@@ -1810,9 +1810,9 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
 
     func testPhoneNotificationAccess() {
         let app = launch()
-        // Messages use the app's notice row, which shows only for unread
-        // messages (SurroundUITests covers it over Game Detail); this fixture
-        // has none, so the toolbar is drawn without it.
+        // A game has no Messages button: the in-game control's popover
+        // reaches Messages (SurroundUITests covers it). This fixture has no
+        // unread messages, so the toolbar is drawn without any.
         XCTAssertFalse(app.buttons[ID.messagesButton].exists,
                        "The design review fixture starts without private messages")
         keepScreenshot("game-settings-toolbar-without-message-badge", in: app)
@@ -1870,10 +1870,10 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         }
     }
 
-    // MARK: v148 connection feedback
+    // MARK: Connection status in a game
 
-    private func connectionBanner(in app: XCUIApplication) -> XCUIElement {
-        app.descendants(matching: .any).matching(identifier: ID.connectionBanner).firstMatch
+    private func connectionStatus(in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: ID.gameConnectionStatus).firstMatch
     }
 
     private func shownClocks(in app: XCUIApplication) -> [XCUIElement] {
@@ -1896,71 +1896,94 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         }.sorted()
     }
 
-    /// Stone removal with the socket down: the banner explains why marking
-    /// stones and Accept are disabled; on iPhone it takes the title slot and
-    /// the title gives way (canvas "Reconnecting in stone removal · iPhone").
-    func testConnectionBannerInStoneRemoval() {
+    /// Stone removal with the socket down: no clock is in play, so the
+    /// title slot says it, as an indigo capsule, in portrait and landscape;
+    /// the clocks carry no mark, Accept is disabled and VoiceOver hears why.
+    /// Chat takes the capsule away in the same pass and one clock carries
+    /// the mark instead.
+    func testConnectionStatusInStoneRemoval() {
         let app = launch(artboard: 64, socketDown: true)
-        let banner = connectionBanner(in: app)
-        XCTAssertTrue(banner.waitForExistence(timeout: 10), "Stone removal shows the app's connection banner")
-        XCTAssertTrue(banner.label.contains("Reconnecting"), "The banner reads \(banner.label)")
+        let status = connectionStatus(in: app)
+        XCTAssertTrue(status.waitForExistence(timeout: 10), "Stone removal shows the status in the title slot")
+        XCTAssertTrue(["Reconnecting…", "Can’t reach OGS"].contains(status.label), "The capsule reads \(status.label)")
+        XCTAssertTrue(app.navigationBars.allElementsBoundByIndex.contains { $0.frame.contains(status.frame) },
+                      "The status sits inside the bar, never over it: \(status.frame)")
         XCTAssertFalse(clockValues(in: app).contains { $0.hasPrefix("Reconnecting…") },
-                       "Scoring clocks carry no Reconnecting… badge: \(clockValues(in: app))")
-        XCTAssertTrue(pollUntil(timeout: 5) { !app.navigationBars.staticTexts["Stone removal"].exists },
-                      "The title gives way to the banner")
+                       "With the capsule, no clock carries the mark: \(clockValues(in: app))")
         let accept = app.buttons["Accept"].firstMatch
         XCTAssertTrue(accept.waitForExistence(timeout: 5), "Accept stays in place")
         XCTAssertFalse(accept.isEnabled, "Accept is disabled while disconnected")
-        recordConnectionBannerPlacement("phone-portrait-stone-removal", in: app)
+        XCTAssertEqual(accept.value as? String, "Reconnecting…", "VoiceOver hears why Accept waits")
+        XCTAssertFalse(accept.staticTexts["Reconnecting…"].exists, "With a title slot, Accept keeps its name")
+        recordConnectionStatusPlacement("phone-portrait-stone-removal", in: app)
         rotate(.landscapeLeft, app: app)
         Thread.sleep(forTimeInterval: 1)
-        XCTAssertTrue(banner.exists, "Landscape keeps the banner")
-        XCTAssertFalse(app.navigationBars.staticTexts["Stone removal"].exists, "Landscape's title gives way too")
-        recordConnectionBannerPlacement("phone-landscape-stone-removal", in: app)
+        XCTAssertTrue(status.waitForExistence(timeout: 5), "Landscape keeps the capsule")
+        recordConnectionStatusPlacement("phone-landscape-stone-removal", in: app)
         rotate(.portrait, app: app)
-    }
-
-    /// After the game: no clock runs, so no badge can stand in for the banner.
-    func testConnectionBannerAfterTheGame() {
-        let app = launch(artboard: 79, clock: "finished-points", socketDown: true)
-        let banner = connectionBanner(in: app)
-        XCTAssertTrue(banner.waitForExistence(timeout: 10), "A finished game shows the app's connection banner")
-        XCTAssertTrue(pollUntil(timeout: 5) { !app.navigationBars.staticTexts["Game over"].exists },
-                      "The title gives way to the banner")
-        recordConnectionBannerPlacement("phone-portrait-game-over", in: app)
-    }
-
-    /// Play: the running clock's Reconnecting… badge stands in for the banner.
-    /// A title chip stands in only when it renders the label: Chat's single
-    /// chip drops it when "Reconnecting…" does not fit beside the countdown,
-    /// and Analyze's glow-only chips have none, so the banner shows there.
-    func testReconnectingBadgeStandsInForTheBanner() {
-        let app = launch(artboard: 1, socketDown: true)
-        let banner = connectionBanner(in: app)
-        XCTAssertTrue(pollUntil(timeout: 10) { self.clockValues(in: app).contains { $0.hasPrefix("Reconnecting…") } },
-                      "The running clock shows Reconnecting…: \(clockValues(in: app))")
-        Thread.sleep(forTimeInterval: 1)
-        XCTAssertFalse(banner.exists, "Only the badge shows; the app's banner gives way")
-        recordConnectionBannerPlacement("phone-portrait-play-badge", in: app)
 
         openGameChat(in: app)
         dismissSoftwareKeyboardIfNeeded(in: app)
+        XCTAssertTrue(pollUntil(timeout: 5) { !status.exists }, "Chat never shows the capsule")
+        XCTAssertTrue(pollUntil(timeout: 5) {
+            self.clockValues(in: app).filter { $0.hasPrefix("Reconnecting…") }.count == 1
+        }, "In Chat one clock carries the mark: \(clockValues(in: app))")
+        recordConnectionStatusPlacement("phone-portrait-stone-removal-chat", in: app)
+        setGameChatVisible(false, in: app)
+        XCTAssertTrue(status.waitForExistence(timeout: 5), "Back in Play the capsule returns")
+    }
+
+    /// After the game: no clock is in play, so the capsule says it, and
+    /// Rematch is disabled while the socket is down.
+    func testConnectionStatusAfterTheGame() {
+        let app = launch(artboard: 79, clock: "finished-points", socketDown: true)
+        let status = connectionStatus(in: app)
+        XCTAssertTrue(status.waitForExistence(timeout: 10), "A finished game shows the status in the title slot")
+        let rematch = app.buttons[ID.gameRematch].firstMatch
+        if rematch.waitForExistence(timeout: 5) {
+            XCTAssertFalse(rematch.isEnabled, "Rematch is disabled while the socket is down")
+            XCTAssertEqual(rematch.value as? String, "Reconnecting…", "VoiceOver hears why Rematch waits")
+        }
+        recordConnectionStatusPlacement("phone-portrait-game-over", in: app)
+    }
+
+    /// Play: the running clock carries the mark at once from the socket, on
+    /// every variant that shows it: the body clock, Chat's title chip and
+    /// Analyze's chips, which hide every other status. A clock in play
+    /// never gives the capsule.
+    func testTheClocksMarkSaysItInPlay() {
+        let app = launch(artboard: 1, socketDown: true)
+        let status = connectionStatus(in: app)
+        XCTAssertTrue(pollUntil(timeout: 10) { self.clockValues(in: app).contains { $0.hasPrefix("Reconnecting…") } },
+                      "The running clock shows Reconnecting…: \(clockValues(in: app))")
+        // Past the window's 2 s reveal, so a capsule would have shown.
+        Thread.sleep(forTimeInterval: 2.5)
+        XCTAssertFalse(status.exists, "A clock in play: no capsule")
+        recordConnectionStatusPlacement("phone-portrait-play-mark", in: app)
+
+        func headerChips() -> [XCUIElement] {
+            app.navigationBars.buttons.matching(NSPredicate(
+                format: "identifier == 'game.clock.black' OR identifier == 'game.clock.white'")).allElementsBoundByIndex
+        }
+        func marked(_ chips: [XCUIElement]) -> Bool {
+            chips.contains { ($0.value as? String ?? "").hasPrefix("Reconnecting…") }
+        }
+        openGameChat(in: app)
+        dismissSoftwareKeyboardIfNeeded(in: app)
         Thread.sleep(forTimeInterval: 1)
-        let chips = app.navigationBars.buttons.matching(NSPredicate(
-            format: "identifier == 'game.clock.black' OR identifier == 'game.clock.white'")).allElementsBoundByIndex
-        print("[ConnectionBanner] phone chat chips \(chips.map { "\($0.identifier) \($0.frame) texts=\($0.staticTexts.allElementsBoundByIndex.map(\.label))" })")
-        let labelled = chips.contains { $0.staticTexts["Reconnecting…"].exists }
-        XCTAssertEqual(banner.waitForExistence(timeout: 3), !labelled,
-                       "The banner shows unless the title chip renders the Reconnecting… label")
-        recordConnectionBannerPlacement("phone-portrait-chat-chip", in: app)
+        print("[ConnectionStatus] phone chat chips \(headerChips().map { "\($0.identifier) \($0.frame) texts=\($0.staticTexts.allElementsBoundByIndex.map(\.label)) spinners=\($0.activityIndicators.count)" })")
+        XCTAssertTrue(marked(headerChips()), "Chat's title chip carries the mark")
+        XCTAssertFalse(status.exists, "Chat: no capsule")
+        recordConnectionStatusPlacement("phone-portrait-chat-chip", in: app)
         setGameChatVisible(false, in: app)
 
         setGameAnalyzing(true, in: app)
-        XCTAssertTrue(banner.waitForExistence(timeout: 5), "Analyze's glow-only title chips show the banner")
-        recordConnectionBannerPlacement("phone-portrait-analyze-chips", in: app)
+        Thread.sleep(forTimeInterval: 1)
+        print("[ConnectionStatus] phone analyze chips \(headerChips().map { "\($0.identifier) \($0.frame) texts=\($0.staticTexts.allElementsBoundByIndex.map(\.label)) spinners=\($0.activityIndicators.count)" })")
+        XCTAssertTrue(marked(headerChips()), "Analyze's chips carry the mark")
+        XCTAssertFalse(status.exists, "Analyze: no capsule")
+        recordConnectionStatusPlacement("phone-portrait-analyze-chips", in: app)
         setGameAnalyzing(false, in: app)
-        XCTAssertTrue(pollUntil(timeout: 5) { !banner.exists },
-                      "Back in Play the badge returns and the banner gives way")
     }
 
     /// One disconnect snapshot per game: mounting the title chips (Chat,
@@ -2386,13 +2409,22 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
     /// enabled pill keeps the accent.
     func testDisabledMainActionIsGrey() {
         continueAfterFailure = true
-        for socketDown in [true, false] {
-            let app = launch(artboard: 64, socketDown: socketDown)
+        // Where the layout has a title slot, a disabled Accept keeps its
+        // name; in Zen, which has none, it reads Reconnecting… instead.
+        for (socketDown, zen) in [(true, false), (false, false), (true, true)] {
+            let app = launch(zen ? .zenMode : .activeGameBoard, artboard: 64, socketDown: socketDown)
             let accept = app.buttons["Accept"].firstMatch
             XCTAssertTrue(accept.waitForExistence(timeout: 10), "Accept is shown")
             XCTAssertEqual(accept.isEnabled, !socketDown, "Accept is enabled only while connected")
             Thread.sleep(forTimeInterval: 2)
-            let state = socketDown ? "disabled" : "enabled"
+            if socketDown {
+                XCTAssertEqual(accept.value as? String, "Reconnecting…", "VoiceOver hears why Accept waits")
+            }
+            if zen {
+                XCTAssertFalse(connectionStatus(in: app).exists, "Zen has no title slot for the capsule")
+            }
+            print("[MainActionLabel] zen=\(zen) socketDown=\(socketDown) label=\(accept.label) texts=\(accept.staticTexts.allElementsBoundByIndex.map(\.label))")
+            let state = socketDown ? (zen ? "relabelled" : "disabled") : "enabled"
             let (fill, label, crop) = pillColours(of: accept)
             let spread = max(fill.0, fill.1, fill.2) - min(fill.0, fill.1, fill.2)
             print("[MainActionFill] \(UIDevice.current.systemVersion) \(state) frame=\(accept.frame) fill=\(String(format: "%.0f %.0f %.0f", fill.0, fill.1, fill.2)) spread=\(String(format: "%.0f", spread)) label=\(String(format: "%.0f", label))")
@@ -2416,48 +2448,55 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
 }
 
 extension XCTestCase {
-    /// v148: where the app's connection banner lands in a Game Detail layout,
-    /// and whether it covers a clock (card or title chip) or the board. Logs
-    /// the frames, keeps a screenshot and asks the host for a display capture.
-    func recordConnectionBannerPlacement(_ layout: String, in app: XCUIApplication) {
+    /// Where a game says that the window's connection is down, in one
+    /// layout: the title slot's capsule and its Retry, the clocks' marks
+    /// (in the title slot or the content), and the main action's name,
+    /// value and text. Logs the frames, keeps a screenshot and asks the host
+    /// for a display capture.
+    func recordConnectionStatusPlacement(_ layout: String, in app: XCUIApplication) {
         typealias ID = SurroundUITestContract.AccessibilityID
         Thread.sleep(forTimeInterval: 1)
         let window = app.windows.firstMatch.frame
-        let banner = app.descendants(matching: .any).matching(identifier: ID.connectionBanner).firstMatch
+        let status = app.descendants(matching: .any).matching(identifier: ID.gameConnectionStatus).firstMatch
+        let retry = app.descendants(matching: .any).matching(identifier: ID.gameConnectionStatusRetry).firstMatch
         let board = app.descendants(matching: .any).matching(identifier: ID.gameBoard).firstMatch
         let clocks = ["game.clock.black", "game.clock.white"].flatMap {
             app.buttons.matching(identifier: $0).allElementsBoundByIndex
         }.filter { $0.exists && $0.frame.width > 1 && $0.frame.intersects(window) }
         let bars = app.navigationBars.allElementsBoundByIndex.filter { $0.exists && $0.frame.height > 0 }
-        func covers(_ a: CGRect, _ b: CGRect) -> CGRect? {
-            let overlap = a.intersection(b)
-            return overlap.isNull || overlap.width <= 1 || overlap.height <= 1 ? nil : overlap
-        }
-        let bannerFrame = banner.exists ? banner.frame : .null
+        let actions = app.buttons.matching(NSPredicate(
+            format: "label IN %@ OR identifier == %@", ["Accept", "Pass", "Submit move", "Rematch"], ID.gameRematch
+        )).allElementsBoundByIndex.filter { $0.exists && $0.frame.intersects(window) }
+        func inBar(_ frame: CGRect) -> Bool { bars.contains { $0.frame.contains(CGPoint(x: frame.midX, y: frame.midY)) } }
         let clockLines = clocks.map { clock -> String in
-            let overlap = covers(bannerFrame, clock.frame)
-            return "\(clock.identifier) frame=\(clock.frame) inTitle=\(bars.contains { $0.frame.contains(CGPoint(x: clock.frame.midX, y: clock.frame.midY)) }) covered=\(overlap.map { "\($0)" } ?? "no")"
+            let value = clock.value as? String ?? ""
+            return "\(clock.identifier) frame=\(clock.frame) inTitle=\(inBar(clock.frame)) marked=\(value.hasPrefix("Reconnecting…") || value.hasPrefix("Connecting…")) texts=\(clock.staticTexts.allElementsBoundByIndex.map(\.label)) spinners=\(clock.activityIndicators.count)"
         }
-        let boardOverlap = board.exists ? covers(bannerFrame, board.frame) : nil
+        let actionLines = actions.map { action in
+            "\(action.label) frame=\(action.frame) enabled=\(action.isEnabled) value='\(action.value as? String ?? "")' texts=\(action.staticTexts.allElementsBoundByIndex.map(\.label))"
+        }
         let text = """
         Layout: \(layout)
         Window: \(window)
-        Banner: \(banner.exists ? "\(bannerFrame) label='\(banner.label)'" : "absent")
+        Status: \(status.exists ? "\(status.frame) label='\(status.label)' inBar=\(inBar(status.frame))" : "absent")
+        Retry: \(retry.exists ? "\(retry.frame)" : "absent")
         Navigation bars: \(bars.map { "\($0.frame)" })
-        Board: \(board.exists ? "\(board.frame)" : "absent") covered=\(boardOverlap.map { "\($0)" } ?? "no")
+        Board: \(board.exists ? "\(board.frame)" : "absent")
         Clocks:
         \(clockLines.joined(separator: "\n"))
+        Actions:
+        \(actionLines.joined(separator: "\n"))
         """
-        print("[ConnectionBanner] " + text.replacingOccurrences(of: "\n", with: " | "))
+        print("[ConnectionStatus] " + text.replacingOccurrences(of: "\n", with: " | "))
         let attachment = XCTAttachment(string: text)
-        attachment.name = "connection-banner-\(layout)"
+        attachment.name = "connection-status-\(layout)"
         attachment.lifetime = .keepAlways
         add(attachment)
         let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.name = "connection-banner-\(layout)"
+        screenshot.name = "connection-status-\(layout)"
         screenshot.lifetime = .keepAlways
         add(screenshot)
-        FileHandle.standardOutput.write(Data("[ArtboardCaptureReady] native-connection-banner-\(layout) window=\(window)\n".utf8))
+        FileHandle.standardOutput.write(Data("[ArtboardCaptureReady] native-connection-status-\(layout) window=\(window)\n".utf8))
         Thread.sleep(forTimeInterval: 3)
     }
 }

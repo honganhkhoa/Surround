@@ -18,9 +18,14 @@ struct GameControlRowMetrics {
     /// small circle beside a large pill.
     let moreButtonDiameter: CGFloat
 
+    /// - Parameter relabelsOffline: The main action reads "Reconnecting…"
+    ///   while the window's connection status shows, as it does where the
+    ///   layout has no title slot and no clock is in play. Only there is
+    ///   that label reserved, so no other layout's pill changes.
     init(dynamicTypeSize: DynamicTypeSize, locale: Locale = .current,
          phase: OGSGamePhase? = .play,
-         localizedLabels: [String]? = nil) {
+         localizedLabels: [String]? = nil,
+         relabelsOffline: Bool = false) {
         let category: UIContentSizeCategory
         switch dynamicTypeSize {
         case .xSmall: category = .extraSmall
@@ -43,7 +48,7 @@ struct GameControlRowMetrics {
         )
         // Unit geometry tests run without the app's localization bundle, so
         // they can supply the same visible labels directly.
-        let labels: [String]
+        var labels: [String]
         if let localizedLabels {
             labels = localizedLabels
         } else if phase == .stoneRemoval {
@@ -60,6 +65,9 @@ struct GameControlRowMetrics {
                 // Reserve a count independently of the currently waiting games.
                 String(localized: "Next", locale: locale) + " (999+)"
             ]
+        }
+        if relabelsOffline {
+            labels.append(String(localized: "Reconnecting…", locale: locale))
         }
         self.font = font
         let statusFont = UIFont.preferredFont(

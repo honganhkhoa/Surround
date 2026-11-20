@@ -106,16 +106,30 @@ final class ActivityFixturesTests: XCTestCase {
         }
     }
 
-    /// "none", "started game-N +K[ dot]", "chip game-N +K[ dot]", "base +K", "dot" or "inbox K".
+    /// "none", "started game-N +K[ dot]", "chip game-N +K[ dot]", "card challenge-N +K", "base +K", "dot"
+    /// or "inbox K".
     private func describe(_ control: ActivityModel.GameControl?) -> String {
         switch control {
         case .none: return "none"
         case let .gameStarted(game, plusN, hasDot): return "started game-\(game.id) +\(plusN)" + (hasDot ? " dot" : "")
         case let .chip(game, plusN, hasDot): return "chip game-\(game.id) +\(plusN)" + (hasDot ? " dot" : "")
+        case let .gameOverCard(challengeID, plusN): return "card challenge-\(challengeID) +\(plusN)"
         case .base(let plusN): return "base +\(plusN)"
         case .dot: return "dot"
         case .inbox(let count): return "inbox \(count)"
         }
+    }
+
+    /// What the game-over card offers in its game's popover: "no card", or
+    /// its challenge with "Reject and Accept" or "View".
+    private func describeCard(_ challengeID: Int?, in input: ActivityModel.Input) -> String {
+        guard let challengeID else { return "no card" }
+        guard let challenge = input.challengesReceived.first(where: { $0.id == challengeID }) else {
+            return "challenge-\(challengeID) gone"
+        }
+        let actions = ActivityRowActionState(isUnusual: challenge.isUnusual, isInGamePopover: true,
+                                             isGameOverCard: true, isOffline: false, state: nil)
+        return "challenge-\(challengeID) " + (actions.showsInlineAcceptAndReject ? "Reject and Accept" : "View")
     }
 
     // MARK: The states
@@ -127,7 +141,9 @@ final class ActivityFixturesTests: XCTestCase {
         var lowTime: Set<Int> = []
         var baseIsLive: Bool
         var baseIsOver = false
+        /// The control in 26268404, with the card Game Detail's rule picks.
         var inGame: String
+        var card = "no card"
     }
 
     /// The designed table. Exhaustive, so a new state can't go unchecked.
@@ -145,7 +161,7 @@ final class ActivityFixturesTests: XCTestCase {
             return Expectation(lead: harbor, list: [harbor, base], baseIsLive: true, inGame: chip)
         case .liveTheirMove:
             return Expectation(lead: harbor, list: [harbor], baseIsLive: false, inGame: "base +0")
-        case .lowTime:
+        case .lowTime, .lowTimeCrossing:
             return Expectation(lead: harbor, list: [harbor, base], lowTime: [ID.harborMistGameID],
                                baseIsLive: true, inGame: chip)
         case .stoneRemoval:
@@ -153,6 +169,9 @@ final class ActivityFixturesTests: XCTestCase {
                                inGame: "chip game-91004003 +0")
         case .gameStarted:
             return Expectation(lead: "started \(started)", list: [base, started], baseIsLive: true,
+                               inGame: "started \(started) +0")
+        case .gameStartedCorrespondence:
+            return Expectation(lead: "started \(started)", list: [started], baseIsLive: false,
                                inGame: "started \(started) +0")
         case .challengeReceived:
             return Expectation(lead: "challenge-95001", list: [base, "challenge-95001"], baseIsLive: true,
@@ -179,10 +198,16 @@ final class ActivityFixturesTests: XCTestCase {
                                baseIsLive: true, inGame: chip + " dot")
         case .rematchOffered:
             return Expectation(lead: "challenge-95004", list: ["challenge-95004"], baseIsLive: true,
-                               baseIsOver: true, inGame: "base +1")
+                               baseIsOver: true, inGame: "card challenge-95004 +0",
+                               card: "challenge-95004 Reject and Accept")
         case .rematchBothAsked:
+            // The user's own challenge waits; it never counts.
             return Expectation(lead: "challenge-95004", list: ["challenge-95004", "waiting-sent-95202"],
-                               baseIsLive: true, baseIsOver: true, inGame: "base +1")
+                               baseIsLive: true, baseIsOver: true, inGame: "card challenge-95004 +0",
+                               card: "challenge-95004 Reject and Accept")
+        case .unusualRematch:
+            return Expectation(lead: "challenge-95004", list: ["challenge-95004"], baseIsLive: true,
+                               baseIsOver: true, inGame: "card challenge-95004 +0", card: "challenge-95004 View")
         }
     }
 
@@ -202,8 +227,12 @@ final class ActivityFixturesTests: XCTestCase {
             XCTAssertEqual(root.lowTimeGameIDs, want.lowTime, "\(state)")
             let base = try XCTUnwrap(ogs.activeGames[baseID], "\(state)")
             XCTAssertEqual(ActivityModel.Place(showing: base), basePlace(state), "\(state)")
-            let control = ActivityModel.gameControl(input(ogs, basePlace(state), seed))
+            // Game Detail on Home's route, with the card its rule picks.
+            let card = GameOverCardRule.challengeID(for: base, among: ogs.challengesReceived)
+            let inGame = input(ogs, basePlace(state), seed)
+            let control = ActivityModel.gameControl(inGame, context: ActivityModel.GameControlContext(cardChallengeID: card))
             XCTAssertEqual(describe(control), want.inGame, "\(state)")
+            XCTAssertEqual(describeCard(card, in: inGame), want.card, "\(state)")
         }
     }
 
@@ -242,6 +271,57 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertEqual(game.clock?.whiteTime.periodTimeLeft, 8)
         XCTAssertTrue(GameDetailClockState(game: game, color: .white).suddenDeath)
         XCTAssertEqual(game.timeUntilTimeout(for: .white), 8)
+    }
+
+    /// `low-time-crossing` starts HarborMist's last period at 0:12, so on a
+    /// running clock it falls through the haptic's 10 s two seconds after
+    /// launch. `low-time`'s 0:08 is already below it.
+    func testLowTimeCrossingFallsThroughTenSecondsTwoSecondsIn() throws {
+        let (ogs, _) = try service(.lowTimeCrossing)
+        let game = try XCTUnwrap(ogs.activeGames[ID.harborMistGameID])
+        let user = try XCTUnwrap(ogs.user)
+        let system = try XCTUnwrap(game.gameData?.timeControl.system)
+        XCTAssertEqual(game.clock?.whiteTime.periodsLeft, 1)
+        XCTAssertTrue(GameDetailClockState(game: game, color: .white).suddenDeath)
+        let watcher = LowTimeHapticWatcher()
+        func fallen(after seconds: TimeInterval) -> [Int] {
+            game.clock?.calculateTimeLeft(with: system, pauseControl: game.pauseControl,
+                                          now: (clock.reference + seconds) * 1_000)
+            let live = ogs.liveGames.compactMap { ActivityModel.LiveGame(game: $0, userID: user.id) }
+            return watcher.record(live, accountID: user.id, isConnected: true)
+        }
+        XCTAssertEqual(fallen(after: 0), [])
+        XCTAssertEqual(game.timeUntilTimeout(for: .white), 12)
+        XCTAssertEqual(fallen(after: 1), [])
+        XCTAssertEqual(fallen(after: 2), [ID.harborMistGameID], "At 10 s left it falls.")
+        XCTAssertEqual(game.timeUntilTimeout(for: .white), 10)
+    }
+
+    /// `game-started-correspondence`: a live game started 5 s ago while
+    /// 26268404 is a correspondence game, so the control there shows it.
+    func testAGameStartsWhileYouPlayCorrespondence() throws {
+        let (ogs, seed) = try service(.gameStartedCorrespondence)
+        XCTAssertEqual(seed.startedGames, [ID.startedGameID: clock.ago(5)])
+        let base = try XCTUnwrap(ogs.activeGames[baseID])
+        XCTAssertEqual(base.gameData?.timeControl.speed, .correspondence)
+        XCTAssertEqual(ogs.liveGames.compactMap(\.ogsID), [ID.startedGameID])
+    }
+
+    /// MapleRidge has accepted the removal and the user hasn't, so the game
+    /// offers Accept, by GameControlRow's rule.
+    func testStoneRemovalWaitsForTheUsersAcceptance() throws {
+        let (ogs, _) = try service(.stoneRemoval)
+        let game = try XCTUnwrap(ogs.activeGames[ID.stoneRemovalGameID])
+        let user = try XCTUnwrap(ogs.user)
+        XCTAssertEqual(game.gamePhase, .stoneRemoval)
+        XCTAssertTrue(game.isUserPlaying)
+        XCTAssertEqual(game.userStoneColor, .white)
+        let removed = try XCTUnwrap(game.currentPosition.removedStones, "Scoring found the stones to remove: none.")
+        XCTAssertEqual(game.removedStonesAccepted[.black], removed, "MapleRidge accepted them.")
+        XCTAssertNil(game.removedStonesAccepted[.white], "The user hasn't.")
+        XCTAssertNotEqual(game.removedStonesAccepted[.white], game.currentPosition.removedStones,
+                          "So Accept shows.")
+        XCTAssertTrue(game.requiresUserAction(forPlayerWithId: user.id))
     }
 
     func testTheStartedLeadEndsAfterThirtySeconds() throws {
@@ -347,6 +427,29 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertFalse(rematch.isUnusual)
         XCTAssertEqual(ogs.challengesSent.map(\.id), [ID.rematchSentChallengeID])
         XCTAssertEqual(ogs.challengesSent.first?.challenged?.id, template.players.black.id)
+
+        // OGS makes a challenge's game as it makes the challenge, so both
+        // rematches have games newer than 26268404.
+        XCTAssertEqual(rematch.game.id, ID.rematchGameID(ID.rematchChallengeID))
+        XCTAssertGreaterThan(rematch.game.id, baseID)
+        let sent = try XCTUnwrap(ogs.challengesSent.first)
+        XCTAssertEqual(sent.game.id, ID.rematchGameID(ID.rematchSentChallengeID))
+        XCTAssertGreaterThan(sent.game.id, baseID)
+    }
+
+    func testTheUnusualRematchAsksForCustomKomi() throws {
+        let (ogs, _) = try service(.unusualRematch)
+        let rematch = try XCTUnwrap(ogs.challengesReceived.first { $0.id == ID.rematchChallengeID })
+        XCTAssertEqual(rematch.game.komi, 0.5)
+        XCTAssertTrue(rematch.useCustomKomi)
+        XCTAssertFalse(rematch.hasHandicap || rematch.unusualBoardSize || rematch.game.timeControl.system.isUnusual,
+                       "Custom komi is its one warning.")
+        XCTAssertTrue(rematch.isUnusual)
+        XCTAssertGreaterThan(rematch.game.id, baseID)
+        XCTAssertTrue(ogs.challengesSent.isEmpty)
+        let base = try XCTUnwrap(ogs.activeGames[baseID])
+        XCTAssertEqual(GameOverCardRule.challengeID(for: base, among: ogs.challengesReceived), ID.rematchChallengeID,
+                       "Komi isn't compared, so the card still leads, with View.")
     }
 
     // MARK: Windows and the journey
@@ -453,7 +556,9 @@ final class ActivityFixturesTests: XCTestCase {
                                   "end@2,start@4"])?.state, .superchat)
         XCTAssertEqual(try parse([state, "several", clockFlag, "frozen"]), Fixtures.Launch(state: .several, clock: clock))
         for selected in State.allCases {
-            XCTAssertEqual(try parse([state, selected.rawValue])?.state, selected)
+            // The crossing state needs its clock to run and tick.
+            let needs = selected == .lowTimeCrossing ? [clockFlag, "running", ticks] : []
+            XCTAssertEqual(try parse([state, selected.rawValue] + needs)?.state, selected)
         }
 
         XCTAssertEqual(failure([state, "x"]), .unknownState("x"))
@@ -474,6 +579,16 @@ final class ActivityFixturesTests: XCTestCase {
         let running = Fixtures.Clock(reference: clock.reference, isFrozen: false)
         XCTAssertEqual(try parse([state, "several", clockFlag, "running", ticks]),
                        Fixtures.Launch(state: .several, clock: running))
+
+        // HarborMist's clock falls through 10 s only while it runs and ticks.
+        let crossing = State.lowTimeCrossing.rawValue
+        let crossingNeeds = Fixtures.LaunchError.stateNeeds(crossing, "\(clockFlag) running and \(ticks)")
+        XCTAssertEqual(failure([state, crossing]), crossingNeeds)
+        XCTAssertEqual(failure([state, crossing, clockFlag, "running"]), crossingNeeds)
+        XCTAssertEqual(failure([state, crossing, ticks]), .cannotCombine(ticks), "A frozen clock can't tick.")
+        XCTAssertTrue(crossingNeeds.description.contains(crossing) && crossingNeeds.description.contains(ticks))
+        XCTAssertEqual(try parse([state, crossing, clockFlag, "running", ticks]),
+                       Fixtures.Launch(state: .lowTimeCrossing, clock: running))
     }
 
     func testTheActivityOpenerNeedsAStateAndAKnownStyle() throws {

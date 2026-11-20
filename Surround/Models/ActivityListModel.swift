@@ -49,6 +49,9 @@ struct ActivityRequest: Identifiable, Equatable {
         case livePill
         case messagesButton
         case debug
+        /// Game Detail's in-game control, which presents the list as its own
+        /// popover.
+        case gameControl
     }
 
     /// Where the list starts.
@@ -200,11 +203,14 @@ enum ActivityListSections {
     /// - A resolved row whose item has gone follows the id that preceded it
     ///   in its section, or comes first in its section when that id is no
     ///   longer there.
-    /// - No id shows twice.
+    /// - No id shows twice, and no id in `excludedIDs` shows at all, its
+    ///   resolved row included: the game-over card's challenge, which a
+    ///   game's popover shows above the sections.
     /// - Empty sections are left out, and Messages shows only with a
     ///   conversation.
-    static func sections(list: [ActivityModel.Item], resolved: [ActivityResolvedRow]) -> [Section] {
-        var seen = Set<String>()
+    static func sections(list: [ActivityModel.Item], resolved: [ActivityResolvedRow],
+                         excluding excludedIDs: Set<String> = []) -> [Section] {
+        var seen = excludedIDs
         let items = list.filter { seen.insert($0.id).inserted }
         // A listed item takes over its id; a repeated resolved id counts once.
         let gone = resolved.filter { seen.insert($0.id).inserted }
@@ -236,6 +242,56 @@ enum ActivityListSections {
             return (section.kind, index > 0 ? section.rows[index - 1].id : nil)
         }
         return nil
+    }
+}
+
+/// The game-over card a finished game's popover leads with: the challenge the
+/// in-game control shows, as a row of the list. The list keeps the card it
+/// first showed while that card has a row, its challenge or the row the user
+/// resolved, so a result stays in the card's place until the list closes,
+/// though the control has moved on. The list leaves the card's id out of its
+/// sections, its resolved row included, so the challenge never also shows
+/// under Challenges received.
+struct ActivityGameOverCard: Equatable {
+    /// The challenges the control showed while the list was open, oldest
+    /// first.
+    private(set) var shownChallengeIDs: [Int] = []
+
+    /// The control shows `challengeID`'s card, or none.
+    mutating func remember(_ challengeID: Int?) {
+        guard let challengeID, !shownChallengeIDs.contains(challengeID) else { return }
+        shownChallengeIDs.append(challengeID)
+    }
+
+    /// The card's row: of the challenges the control has shown, `showing`
+    /// included, the first that still has its listed challenge or, once that
+    /// has gone, the row the user resolved. Nil when none has either.
+    /// - Parameters:
+    ///   - showing: The control's card now, which counts before `remember`
+    ///     records it, so the first pass already leads with it.
+    ///   - listed: The model's items that the results store doesn't hide.
+    ///   - resolved: The rows the user acted on in the list's session.
+    func row(showing challengeID: Int?, listed: [ActivityModel.Item],
+             resolved: [ActivityResolvedRow]) -> ActivityListSections.Row? {
+        var candidates = shownChallengeIDs
+        if let challengeID, !candidates.contains(challengeID) {
+            candidates.append(challengeID)
+        }
+        for candidate in candidates {
+            let id = Self.itemID(candidate)
+            if let item = listed.first(where: { $0.id == id }) {
+                return .item(item)
+            }
+            if let row = resolved.first(where: { $0.id == id }) {
+                return .resolved(row)
+            }
+        }
+        return nil
+    }
+
+    /// A received challenge's id in the list.
+    static func itemID(_ challengeID: Int) -> String {
+        ActivityModel.Item.challenge(ActivityModel.Challenge(id: challengeID, isLive: false)).id
     }
 }
 
@@ -493,15 +549,20 @@ struct ActivityRowActionState: Equatable {
     }
 
     /// Inline Reject and Accept show only for a usual challenge outside a
-    /// game's popover. Otherwise the row shows its warning and View, and the
-    /// full challenge card decides.
+    /// game's popover, or on the game-over card, that popover's one
+    /// exception. Otherwise the row shows its warning and View, and the full
+    /// challenge card decides.
     let showsInlineAcceptAndReject: Bool
     private let isOffline: Bool
     private let isPending: Bool
 
-    /// - Parameter state: The row's latest action, if any.
-    init(isUnusual: Bool, isInGamePopover: Bool, isOffline: Bool, state: ActivityActionState?) {
-        showsInlineAcceptAndReject = !isUnusual && !isInGamePopover
+    /// - Parameters:
+    ///   - isGameOverCard: The row is the game-over card, which leads a
+    ///     finished game's popover.
+    ///   - state: The row's latest action, if any.
+    init(isUnusual: Bool, isInGamePopover: Bool, isGameOverCard: Bool = false, isOffline: Bool,
+         state: ActivityActionState?) {
+        showsInlineAcceptAndReject = !isUnusual && (!isInGamePopover || isGameOverCard)
         self.isOffline = isOffline
         isPending = state?.isPending ?? false
     }

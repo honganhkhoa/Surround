@@ -12,12 +12,13 @@ on:
 permissions:
   contents: read
 
-# Every "part N of M" step below keeps a 50-minute limit: run-ipad-ui-tests.sh
-# interrupts xcodebuild at 46 minutes and needs the rest to save the result
-# bundle and failure evidence. The composer and continuity steps keep 45
-# minutes, interrupted at 41, and the Activity steps 30, interrupted at 26.
-# Change part_deadline_seconds, isolated_phase_deadline_seconds and
-# activity_phase_deadline_seconds with these limits.
+# Every "part N of M" step below, and each composer step, keeps a 50-minute
+# limit: run-ipad-ui-tests.sh interrupts xcodebuild at 46 minutes and needs
+# the rest to save the result bundle and failure evidence. The game control
+# and continuity steps keep 45 minutes, interrupted at 41, and the Activity
+# steps 30, interrupted at 26. Change part_deadline_seconds,
+# isolated_phase_deadline_seconds and activity_phase_deadline_seconds with
+# these limits.
 jobs:
   test:
     runs-on: macos-26
@@ -63,7 +64,7 @@ jobs:
   iphone-navigation-ui-tests:
     name: iOS ${{ matrix.ios }} iPhone navigation
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 40
+    timeout-minutes: 70
     strategy:
       fail-fast: false
       matrix:
@@ -141,6 +142,46 @@ jobs:
             -maximum-test-execution-time-allowance 300 \
             -resultBundlePath "TestResults/SurroundUITests-iPhone-iOS${{ matrix.ios }}-Navigation.xcresult"
 
+      - name: Run game control and own-game freeze tests
+        if: ${{ !cancelled() && steps.iphone_ui_build.outcome == 'success' }}
+        timeout-minutes: 30
+        shell: bash
+        env:
+          TEST_RUNNER_SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES: '4'
+        run: |
+          test_cases=(
+            SurroundUITests/testCompactBottomBarKeepsActiveGamesBeforeTheModes
+            SurroundUITests/testOwnGameNavigationAndSwitchingRemainResponsive
+            GameControlUITests/testTheControlNeverHidesAnalyzeOrChat
+            GameControlUITests/testAtTheLargestTextSizeAHoldOpensThePopover
+          )
+          selection_arguments=()
+          for test_case in "${test_cases[@]}"; do
+            test_class="${test_case%%/*}"
+            test_name="${test_case#*/}"
+            test_source="SurroundUITests/${test_class}.swift"
+            class_count="$(grep -Ec "^[[:space:]]*final[[:space:]]+class[[:space:]]+${test_class}[[:space:]]*:[[:space:]]*SurroundJourneyUITestCase[[:space:]]*\{" "$test_source" || true)"
+            declaration_count="$(grep -Ec "^[[:space:]]*func[[:space:]]+${test_name}[[:space:]]*\([[:space:]]*\)" "$test_source" || true)"
+            if [[ "$class_count" != "1" || "$declaration_count" != "1" ]]; then
+              echo "Expected exactly one ${test_class} class and ${test_name} declaration in ${test_source}. Update the iPhone game control selection when renaming or moving it." >&2
+              exit 1
+            fi
+            selection_arguments+=("-only-testing:SurroundUITests/${test_case}")
+          done
+          mkdir -p TestResults
+          xcodebuild test-without-building \
+            -scheme Surround \
+            -project Surround.xcodeproj \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
+            -parallel-testing-enabled NO \
+            "${selection_arguments[@]}" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 900 \
+            -maximum-test-execution-time-allowance 900 \
+            -resultBundlePath "TestResults/SurroundUITests-iPhone-iOS${{ matrix.ios }}-GameControl.xcresult"
+
       - name: Upload iPhone navigation UI test results
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -214,7 +255,7 @@ jobs:
 
   ipad-messages-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 165
+    timeout-minutes: 265
 
     steps:
       - uses: actions/checkout@v4
@@ -241,7 +282,7 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.simulator.outputs.id }}" iPad
 
-      - name: Run iPad Messages UI tests, part 1 of 2
+      - name: Run iPad Messages UI tests, part 1 of 4
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
@@ -249,12 +290,28 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh messages-1 \
             "${{ steps.simulator.outputs.id }}" iPad
 
-      - name: Run iPad Messages UI tests, part 2 of 2
+      - name: Run iPad Messages UI tests, part 2 of 4
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh messages-2 \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run iPad Messages UI tests, part 3 of 4
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh messages-3 \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run iPad Messages UI tests, part 4 of 4
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh messages-4 \
             "${{ steps.simulator.outputs.id }}" iPad
 
       - name: Run iPad Activity UI tests
@@ -276,7 +333,7 @@ jobs:
 
   ipad-profile-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 185
+    timeout-minutes: 230
 
     steps:
       - uses: actions/checkout@v4
@@ -327,6 +384,14 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh profile-3 \
             "${{ steps.simulator.outputs.id }}" iPad
 
+      - name: Run iPad game control UI tests
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh game-control \
+            "${{ steps.simulator.outputs.id }}" iPad
+
       - name: Upload iPad profile UI test results
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -336,11 +401,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  # The iOS 18 unit tests share this job with the profile UI phase. The unit
-  # step also warms the UI build's derived data.
+  # The iOS 18 unit tests share this job with the profile and game control UI
+  # phases. The unit step also warms the UI build's derived data.
   minimum-ios-18:
     runs-on: macos-15
-    timeout-minutes: 205
+    timeout-minutes: 250
 
     steps:
       - uses: actions/checkout@v4
@@ -422,6 +487,14 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh profile-3 \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
+      - name: Run iPad game control UI tests on iPadOS 18
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh game-control \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
       - name: Upload iOS 18 test results
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -501,7 +574,7 @@ jobs:
 
   minimum-ios-18-messages-ui-tests:
     runs-on: macos-15
-    timeout-minutes: 165
+    timeout-minutes: 265
 
     steps:
       - uses: actions/checkout@v4
@@ -534,7 +607,7 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Run iPad Messages UI tests on iPadOS 18, part 1 of 2
+      - name: Run iPad Messages UI tests on iPadOS 18, part 1 of 4
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
@@ -542,12 +615,28 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh messages-1 \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Run iPad Messages UI tests on iPadOS 18, part 2 of 2
+      - name: Run iPad Messages UI tests on iPadOS 18, part 2 of 4
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh messages-2 \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run iPad Messages UI tests on iPadOS 18, part 3 of 4
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh messages-3 \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run iPad Messages UI tests on iPadOS 18, part 4 of 4
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh messages-4 \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
       - name: Run iPad Activity UI tests on iPadOS 18
@@ -574,7 +663,7 @@ jobs:
   ipad-composer-ui-tests:
     name: iPadOS ${{ matrix.ios }} composer and continuity
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
+    timeout-minutes: 130
     strategy:
       fail-fast: false
       matrix:
@@ -615,7 +704,7 @@ jobs:
             "${{ steps.simulator.outputs.id }}" "iPadOS${{ matrix.ios }}"
 
       - name: Verify iPadOS ${{ matrix.ios }} composer input
-        timeout-minutes: 5
+        timeout-minutes: 10
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh preflight \
@@ -623,7 +712,7 @@ jobs:
 
       - name: Run isolated iPad composer UI tests
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 45
+        timeout-minutes: 50
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh composer \

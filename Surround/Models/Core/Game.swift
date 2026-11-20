@@ -442,6 +442,13 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     var positionByLastMoveNumber = [Int: BoardPosition]()
     
     var rengo: Bool { gameData?.rengo ?? false }
+    /// OGS's speed tag, or, where the payload has none, the speed the clock
+    /// gives on this board, as the service sorts its active games into live
+    /// and correspondence. Nil before the game's details arrive, and for an
+    /// untagged clock system the client does not know.
+    var resolvedSpeed: TimeControlSpeed? {
+        gameData.flatMap { $0.timeControl.resolvedSpeed(boardWidth: $0.width, boardHeight: $0.height) }
+    }
     var latestPlayerUpdate: OGSPlayerUpdate? {
         didSet {
             if let update = latestPlayerUpdate {

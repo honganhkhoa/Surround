@@ -586,13 +586,15 @@ struct ActivityLiveGameRow: View {
         .accessibilityIdentifier(ID.activityRow(itemID))
     }
 
-    /// The user's clock, as Home's row reads it, then Low on time: the row's
-    /// value, which changes each second while the user's clock runs, so the
-    /// label holds still.
+    /// The user's clock as a spoken duration, such as "42 seconds", as the
+    /// in-game control says it, then Low on time: the row's value, which
+    /// changes each second while the user's clock runs, so the label holds
+    /// still.
     private func clockValue(_ facts: HomeGameFacts) -> String {
         var parts = [String]()
         if facts.userColor != nil {
-            parts.append("\(String(localized: "You")): \(facts.chipTime(facts.bottomColor))")
+            let time = facts.chipTimeLeft(facts.bottomColor).map { GameControlAccessibility.spokenDuration($0) }
+            parts.append("\(String(localized: "You")): \(time ?? facts.chipTime(facts.bottomColor))")
         }
         if isLowOnTime {
             parts.append(String(
@@ -608,8 +610,10 @@ struct ActivityLiveGameRow: View {
 
 /// A challenge someone sent the user. A usual one, outside a game's
 /// popover, takes Reject and Accept on their own line; an unusual one, or
-/// any in a game's popover, shows its warnings and View, which opens the
-/// full card.
+/// any other in a game's popover, shows its warnings and View, which opens
+/// the full card. The game-over card, which leads a finished game's
+/// popover, is the exception there: a usual one takes Reject and Accept,
+/// and an automatic handicap counts as unusual.
 struct ActivityChallengeRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let itemID: String
@@ -624,8 +628,17 @@ struct ActivityChallengeRow: View {
     let view: () -> Void
     let retry: () -> Void
     let openGame: (Int) -> Void
+    /// The game-over card shows the time control and komi in a game's
+    /// popover too, as the sheet's rows do, since its Accept needs no View.
+    var isGameOverCard = false
 
     private var name: String { challenge.challenger?.username ?? "" }
+
+    /// The challenge has warnings to show: on the game-over card an
+    /// automatic handicap is one.
+    private var isUnusual: Bool {
+        isGameOverCard ? challenge.isUnusualOnGameOverCard : challenge.isUnusual
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -636,9 +649,9 @@ struct ActivityChallengeRow: View {
                 }
             }
             if !actionState.showsInlineAcceptAndReject {
-                if challenge.isUnusual {
+                if isUnusual {
                     VStack(alignment: .leading, spacing: 2) {
-                        ChallengeWarningLines(challenge: challenge)
+                        ChallengeWarningLines(challenge: challenge, namesAutomaticHandicap: isGameOverCard)
                     }
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Color(.systemOrange))
@@ -664,7 +677,8 @@ struct ActivityChallengeRow: View {
     private var summary: some View {
         HStack(spacing: 12) {
             ActivityRowTile(user: challenge.challenger, symbol: nil, size: density.tile)
-            ActivityRowLines(content: content, density: density, showsMoreDetails: density == .regular)
+            ActivityRowLines(content: content, density: density,
+                             showsMoreDetails: density == .regular || isGameOverCard)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)

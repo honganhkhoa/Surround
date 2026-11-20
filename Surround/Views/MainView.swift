@@ -109,16 +109,23 @@ struct MainView: View {
         backgroundTask = nil
     }
 
-    /// Connects the window's Activity stores to its service, and its list
-    /// to this presenter, once.
+    /// Connects the window's Activity stores and producers to its service,
+    /// and its list to this presenter, once.
     private func attachActivity() {
         guard activityFirstSeen == nil else { return }
         nav.activityResults.attach(client: .live(ogs), navigator: nav,
                                    scheduler: OGSMainQueueWebsocketScheduler.shared)
         nav.activityLastKnown.attach(ogs: ogs)
         activityFirstSeen = ActivityFirstSeenObserver(ogs: ogs)
-        let nav = nav
+        let nav = nav, ogs = ogs
         nav.onCloseActivity = { [weak nav] in nav?.main.activity = nil }
+        nav.startedGamesRecorder.attach(ogs: ogs, navigation: nav)
+        nav.lowTimeHapticWatcher.attach(
+            ogs: ogs,
+            post: { [weak nav] in nav?.announce($0) },
+            isCovered: { [weak ogs] in ogs?.superchatCover != nil },
+            gamesOnScreen: { [weak nav] in nav?.ownLiveGameIDsOnScreen ?? [] }
+        )
     }
 
     /// Another account's list, results, drafts and last-known rows don't
@@ -186,6 +193,10 @@ struct MainView: View {
             .environment(\.scenePhase, environment.scenePhase)
             .environment(\.surroundAllowsLocalPersistence, environment.surroundAllowsLocalPersistence)
             .environment(\.surroundAllowsRemoteActivity, allowsRemoteActivity)
+            // The window root's, so a game in any tab reads the same source
+            // and the window's measured width class and shape.
+            .environment(\.connectionStatus, environment.connectionStatus)
+            .environment(\.gameControlWindowClass, environment.gameControlWindowClass)
             .modifier(AppReviewHostedPresentation(root: root))
             .environment(\.appReviewCoordinator, environment.appReviewCoordinator)
             .environment(\.appReviewPresentationRelay, environment.appReviewPresentationRelay))
@@ -330,7 +341,7 @@ struct MainView: View {
             tabNavigation
                 .modifier(ActivitySheetPresenter())
             if ogs.isLoggedIn {
-                NotificationPopup()
+                NotificationPopupHost(places: nav.activityPlaces, selectedTab: nav.main.rootView)
             }
         }
         // The popover's anchor, above everything it may be opened from.
@@ -411,6 +422,43 @@ struct MainView: View {
         )
         .environment(\.surroundAllowsRemoteActivity, allowsRemoteActivity)
         .environmentObject(gameChatSessions)
+    }
+}
+
+/// NotificationPopup, while the selected tab doesn't show a game. A game
+/// says its connection status itself, and its control and the control's
+/// popover carry what the popup's pills and Messages button offer.
+/// Conversations keep the popup. A game in a presented stack, such as the
+/// iPad Profile sheet, has no tab, so the popup stays under the sheet.
+///
+/// Both halves settle after the layout pass: the registry a main-queue turn
+/// after the screens change, and the selected tab, which changes as soon as
+/// one is picked, as this host's copy a turn after it does.
+private struct NotificationPopupHost: View {
+    @ObservedObject var places: ActivityPlaceRegistry
+    let selectedTab: RootView
+    @State private var settledTab: RootView
+
+    init(places: ActivityPlaceRegistry, selectedTab: RootView) {
+        self.places = places
+        self.selectedTab = selectedTab
+        _settledTab = State(initialValue: selectedTab)
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            // Always here, so the host follows the selected tab while the
+            // popup is unmounted.
+            Color.clear
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
+            if places.place(in: settledTab).gameID == nil {
+                NotificationPopup()
+            }
+        }
+        .onChange(of: selectedTab) { _, tab in
+            DispatchQueue.main.async { settledTab = tab }
+        }
     }
 }
 
