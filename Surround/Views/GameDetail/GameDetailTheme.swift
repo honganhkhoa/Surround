@@ -153,11 +153,10 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         }
         if self == .paperBlossoms, scheme == .dark {
             var night = board
-            // Keep rice paper light enough to separate the ink stones. Only
-            // its illumination changes; the native grid and marks stay crisp.
+            // Dim the parchment and folded paper independently in evening light.
             night.boardColor = Color(themeHex: 0xD6C0A0)
             night.compactBoardColor = Color(themeHex: 0xD6C0A0)
-            night.boardTexture?.tint = Color(themeHex: 0xE1D5C1)
+            night.boardTexture?.tint = Color(themeHex: 0xCFBCA0)
             night.stoneImages?.tint = Color(themeHex: 0xE8DFD0)
             night.boardEdge = Color(themeHex: 0x75513F)
             return night
@@ -716,6 +715,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 // paper; it adds only cast/contact shadows, never gloss.
                 imageStoneShadow: .raisedGlass,
                 imageStoneShading: .clamshellShoulder,
+                hasIvoryPaperBacking: true,
                 gridColor: Color(themeHex: 0x9E2F25),
                 coordinateColor: Color(themeHex: 0x5B201A),
                 black: StonePalette(
@@ -2593,19 +2593,18 @@ extension SurroundTheme {
 
 /// Paper artwork never includes grid geometry or game marks. Static images
 /// keep their identity through clock ticks, panel transitions and resizing.
-private enum PaperBlossomsAssets {
-    static let board = UIImage(named: "PaperBlossomsBoard")
-        .map { BoardTexture(image: $0, mapping: .board) }
+private final class PaperBlossomsAssets {
+    private static let bundle = Bundle(for: PaperBlossomsAssets.self)
+    static let board = UIImage(named: "PaperBlossomsBoard", in: bundle, compatibleWith: nil)
+        .map { BoardTexture(image: $0, mapping: .board, tint: Color(themeHex: 0xDBCAB5)) }
     static let stones: StoneImages? = {
-        guard let black = UIImage(named: "PaperBlossomsBlackStone"),
-              let white = UIImage(named: "PaperBlossomsWhiteStone") else { return nil }
+        guard let black = UIImage(named: "PaperBlossomsBlackStone", in: bundle, compatibleWith: nil),
+              let white = UIImage(named: "PaperBlossomsWhiteStone", in: bundle, compatibleWith: nil) else { return nil }
         return StoneImages(black: [black], white: [white], blackFaceGain: 1.3)
     }()
-    private final class ResourceBundle {}
-    static let turnedCorner = UIImage(named: "PaperBlossomsTurnedCorner",
-                                      in: Bundle(for: ResourceBundle.self), compatibleWith: nil)
-    static let portrait = UIImage(named: "PaperBlossomsScenePortrait")
-    static let landscape = UIImage(named: "PaperBlossomsSceneLandscape")
+    static let turnedCorner = UIImage(named: "PaperBlossomsTurnedCorner", in: bundle, compatibleWith: nil)
+    static let portrait = UIImage(named: "PaperBlossomsScenePortrait", in: bundle, compatibleWith: nil)
+    static let landscape = UIImage(named: "PaperBlossomsSceneLandscape", in: bundle, compatibleWith: nil)
 }
 
 /// Warm matte pigments keep labels independent of the red garden. The
@@ -2761,6 +2760,48 @@ struct PaperBlossomsControlSurface: View {
             .clipShape(shape)
             .compositingGroup()
             .shadow(color: .black.opacity(showsFold ? 0.2 : 0), radius: 1, x: 0, y: 0.8)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
+/// The vermilion action can sit over the same pigment in the garden.
+struct PaperBlossomsActionOutline: View {
+    let prominent: Bool
+    let interactive: Bool
+    let disabled: Bool
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    var body: some View {
+        if prominent && interactive && !disabled {
+            Capsule()
+                .strokeBorder(PaperBlossomsColors.cream.opacity(contrast == .increased ? 1 : 0.74),
+                              lineWidth: contrast == .increased ? 1.5 : 1)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+struct PaperBlossomsIdentityOutline: View {
+    let color: StoneColor
+    let cornerRadius: CGFloat
+    let compact: Bool
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        let increased = contrast == .increased
+        // The charcoal tag needs a visible cut edge against the garden.
+        // Its perimeter stays finer than the adjacent running clock's ring.
+        let blackOpacity = increased ? 1.0 : (scheme == .light ? 0.96 : 0.72)
+        let pigment = color == .black ? PaperBlossomsColors.blackBorder.opacity(blackOpacity)
+                                     : SurroundTheme.paperBlossoms.identityChipBorder(.white)
+        let width: CGFloat = color == .black ? (increased ? 1.75 : 1.25) : 1
+        PaperBlossomsControlShape(cornerRadius: cornerRadius, compact: compact, faceOnly: true,
+                                  folded: !reduceTransparency && !increased)
+            .strokeBorder(pigment, lineWidth: width)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }

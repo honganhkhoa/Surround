@@ -1731,6 +1731,11 @@ final class SurroundThemeTests: XCTestCase {
         for scheme: ColorScheme in [.light, .dark] {
             let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
             let board = theme.board(for: scheme)
+            let texture = try XCTUnwrap(board.boardTexture)
+            XCTAssertEqual(texture.tint, Color(themeHex: scheme == .dark ? 0xCFBCA0 : 0xDBCAB5))
+            XCTAssertEqual(board.surfaceColor(detailed: false),
+                           Color(themeHex: scheme == .dark ? 0xD6C0A0 : 0xF3DEC1),
+                           "Only the detailed rice-paper texture takes the parchment tint")
             XCTAssertEqual(board.gridStyle, .straight, "The native grid keeps precise playing intersections")
             XCTAssertLessThanOrEqual(board.gridLineScale, 1, "The vermilion grid stays fine")
             XCTAssertNil(board.boardDepth, "Paper does not introduce a thick slab or move the playing surface")
@@ -1749,6 +1754,65 @@ final class SurroundThemeTests: XCTestCase {
                                            "Labels retain a readable edge across folded-paper facets")
             }
             try assertNightControlFallbacksKeepReadableTextAndRoles(theme, scheme: scheme)
+        }
+    }
+
+    @MainActor
+    func testPaperBlossomsBackingAppearsOnlyAlongDetailedWhiteStoneEdges() throws {
+        for cell: CGFloat in [7, 13.99, 14, 20, 38, 64] {
+            let offset = IvoryPaperBacking.offset(forCellSize: cell)
+            if cell < 14 {
+                XCTAssertEqual(offset, .zero)
+            } else {
+                XCTAssertGreaterThan(offset.width, 0)
+                XCTAssertGreaterThan(offset.height, offset.width)
+                XCTAssertLessThan(hypot(offset.width, offset.height), 2,
+                                  "Neighboring stone faces have a two-point gap")
+            }
+        }
+        for scheme: ColorScheme in [.light, .dark] {
+            for theme in SurroundTheme.allCases {
+                XCTAssertEqual(theme.board(for: scheme).hasIvoryPaperBacking, theme == .paperBlossoms)
+            }
+            let backed = SurroundTheme.paperBlossoms.board(for: scheme)
+            var plain = backed
+            plain.hasIvoryPaperBacking = false
+            for side: StoneColor in [.black, .white] {
+                for (diameter, shadow): (CGFloat, CGFloat) in [(13, 1), (14, 1), (20, 0), (20, 1), (38, 1)] {
+                    func render(_ board: BoardAppearance) throws -> (pixels: [UInt8], width: Int, height: Int) {
+                        try nativeMaterialPixels(Stone(color: side, shadowRadius: shadow)
+                            .frame(width: diameter, height: diameter)
+                            .padding(4)
+                            .background(board.surfaceColor(detailed: false))
+                            .environment(\.boardAppearance, board)
+                            .environment(\.colorScheme, scheme), scale: 3)
+                    }
+                    let before = try render(plain), after = try render(backed)
+                    let detail = "\(scheme) \(side), \(diameter) pt, shadow \(shadow)"
+                    if side == .black || diameter < 14 || shadow == 0 {
+                        XCTAssertEqual(after.pixels, before.pixels, detail)
+                        continue
+                    }
+                    let radius = diameter * 3 / 2
+                    var edgePixels = 0, maximumFaceChange = 0
+                    for y in 0..<after.height {
+                        for x in 0..<after.width {
+                            let distance = hypot(CGFloat(x) + 0.5 - CGFloat(after.width) / 2,
+                                                 CGFloat(y) + 0.5 - CGFloat(after.height) / 2)
+                            let index = (y * after.width + x) * 4
+                            let redChange = abs(Int(after.pixels[index]) - Int(before.pixels[index]))
+                            if distance < radius / 2 {
+                                maximumFaceChange = max(maximumFaceChange, redChange)
+                            } else if abs(distance - radius) < 6, redChange > 10 {
+                                edgePixels += 1
+                            }
+                        }
+                    }
+                    XCTAssertGreaterThan(edgePixels, 10, "The exposed paper edge must be visible: \(detail)")
+                    XCTAssertLessThanOrEqual(maximumFaceChange, 4,
+                                             "Keep the folded face beneath game marks clear: \(detail)")
+                }
+            }
         }
     }
 
@@ -1821,9 +1885,6 @@ final class SurroundThemeTests: XCTestCase {
     func testPaperBlossomsBlackFacetLiftPreservesOtherRendering() throws {
         typealias Raster = (pixels: [UInt8], width: Int, height: Int)
         let scale: CGFloat = 3
-        let bundle = Bundle(for: Self.self)
-        let black = try XCTUnwrap(UIImage(named: "PaperBlossomsBlackStone", in: bundle, compatibleWith: nil))
-        let white = try XCTUnwrap(UIImage(named: "PaperBlossomsWhiteStone", in: bundle, compatibleWith: nil))
         // The unit target compiles Stone.swift, not the complete board view.
         // Native marker-gallery exports cover the board Canvas and game ink.
         func render(_ appearance: BoardAppearance, color: StoneColor, cell: CGFloat) throws -> Raster {
@@ -1839,10 +1900,7 @@ final class SurroundThemeTests: XCTestCase {
         }
 
         for scheme: ColorScheme in [.light, .dark] {
-            var lifted = SurroundTheme.paperBlossoms.board(for: scheme)
-            // Assets live in the unit-test bundle, not the app's main bundle.
-            lifted.stoneImages = StoneImages(black: [black], white: [white],
-                tint: scheme == .dark ? Color(themeHex: 0xE8DFD0) : .white, blackFaceGain: 1.3)
+            let lifted = SurroundTheme.paperBlossoms.board(for: scheme)
             var original = lifted
             original.stoneImages?.blackFaceGain = 1
             for color: StoneColor in [.black, .white] {
@@ -1891,6 +1949,67 @@ final class SurroundThemeTests: XCTestCase {
                                              "Neither shadows nor transparent padding may brighten: \(detail)")
                 }
             }
+        }
+    }
+
+    @MainActor
+    func testPaperBlossomsGameControlEdgesReadAgainstTheGarden() throws {
+        let theme = SurroundTheme.paperBlossoms
+        for scheme: ColorScheme in [.light, .dark] {
+            let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+            // Garden colors beside Next in iPhone portrait and above the black
+            // identity in iPad landscape, where the red paper is brighter.
+            let actionScene = Color(themeHex: scheme == .dark ? 0x4B0907 : 0xB30D09)
+            let chipScene = Color(themeHex: scheme == .dark ? 0x500A07 : 0xBE0F07)
+            let actionFace = try XCTUnwrap(theme.actionTint)
+            let chipFace = theme.clockSolidSurface(.black)
+            for scale: CGFloat in [2, 3] {
+                func checkEdge<V: View>(_ view: V, width: CGFloat, scene: Color) throws {
+                    let image = try nativeMaterialPixels(view.frame(width: width, height: 44)
+                        .background(scene).environment(\.colorScheme, scheme), scale: scale)
+                    func pixel(row: Int) -> Color {
+                        let i = (row * image.width + image.width / 2) * 4
+                        return Color(.sRGB, red: Double(image.pixels[i]) / 255,
+                                     green: Double(image.pixels[i + 1]) / 255,
+                                     blue: Double(image.pixels[i + 2]) / 255)
+                    }
+                    let face = pixel(row: image.height / 2)
+                    // Inspect the straight center of the edge; the same pixel
+                    // must separate from both the face and the neighboring garden.
+                    let strength = (0..<Int(2 * scale)).map { row in
+                        min(contrast(pixel(row: row), face, style: style),
+                            contrast(pixel(row: row), scene, style: style))
+                    }.max() ?? 0
+                    XCTAssertGreaterThanOrEqual(strength, 3, "\(scheme), \(width) pt, \(scale)×")
+                }
+                try checkEdge(Capsule().fill(actionFace).overlay {
+                    PaperBlossomsActionOutline(prominent: true, interactive: true, disabled: false)
+                }, width: 132, scene: actionScene)
+                try checkEdge(PaperBlossomsControlShape(cornerRadius: 9, compact: true).fill(chipFace)
+                    .overlay { PaperBlossomsIdentityOutline(color: .black, cornerRadius: 9, compact: true) },
+                    width: 156, scene: chipScene)
+            }
+        }
+    }
+
+    @MainActor
+    func testPaperBlossomsControlEdgesPreserveSecondaryStatesAndWhiteIdentity() throws {
+        for (prominent, interactive, disabled) in [(false, true, false), (true, true, true), (true, false, false)] {
+            let outline = try nativeMaterialPixelsUsingDirectContext(PaperBlossomsActionOutline(
+                prominent: prominent, interactive: interactive, disabled: disabled
+            ).frame(width: 132, height: 44))
+            XCTAssertTrue(stride(from: 3, to: outline.pixels.count, by: 4).allSatisfy { outline.pixels[$0] == 0 },
+                          "Only the enabled primary action gains an ivory edge")
+        }
+        for scheme: ColorScheme in [.light, .dark] {
+            let white = try nativeMaterialPixels(PaperBlossomsIdentityOutline(
+                color: .white, cornerRadius: 9, compact: true
+            ).frame(width: 126, height: 44).environment(\.colorScheme, scheme))
+            let existing = try nativeMaterialPixels(PaperBlossomsControlShape(
+                cornerRadius: 9, compact: true, faceOnly: true
+            ).strokeBorder(SurroundTheme.paperBlossoms.identityChipBorder(.white), lineWidth: 1)
+                .frame(width: 126, height: 44).environment(\.colorScheme, scheme))
+            XCTAssertEqual(white.pixels, existing.pixels, "The white identity keeps its fine folded-paper contour")
         }
     }
 

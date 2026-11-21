@@ -1329,10 +1329,8 @@ struct GameDetailPlayerIdentity: View {
                 PaperBlossomsControlSurface(color: color, cornerRadius: chipCornerRadius,
                                             compact: compactPaperCorner)
                     .overlay {
-                        PaperBlossomsControlShape(cornerRadius: chipCornerRadius, compact: compactPaperCorner,
-                                                  faceOnly: true,
-                                                  folded: !reduceTransparency && contrast != .increased)
-                            .strokeBorder(theme.identityChipBorder(color), lineWidth: 1)
+                        PaperBlossomsIdentityOutline(color: color, cornerRadius: chipCornerRadius,
+                                                     compact: compactPaperCorner)
                     }
             } else if theme.isFlowingInk {
                 RoundedRectangle(cornerRadius: chipCornerRadius)

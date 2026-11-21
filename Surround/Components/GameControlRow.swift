@@ -92,6 +92,9 @@ private struct GameControlGlass<Surface: Shape>: ViewModifier {
                         shape.stroke(theme.panelBorder, lineWidth: contrast == .increased ? 2 : 1)
                             .allowsHitTesting(false)
                     }
+                    if theme == .paperBlossoms {
+                        PaperBlossomsActionOutline(prominent: prominent, interactive: interactive, disabled: disabled)
+                    }
                 }
         } else if reduceTransparency || (theme.usesLightSceneSurfaces && contrast == .increased) {
             content.background(prominent ? prominentFill : Color(uiColor: .secondarySystemGroupedBackground), in: shape)

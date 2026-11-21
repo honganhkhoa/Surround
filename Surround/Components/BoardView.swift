@@ -927,6 +927,7 @@ private struct ImageStoneCanvas: View, Equatable {
     var lightDirection: StoneLightDirection
     var shadowStyle: ImageStoneShadowStyle
     var shading: ImageStoneShading
+    var hasIvoryPaperBacking: Bool
     var blackPalette: StonePalette
     var whitePalette: StonePalette
     // The raised profile is capped at a 3 pt blur and 3 pt offset; allow
@@ -939,6 +940,7 @@ private struct ImageStoneCanvas: View, Equatable {
             context.translateBy(x: overhang, y: overhang)
             let black = images.black.map { context.resolve(Image(uiImage: $0).interpolation(.high)) }
             let white = images.white.map { context.resolve(Image(uiImage: $0).interpolation(.high)) }
+            let backingOffset = IvoryPaperBacking.offset(forCellSize: cellSize)
 
             // Long casts shift the apparent center of a tiny stone. Keep
             // phone-size shadows close to its footprint; larger boards
@@ -994,6 +996,15 @@ private struct ImageStoneCanvas: View, Equatable {
                 // Scoring fades the whole stone, as removed flat stones do.
                 if stone.isRemoved { stoneContext.opacity = 0.5 }
                 let side = stone.rect.width / images.footprint
+                let artworkRect = CGRect(x: stone.rect.midX - side / 2, y: stone.rect.midY - side / 2,
+                                         width: side, height: side)
+                let artwork = variants[stone.variant % variants.count]
+                if hasIvoryPaperBacking, stone.color == .white, !stone.isRemoved {
+                    var backing = artwork
+                    backing.shading = .color(IvoryPaperBacking.color)
+                    stoneContext.draw(backing, in: artworkRect.offsetBy(dx: backingOffset.width,
+                                                                        dy: backingOffset.height))
+                }
                 var artworkContext = stoneContext
                 if stone.color == .black, images.blackFaceGain != 1 {
                     var matrix = ColorMatrix()
@@ -1004,9 +1015,7 @@ private struct ImageStoneCanvas: View, Equatable {
                     // accents and all game marks retain their own colors.
                     artworkContext.addFilter(.colorMatrix(matrix))
                 }
-                artworkContext.draw(variants[stone.variant % variants.count],
-                                  in: CGRect(x: stone.rect.midX - side / 2, y: stone.rect.midY - side / 2,
-                                             width: side, height: side))
+                artworkContext.draw(artwork, in: artworkRect)
                 // Removed stones retain their original faded artwork. The
                 // living face gets a small shoulder accent before all marks.
                 if !stone.isRemoved {
@@ -1234,6 +1243,7 @@ struct Stones: View {
                                  lightDirection: appearance.stoneLightDirection,
                                  shadowStyle: appearance.imageStoneShadow,
                                  shading: appearance.imageStoneShading,
+                                 hasIvoryPaperBacking: appearance.hasIvoryPaperBacking,
                                  blackPalette: black, whitePalette: white)
                 .equatable()
             }

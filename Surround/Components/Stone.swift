@@ -154,6 +154,18 @@ struct StoneImages: Equatable {
     }
 }
 
+/// The lower sheet of an ivory paper stone follows the cut edge of its face.
+enum IvoryPaperBacking {
+    static let color = Color(red: 129 / 255, green: 107 / 255, blue: 86 / 255)
+
+    static func offset(forCellSize size: CGFloat) -> CGSize {
+        guard size.isFinite, usesDetailedStoneRendering(at: size) else { return .zero }
+        // A 20 pt cell shows a 1.2 pt lip. Even at tablet size the backing
+        // leaves some of the two-point gap between neighboring faces open.
+        return CGSize(width: min(0.72, size * 0.0275), height: min(1.7, size * 0.06))
+    }
+}
+
 /// Native shading and contact shadows follow the rendered stones' key light.
 enum StoneLightDirection: Equatable {
     case upperLeft, upperRight
@@ -995,6 +1007,7 @@ struct BoardAppearance: Equatable {
     var stoneLightDirection: StoneLightDirection = .upperLeft
     var imageStoneShadow: ImageStoneShadowStyle = .contact
     var imageStoneShading: ImageStoneShading = .artwork
+    var hasIvoryPaperBacking = false
     var gridColor: Color
     var coordinateColor: Color
     var black: StonePalette
@@ -1125,6 +1138,18 @@ struct Stone: View {
                             .contrast(faceGain)
                             .colorMultiply(images.tint)
                             .frame(width: imageSize / images.footprint, height: imageSize / images.footprint)
+                            .background {
+                                if appearance.hasIvoryPaperBacking, color == .white {
+                                    Image(uiImage: image)
+                                        .renderingMode(.template)
+                                        .resizable()
+                                        .foregroundStyle(IvoryPaperBacking.color)
+                                        .colorMultiply(images.tint)
+                                        .offset(IvoryPaperBacking.offset(forCellSize: size))
+                                        .allowsHitTesting(false)
+                                        .accessibilityHidden(true)
+                                }
+                            }
                             .frame(width: imageSize, height: imageSize)
                             // Reflected contours must not cast a blurred ring.
                             .shadow(color: .black.opacity(appearance.imageStoneShading.keepsAccentOutOfShadow ? 0.35 : 0), radius: shadowRadius,
