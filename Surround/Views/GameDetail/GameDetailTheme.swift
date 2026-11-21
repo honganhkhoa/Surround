@@ -5027,14 +5027,21 @@ private struct FeltMeadowSceneContent: View, Equatable {
     }
 
     var body: some View {
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        let portraitPhone = isPhone && size.height > size.width
+        let landscapePhone = isPhone && size.width > size.height
         ZStack {
             chrome
-            Image("FeltMeadowScene")
+            Image(decorative: portraitPhone ? "FeltMeadowScenePortrait" : "FeltMeadowScene")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
+                // On a wide phone, place the daisies at the trailing edge, beyond the clocks.
+                .scaleEffect(x: landscapePhone ? -1 : 1, y: 1)
+                .flipsForRightToLeftLayoutDirection(landscapePhone)
                 .saturation(scheme == .dark ? 0.55 : 1)
                 .colorMultiply(scheme == .dark ? Color(themeHex: 0x61765F) : .white)
-                .frame(width: size.width, height: size.height, alignment: .bottomLeading)
+                .frame(width: size.width, height: size.height,
+                       alignment: portraitPhone || landscapePhone ? .center : .bottomLeading)
                 .clipped()
             if usesLegacyChrome {
                 VStack(spacing: 0) {
@@ -5142,6 +5149,17 @@ private struct SurroundStudioSceneContent: View, Equatable {
 /// plane and raised UI controls + main detailed ceramic board.
 /// Visible tips can move toward their offscreen stems to keep the playing field open.
 struct SakuraStreamCanopyLayout: Equatable {
+    fileprivate struct LongBough: Identifiable, Equatable {
+        let art: SakuraStreamCanopyAssets.Bough
+        let frame: CGRect
+        let groundShadow: CGRect
+        let raisedShadow: CGRect
+        let reveal: CGFloat
+
+        var id: SakuraStreamCanopyAssets.Bough { art }
+    }
+
+    fileprivate let longBoughs: [LongBough]
     let size: CGSize
     let canopy: CGRect
     let leftCanopy: CGRect
@@ -5170,6 +5188,7 @@ struct SakuraStreamCanopyLayout: Equatable {
         let shortSide = min(width, height)
         let longSide = max(width, height)
         guard shortSide > 0 else {
+            longBoughs = []
             canopy = .zero
             leftCanopy = .zero
             bottomLeftCanopy = .zero
@@ -5197,7 +5216,7 @@ struct SakuraStreamCanopyLayout: Equatable {
         let viewport = CGRect(origin: .zero, size: self.size)
         // Move the whole bough along its offscreen stem until its outermost
         // visible petals clear the grid. The near tips can graze the rim.
-        func place(_ corner: SakuraStreamCanopyAssets.Corner, scale: CGFloat,
+        func place(_ corner: SakuraStreamCanopyAssets.Bough, scale: CGFloat,
                    outsideX: CGFloat, outsideY: CGFloat) -> CGRect {
             let span = side * scale
             let x = corner.isLeft ? -outsideX * span : width - (1 - outsideX) * span
@@ -5249,8 +5268,8 @@ struct SakuraStreamCanopyLayout: Equatable {
         let sunDY = side * (0.71 - 0.25 * wide)
         func cast(_ frame: CGRect, elevation: CGFloat, ground: Bool) -> CGRect {
             let distance = elevation * (ground ? 1 : 0.84)
-            let spread = frame.width * (ground ? 0.14 : 0.11)
-            return frame.insetBy(dx: -spread, dy: -spread)
+            let spread: CGFloat = ground ? 0.14 : 0.11
+            return frame.insetBy(dx: -frame.width * spread, dy: -frame.height * spread)
                 .offsetBy(dx: sunDX * distance, dy: sunDY * distance)
         }
         leftGroundShadowCanopy = cast(leftCanopy, elevation: 1.18, ground: true)
@@ -5261,8 +5280,37 @@ struct SakuraStreamCanopyLayout: Equatable {
         rightShadowCanopy = cast(canopy, elevation: 1, ground: false)
         bottomLeftShadowCanopy = cast(bottomLeftCanopy, elevation: 1, ground: false)
         bottomRightShadowCanopy = cast(bottomRightCanopy, elevation: 1.30, ground: false)
+        longBoughs = Self.placeLongBoughs(in: self.size, board: main, cast: cast)
         leftShadowFeather = 0.22
         shadowEdgeFeather = 0.22
+    }
+
+    private static func placeLongBoughs(in size: CGSize, board: BoardSceneShadowRegion?,
+                                        cast: (CGRect, CGFloat, Bool) -> CGRect) -> [LongBough] {
+        let reveal = min(1, (min(size.width, size.height) - 480) / 350)
+        guard reveal > 0 else { return [] }
+
+        // Two whole limbs grow in from opposite sides. Their bark and flowering
+        // forks share one image, so resizing never changes the angle at a joint.
+        let span = min(size.width * 0.96, sqrt(size.width * size.height) * 0.78)
+        return [SakuraStreamCanopyAssets.Bough.arching, .trailing].compactMap { art in
+            guard let image = SakuraStreamCanopyAssets.image(for: art), image.size.width > 0 else { return nil }
+            let upper = art == .arching
+            let width = span * (upper ? 1 : 0.94)
+            let height = width * image.size.height / image.size.width
+            let overhang = width * (1 - 0.95 * reveal)
+            let x = upper ? -overhang : size.width - width + overhang
+            let upperBand = min(size.height * 0.10, size.width * 0.12)
+            var y = upper ? upperBand - height * 0.42 : size.height * 0.98 - height * 0.82
+            if let face = board?.faceBounds, x < face.maxX, x + width > face.minX {
+                // Reserve the band containing the continuous woody stem. Outer
+                // petals can tuck behind the slab, which is drawn above the limb.
+                y = upper ? min(y, face.minY - height * 0.76) : max(y, face.maxY - height * 0.30)
+            }
+            let frame = CGRect(x: x, y: y, width: width, height: height)
+            return LongBough(art: art, frame: frame, groundShadow: cast(frame, 0.65, true),
+                             raisedShadow: cast(frame, 0.65, false), reveal: reveal)
+        }
     }
 }
 
@@ -5334,8 +5382,8 @@ struct SakuraStreamBoardCanopyMask: View, Equatable {
 }
 
 private final class SakuraStreamCanopyAssets {
-    enum Corner: Hashable, CaseIterable {
-        case topLeft, topRight, bottomLeft, bottomRight
+    enum Bough: Hashable {
+        case topLeft, topRight, bottomLeft, bottomRight, arching, trailing
 
         var isLeft: Bool { self == .topLeft || self == .bottomLeft }
         var isTop: Bool { self == .topLeft || self == .topRight }
@@ -5352,7 +5400,7 @@ private final class SakuraStreamCanopyAssets {
     /// Only the outwardmost ink in each direction can be the first petal to
     /// meet the board. Measure that outline once, in coordinates pointing
     /// inward from each sprite's tree trunk.
-    static let reach: [Corner: [CGPoint]] = Dictionary(uniqueKeysWithValues: Corner.allCases.map { corner in
+    static let reach: [Bough: [CGPoint]] = Dictionary(uniqueKeysWithValues: [Bough.topLeft, .topRight, .bottomLeft, .bottomRight].map { corner in
         let side = 192
         var tips: [CGPoint] = []
         guard let source = image(for: corner)?.cgImage,
@@ -5381,12 +5429,17 @@ private final class SakuraStreamCanopyAssets {
         return (corner, tips)
     })
 
-    static func image(for corner: Corner) -> UIImage? {
-        switch corner {
+    static let archingBough = UIImage(named: "SakuraStreamArchingBough", in: bundle, compatibleWith: nil)
+    static let trailingBough = UIImage(named: "SakuraStreamTrailingBough", in: bundle, compatibleWith: nil)
+
+    static func image(for bough: Bough) -> UIImage? {
+        switch bough {
         case .topLeft: leftCanopy
         case .topRight: canopy
         case .bottomLeft: bottomLeftCanopy
         case .bottomRight: bottomRightCanopy
+        case .arching: archingBough
+        case .trailing: trailingBough
         }
     }
 }
@@ -5398,19 +5451,19 @@ private struct SakuraStreamCanopyImage: View, Equatable {
     let frame: CGRect
     let scheme: ColorScheme
     var silhouette = false
-    var corner: SakuraStreamCanopyAssets.Corner = .topRight
+    var bough: SakuraStreamCanopyAssets.Bough = .topRight
     var leadingFeather: CGFloat = 0
     var topFeather: CGFloat = 0
     var isEnabled = true
 
     var body: some View {
-        if let canopy = SakuraStreamCanopyAssets.image(for: corner) {
+        if let canopy = SakuraStreamCanopyAssets.image(for: bough) {
             Image(uiImage: canopy)
                 .renderingMode(silhouette ? .template : .original)
                 .resizable()
                 .foregroundStyle(Color(themeHex: scheme == .dark ? 0x0B0710 : 0x2A1822))
                 .saturation(silhouette ? 1 : (scheme == .dark ? 0.65 : 1))
-                .colorMultiply(silhouette || scheme != .dark ? .white : Color(themeHex: corner.isNear ? 0x948397 : 0x827488))
+                .colorMultiply(silhouette || scheme != .dark ? .white : Color(themeHex: bough.isNear ? 0x948397 : 0x827488))
                 .mask {
                     LinearGradient(
                         stops: [
@@ -5418,8 +5471,8 @@ private struct SakuraStreamCanopyImage: View, Equatable {
                             .init(color: .white, location: max(0.001, min(0.999, leadingFeather))),
                             .init(color: .white, location: 1)
                         ],
-                        startPoint: .leading,
-                        endPoint: .trailing
+                        startPoint: bough == .trailing ? .trailing : .leading,
+                        endPoint: bough == .trailing ? .leading : .trailing
                     )
                 }
                 .mask {
@@ -5429,17 +5482,35 @@ private struct SakuraStreamCanopyImage: View, Equatable {
                             .init(color: .white, location: max(0.001, min(0.999, topFeather))),
                             .init(color: .white, location: 1)
                         ],
-                        startPoint: .top,
-                        endPoint: .bottom
+                        startPoint: bough.isTop ? .top : .bottom,
+                        endPoint: bough.isTop ? .bottom : .top
                     )
                 }
                 // Keep each image mounted while its visibility changes.
                 .opacity(isEnabled && !frame.isEmpty ? 1 : 0)
                 .frame(width: frame.width, height: frame.height)
                 // The upper-left bough gets its height from scale and its displaced shadow.
-                .blur(radius: !silhouette && corner == .bottomRight ? min(1.2, frame.width * 0.0025) : 0)
+                .blur(radius: !silhouette && bough == .bottomRight ? min(1.2, frame.width * 0.0025) : 0)
+                // Let the entire trailing limb follow the shallow margin below the board.
+                .rotationEffect(.degrees(bough == .trailing ? 5 : 0))
                 .position(x: frame.midX, y: frame.midY)
                 .frame(width: viewportSize.width, height: viewportSize.height)
+        }
+    }
+}
+
+private struct SakuraStreamLongBoughs: View {
+    let layout: SakuraStreamCanopyLayout
+    let scheme: ColorScheme
+    let frame: KeyPath<SakuraStreamCanopyLayout.LongBough, CGRect>
+    var silhouette = false
+
+    var body: some View {
+        ForEach(layout.longBoughs) { bough in
+            SakuraStreamCanopyImage(viewportSize: layout.size, frame: bough[keyPath: frame],
+                                    scheme: scheme, silhouette: silhouette, bough: bough.art,
+                                    leadingFeather: layout.shadowEdgeFeather)
+                .opacity(silhouette ? bough.reveal : 1)
         }
     }
 }
@@ -5454,17 +5525,18 @@ struct SakuraStreamCanopyBehind: View, Equatable {
         ZStack {
             // The crown and its softened cast occupy distinct planes.
             ZStack {
+                SakuraStreamLongBoughs(layout: layout, scheme: scheme, frame: \.groundShadow, silhouette: true)
                 SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.rightGroundShadowCanopy,
-                                        scheme: scheme, silhouette: true, corner: .topRight,
+                                        scheme: scheme, silhouette: true, bough: .topRight,
                                         topFeather: layout.shadowEdgeFeather)
                 SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.leftGroundShadowCanopy,
-                                        scheme: scheme, silhouette: true, corner: .topLeft,
+                                        scheme: scheme, silhouette: true, bough: .topLeft,
                                         leadingFeather: layout.shadowEdgeFeather,
                                         topFeather: layout.shadowEdgeFeather)
                 SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomRightGroundShadowCanopy,
-                                        scheme: scheme, silhouette: true, corner: .bottomRight)
+                                        scheme: scheme, silhouette: true, bough: .bottomRight)
                 SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomLeftGroundShadowCanopy,
-                                        scheme: scheme, silhouette: true, corner: .bottomLeft,
+                                        scheme: scheme, silhouette: true, bough: .bottomLeft,
                                         leadingFeather: layout.shadowEdgeFeather)
             }
             .compositingGroup()
@@ -5472,14 +5544,15 @@ struct SakuraStreamCanopyBehind: View, Equatable {
             .opacity(scheme == .dark ? 0.19 : 0.25)
 
             ZStack {
+                SakuraStreamLongBoughs(layout: layout, scheme: scheme, frame: \.frame)
                 SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.canopy,
-                                        scheme: scheme, corner: .topRight)
+                                        scheme: scheme, bough: .topRight)
                 SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomLeftCanopy,
-                                        scheme: scheme, corner: .bottomLeft)
+                                        scheme: scheme, bough: .bottomLeft)
                 SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.leftCanopy,
-                                        scheme: scheme, corner: .topLeft)
+                                        scheme: scheme, bough: .topLeft)
                 SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomRightCanopy,
-                                        scheme: scheme, corner: .bottomRight)
+                                        scheme: scheme, bough: .bottomRight)
             }
             .compositingGroup()
         }
@@ -5517,18 +5590,19 @@ struct SakuraStreamCanopyShadowProjection: View {
     var body: some View {
         let layout = SakuraStreamCanopyLayout(size: size, boards: boards)
         ZStack {
+            SakuraStreamLongBoughs(layout: layout, scheme: scheme, frame: \.raisedShadow, silhouette: true)
             SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.rightShadowCanopy,
-                                    scheme: scheme, silhouette: true, corner: .topRight,
+                                    scheme: scheme, silhouette: true, bough: .topRight,
                                     topFeather: layout.shadowEdgeFeather, isEnabled: isEnabled)
             SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.leftShadowCanopy,
-                                    scheme: scheme, silhouette: true, corner: .topLeft,
+                                    scheme: scheme, silhouette: true, bough: .topLeft,
                                     leadingFeather: layout.leftShadowFeather,
                                     topFeather: layout.shadowEdgeFeather, isEnabled: isEnabled)
             SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomLeftShadowCanopy,
-                                    scheme: scheme, silhouette: true, corner: .bottomLeft,
+                                    scheme: scheme, silhouette: true, bough: .bottomLeft,
                                     leadingFeather: layout.shadowEdgeFeather, isEnabled: isEnabled)
             SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomRightShadowCanopy,
-                                    scheme: scheme, silhouette: true, corner: .bottomRight, isEnabled: isEnabled)
+                                    scheme: scheme, silhouette: true, bough: .bottomRight, isEnabled: isEnabled)
         }
         .compositingGroup()
         .blur(radius: layout.blurRadius)
@@ -5551,9 +5625,9 @@ struct SakuraStreamCanopyRim: View {
         let layout = SakuraStreamCanopyLayout(size: size, boards: boards)
         ZStack {
             SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.leftCanopy,
-                                    scheme: scheme, corner: .topLeft)
+                                    scheme: scheme, bough: .topLeft)
             SakuraStreamCanopyImage(viewportSize: layout.size, frame: layout.bottomRightCanopy,
-                                    scheme: scheme, corner: .bottomRight)
+                                    scheme: scheme, bough: .bottomRight)
         }
         .mask {
             Canvas { context, viewportSize in

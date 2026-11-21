@@ -2750,6 +2750,110 @@ final class SurroundThemeTests: XCTestCase {
         ))
     }
 
+    /// The transparent canopy layer separates cherry petals from the pink flowers on the bank.
+    private func isOpaqueSakuraPetal(_ pixels: [UInt8], at offset: Int) -> Bool {
+        let red = Int(pixels[offset]), green = Int(pixels[offset + 1]), blue = Int(pixels[offset + 2])
+        return pixels[offset + 3] >= 250 && red > 205 && red - green > 30 && blue - green > 14
+    }
+
+    @MainActor
+    func testSakuraStreamHorizontalBoughsConnectBlossomsToTheirStems() throws {
+        for (name, growsFromLeft) in [("SakuraStreamArchingBough", true), ("SakuraStreamTrailingBough", false)] {
+            let image = try XCTUnwrap(UIImage(named: name, in: Bundle(for: Self.self), compatibleWith: nil), name)
+            let width = 320, height = Int((CGFloat(width) * image.size.height / image.size.width).rounded())
+            let pixels = try nativeMaterialPixelsUsingDirectContext(
+                Image(uiImage: image).resizable().frame(width: CGFloat(width), height: CGFloat(height)), scale: 1
+            ).pixels
+            let rootColumn = growsFromLeft ? 0 : width - 1
+            let rootRows = (0..<height).filter { pixels[($0 * width + rootColumn) * 4 + 3] > 128 }
+            XCTAssertGreaterThanOrEqual(rootRows.count, max(3, height / 24), "\(name) needs a visible stem at its root edge")
+            let rootRow = try XCTUnwrap(rootRows.dropFirst(rootRows.count / 2).first, name)
+            let root = rootRow * width + rootColumn
+            var connected = [Bool](repeating: false, count: width * height)
+            connected[root] = true
+            var frontier = [root]
+            while let next = frontier.popLast() {
+                let x = next % width, y = next / width
+                for row in max(0, y - 1)...min(height - 1, y + 1) {
+                    for column in max(0, x - 1)...min(width - 1, x + 1) {
+                        let neighbor = row * width + column
+                        if !connected[neighbor], pixels[neighbor * 4 + 3] >= 64 {
+                            connected[neighbor] = true
+                            frontier.append(neighbor)
+                        }
+                    }
+                }
+            }
+            let ink = connected.indices.filter { pixels[$0 * 4 + 3] >= 64 }
+            let petals = ink.filter { isOpaqueSakuraPetal(pixels, at: $0 * 4) }
+            XCTAssertGreaterThan(ink.filter { connected[$0] }.count, ink.count * 85 / 100, "\(name) has detached branches")
+            XCTAssertGreaterThan(petals.count, width * height / 100, "\(name) needs visible pink petals")
+            XCTAssertGreaterThan(petals.filter { connected[$0] }.count, petals.count * 90 / 100,
+                                 "\(name) has blossoms disconnected from its stem")
+            XCTAssertTrue(ink.contains { index in
+                let distance = abs(index % width - rootColumn)
+                return connected[index] && distance > width * 9 / 10
+            }, "\(name) needs a continuous stem reaching the far tip")
+            let columns = (width / 4)..<(width * 3 / 4), rows = (height / 4)..<(height * 3 / 4)
+            var gaps = 0
+            for y in rows {
+                for x in columns where pixels[(y * width + x) * 4 + 3] < 10 { gaps += 1 }
+            }
+            XCTAssertGreaterThan(gaps, rows.count * columns.count / 6, "\(name) needs open space among its blossoms")
+        }
+    }
+
+    @MainActor
+    func testSakuraStreamBlossomCoverageAcrossViewportSizes() throws {
+        func petalCoverage(in size: CGSize, expectsHorizontalBoughs: Bool = false) throws -> Double {
+            let canopy = try nativeMaterialPixelsUsingDirectContext(
+                SakuraStreamCanopyBehind(size: size, scheme: .light).environment(\.colorScheme, .light),
+                scale: 1
+            )
+            var petalPixels = 0
+            for offset in stride(from: 0, to: canopy.pixels.count, by: 4)
+                where isOpaqueSakuraPetal(canopy.pixels, at: offset) {
+                petalPixels += 1
+            }
+            if expectsHorizontalBoughs {
+                // Both horizontal boughs bring flowers into the open band between the corners.
+                let columns = (canopy.width / 3)..<(canopy.width * 2 / 3)
+                let top = 0..<(canopy.height / 6), bottom = (canopy.height * 5 / 6)..<canopy.height
+                for rows in [top, bottom] {
+                    var edgePetals = 0
+                    for y in rows {
+                        for x in columns where isOpaqueSakuraPetal(canopy.pixels, at: (y * canopy.width + x) * 4) {
+                            edgePetals += 1
+                        }
+                    }
+                    XCTAssertGreaterThan(edgePetals, columns.count * rows.count / 100,
+                                         "Expected blossoms between the corners at \(size), rows \(rows)")
+                }
+            }
+            return Double(petalPixels) / Double(canopy.width * canopy.height)
+        }
+
+        var measurements: [String] = []
+        for landscape in [false, true] {
+            func viewport(_ short: CGFloat, _ long: CGFloat) -> CGSize {
+                landscape ? CGSize(width: long, height: short) : CGSize(width: short, height: long)
+            }
+            let phone = try petalCoverage(in: viewport(402, 874))
+            XCTAssertTrue((0.045...0.10).contains(phone), "Expected the established phone blossom coverage, got \(phone)")
+            for size in [viewport(834, 1210), viewport(1032, 1376)] {
+                let tablet = try petalCoverage(in: size, expectsHorizontalBoughs: true)
+                measurements.append(String(format: "%.0f × %.0f: %.2f%% (phone %.2f%%)",
+                                           size.width, size.height, tablet * 100, phone * 100))
+                XCTAssertTrue((phone * 0.80...phone * 1.30).contains(tablet),
+                              "Blossom coverage at \(size) was \(tablet), compared with \(phone) on the phone")
+            }
+        }
+        let report = XCTAttachment(string: measurements.joined(separator: "\n"))
+        report.name = "Sakura Stream petal coverage"
+        report.lifetime = .keepAlways
+        add(report)
+    }
+
     func testSakuraStreamCanopyPlacementAndBoardSelectionStayBounded() {
         let fixtures: [(CGSize, CGRect)] = [
             (CGSize(width: 402, height: 874), CGRect(x: 0, y: 284, width: 402, height: 402)),
@@ -3231,13 +3335,13 @@ final class SurroundThemeTests: XCTestCase {
                 for y in rows {
                     for x in columns {
                         let i = (y * canopy.width + x) * 4
-                        let r = Int(canopy.pixels[i]), g = Int(canopy.pixels[i + 1]), b = Int(canopy.pixels[i + 2])
-                        guard canopy.pixels[i + 3] >= 250, r > 205, r - g > 30, b - g > 14 else { continue }
+                        guard isOpaqueSakuraPetal(canopy.pixels, at: i) else { continue }
                         corePetals += 1
                         // Older systems add a scrim at the screen edges. Compare
                         // independent renders only where the petals are unobscured.
                         guard y >= 92, y < canopy.height - 76 else { continue }
                         interiorPetals += 1
+                        let r = Int(canopy.pixels[i]), g = Int(canopy.pixels[i + 1]), b = Int(canopy.pixels[i + 2])
                         if abs(r - Int(day[i])) <= 10 && abs(g - Int(day[i + 1])) <= 10 && abs(b - Int(day[i + 2])) <= 10 {
                             matchingPetals += 1
                         }
@@ -5648,7 +5752,10 @@ final class SurroundThemeTests: XCTestCase {
         func image(named name: String) throws -> UIImage {
             try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
         }
-        _ = try image(named: "FeltMeadowScene")
+        let landscape = try image(named: "FeltMeadowScene")
+        let portrait = try image(named: "FeltMeadowScenePortrait")
+        XCTAssertGreaterThan(landscape.size.width, landscape.size.height)
+        XCTAssertGreaterThan(portrait.size.height, portrait.size.width)
         _ = try image(named: "FeltMeadowBoard")
         // The processor holds the longest opaque extent at 0.94; natural
         // tufts can leave the center-line body slightly narrower. Preserve
