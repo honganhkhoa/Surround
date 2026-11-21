@@ -920,6 +920,83 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     @MainActor
+    func testFrostPineRunningHighlightPreservesTheWeatheredClockAndSnow() throws {
+        let padding: CGFloat = 8
+        let scale: CGFloat = 3
+        for size in [CGSize(width: 190, height: 96), CGSize(width: 88, height: 34)] {
+            let frame = CGRect(origin: CGPoint(x: padding, y: padding), size: size)
+            let textFace = RoundedRectangle(cornerRadius: 7, style: .circular)
+                .path(in: frame.insetBy(dx: 5, dy: 5))
+            for scheme: ColorScheme in [.light, .dark] {
+                var blackEdgeInks: [Set<Data>] = []
+                for color: StoneColor in [.black, .white] {
+                    func render(_ highlight: FrostPineClockHighlight?) throws -> [UInt8] {
+                        try nativeMaterialPixelsUsingDirectContext(FrostPineWoodPlateMaterial(
+                            color: color, cornerRadius: 12, role: .clock, compact: size.height == 34,
+                            scheme: scheme, reduceTransparency: false, contrast: .standard,
+                            highlight: highlight)
+                            .frame(width: size.width, height: size.height)
+                            .padding(padding)
+                            .environment(\.colorScheme, scheme), scale: scale).pixels
+                    }
+
+                    let idle = try render(nil)
+                    let normal = try render(.running)
+                    let warning = try render(.warning)
+                    let width = Int((size.width + 2 * padding) * scale)
+                    let detail = "\(color), \(scheme), \(size)"
+                    XCTAssertTrue(normal != warning, "Time warning changes the edge color: \(detail)")
+                    for (state, active) in [normal, warning].enumerated() {
+                        // Count perceptible changes, tolerating rasterization at the frayed edge.
+                        let changed = stride(from: 0, to: idle.count, by: 4).filter { i in
+                            (0..<4).contains { abs(Int(active[i + $0]) - Int(idle[i + $0])) > 12 }
+                        }
+                        let points = changed.map { i in
+                            CGPoint(x: (CGFloat(i / 4 % width) + 0.5) / scale,
+                                    y: (CGFloat(i / 4 / width) + 0.5) / scale)
+                        }
+                        XCTAssertFalse(changed.contains { idle[$0 + 3] < 16 },
+                                       "Lighting the wood must preserve its chipped silhouette: \(detail)")
+                        XCTAssertTrue(points.allSatisfy { frame.contains($0) && $0.y > frame.minY + 1 },
+                                      "Snow above the plate and across its top edge stays clear: \(detail)")
+                        XCTAssertFalse(points.contains { textFace.contains($0) },
+                                       "The running and warning lights leave the clock face clear: \(detail)")
+                        let onSides = points.filter { abs($0.y - frame.midY) < frame.height / 4 }
+                        for count in [onSides.filter { $0.x < frame.midX }.count,
+                                      onSides.filter { $0.x > frame.midX }.count] {
+                            XCTAssertGreaterThan(count, Int(size.height * scale / 2),
+                                                 "Both exposed sides carry the highlight: \(detail)")
+                        }
+                        XCTAssertGreaterThan(points.filter { $0.y > frame.maxY - 5 }.count,
+                                             Int(size.width * scale),
+                                             "The lower cut carries the highlight: \(detail)")
+
+                        // Below the snow, find the repeated edge pigments on a straight side.
+                        // The two cuts of wood have different grain and different chips.
+                        let side = changed.filter { i in
+                            let y = CGFloat(i / 4 / width) / scale
+                            return i / 4 % width < width / 2 && y > frame.midY && y < frame.maxY - 10
+                        }
+                        let pigments = Dictionary(grouping: side) { i in Data(active[i..<i + 3]) }
+                        let repeated = Set(pigments.filter { $0.value.count >= 6 }.keys)
+                        if color == .black {
+                            blackEdgeInks.append(repeated)
+                        } else {
+                            XCTAssertGreaterThanOrEqual(blackEdgeInks[state].intersection(repeated).count, 2,
+                                                        "Both woods use the same light and shade: \(detail)")
+                        }
+                        if size.height > 34 {
+                            let rows = Dictionary(grouping: side) { $0 / 4 / width }
+                            let starts = rows.values.compactMap { $0.first.map { $0 / 4 % width } }
+                            XCTAssertGreaterThan(Set(starts).count, 1, "The light follows the rough cut: \(detail)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
     func testFrostPineWoodPlatesKeepTextReadableAcrossSizesAndAccessibility() throws {
         _ = try XCTUnwrap(UIImage(named: "FrostPineControlWood", in: Bundle(for: Self.self), compatibleWith: nil),
                           "The material audit must include the bundled pine grain")
@@ -1403,18 +1480,92 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testLiquidGlassClockTintedShoulderFadesBeforeTheCenter() throws {
+        let themes: [SurroundTheme] = [.surroundStudio, .rakedGarden, .nebulaPearl, .sakuraStream]
+        XCTAssertEqual(Set(SurroundTheme.allCases.filter(\.usesTintedClockShoulder)), Set(themes))
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let scale: CGFloat = 2
+        let padding: CGFloat = 4
+        for theme in themes {
+            for scheme: ColorScheme in [.light, .dark] {
+                let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+                for color: StoneColor in [.black, .white] {
+                    for size in [CGSize(width: 88, height: 34), CGSize(width: 190, height: 96),
+                                 CGSize(width: 320, height: 28)] {
+                        func render(warning: Bool?) throws -> (pixels: [UInt8], width: Int, height: Int) {
+                            try nativeMaterialPixelsUsingDirectContext(shape.fill(theme.clockSolidSurface(color))
+                                .overlay {
+                                    if let warning {
+                                        TintedClockShoulder(theme: theme, color: color, isWarning: warning, shape: shape)
+                                    }
+                                }
+                                .frame(width: size.width, height: size.height)
+                                .padding(padding)
+                                .environment(\.colorScheme, scheme), scale: scale)
+                        }
+                        let idle = try render(warning: nil)
+                        let running = try render(warning: false).pixels
+                        let warning = try render(warning: true).pixels
+                        let midrow = idle.height / 2
+                        func offset(_ x: CGFloat) -> Int {
+                            (midrow * idle.width + Int((padding + x) * scale)) * 4
+                        }
+                        func delta(_ a: [UInt8], _ b: [UInt8], at offset: Int) -> Int {
+                            max(abs(Int(a[offset]) - Int(b[offset])),
+                                abs(Int(a[offset + 1]) - Int(b[offset + 1])),
+                                abs(Int(a[offset + 2]) - Int(b[offset + 2])))
+                        }
+                        let detail = "\(theme) \(scheme) \(color) \(size)"
+                        XCTAssertGreaterThan(delta(running, warning, at: offset(2)), 12,
+                                             "Low time has its own shoulder color: \(detail)")
+                        for (isWarning, active) in [(false, running), (true, warning)] {
+                            let peak = delta(active, idle.pixels, at: offset(2))
+                            XCTAssertGreaterThan(peak, 32, "Visible tint at the leading edge: \(detail)")
+                            let profile = (3..<Int(size.width / 3)).map {
+                                delta(active, idle.pixels, at: offset(CGFloat($0)))
+                            }
+                            XCTAssertGreaterThan(profile.filter { $0 > 8 && $0 < peak - 5 }.count, 2,
+                                                 "Several points of fading tint extend into the face: \(detail)")
+                            let protectedX = Int((padding + size.width / 3) * scale)
+                            let intrusion = stride(from: 0, to: active.count, by: 4).contains { i in
+                                if idle.pixels[i + 3] == 0 { return active[i + 3] > 1 }
+                                return i / 4 % idle.width >= protectedX && delta(active, idle.pixels, at: i) > 1
+                            }
+                            XCTAssertFalse(intrusion, "Keep the tint inside the glass and clear of the center: \(detail)")
+
+                            // Inline clock content can begin eight points from the leading edge.
+                            let i = offset(8)
+                            let face = Color(.sRGB, red: Double(active[i]) / 255, green: Double(active[i + 1]) / 255,
+                                             blue: Double(active[i + 2]) / 255)
+                            XCTAssertGreaterThanOrEqual(contrast(theme.clockForeground(color, scheme: scheme), face,
+                                                                 style: style), 4.5,
+                                                        "Clock text stays legible over the tint: \(detail)")
+                            if isWarning {
+                                let countdown = theme.clockSuddenDeathAccent(color, scheme: scheme)
+                                XCTAssertGreaterThanOrEqual(contrast(countdown, face, style: style), 4.5,
+                                                            "Warning countdown stays legible over the tint: \(detail)")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Exercise the exact outline used by the production clock card, rather
     /// than only checking an unused palette token. Header and score cards use
     /// this same view. The UI audit separately exercises the system's read-only
     /// Increase Contrast environment through the supported simulator setting.
     @MainActor
     func testMatteThemeRunningClockOutlineRemainsVisibleAtEverySize() throws {
-        for theme: SurroundTheme in [.flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain, .paperBlossoms] {
+        for theme: SurroundTheme in [.flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain] {
             for scheme: ColorScheme in [.light, .dark] {
                 for color: StoneColor in [.black, .white] {
                     for size in [CGSize(width: 88, height: 32), CGSize(width: 132, height: 48),
                                  CGSize(width: 178, height: 88)] {
                         for scale: CGFloat in [2, 3] {
+                          var normalRunningInk: Color?
                           for warning in [false, true] {
                             var widths: [Int] = []
                             for running in [false, true] {
@@ -1435,9 +1586,25 @@ final class SurroundThemeTests: XCTestCase {
                                 let interior = pixel(image.height / 2)
                                 let detail = "\(theme) \(scheme) \(color) \(size) scale=\(scale) warning=\(warning)"
                                 if running {
-                                    XCTAssertGreaterThanOrEqual(contrast(pixel(Int(scale)), interior), 3, detail)
+                                    let ringInk = pixel(Int(3 * scale))
+                                    XCTAssertGreaterThanOrEqual(contrast(ringInk, interior), 3, detail)
+                                    // Even when ring and page match, two points of the clock
+                                    // face must separate them before the solid ink begins.
+                                    XCTAssertTrue((0..<Int(2 * scale)).allSatisfy { pixel($0) == interior },
+                                                  "Face surrounds the running ring: \(detail)")
+                                    XCTAssertTrue((Int(2 * scale)..<Int(5 * scale)).allSatisfy { pixel($0) == ringInk },
+                                                  "Three continuous points of ink: \(detail)")
+                                    XCTAssertEqual(pixel(Int(6 * scale)), interior, detail)
+                                    if warning {
+                                        XCTAssertNotEqual(ringInk, try XCTUnwrap(normalRunningInk),
+                                                          "Low time uses distinct ink on either stone: \(detail)")
+                                    } else {
+                                        normalRunningInk = ringInk
+                                    }
+                                } else {
+                                    XCTAssertEqual(pixel(Int(2 * scale)), interior, "Idle has no inset ring: \(detail)")
                                 }
-                                widths.append((0..<Int(6 * scale)).filter {
+                                widths.append((0..<Int(7 * scale)).filter {
                                     abs(luminance(pixel($0)) - luminance(interior)) > 0.05
                                 }.count)
                             }
@@ -1682,41 +1849,55 @@ final class SurroundThemeTests: XCTestCase {
     @MainActor
     func testWhittledWoodlandRunningInlayFollowsTheCarvedClockFace() throws {
         let theme = SurroundTheme.whittledWoodland
-        let sizes: [(CGSize, CGFloat, Bool)] = [
-            (CGSize(width: 180, height: 86), 2, false), (CGSize(width: 88, height: 30), 3, false),
-            (CGSize(width: 88, height: 30), 3, true)
+        let sizes: [(size: CGSize, scale: CGFloat, radius: CGFloat, shallow: Bool)] = [
+            (CGSize(width: 180, height: 86), 2, 12, false), // Full clock
+            (CGSize(width: 116, height: 68), 3, 12, false), // Three compact rows
+            (CGSize(width: 96, height: 136), 2, 12, false), // Narrow column
+            (CGSize(width: 88, height: 34), 3, 12, false),  // Inline header
+            (CGSize(width: 140, height: 28), 3, 8, true)    // Home chip
         ]
-        for (size, scale, shallow) in sizes {
-            let contour = try nativeMaterialPixelsUsingDirectContext(
-                WhittledWoodlandControlShape(cornerRadius: 12, isIdentity: shallow, faceOnly: true)
-                    .strokeBorder(.white, lineWidth: 3)
-                    .frame(width: size.width, height: size.height), scale: scale)
+        for (size, scale, radius, shallow) in sizes {
+            let silhouette = WhittledWoodlandControlShape(cornerRadius: radius, isIdentity: shallow)
+            let face = WhittledWoodlandControlShape(cornerRadius: radius, isIdentity: shallow, faceOnly: true)
+            func mask(_ shape: WhittledWoodlandControlShape) throws -> [UInt8] {
+                try nativeMaterialPixelsUsingDirectContext(shape.fill(.white)
+                    .frame(width: size.width, height: size.height), scale: scale).pixels
+            }
+            let outsideEdge = try mask(silhouette)
+            // Allow a half-point for antialiasing along the cut face.
+            let textFace = try mask(face.inset(by: 0.5))
             for scheme: ColorScheme in [.light, .dark] {
                 for side: StoneColor in [.black, .white] {
-                    var normalRing: [UInt8] = []
-                    for (running, warning) in [(false, false), (true, false), (true, true)] {
-                        let ring = try nativeMaterialPixelsUsingDirectContext(
-                            GameDetailMatteClockOutline(color: side, isRunning: running, isWarning: warning,
-                                                       cornerRadius: 12, shallowWoodCut: shallow)
+                    func render(_ ink: Color?) throws -> (pixels: [UInt8], width: Int, height: Int) {
+                        try nativeMaterialPixelsUsingDirectContext(
+                            WhittledWoodlandControlSurface(color: side, cornerRadius: radius,
+                                                          isIdentity: shallow, runningInk: ink)
                                 .frame(width: size.width, height: size.height)
-                                .environment(\.surroundTheme, theme)
                                 .environment(\.colorScheme, scheme), scale: scale)
-                        let solid = stride(from: 3, to: ring.pixels.count, by: 4).filter { ring.pixels[$0] > 245 }
-                        let detail = "\(size) \(side) \(scheme)"
-                        if running {
-                            XCTAssertGreaterThan(solid.count, Int((size.width + size.height) * scale),
-                                                 "The running clock must show a continuous visible inlay: \(detail)")
-                            if warning {
-                                XCTAssertNotEqual(ring.pixels, normalRing, "Sudden death uses warning ink: \(detail)")
-                            } else {
-                                normalRing = ring.pixels
-                            }
-                            let outside = solid.filter { contour.pixels[$0] < 16 }.count
-                            XCTAssertLessThanOrEqual(outside, solid.count / 100,
-                                                     "The inlay must follow the faceted inner lip: \(detail)")
-                        } else {
-                            XCTAssertTrue(solid.isEmpty, "The idle clock leaves its wood bevel unpainted: \(detail)")
+                    }
+                    let idle = try render(nil)
+                    let normal = try render(theme.clockAccent(side))
+                    let warning = try render(theme.clockSuddenDeathAccent(side, scheme: scheme))
+                    let detail = "\(size) \(side) \(scheme)"
+                    XCTAssertTrue(normal.pixels != warning.pixels, "Sudden death changes the ink: \(detail)")
+                    for active in [normal, warning] {
+                        let changed = stride(from: 0, to: idle.pixels.count, by: 4).filter { offset in
+                            (0..<4).contains { abs(Int(active.pixels[offset + $0]) - Int(idle.pixels[offset + $0])) > 12 }
                         }
+                        XCTAssertGreaterThan(changed.count, Int((size.width + size.height) * scale),
+                                             "The running clock has a visible inlay: \(detail)")
+                        XCTAssertFalse(changed.contains { textFace[$0 + 3] == 255 },
+                                       "Ink must leave the face clear for text: \(detail)")
+                        XCTAssertFalse(changed.contains { outsideEdge[$0 + 3] == 0 },
+                                       "Ink must stay inside the carved silhouette: \(detail)")
+                        let middleX = idle.width / 2, middleY = idle.height / 2
+                        let vertical = changed.map { $0 / 4 }.filter { $0 % idle.width == middleX }
+                        let horizontal = changed.map { $0 / 4 }.filter { $0 / idle.width == middleY }
+                        XCTAssertTrue(vertical.contains { $0 / idle.width < middleY }
+                                      && vertical.contains { $0 / idle.width > middleY }
+                                      && horizontal.contains { $0 % idle.width < middleX }
+                                      && horizontal.contains { $0 % idle.width > middleX },
+                                      "The inlay is visible at every side: \(detail)")
                     }
                 }
             }
@@ -2014,7 +2195,89 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     @MainActor
-    func testPaperBlossomsTurnedCornerKeepsTextAndTurnRingReadable() throws {
+    func testPaperBlossomsClockPrintCoversTheFaceAndKeepsTimeReadable() throws {
+        let theme = SurroundTheme.paperBlossoms
+        func difference(_ a: [UInt8], _ b: [UInt8], at i: Int) -> Int {
+            max(abs(Int(a[i]) - Int(b[i])), abs(Int(a[i + 1]) - Int(b[i + 1])),
+                abs(Int(a[i + 2]) - Int(b[i + 2])))
+        }
+
+        for scheme: ColorScheme in [.light, .dark] {
+            let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+            for color: StoneColor in [.black, .white] {
+                func check<Face: InsettableShape, Paper: ShapeStyle>(_ face: Face, fill: Paper, size: CGSize,
+                                                                    placement: PaperBlossomsClockPrint<Face>.Placement) throws {
+                    func render(warning: Bool?) throws -> [UInt8] {
+                        try nativeMaterialPixelsUsingDirectContext(face.fill(fill).overlay {
+                            if let warning {
+                                PaperBlossomsClockPrint(shape: face, color: color, isWarning: warning,
+                                                       placement: placement)
+                            }
+                        }.frame(width: size.width, height: size.height).padding(2)
+                         .environment(\.colorScheme, scheme), scale: 2).pixels
+                    }
+                    let idle = try render(warning: nil)
+                    let running = try render(warning: false)
+                    let warning = try render(warning: true)
+                    let detail = "\(color), \(scheme), \(size), \(placement)"
+                    for isWarning in [false, true] {
+                        let active = isWarning ? warning : running
+                        var facePixels = 0, printedPixels = 0, escapedPixels = 0
+                        var largestDifference = 0, inkSample = 0
+                        for i in stride(from: 0, to: idle.count, by: 4) {
+                            if idle[i + 3] == 0 && active[i + 3] > 3 { escapedPixels += 1 }
+                            guard idle[i + 3] == 255 else { continue }
+                            facePixels += 1
+                            let change = difference(active, idle, at: i)
+                            if change > 24 { printedPixels += 1 }
+                            if change > largestDifference {
+                                largestDifference = change
+                                inkSample = i
+                            }
+                        }
+                        XCTAssertEqual(escapedPixels, 0, "Keep the fold and the exterior clear: \(detail)")
+                        let coverage = Double(printedPixels) / Double(facePixels)
+                        XCTAssertGreaterThan(coverage, 0.12, "The print must survive the smallest layout: \(detail)")
+                        XCTAssertLessThan(coverage, 0.65, "Leave the original paper visible between petals: \(detail)")
+                        XCTAssertGreaterThan(difference(running, warning, at: inkSample), 12,
+                                             "Low time uses a distinct print: \(detail)")
+                        let ink = Color(.sRGB, red: Double(active[inkSample]) / 255,
+                                        green: Double(active[inkSample + 1]) / 255,
+                                        blue: Double(active[inkSample + 2]) / 255)
+                        let timer = isWarning ? theme.clockSuddenDeathAccent(color, scheme: scheme)
+                                              : theme.clockForeground(color, scheme: scheme)
+                        XCTAssertGreaterThanOrEqual(contrast(timer, ink, style: style), 4.5,
+                                                    "The countdown stays readable over a petal: \(detail)")
+                        if case .strip(carriesSecondaryText: true) = placement {
+                            XCTAssertGreaterThanOrEqual(contrast(theme.identitySecondary(color), ink, style: style), 4.5,
+                                                        "Secondary text stays readable over a petal: \(detail)")
+                        }
+                    }
+                }
+
+                let paper = theme.clockSolidSurface(color)
+                for (size, strip) in [(CGSize(width: 190, height: 96), false),
+                                      (CGSize(width: 150, height: 60), false),
+                                      (CGSize(width: 88, height: 34), true)] {
+                    let face = PaperBlossomsControlShape(cornerRadius: 12, compact: strip, faceOnly: true)
+                    try check(face, fill: paper, size: size, placement: strip ? .strip(carriesSecondaryText: true)
+                                                                              : .card(countdownTrailing: color == .white))
+                }
+                let unfolded = PaperBlossomsControlShape(cornerRadius: 12, compact: true, faceOnly: true, folded: false)
+                try check(unfolded, fill: paper, size: CGSize(width: 88, height: 34),
+                          placement: .strip(carriesSecondaryText: true))
+                let home = RoundedRectangle(cornerRadius: 8, style: .continuous)
+                let gradient = LinearGradient(colors: theme.identityChipColors(color), startPoint: .top, endPoint: .bottom)
+                for carriesSecondaryText in [false, true] {
+                    try check(home, fill: gradient, size: CGSize(width: 140, height: 28),
+                              placement: .strip(carriesSecondaryText: carriesSecondaryText))
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testPaperBlossomsTurnedCornerKeepsTheTextFaceClear() throws {
         let theme = SurroundTheme.paperBlossoms
         let scale: CGFloat = 2
         let asset = try XCTUnwrap(UIImage(named: "PaperBlossomsTurnedCorner",
@@ -2063,11 +2326,6 @@ final class SurroundThemeTests: XCTestCase {
                         cornerRadius: radius, compact: compact, faceOnly: true)
                         .strokeBorder(.white, lineWidth: 4)
                         .frame(width: size.width, height: size.height), scale: scale)
-                    let ring = try nativeMaterialPixels(GameDetailMatteClockOutline(
-                        color: color, isRunning: true, cornerRadius: radius, paperCompact: compact)
-                        .frame(width: size.width, height: size.height)
-                        .environment(\.surroundTheme, theme)
-                        .environment(\.colorScheme, scheme), scale: scale)
                     // Accessibility flags are read-only SwiftUI environment
                     // values; fallback selection is reviewed in production.
                     let rendered = try nativeMaterialPixels(PaperBlossomsControlSurface(
@@ -2080,10 +2338,7 @@ final class SurroundThemeTests: XCTestCase {
                     var minimum = Double.infinity, maximum = 0.0
                     var opaqueFailures = 0, textSamples = 0, flatFaceDelta = 0
                     var tipSamples = 0, tipAlpha = 0, redPixels = 0, misplacedRed = 0
-                    var perimeterSamples = 0, redUnderPerimeter = 0, cornerRingSamples = 0
-                    var ringOverTransparency = 0, ringOutsideFacePerimeter = 0
-                    var nonOpaqueRingPixels: [String] = []
-                    var minimumRingContrast = Double.infinity
+                    var perimeterSamples = 0, redUnderPerimeter = 0
                     for y in 0..<rendered.height {
                         for x in 0..<rendered.width {
                             let offset = (y * rendered.width + x) * 4
@@ -2126,27 +2381,6 @@ final class SurroundThemeTests: XCTestCase {
                                 perimeterSamples += 1
                                 if isVermilion { redUnderPerimeter += 1 }
                             }
-                            if ring.pixels[offset + 3] == 255 {
-                                let perimeterCoverage = protectedPerimeter.pixels[offset + 3]
-                                if perimeterCoverage == 0 { ringOutsideFacePerimeter += 1 }
-                                // At the three ordinary rounded corners, the
-                                // native 3pt stroke can be opaque while the
-                                // 4pt mask is 254 and clipped paper is 250. Those
-                                // are antialiased edge samples, not paper holes.
-                                if alpha == 0 || (perimeterCoverage == 255 && alpha != 255) {
-                                    ringOverTransparency += 1
-                                    if nonOpaqueRingPixels.count < 12 {
-                                        nonOpaqueRingPixels.append("(\(x),\(y)):alpha=\(alpha),interior=\(interior.pixels[offset + 3]),perimeter=\(protectedPerimeter.pixels[offset + 3])")
-                                    }
-                                }
-                                let ink = pixelLuminance(ring.pixels, offset)
-                                let backing = pixelLuminance(rendered.pixels, offset)
-                                let ratio = (max(ink, backing) + 0.05) / (min(ink, backing) + 0.05)
-                                minimumRingContrast = min(minimumRingContrast, ratio)
-                                if point.x > size.width - fold - 4 && point.y > size.height - fold - 4 {
-                                    cornerRingSamples += 1
-                                }
-                            }
                         }
                     }
                     XCTAssertEqual(opaqueFailures, 0, "Paper face and reverse must be opaque: \(detail)")
@@ -2157,14 +2391,7 @@ final class SurroundThemeTests: XCTestCase {
                     XCTAssertGreaterThan(textSamples, 500, detail)
                     XCTAssertLessThanOrEqual(flatFaceDelta, 1, "No broad facet shading may return: \(detail)")
                     XCTAssertGreaterThan(perimeterSamples, 100, detail)
-                    XCTAssertEqual(redUnderPerimeter, 0, "The ring must stay on ink/ivory, including the crease: \(detail)")
-                    XCTAssertGreaterThan(cornerRingSamples, 4, "The native ring follows the turned corner: \(detail)")
-                    XCTAssertEqual(ringOutsideFacePerimeter, 0,
-                                   "The native ring must follow the paper's crease perimeter: \(detail)")
-                    XCTAssertEqual(ringOverTransparency, 0,
-                                   "The turn ring stays inside the paper: \(detail); \(nonOpaqueRingPixels)")
-                    XCTAssertGreaterThanOrEqual(minimumRingContrast, 3,
-                                               "The actual ring must contrast beside the red reverse: \(detail)")
+                    XCTAssertEqual(redUnderPerimeter, 0, "The folded reverse stays behind the crease: \(detail)")
                     for ink in inks {
                         let value = luminance(ink, style: style)
                         for surface in [minimum, maximum] {
@@ -4498,6 +4725,73 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     @MainActor
+    func testFeltClockRunningStitchLeavesGapsAndProtectsTheClothEdge() throws {
+        let scale: CGFloat = 2
+        let padding: CGFloat = 3
+        func delta(_ a: [UInt8], _ b: [UInt8], _ i: Int) -> Int {
+            max(abs(Int(a[i]) - Int(b[i])), abs(Int(a[i + 1]) - Int(b[i + 1])),
+                abs(Int(a[i + 2]) - Int(b[i + 2])), abs(Int(a[i + 3]) - Int(b[i + 3])))
+        }
+        for scheme: ColorScheme in [.light, .dark] {
+            for color: StoneColor in [.black, .white] {
+                for size in [CGSize(width: 140, height: 28), CGSize(width: 88, height: 34),
+                             CGSize(width: 190, height: 96)] {
+                    let shape = RoundedRectangle(cornerRadius: size.height == 28 ? 8 : 12)
+                    let rect = CGRect(origin: CGPoint(x: padding, y: padding), size: size)
+                    let outer = shape.inset(by: 0.5).path(in: rect)
+                    let content = shape.inset(by: 5).path(in: rect)
+                    for textured in [false, true] {
+                        func render(_ warning: Bool?) throws -> (pixels: [UInt8], width: Int, height: Int) {
+                            try nativeMaterialPixelsUsingDirectContext(
+                                FeltControlMaterial(color: color, shape: shape, colorScheme: scheme, showsTexture: textured,
+                                                    runningClock: warning != nil, isWarning: warning == true)
+                                    .frame(width: size.width, height: size.height)
+                                    .padding(padding)
+                                    .environment(\.colorScheme, scheme), scale: scale)
+                        }
+                        let idle = try render(nil)
+                        let running = try render(false).pixels
+                        let warning = try render(true).pixels
+                        let description = "\(scheme) \(color) \(size), textured=\(textured)"
+                        XCTAssertTrue(stride(from: 0, to: running.count, by: 4).contains {
+                            delta(running, warning, $0) > 32
+                        }, "Sudden death changes the thread color: \(description)")
+                        for active in [running, warning] {
+                            let touchesProtectedArea = stride(from: 0, to: active.count, by: 4).contains { offset in
+                                guard delta(active, idle.pixels, offset) > 3 else { return false }
+                                let x = offset / 4 % idle.width, y = offset / 4 / idle.width
+                                let point = CGPoint(x: (CGFloat(x) + 0.5) / scale, y: (CGFloat(y) + 0.5) / scale)
+                                return !outer.contains(point) || content.contains(point)
+                            }
+                            XCTAssertFalse(touchesProtectedArea, "Protect the loose fibers and the clock content: \(description)")
+
+                            // Project each straight section across the seam's thickness. A solid ring
+                            // cannot pass the gap check, and a top-only treatment misses three sides.
+                            for vertical in [false, true] {
+                                let length = Int((vertical ? size.height : size.width) * scale)
+                                let inset = Int(padding * scale), skipCorner = Int(9 * scale)
+                                for farSide in [false, true] {
+                                    let peaks = (skipCorner..<(length - skipCorner)).map { along in
+                                        (0..<Int(5 * scale)).map { depth in
+                                            let cross = farSide ? (vertical ? idle.width : idle.height) - 1 - inset - depth
+                                                                : inset + depth
+                                            let x = vertical ? cross : inset + along
+                                            let y = vertical ? inset + along : cross
+                                            return delta(active, idle.pixels, (y * idle.width + x) * 4)
+                                        }.max() ?? 0
+                                    }
+                                    XCTAssertTrue(peaks.contains { $0 > 50 }, "Visible thread on every edge: \(description)")
+                                    XCTAssertTrue(peaks.contains { $0 < 5 }, "Cloth shows between stitches: \(description)")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
     func testFeltControlMaterialKeepsTextReadableAcrossSizesAndAppearances() throws {
         let theme = SurroundTheme.feltMeadow
         let linear = (0...255).map { byte -> Double in
@@ -4740,6 +5034,63 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     @MainActor
+    func testNightGardenClockHighlightsStandOutAlongTheGlassEdges() throws {
+        let scale: CGFloat = 3
+        for (size, compact) in [(CGSize(width: 140, height: 28), true),
+                                (CGSize(width: 190, height: 96), false)] {
+            let bounds = CGRect(origin: .zero, size: size)
+            let face = NightGardenPaneOutline(compact: compact).inset(by: 4).path(in: bounds)
+            let width = Int(size.width * scale)
+            for scheme: ColorScheme in [.light, .dark] {
+                for color: StoneColor in [.white, .black] {
+                    for detailed in [true, false] {
+                        func render(_ highlight: NightGardenClockHighlight?) throws -> [UInt8] {
+                            try nativeMaterialPixelsUsingDirectContext(
+                                NightGardenPaneMaterial(color: color, role: .clock, colorScheme: scheme,
+                                    showsDetail: detailed, compact: compact, highlight: highlight)
+                                    .frame(width: size.width, height: size.height)
+                                    .environment(\.colorScheme, scheme), scale: scale).pixels
+                        }
+                        let idle = try render(nil)
+                        let running = try render(.running)
+                        let warning = try render(.warning)
+                        let detail = "\(color), \(scheme), \(size), detailed=\(detailed)"
+                        XCTAssertTrue(running != warning, "The warning changes the turn cue: \(detail)")
+                        for active in [running, warning] {
+                            let changed = stride(from: 0, to: idle.count, by: 4).filter { i in
+                                (0..<4).contains { abs(Int(active[i + $0]) - Int(idle[i + $0])) > 8 }
+                            }
+                            XCTAssertTrue(changed.allSatisfy { i in
+                                let point = CGPoint(x: (CGFloat(i / 4 % width) + 0.5) / scale,
+                                                    y: (CGFloat(i / 4 / width) + 0.5) / scale)
+                                let outsideCentralFacets = !detailed || abs(point.x - bounds.midX) > size.width / 4
+                                return idle[i + 3] > 0 && !face.contains(point) && outsideCentralFacets
+                            }, "The cue stays on the chamfer and leaves the text and facets inside it clear: \(detail)")
+
+                            // Read the actual glass just inside each side and compare it with the
+                            // strongest part of the lit edge. The satin shoulder varies with size.
+                            for fromRight in [false, true] {
+                                func sample(_ pixels: [UInt8], inset: Int) -> Color {
+                                    let x = fromRight ? width - 1 - inset : inset
+                                    let i = (Int(size.height * scale / 2) * width + x) * 4
+                                    return Color(.sRGB, red: Double(pixels[i]) / 255,
+                                                 green: Double(pixels[i + 1]) / 255, blue: Double(pixels[i + 2]) / 255)
+                                }
+                                let glass = sample(idle, inset: Int(6 * scale))
+                                let edge = (0..<Int(4 * scale)).compactMap { inset -> Double? in
+                                    let ink = sample(active, inset: inset)
+                                    return ink == sample(idle, inset: inset) ? nil : contrast(ink, glass)
+                                }
+                                XCTAssertGreaterThanOrEqual(edge.max() ?? 0, 3, "Visible turn on either pane: \(detail)")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
     func testNightGardenPaneTexturesCacheTheSameArtworkAtBothMaterialScales() throws {
         var fields = [Data]()
         for color: StoneColor in [.black, .white] {
@@ -4794,6 +5145,57 @@ final class SurroundThemeTests: XCTestCase {
                 XCTAssertTrue(shape.path(in: rect).isEmpty, "Invalid/transitional layout slots draw no path")
             }
             XCTAssertTrue(shape.inset(by: 20).path(in: CGRect(x: 0, y: 0, width: 12, height: 12)).isEmpty)
+        }
+    }
+
+    @MainActor
+    func testChristmasKeepsakeRunningClockPinstripeFollowsThePaintedFace() throws {
+        let theme = SurroundTheme.christmasKeepsakes
+        let scale: CGFloat = 3
+        for scheme: ColorScheme in [.light, .dark] {
+            for side: StoneColor in [.black, .white] {
+                for (size, compact) in [(CGSize(width: 140, height: 28), true),
+                                        (CGSize(width: 190, height: 96), false)] {
+                    func render<Outline: View>(@ViewBuilder outline: () -> Outline) throws
+                        -> (pixels: [UInt8], width: Int, height: Int) {
+                        try nativeMaterialPixelsUsingDirectContext(
+                            ChristmasOrnamentMaterial(color: side, role: .clock, colorScheme: scheme,
+                                                      showsDetail: true, compact: compact)
+                                .overlay(content: outline)
+                                .frame(width: size.width, height: size.height)
+                                .environment(\.surroundTheme, theme)
+                                .environment(\.colorScheme, scheme), scale: scale)
+                    }
+                    let detail = "\(scheme), \(side), \(size)"
+                    let wood = try render { EmptyView() }
+                    let idle = try render { GameDetailMatteClockOutline(color: side, isRunning: false) }
+                    XCTAssertTrue(idle.pixels == wood.pixels, "Idle leaves the painted wood bare: \(detail)")
+
+                    let sample = (Int(4 * scale) * wood.width + wood.width / 2) * 4
+                    func inkAtSample(_ pixels: [UInt8]) -> Color {
+                        Color(.sRGB, red: Double(pixels[sample]) / 255, green: Double(pixels[sample + 1]) / 255,
+                              blue: Double(pixels[sample + 2]) / 255)
+                    }
+                    var runningInks: [Color] = []
+                    for warning in [false, true] {
+                        let ink = warning ? theme.clockSuddenDeathAccent(side, scheme: scheme) : theme.clockAccent(side)
+                        let expected = try render {
+                            // The exposed wood ends at 2.4 pt. Check the whole contour,
+                            // including the diagonal cuts and the painted strip outside the ink.
+                            ChristmasOrnamentOutline(role: .clock).inset(by: 3)
+                                .strokeBorder(ink, lineWidth: 2)
+                        }
+                        let actual = try render {
+                            GameDetailMatteClockOutline(color: side, isRunning: true, isWarning: warning)
+                        }
+                        XCTAssertTrue(actual.pixels == expected.pixels, "Painted pinstripe: \(detail), warning=\(warning)")
+                        let renderedInk = inkAtSample(actual.pixels)
+                        XCTAssertGreaterThanOrEqual(contrast(renderedInk, inkAtSample(wood.pixels)), 3, detail)
+                        runningInks.append(renderedInk)
+                    }
+                    XCTAssertNotEqual(runningInks[0], runningInks[1], "Low time changes the ink: \(detail)")
+                }
+            }
         }
     }
 

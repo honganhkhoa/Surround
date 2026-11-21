@@ -6,6 +6,8 @@ import UIKit
 struct FeltControlSurface: View {
     let color: StoneColor
     let shape: RoundedRectangle
+    var runningClock = false
+    var isWarning = false
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -13,7 +15,34 @@ struct FeltControlSurface: View {
     private var showsTexture: Bool { contrast != .increased && !reduceTransparency }
 
     var body: some View {
-        FeltControlMaterial(color: color, shape: shape, colorScheme: colorScheme, showsTexture: showsTexture)
+        FeltControlMaterial(color: color, shape: shape, colorScheme: colorScheme, showsTexture: showsTexture,
+                            runningClock: runningClock, isWarning: isWarning)
+    }
+}
+
+/// A running stitch just inside the cut wool, beneath the clock's lettering.
+private struct FeltClockStitch: View {
+    let ink: Color
+    let shape: RoundedRectangle
+    let raised: Bool
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    var body: some View {
+        Canvas { context, size in
+            let compact = size.height <= 44
+            let inset: CGFloat = compact && contrast != .increased ? 2.6 : 3.2
+            let width: CGFloat = contrast == .increased ? 1.8 : (compact ? 1.35 : 1.5)
+            let seam = shape.inset(by: inset).path(in: CGRect(origin: .zero, size: size))
+            let style = StrokeStyle(lineWidth: width, lineCap: .round,
+                                    dash: compact ? [3.2, 3.8] : [4, 4.4])
+            // A short contact shadow lifts each piece of thread off the wool.
+            if raised {
+                var shadow = context
+                shadow.translateBy(x: 0, y: 0.35)
+                shadow.stroke(seam, with: .color(.black.opacity(0.35)), style: style)
+            }
+            context.stroke(seam, with: .color(ink), style: style)
+        }
     }
 }
 
@@ -23,6 +52,8 @@ struct FeltControlMaterial: View {
     let shape: RoundedRectangle
     let colorScheme: ColorScheme
     let showsTexture: Bool
+    var runningClock = false
+    var isWarning = false
 
     var body: some View {
         shape.fill(SurroundTheme.feltMeadow.clockSolidSurface(color))
@@ -33,8 +64,7 @@ struct FeltControlMaterial: View {
                 }
             }
             .overlay {
-                // A broad, quiet edge gives the cloth a padded profile. The
-                // clock's turn/warning ring is drawn separately above this.
+                // A broad, quiet edge gives the cloth a padded profile.
                 shape.inset(by: 1).strokeBorder(
                     LinearGradient(colors: [.white.opacity(0.16), .clear, .black.opacity(0.18)],
                                    startPoint: .topLeading, endPoint: .bottomTrailing),
@@ -47,13 +77,20 @@ struct FeltControlMaterial: View {
                 FeltControlFringe(color: color, shape: shape)
                     .opacity(showsTexture ? 1 : 0)
             }
+            .overlay {
+                if runningClock {
+                    let theme = SurroundTheme.feltMeadow
+                    let thread = color == .black ? Color(themeHex: 0xECC068) : theme.clockAccent(.white)
+                    let ink = isWarning ? theme.clockSuddenDeathAccent(color, scheme: colorScheme) : thread
+                    FeltClockStitch(ink: ink, shape: shape, raised: showsTexture)
+                }
+            }
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
 }
 
-/// Loose strands sit beyond the trimmed body. The existing turn/warning ring
-/// remains above the cloth, and the fibers never affect layout or hit testing.
+/// Loose strands extend beyond the trimmed body without affecting layout or hit testing.
 private struct FeltControlFringe: View {
     let color: StoneColor
     let shape: RoundedRectangle

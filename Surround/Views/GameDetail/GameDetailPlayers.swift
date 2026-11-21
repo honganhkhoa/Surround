@@ -386,7 +386,7 @@ private struct GameDetailClockCard: View {
         let countdownScale = capsFullCountdown ? min(scale, 1.2) : scale
         return .system(size: size * countdownScale, weight: .semibold).monospacedDigit()
     }
-    /// A narrow title chip can drop its turn label; the outline still shows the turn.
+    /// A narrow title chip can drop its turn label; the highlight still shows the turn.
     private var displaysStatus: Bool {
         // An estimate stays readable when a title chip drops its turn label
         // or time metadata to fit the navigation bar. A lost connection shows
@@ -471,7 +471,10 @@ private struct GameDetailClockCard: View {
                 .background {
                     surface
                         .overlay {
-                            if style != .inline {
+                            if theme.usesTintedClockShoulder && state.running {
+                                TintedClockShoulder(theme: theme, color: color,
+                                                    isWarning: state.suddenDeath, shape: shape)
+                            } else if style != .inline {
                                 ChristmasKeepsakesSurfaceLighting(profile: showsThemeGlass
                                     ? (color == .white ? .ivoryGlassCard : .glassCard) : .pigmentCard)
                                     .clipShape(shape)
@@ -485,7 +488,11 @@ private struct GameDetailClockCard: View {
                                                  spareClockCorner: hasSakuraEtchCorner, mirrored: mirrored)
                     }
                 }
-                .overlay { clockOutline }
+                .overlay {
+                    if theme != .whittledWoodland && theme != .frostPine && theme != .nightGarden && theme != .paperBlossoms {
+                        clockOutline
+                    }
+                }
                 .modifier(GameDetailClearGlass(shape: shape,
                                                enabled: !theme.isFlowingInk && theme != .feltMeadow
                                                    && theme != .paperBlossoms && theme != .christmasKeepsakes && theme != .frostPine
@@ -636,22 +643,36 @@ private struct GameDetailClockCard: View {
 
     @ViewBuilder private var surface: some View {
         if theme == .whittledWoodland {
-            WhittledWoodlandControlSurface(color: color, cornerRadius: clockCornerRadius)
+            WhittledWoodlandControlSurface(color: color, cornerRadius: clockCornerRadius,
+                                           runningInk: state.running ? accent : nil)
         } else if theme == .frostPine {
             FrostPineWoodPlateSurface(color: color, cornerRadius: clockCornerRadius, role: .clock,
-                                     compact: style == .inline)
+                                     compact: style == .inline,
+                                     highlight: .init(active: state.running, warning: state.suddenDeath))
         } else if theme == .paperBlossoms {
             PaperBlossomsControlSurface(color: color, cornerRadius: clockCornerRadius,
                                         compact: compactPaperCorner)
+                .overlay {
+                    let face = PaperBlossomsControlShape(cornerRadius: clockCornerRadius, compact: compactPaperCorner,
+                                                         faceOnly: true, folded: !reduceTransparency && contrast != .increased)
+                    if state.running {
+                        PaperBlossomsClockPrint(shape: face, color: color, isWarning: state.suddenDeath,
+                                                placement: style == .inline ? .strip(carriesSecondaryText: true)
+                                                                            : .card(countdownTrailing: mirrored))
+                    }
+                    face.strokeBorder(foreground.opacity(contrast == .increased ? 0.5 : 0.22),
+                                      lineWidth: contrast == .increased ? 2 : 1)
+                }
         } else if theme.isFlowingInk {
             shape.fill(theme.clockSolidSurface(color))
         } else if theme == .feltMeadow {
-            FeltControlSurface(color: color, shape: shape)
+            FeltControlSurface(color: color, shape: shape, runningClock: state.running, isWarning: state.suddenDeath)
         } else if theme == .christmasKeepsakes {
             ChristmasOrnamentSurface(color: color, role: .clock,
                                      compact: style == .inline || columnCard || narrowFullCard || narrowCompactCard)
         } else if theme == .nightGarden {
-            NightGardenPaneSurface(color: color, role: .clock, compact: compactNightGardenPane)
+            NightGardenPaneSurface(color: color, role: .clock, compact: compactNightGardenPane,
+                                   highlight: .init(active: state.running, warning: state.suddenDeath))
         } else if showsThemeGlass {
             Color.clear
         } else if theme == .sakuraStream && (reduceTransparency || contrast == .increased) {
@@ -671,45 +692,23 @@ private struct GameDetailClockCard: View {
         }
     }
 
-    // Matte themes use an opaque, contrasting ring. Other themes keep their
-    // halo and outline in the glass's foreground content so the native
-    // compositor cannot cover them.
     private var clockOutline: some View {
         ZStack {
-            if theme.isFlowingInk || theme == .paperBlossoms || theme == .whittledWoodland {
+            if theme.isFlowingInk || theme == .christmasKeepsakes {
                 GameDetailMatteClockOutline(color: color, isRunning: state.running,
-                                           isWarning: state.suddenDeath,
-                                           cornerRadius: clockCornerRadius, paperCompact: compactPaperCorner)
-            } else if theme == .nightGarden {
-                let outline = NightGardenPaneOutline(compact: compactNightGardenPane)
-                if state.running && contrast != .increased {
-                    outline.strokeBorder(turnGlow.opacity(colorScheme == .dark ? 0.6 : 0.55), lineWidth: 6)
-                        .blur(radius: style == .inline ? 6 : (colorScheme == .dark ? 9 : 8))
-                        .clipShape(outline)
-                }
-                if state.running || contrast == .increased {
-                    outline.strokeBorder(
-                        state.running
-                            ? turnOutline.opacity(contrast == .increased ? 1 : (colorScheme == .dark ? 0.85 : 0.7))
-                            : foreground.opacity(0.5),
-                        lineWidth: contrast == .increased ? 2 : 1
-                    )
-                }
+                                           isWarning: state.suddenDeath, cornerRadius: clockCornerRadius)
             } else {
-                if state.running && contrast != .increased {
+                let highlightsOutline = state.running && theme != .feltMeadow && !theme.usesTintedClockShoulder
+                if highlightsOutline && contrast != .increased {
                     shape.strokeBorder(turnGlow.opacity(colorScheme == .dark ? 0.6 : 0.55), lineWidth: 6)
                         .blur(radius: style == .inline ? 6 : (colorScheme == .dark ? 9 : 8))
                 }
-                // Ice and wood supply their own idle boundary; only turn and
-                // accessibility outlines need another stroke on these surfaces.
-                if (theme != .christmasKeepsakes && theme != .frostPine) || state.running || contrast == .increased {
-                    shape.strokeBorder(
-                        state.running
-                            ? turnOutline.opacity(contrast == .increased ? 1 : (colorScheme == .dark ? 0.85 : 0.7))
-                            : (contrast == .increased ? foreground.opacity(0.5) : theme.panelBorder),
-                        lineWidth: contrast == .increased ? 2 : 1
-                    )
-                }
+                shape.strokeBorder(
+                    highlightsOutline
+                        ? turnOutline.opacity(contrast == .increased ? 1 : (colorScheme == .dark ? 0.85 : 0.7))
+                        : (contrast == .increased ? foreground.opacity(0.5) : theme.panelBorder),
+                    lineWidth: contrast == .increased ? 2 : 1
+                )
             }
         }
         .allowsHitTesting(false)
@@ -737,10 +736,10 @@ private struct GameDetailClockCard: View {
             // A full card can contain a header and two metadata lines. Eight
             // points per edge made SwiftUI shrink the 30pt countdown to fit its
             // 96pt surface; four preserves the type size and centered content.
-            // The compact wood block stands above a lower bevel. Center
-            // the three live rows on its face so the footer clears the inlay.
-            .padding(.top, compactWoodClock ? 1 : 4)
-            .padding(.bottom, compactWoodClock ? 6 : 4)
+            // The compact wood block has a deeper lower bevel. Leave a
+            // little more room there while keeping the turn badge off the top edge.
+            .padding(.top, compactWoodClock ? 3 : 4)
+            .padding(.bottom, 4)
         }
     }
 

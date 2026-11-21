@@ -171,8 +171,8 @@ struct HomeGameFacts {
 
 // MARK: - Clock chip
 
-/// A clock folded into a chip in its side's stone colors. The running clock
-/// wears the theme's turn ring; the user's own under 12 hours turns red.
+/// A clock folded into a chip in its side's stone colors. A highlight shows
+/// whose time is running, with a warning when the user's time is low.
 struct HomeClockChip<Leading: View>: View {
     enum Size {
         case row, tile
@@ -202,6 +202,7 @@ struct HomeClockChip<Leading: View>: View {
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: size.radius, style: .continuous) }
 
     var body: some View {
+        let timeDetail = facts.chipDetail(color)
         HStack(spacing: 4) {
             leading()
             Spacer(minLength: 4)
@@ -211,8 +212,8 @@ struct HomeClockChip<Leading: View>: View {
                 .foregroundStyle(warning ? warningColor : theme.identityForeground(color))
                 .lineLimit(1)
                 .layoutPriority(1)
-            if let detail = facts.chipDetail(color) {
-                Text(verbatim: detail)
+            if let timeDetail {
+                Text(verbatim: timeDetail)
                     .font(.caption.weight(.semibold).monospacedDigit())
                     .foregroundStyle(warning ? warningColor : theme.identitySecondary(color))
                     .lineLimit(1)
@@ -224,19 +225,36 @@ struct HomeClockChip<Leading: View>: View {
         .frame(minHeight: size.minHeight)
         .background {
             if theme == .whittledWoodland {
-                WhittledWoodlandControlSurface(color: color, cornerRadius: size.radius, isIdentity: true)
+                let ink = warning ? warningColor : theme.clockAccent(color)
+                WhittledWoodlandControlSurface(color: color, cornerRadius: size.radius, isIdentity: true,
+                                               runningInk: state.running || lowOnTime ? ink : nil)
             } else if theme == .feltMeadow {
-                FeltControlSurface(color: color, shape: shape)
+                FeltControlSurface(color: color, shape: shape, runningClock: state.running || lowOnTime,
+                                   isWarning: warning)
             } else if theme == .christmasKeepsakes {
                 ChristmasOrnamentSurface(color: color, role: .clock, compact: true)
             } else if theme == .nightGarden {
-                NightGardenPaneSurface(color: color, role: .clock, compact: true)
+                NightGardenPaneSurface(color: color, role: .clock, compact: true,
+                                       highlight: .init(active: state.running || lowOnTime, warning: warning))
             } else {
                 shape.fill(LinearGradient(colors: theme.identityChipColors(color),
                                           startPoint: .top, endPoint: .bottom))
+                    .overlay {
+                        if theme == .paperBlossoms {
+                            if state.running || lowOnTime {
+                                PaperBlossomsClockPrint(shape: shape, color: color, isWarning: warning,
+                                    placement: .strip(carriesSecondaryText: size == .tile || timeDetail != nil))
+                            }
+                            shape.strokeBorder(theme.identityChipBorder(color), lineWidth: 1)
+                        } else if theme.usesTintedClockShoulder && (state.running || lowOnTime) {
+                            TintedClockShoulder(theme: theme, color: color, isWarning: warning, shape: shape)
+                        }
+                    }
             }
         }
-        .overlay { ring }
+        .overlay {
+            if theme != .whittledWoodland && theme != .nightGarden && theme != .paperBlossoms { ring }
+        }
     }
 
     @ViewBuilder
@@ -253,7 +271,7 @@ struct HomeClockChip<Leading: View>: View {
                 .font(.system(size: iconSize))
                 .foregroundStyle(theme.identitySecondary(color))
         } else if state.running {
-            // The hourglass, like the ring, means the time is running.
+            // The hourglass means the time is running.
             Image(systemName: "hourglass")
                 .font(.system(size: iconSize, weight: .semibold))
                 .foregroundStyle(warning ? warningColor : theme.homeChipAccent(color))
@@ -263,32 +281,24 @@ struct HomeClockChip<Leading: View>: View {
     /// Strokes, not blurred shadows: a list of rows must scroll smoothly.
     @ViewBuilder
     private var ring: some View {
-        if theme == .whittledWoodland {
+        if theme.isFlowingInk || theme == .christmasKeepsakes {
             GameDetailMatteClockOutline(color: color, isRunning: state.running || lowOnTime,
-                                        isWarning: warning, cornerRadius: size.radius, shallowWoodCut: true)
-        } else if theme == .nightGarden {
-            if state.running || lowOnTime || contrast == .increased {
-                let outline = NightGardenPaneOutline(compact: true)
-                let ringColor = warning ? warningColor
-                    : (state.running ? theme.turnOutline(scheme: colorScheme) : theme.identityForeground(color).opacity(0.5))
-                outline.strokeBorder(ringColor, lineWidth: contrast == .increased ? 2 : 1)
-                    .background {
-                        if (state.running || lowOnTime) && contrast != .increased {
-                            outline.strokeBorder((warning ? warningColor : theme.turnGlow)
-                                .opacity(colorScheme == .dark ? 0.5 : 0.4), lineWidth: 4)
-                        }
+                                        isWarning: warning, cornerRadius: size.radius)
+        } else if theme == .frostPine {
+            shape.strokeBorder(theme.identityChipBorder(color), lineWidth: 1)
+                .overlay {
+                    if let highlight = FrostPineClockHighlight(active: state.running || lowOnTime, warning: warning) {
+                        highlight.edge(on: shape, contrast: contrast)
                     }
-            }
-        } else if state.running || lowOnTime {
-            let usesSideInk = theme == .paperBlossoms
-            let ringColor = warning ? warningColor
-                : (usesSideInk ? theme.clockAccent(color) : theme.turnOutline(scheme: colorScheme))
+                }
+        } else if (state.running || lowOnTime) && theme != .feltMeadow && !theme.usesTintedClockShoulder {
+            let ringColor = warning ? warningColor : theme.turnOutline(scheme: colorScheme)
             let glowColor = warning ? warningColor : theme.turnGlow
-            shape.strokeBorder(ringColor, lineWidth: usesSideInk ? 3 : 1)
+            shape.strokeBorder(ringColor, lineWidth: 1)
                 .background {
                     shape.inset(by: -2.5).stroke(glowColor.opacity(colorScheme == .dark ? 0.5 : 0.4), lineWidth: 3)
                 }
-        } else if theme != .christmasKeepsakes {
+        } else {
             shape.strokeBorder(theme.identityChipBorder(color), lineWidth: 1)
         }
     }

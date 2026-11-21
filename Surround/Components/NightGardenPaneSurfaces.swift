@@ -12,17 +12,36 @@ enum NightGardenPaneRole: Hashable, CaseIterable {
     }
 }
 
+enum NightGardenClockHighlight {
+    case running, warning
+
+    init?(active: Bool, warning: Bool) {
+        guard active else { return nil }
+        self = warning ? .warning : .running
+    }
+}
+
 struct NightGardenPaneSurface: View {
     let color: StoneColor
     let role: NightGardenPaneRole
     var compact: Bool = false
+    var highlight: NightGardenClockHighlight? = nil
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         NightGardenPaneMaterial(color: color, role: role, colorScheme: colorScheme,
-            showsDetail: contrast != .increased && !reduceTransparency, compact: compact)
+            showsDetail: contrast != .increased && !reduceTransparency, compact: compact, highlight: highlight)
+            .overlay {
+                if role == .clock, highlight == nil, contrast == .increased {
+                    NightGardenPaneOutline(compact: compact)
+                        .strokeBorder(SurroundTheme.nightGarden.clockForeground(color, scheme: colorScheme)
+                            .opacity(0.5), lineWidth: 2)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
     }
 }
 
@@ -35,6 +54,7 @@ struct NightGardenPaneMaterial: View {
     let colorScheme: ColorScheme
     let showsDetail: Bool
     var compact: Bool = false
+    var highlight: NightGardenClockHighlight? = nil
 
     static let depthOutset: CGFloat = 0
 
@@ -65,8 +85,40 @@ struct NightGardenPaneMaterial: View {
                         .clipShape(outline)
                 }
             }
+            .overlay {
+                if let highlight {
+                    let theme = SurroundTheme.nightGarden
+                    let bronze = highlight == .warning ? theme.clockSuddenDeathAccent(.white, scheme: colorScheme)
+                                                       : theme.clockAccent(.white)
+                    let glint = highlight == .warning ? theme.clockSuddenDeathAccent(.black, scheme: colorScheme)
+                                                      : theme.clockAccent(.black)
+                    let width: CGFloat = showsDetail && compact ? 3 : 3.5
+                    outline.strokeBorder(bronze, lineWidth: width)
+                        .overlay { outline.strokeBorder(glint, lineWidth: width * 0.45) }
+                        .mask {
+                            if showsDetail { cutCornerMask } else { Color.white }
+                        }
+                }
+            }
             .allowsHitTesting(false)
             .accessibilityHidden(true)
+    }
+
+    /// Keep the light on the two cut ends of the pane. Its reach matches the
+    /// fixed corner slices, even on a wide clock or a short Home chip.
+    private var cutCornerMask: some View {
+        GeometryReader { geometry in
+            let slice = NightGardenPaneTexture.capInsets(compact: compact).leading
+            let reach = min(0.5, slice / max(1, geometry.size.width))
+            LinearGradient(stops: [
+                .init(color: .white, location: 0),
+                .init(color: .white, location: reach * 0.65),
+                .init(color: .clear, location: reach),
+                .init(color: .clear, location: 1 - reach),
+                .init(color: .white, location: 1 - reach * 0.65),
+                .init(color: .white, location: 1)
+            ], startPoint: .leading, endPoint: .trailing)
+        }
     }
 
     /// Reveal the original glass at the perimeter instead of flattening its

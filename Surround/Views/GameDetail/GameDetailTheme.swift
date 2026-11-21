@@ -1385,6 +1385,8 @@ private enum FrostPineColors {
     static let whiteForeground = adaptive(0x173A50, 0x112E43)
     static let blackAccent = adaptive(0xD1E4C6, 0xD7E9CE)
     static let whiteAccent = adaptive(0x3F583A, 0x2C472F)
+    static let warningLight = Color(themeHex: 0xFFACAC)
+    static let warningShade = Color(themeHex: 0x7B2433)
     static let turnOutline = adaptive(0x526A43, 0xB5D1A1)
     static let turnGlow = adaptive(0xB3CB9E, 0xB7D2AA)
     static let blackBorder = adaptive(0xBCB7A8, 0xA5A99C)
@@ -1649,6 +1651,19 @@ extension SurroundTheme {
     /// use pine plates and Christmas uses painted ornaments; their main actions
     /// keep glass.
     var usesGlassControls: Bool { self != .standard && self != .feltMeadow && self != .paperBlossoms && self != .whittledWoodland && !isFlowingInk }
+
+    /// The same hue has different strengths on the dark and pale clock faces.
+    fileprivate var clockShoulderPigments: (black: UInt32, white: UInt32)? {
+        switch self {
+        case .surroundStudio: (0xBC8B47, 0xAC773D)
+        case .rakedGarden: (0xC58C38, 0xC18A28)
+        case .nebulaPearl: (0xB183DF, 0x9B74CE)
+        case .sakuraStream: (0x69A799, 0x459C91)
+        default: nil
+        }
+    }
+
+    var usesTintedClockShoulder: Bool { clockShoulderPigments != nil }
 
     /// The natural scenes use their own foregrounds, translucent pigment
     /// on older systems, and opaque controls under Increase Contrast.
@@ -2100,23 +2115,19 @@ extension SurroundTheme {
         }
     }
 
-    /// Keep the existing warning red on every daytime/other-theme clock.
-    /// Pale night clocks need deeper red; dark clocks use brighter coral.
+    /// Warning lettering on the player's own clock surface.
     func clockSuddenDeathAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
+        if usesTintedClockShoulder {
+            return Color(themeHex: color == .white ? 0x611520 : 0xFFD5C9)
+        }
         if isFlowingInk, scheme == .dark, color == .white { return Color(themeHex: 0x7D293B) }
         if self == .whittledWoodland, color == .white { return Color(themeHex: 0x6E2130) }
         if usesWarmClockStatusColors { return Color(themeHex: color == .white ? 0x7D293B : 0xFFB5AF) }
         if self == .feltMeadow {
             return Color(themeHex: color == .white ? 0x7D2D2D : 0xFFADA1)
         }
-        if self == .rakedGarden, scheme == .dark {
-            return Color(themeHex: color == .white ? 0x6B2024 : 0xFF8277)
-        }
-        if self == .surroundStudio, scheme == .dark {
-            return Color(themeHex: color == .white ? 0x7D2D2D : 0xFF9787)
-        }
         if self == .frostPine {
-            return Color(themeHex: color == .white ? 0x7B2433 : 0xFFACAC)
+            return color == .white ? FrostPineColors.warningShade : FrostPineColors.warningLight
         }
         return color == .white ? Color(red: 0.75, green: 0.10, blue: 0.07)
             : Color(red: 1, green: 0.34, blue: 0.30)
@@ -2643,6 +2654,8 @@ private enum PaperBlossomsColors {
     static let whiteForeground = adaptive(0x54271E, 0x44231B)
     static let blackAccent = adaptive(0xF2C5A0, 0xEFC6A2)
     static let whiteAccent = adaptive(0x8D3026, 0x752B22)
+    static let stripOchre = adaptive(0xFFCA61, 0xEAB656)
+    static let stripCoral = adaptive(0xFBC8A8, 0xF4AD99)
     static let turnOutline = adaptive(0xAD392B, 0xEAB98D)
     static let turnGlow = adaptive(0xC75A3D, 0xDAA174)
     static let blackBorder = adaptive(0xCBB99B, 0xBFA78A)
@@ -2660,7 +2673,7 @@ private enum PaperBlossomsColors {
 }
 
 /// One turned corner, shared by full cards and compact headers. The face-only
-/// path follows the crease so the turn ring stays on readable ink/ivory paper.
+/// path follows the crease where the flat paper meets its vermilion reverse.
 struct PaperBlossomsControlShape: InsettableShape {
     var cornerRadius: CGFloat = 12
     var compact = false
@@ -2765,6 +2778,78 @@ struct PaperBlossomsControlSurface: View {
     }
 }
 
+/// A flat plum-blossom print on the running player's paper, behind the clock lettering.
+struct PaperBlossomsClockPrint<Face: InsettableShape>: View {
+    enum Placement {
+        case card(countdownTrailing: Bool)
+        case strip(carriesSecondaryText: Bool)
+    }
+
+    let shape: Face
+    let color: StoneColor
+    let isWarning: Bool
+    let placement: Placement
+
+    private var ink: Color {
+        // Narrow strips can carry secondary ink for an opponent's name, rank, or overtime.
+        if case .strip(carriesSecondaryText: true) = placement {
+            if isWarning {
+                return color == .black ? Color(themeHex: 0x783E34) : PaperBlossomsColors.stripCoral
+            }
+            return color == .black ? Color(themeHex: 0x7B444F) : PaperBlossomsColors.stripOchre
+        }
+        if isWarning {
+            return Color(themeHex: color == .black ? 0x783E34 : 0xEBB093)
+        }
+        return Color(themeHex: color == .black ? 0x8B525D : 0xD69A50)
+    }
+
+    var body: some View {
+        Canvas { context, size in
+            let width = size.width, height = size.height
+            let pigment = GraphicsContext.Shading.color(ink)
+            func stamp(x: CGFloat, y: CGFloat, radius: CGFloat, angle: Double) {
+                var press = context
+                press.translateBy(x: x * width, y: y * height)
+                press.scaleBy(x: radius, y: radius)
+                press.rotate(by: .degrees(angle))
+                press.fill(paperBlossomsFlower, with: pigment)
+            }
+            switch placement {
+            case .card(let countdownTrailing):
+                let radius = min(width * 0.27, height * 0.53)
+                stamp(x: countdownTrailing ? 0.24 : 0.75, y: 0.75, radius: radius, angle: -8)
+                stamp(x: countdownTrailing ? 0.035 : 0.09, y: countdownTrailing ? 0.22 : 0,
+                      radius: radius * 0.57, angle: 15)
+            case .strip:
+                // On a 28 pt Home chip, crop one large bloom between the name and the time.
+                let radius = min(width * 0.19, height * 1.24)
+                stamp(x: 0.44, y: 0.83, radius: radius, angle: 6)
+                stamp(x: 0.23, y: -0.12, radius: radius * 0.47, angle: -14)
+            }
+        }
+        .clipShape(shape)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// The five rounded lobes form one silhouette. Both impressions use the same printing block.
+private let paperBlossomsFlower = Path { path in
+    let valleyX = 0.42 * sin(CGFloat.pi / 5)
+    let valleyY = -0.42 * cos(CGFloat.pi / 5)
+    for petal in 0..<5 {
+        let rotation = CGAffineTransform(rotationAngle: CGFloat(petal) * 2 * .pi / 5)
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: x, y: y).applying(rotation)
+        }
+        if petal == 0 { path.move(to: point(-valleyX, valleyY)) }
+        path.addCurve(to: point(0, -1), control1: point(-0.55, -0.75), control2: point(-0.30, -1))
+        path.addCurve(to: point(valleyX, valleyY), control1: point(0.32, -1), control2: point(0.51, -0.72))
+    }
+    path.closeSubpath()
+}
+
 /// The vermilion action can sit over the same pigment in the garden.
 struct PaperBlossomsActionOutline: View {
     let prominent: Bool
@@ -2794,7 +2879,6 @@ struct PaperBlossomsIdentityOutline: View {
     var body: some View {
         let increased = contrast == .increased
         // The charcoal tag needs a visible cut edge against the garden.
-        // Its perimeter stays finer than the adjacent running clock's ring.
         let blackOpacity = increased ? 1.0 : (scheme == .light ? 0.96 : 0.72)
         let pigment = color == .black ? PaperBlossomsColors.blackBorder.opacity(blackOpacity)
                                      : SurroundTheme.paperBlossoms.identityChipBorder(.white)
@@ -3502,6 +3586,42 @@ struct SakuraStreamGlassEtchDrawing: View {
     }
 }
 
+enum FrostPineClockHighlight: Equatable {
+    case running, warning
+
+    init?(active: Bool, warning: Bool) {
+        guard active else { return nil }
+        self = warning ? .warning : .running
+    }
+
+    /// Both woods catch the same light. The shaded part is visible against
+    /// pale pine and the glint against charcoal. Let the snow keep the top edge.
+    fileprivate func draw(along edge: Path, in context: GraphicsContext, width: CGFloat) {
+        let bounds = edge.boundingRect
+        let start = CGPoint(x: bounds.midX, y: bounds.minY + bounds.height * 0.12)
+        let end = CGPoint(x: bounds.midX, y: bounds.minY + bounds.height * 0.42)
+        var clipped = context
+        clipped.clip(to: edge)
+        func stroke(_ pigment: Color, width: CGFloat) {
+            clipped.stroke(edge, with: .linearGradient(Gradient(colors: [pigment.opacity(0), pigment]),
+                                                       startPoint: start, endPoint: end),
+                           style: StrokeStyle(lineWidth: 2 * width, lineJoin: .round))
+        }
+        stroke(self == .warning ? FrostPineColors.warningShade : FrostPineColors.whiteAccent, width: width)
+        stroke(self == .warning ? FrostPineColors.warningLight : FrostPineColors.turnGlow, width: width / 2)
+    }
+
+    /// Home chips and opaque accessibility plates have a plain rounded edge.
+    func edge(on shape: RoundedRectangle, contrast: ColorSchemeContrast) -> some View {
+        Canvas { context, size in
+            draw(along: shape.path(in: CGRect(origin: .zero, size: size)), in: context,
+                 width: contrast == .increased ? 3 : 2)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 /// Weathered pine with frayed edges, worn fibers and accumulated upper snow. The
 /// material owns no layout or interaction; clock and identity content sit above it.
 struct FrostPineWoodPlateSurface: View {
@@ -3511,6 +3631,7 @@ struct FrostPineWoodPlateSurface: View {
     let cornerRadius: CGFloat
     let role: Role
     var compact = false
+    var highlight: FrostPineClockHighlight? = nil
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
@@ -3518,7 +3639,8 @@ struct FrostPineWoodPlateSurface: View {
     var body: some View {
         FrostPineWoodPlateMaterial(color: color, cornerRadius: cornerRadius, role: role,
                                   compact: compact, scheme: colorScheme,
-                                  reduceTransparency: reduceTransparency, contrast: contrast)
+                                  reduceTransparency: reduceTransparency, contrast: contrast,
+                                  highlight: highlight)
     }
 }
 
@@ -3531,6 +3653,7 @@ struct FrostPineWoodPlateMaterial: View {
     let scheme: ColorScheme
     let reduceTransparency: Bool
     let contrast: ColorSchemeContrast
+    var highlight: FrostPineClockHighlight? = nil
 
     var body: some View {
         Group {
@@ -3538,13 +3661,16 @@ struct FrostPineWoodPlateMaterial: View {
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(SurroundTheme.frostPine.clockSolidSurface(color))
                     .overlay {
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .strokeBorder(SurroundTheme.frostPine.identityChipBorder(color),
-                                          lineWidth: contrast == .increased ? 2 : 1)
+                        let shape = RoundedRectangle(cornerRadius: cornerRadius)
+                        shape.strokeBorder(SurroundTheme.frostPine.identityChipBorder(color),
+                                           lineWidth: contrast == .increased ? 2 : 1)
+                            .overlay {
+                                if let highlight { highlight.edge(on: shape, contrast: contrast) }
+                            }
                     }
             } else {
                 FrostPineWoodPlateDrawing(color: color, cornerRadius: cornerRadius,
-                                          role: role, compact: compact, scheme: scheme)
+                                          role: role, compact: compact, scheme: scheme, highlight: highlight)
                     .equatable()
                     .shadow(color: Color(themeHex: 0x242A27).opacity(scheme == .dark ? 0.23 : 0.17),
                             radius: compact ? 0.65 : 1.25, x: compact ? 0.2 : 0.4, y: compact ? 0.5 : 0.8)
@@ -3561,6 +3687,7 @@ private struct FrostPineWoodPlateDrawing: View, Equatable {
     let role: FrostPineWoodPlateSurface.Role
     let compact: Bool
     let scheme: ColorScheme
+    let highlight: FrostPineClockHighlight?
 
     private var darkStone: Bool { color == .black }
     private var seed: UInt32 {
@@ -3582,10 +3709,11 @@ private struct FrostPineWoodPlateDrawing: View, Equatable {
                               width: outer.width, height: outer.height - depth)
             let radius = min(cornerRadius, face.height / 2, face.width / 2)
             let facePath = woodPath(face, radius: radius)
+            let outerPath = woodPath(outer, radius: radius)
 
             // A shallow raw-pine cut warms the lower edge. The face and all
             // decoration stay inside the existing layout and text reservation.
-            context.fill(woodPath(outer, radius: radius), with: .linearGradient(
+            context.fill(outerPath, with: .linearGradient(
                 Gradient(colors: [Color(themeHex: 0xD5C3A4), Color(themeHex: 0x827761),
                                   Color(themeHex: 0xB7A17D)]),
                 startPoint: CGPoint(x: outer.minX, y: outer.minY),
@@ -3608,8 +3736,12 @@ private struct FrostPineWoodPlateDrawing: View, Equatable {
             }
 
             drawSurfaceWear(context: &faceContext, rect: face)
+            if let highlight {
+                // Follow the cut itself. The fibers and frost cover the pigment where they overlap.
+                highlight.draw(along: outerPath, in: context, width: compact ? 1.8 : 2.3)
+            }
             let rimWidth: CGFloat = compact ? 1.8 : 3
-            var rim = woodPath(outer, radius: radius)
+            var rim = outerPath
             rim.addPath(path(outer.insetBy(dx: rimWidth, dy: rimWidth),
                              radius: max(0, radius - rimWidth)))
             var rimContext = faceContext
@@ -3835,17 +3967,44 @@ private struct FrostPineWoodPlateDrawing: View, Equatable {
     }
 }
 
+/// Light entering the leading edge of the active clock, beneath its lettering and etching.
+struct TintedClockShoulder: View {
+    let theme: SurroundTheme
+    let color: StoneColor
+    let isWarning: Bool
+    let shape: RoundedRectangle
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    var body: some View {
+        if let pigments = theme.clockShoulderPigments {
+            let turnPigment = color == .black ? pigments.black : pigments.white
+            let warningPigment: UInt32 = color == .black ? 0xAD5355 : 0xD88180
+            let tint = Color(themeHex: isWarning ? warningPigment : turnPigment)
+            GeometryReader { geometry in
+                // Bound the pool on wide cards, and scale it with narrow toolbar chips.
+                let reach = min(0.30, 64 / max(1, geometry.size.width))
+                shape.fill(LinearGradient(stops: [
+                    .init(color: tint.opacity(contrast == .increased ? 1 : 0.90), location: 0),
+                    .init(color: tint.opacity(0.49), location: 0.14),
+                    .init(color: tint.opacity(0.32), location: 0.40),
+                    .init(color: tint.opacity(0.10), location: 0.71),
+                    .init(color: tint.opacity(0), location: 1)
+                ], startPoint: .leading, endPoint: .init(x: reach, y: 0.5)))
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+}
+
 /// A flat, stone-contrasting turn cue that also reads when a compact clock
 /// omits its status label or shows a score estimate. The stroke stays inside
-/// the solid clock face, so landscape colors cannot reduce its contrast.
+/// the clock face, so landscape colors cannot reduce its contrast.
 struct GameDetailMatteClockOutline: View {
     let color: StoneColor
     let isRunning: Bool
     var isWarning = false
     var cornerRadius: CGFloat = 12
-    var paperCompact = false
-    var shallowWoodCut = false
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.surroundTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
@@ -3853,22 +4012,26 @@ struct GameDetailMatteClockOutline: View {
     var body: some View {
         let increased = contrast == .increased
         let foreground = theme.clockForeground(color, scheme: colorScheme)
-        let runningInk = theme == .paperBlossoms || theme == .whittledWoodland
-            ? (isWarning ? theme.clockSuddenDeathAccent(color, scheme: colorScheme) : theme.clockAccent(color))
-            : foreground
+        let turnInk = theme.isFlowingInk ? foreground : theme.clockAccent(color)
+        let runningInk = isWarning ? theme.clockSuddenDeathAccent(color, scheme: colorScheme) : turnInk
         let ink = isRunning ? runningInk : foreground.opacity(increased ? 0.5 : 0.22)
         let width: CGFloat = isRunning ? (increased ? 4 : 3) : (increased ? 2 : 1)
-        if theme == .whittledWoodland {
-            if isRunning || increased {
-                WhittledWoodlandControlShape(cornerRadius: cornerRadius, isIdentity: shallowWoodCut, faceOnly: true)
-                    .strokeBorder(ink, lineWidth: isRunning && increased ? 3 : 1.5)
+        if theme == .christmasKeepsakes {
+            let plaque = ChristmasOrnamentOutline(role: .clock)
+            if isRunning {
+                // Paint begins 2.4 pt inside the wooden edge. Keep the stripe
+                // within the first 5 pt, including on the smallest clock chips.
+                let stripeWidth: CGFloat = increased ? 3 : 2
+                plaque.inset(by: 5 - stripeWidth).strokeBorder(ink, lineWidth: stripeWidth)
+            } else if increased {
+                plaque.strokeBorder(ink, lineWidth: 1)
             }
-        } else if theme == .paperBlossoms {
-            PaperBlossomsControlShape(cornerRadius: cornerRadius, compact: paperCompact,
-                                      faceOnly: true, folded: !increased && !reduceTransparency)
-                .strokeBorder(ink, lineWidth: width)
         } else {
-            RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(ink, lineWidth: width)
+            // Leave a rim of the clock face outside Flowing Ink's running
+            // outline so even white ink against the landscape mist stays visible.
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .inset(by: isRunning ? 2 : 0)
+                .strokeBorder(ink, lineWidth: width)
         }
     }
 }
@@ -4213,6 +4376,7 @@ struct WhittledWoodlandControlSurface: View {
     let color: StoneColor
     let cornerRadius: CGFloat
     var isIdentity = false
+    var runningInk: Color? = nil
     @Environment(\.colorScheme) private var scheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -4230,13 +4394,16 @@ struct WhittledWoodlandControlSurface: View {
                     radius: isIdentity ? 1.5 : 2.6, x: isIdentity ? 0 : -0.3, y: isIdentity ? 1.6 : 3.2)
             .overlay {
                 if simplified {
-                    shape.strokeBorder(theme.identityChipBorder(color), lineWidth: contrast == .increased ? 2 : 1)
+                    let edgeWidth: CGFloat = contrast == .increased ? 2 : 1
+                    shape.strokeBorder(runningInk ?? theme.identityChipBorder(color),
+                                       lineWidth: runningInk == nil ? edgeWidth : edgeWidth + 1)
                 } else {
                     Canvas { context, size in
                         let bounds = CGRect(origin: .zero, size: size)
                         let outer = shape.planes(in: bounds)
                         guard !outer.isEmpty else { return }
-                        context.clip(to: shape.path(in: bounds))
+                        let silhouette = shape.path(in: bounds)
+                        context.clip(to: silhouette)
                         if let image {
                             // Preserve the fibers' proportions on tall side columns and thin inline clocks.
                             let scale = max(size.width / image.size.width, size.height / image.size.height)
@@ -4255,6 +4422,14 @@ struct WhittledWoodlandControlSurface: View {
                         let face = faceShape.planes(in: bounds).map(\.start)
                         guard shoulder.count == outer.count, face.count == outer.count else { return }
                         drawCarving(in: context, outer: outer, shoulder: shoulder, face: face)
+                        if let runningInk {
+                            // The outer 2 pt carry the inlay. On shallow cuts the
+                            // bevel ends sooner, leaving the entire wooden face clear.
+                            var bevel = Path(bounds)
+                            bevel.addPath(WhittledWoodlandControlShape.polygon(face))
+                            context.clip(to: bevel, style: FillStyle(eoFill: true))
+                            context.stroke(silhouette, with: .color(runningInk), lineWidth: 4)
+                        }
                     }
                 }
             }
