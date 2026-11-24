@@ -593,8 +593,8 @@ extension ActivityModel.LiveGame {
 
 extension ActivityModel {
     /// A game is over once its phase is finished or OGS has sent an
-    /// outcome; either can arrive first, as
-    /// NavigationService.liveGamesNeedingNotice(among:) notes.
+    /// outcome; either can arrive first: a `phase` event ends a game before
+    /// its outcome or the service's list catches up.
     static func hasEnded(_ game: Game) -> Bool {
         game.gamePhase == .finished
             || !(game.gameData?.outcome?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)

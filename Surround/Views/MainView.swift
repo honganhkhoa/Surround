@@ -381,13 +381,7 @@ struct MainView: View {
                 }
             }
         }
-        return ZStack(alignment: .top) {
-            tabNavigation
-                .modifier(ActivitySheetPresenter())
-            if ogs.isLoggedIn {
-                NotificationPopupHost(places: nav.activityPlaces, selectedTab: nav.main.rootView)
-            }
-        }
+        return tabNavigation.modifier(ActivitySheetPresenter())
         // The popover's anchor, above everything it may be opened from.
         .overlay { ActivityPopoverPresenter() }
         .sheet(item: $nav.main.accountSheet) { destination in
@@ -473,43 +467,6 @@ struct MainView: View {
         )
         .environment(\.surroundAllowsRemoteActivity, allowsRemoteActivity)
         .environmentObject(gameChatSessions)
-    }
-}
-
-/// NotificationPopup, while the selected tab doesn't show a game. A game
-/// says its connection status itself, and its control and the control's
-/// popover carry what the popup's pills and Messages button offer.
-/// Conversations keep the popup. A game in a presented stack, such as the
-/// iPad Profile sheet, has no tab, so the popup stays under the sheet.
-///
-/// Both halves settle after the layout pass: the registry a main-queue turn
-/// after the screens change, and the selected tab, which changes as soon as
-/// one is picked, as this host's copy a turn after it does.
-private struct NotificationPopupHost: View {
-    @ObservedObject var places: ActivityPlaceRegistry
-    let selectedTab: RootView
-    @State private var settledTab: RootView
-
-    init(places: ActivityPlaceRegistry, selectedTab: RootView) {
-        self.places = places
-        self.selectedTab = selectedTab
-        _settledTab = State(initialValue: selectedTab)
-    }
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            // Always here, so the host follows the selected tab while the
-            // popup is unmounted.
-            Color.clear
-                .frame(width: 0, height: 0)
-                .accessibilityHidden(true)
-            if places.place(in: settledTab).gameID == nil {
-                NotificationPopup()
-            }
-        }
-        .onChange(of: selectedTab) { _, tab in
-            DispatchQueue.main.async { settledTab = tab }
-        }
     }
 }
 

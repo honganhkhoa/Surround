@@ -760,7 +760,7 @@ final class ActivityFixturesTests: XCTestCase {
                       "The challenger moves first.")
         XCTAssertFalse(leads.liveGames.contains { $0.ogsID == correspondenceID })
 
-        // Withdrawn and rejected challenges leave their lists; the pill counts what's left.
+        // Withdrawn and rejected challenges leave their lists; `waitingLiveGames` counts what's left.
         let (waiting, _) = try service(.waiting, actions: actions)
         XCTAssertEqual(waiting.waitingLiveGames, 3)
         let open = try XCTUnwrap(waiting.openChallengeSentById[ID.openChallengeID])

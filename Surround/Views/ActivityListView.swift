@@ -413,16 +413,14 @@ private struct ActivityListContent: View {
                     .accessibilityIdentifier(ID.activityEmpty)
                 }
             } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            scrolledContent(snapshot)
-                        }
-                        .padding(.horizontal, density == .regular ? 16 : 0)
-                        .padding(.bottom, 20)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        scrolledContent(snapshot)
                     }
-                    .onAppear { applyFocus(proxy, snapshot) }
+                    .padding(.horizontal, density == .regular ? 16 : 0)
+                    .padding(.bottom, 20)
                 }
+                .onAppear { applyFocus(snapshot) }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -444,33 +442,23 @@ private struct ActivityListContent: View {
         header
         ForEach(snapshot.sections) { section in
             sectionView(section, snapshot)
-                .id(section.kind)
         }
     }
 
-    /// Opened at Messages, the list scrolls there on its first appearance.
-    /// With exactly one unread conversation it also opens that one at once,
-    /// so Back shows the list at Messages. Opened at an item, as View in the
-    /// bar or a Now row opens it, the list pushes that item's card at once,
-    /// so Back shows the list.
-    private func applyFocus(_ proxy: ScrollViewProxy, _ snapshot: ActivityListSource.Snapshot) {
+    /// Opened at an item, as View in the bar or a Now row opens it, the list
+    /// pushes that item's card on its first appearance, so Back shows the
+    /// list.
+    private func applyFocus(_ snapshot: ActivityListSource.Snapshot) {
         guard focus != .top, !hasFocused else { return }
         hasFocused = true
         let opening = focus.opening(in: snapshot.model.list)
-        // After the first layout, so the section has its place and the
-        // stack has appeared.
+        // After the first layout, so the stack has appeared.
         DispatchQueue.main.async {
             var transaction = Transaction()
             transaction.disablesAnimations = true
             switch opening {
             case .none:
                 break
-            case .messages(let peerID):
-                proxy.scrollTo(ActivitySection.messages, anchor: .top)
-                guard let conversation = peerID.flatMap({ peer($0) }) else { return }
-                withTransaction(transaction) {
-                    navigation.openConversation(conversation)
-                }
             case .card(let itemID):
                 withTransaction(transaction) {
                     push(itemID)
@@ -1101,11 +1089,12 @@ struct ActivitySheetPresenter: ViewModifier {
 }
 
 /// The window's Activity list as a popover, for a popover request: regular
-/// widths, and games opened from the window's pills. It hangs off this
-/// always-mounted, invisible anchor, placed at the opener's frame as it was
-/// tapped, so the popover never depends on its opener staying on screen. An
-/// outside tap or Escape closes the request. The in-game control's requests
-/// are its own popover's, so this presenter never shows them.
+/// widths, and over a game, as the Now section and the Mac's Activity
+/// command open it there. It hangs off this always-mounted, invisible
+/// anchor, placed at the opener's frame as it was tapped, so the popover
+/// never depends on its opener staying on screen. An outside tap or Escape
+/// closes the request. The in-game control's requests are its own
+/// popover's, so this presenter never shows them.
 struct ActivityPopoverPresenter: View {
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
@@ -1197,9 +1186,8 @@ struct ActivityOpenerButton<Label: View>: View {
 }
 
 /// An opener's latest frame in the window's global space, held by
-/// reference so a new frame redraws nothing. A control that opens the list
-/// only sometimes, as the live pill does, keeps one in `@State` and records
-/// it with `activityOpenerFrame(_:source:)`.
+/// reference so a new frame redraws nothing. `ActivityOpenerButton` keeps
+/// one in `@State` and records it with `activityOpenerFrame(_:source:)`.
 final class ActivityOpenerFrame {
     fileprivate(set) var value = CGRect.zero
 }

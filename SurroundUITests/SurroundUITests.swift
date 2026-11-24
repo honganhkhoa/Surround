@@ -2457,24 +2457,13 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             // the actual clipped content frame; intersect the wrappers so a
             // landscape drag stays inside that visible scroll viewport.
             let window = windowFrame(in: app)
-            let content = app.descendants(matching: .any).matching(identifier: id.screenHome)
+            // Nothing floats over the top of Home's content, so the viewport
+            // starts at its top edge.
+            var viewport = app.descendants(matching: .any).matching(identifier: id.screenHome)
                 .allElementsBoundByIndex.map(\.frame)
                 .filter { !$0.isEmpty && $0.intersects(window) }
                 .reduce(window) { $0.intersection($1) }
                 .insetBy(dx: 8, dy: 8)
-            // Root screens keep the app's notices over the top of Home, lower
-            // on iOS 18: a drag that starts on one doesn't move Home, and a
-            // tap opens it. The viewport starts below them.
-            let notices = app.descendants(matching: .any).matching(NSPredicate(
-                format: "identifier IN %@",
-                [id.liveGameBanner, id.waitingBanner, id.challengeBanner, id.connectionBanner, id.messagesButton]
-            )).allElementsBoundByIndex.map(\.frame)
-                .filter { !$0.isEmpty && $0.intersects(content) && $0.midY < content.midY }
-            var viewport = content
-            if let bottom = notices.map(\.maxY).max(), bottom + 8 < content.maxY {
-                viewport = CGRect(x: content.minX, y: max(content.minY, bottom + 8), width: content.width,
-                                  height: content.maxY - max(content.minY, bottom + 8))
-            }
             // It ends above the bottom chrome, a tab bar, the Activity bar or
             // a docked keyboard, wherever Home's frame ends: a drag that
             // starts on one doesn't move Home, and a tap reaches it.
@@ -2774,9 +2763,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         #endif
     }
 
-    func testGameMessageButtonOpensActivity() {
+    func testTheBarCountsUnreadAndTheGamePopoverReadsThem() {
         // The basic game fixture has no private messages. Explicitly seed
-        // incoming messages so this journey exercises the unread button.
+        // incoming messages so +N counts unread conversations.
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.messagesContentLaunchArgument,
         ], orientation: .portrait)
@@ -2785,20 +2774,20 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         // The fixture's conversations, newest first: hakhoa, then khoahong.
         let newestPeerID = 765_826
         let olderPeerID = 955_348
-        let messageButton = app.buttons.matching(identifier: id.messagesButton).firstMatch
-        func unread() -> Int { Int(messageButton.value as? String ?? "") ?? 0 }
-        XCTAssertTrue(messageButton.waitForExistence(timeout: 10), "Home shows the app's Messages button.")
-        XCTAssertEqual(unread(), 2, "The fixture has two unread conversations.")
+        let bar = app.descendants(matching: .any).matching(identifier: id.activityBar).firstMatch
+        // 26268404 leads, and +N, in the bar or the Now section's All
+        // activity, counts the two unread conversations.
+        XCTAssertTrue(pollUntil(timeout: 10) { self.activityPlusN(in: app) == 2 },
+                      "Home's +N counts the fixture's two unread conversations: "
+                        + String(describing: activityPlusN(in: app)))
+        keepScreenshot("Home with +2 for two unread conversations", in: app)
         tap(id.homeGame(gameID), in: app)
         let gameDetail = element(id.gameDetail(gameID), in: app)
 
-        // The app's notice row leaves games: in a game, Messages is in the
-        // in-game control's popover, in every pose.
-        XCTAssertTrue(pollUntil(timeout: 10) { !messageButton.exists },
-                      "Game Detail shows no Messages button.")
-        XCTAssertFalse(app.navigationBars.buttons[id.messagesButton].exists,
-                       "Game Detail adds no Messages toolbar item.")
-        keepScreenshot("Game Detail without the Messages button", in: app)
+        // The bar leaves games: in a game, Messages is in the in-game
+        // control's popover, in every pose.
+        XCTAssertTrue(pollUntil(timeout: 10) { !bar.exists }, "Game Detail shows no Activity bar.")
+        keepScreenshot("Game Detail without the Activity bar", in: app)
 
         _ = openGameControlPopover(in: app)
         let popover = app.popovers.firstMatch
@@ -2831,16 +2820,16 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: id.activityList).firstMatch.exists,
                        "Closing the popover closes Activity.")
         XCTAssertTrue(gameDetail.exists, "Closing Activity returns to Game Detail.")
-        XCTAssertFalse(messageButton.exists, "Still no Messages button in the game.")
+        XCTAssertFalse(bar.exists, "Still no Activity bar in the game.")
 
-        // Back on Home the button returns, with one unread conversation.
+        // Back on Home, +N counts the one unread conversation left.
         returnHomeFromFixtureGame(in: app)
-        XCTAssertTrue(messageButton.waitForExistence(timeout: 10), "Home shows the Messages button again.")
-        XCTAssertTrue(pollUntil(timeout: 10) { unread() == 1 },
-                      "Reading a conversation in the game's popover marks it read: \(unread())")
+        XCTAssertTrue(pollUntil(timeout: 10) { self.activityPlusN(in: app) == 1 },
+                      "Reading a conversation in the game's popover marks it read: "
+                        + String(describing: activityPlusN(in: app)))
     }
 
-    func testLiveGameBannerUsesHomeNavigationStack() {
+    func testTheBarsLiveGameUsesHomeNavigationStack() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
         ], orientation: .portrait)
@@ -2855,16 +2844,19 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let carousel = app.descendants(matching: .any)
             .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel).firstMatch
         XCTAssertFalse(carousel.exists, "Active games must stay hidden until requested.")
-        // Root screens keep the app's live-game pill; a game shows the live
-        // game on your move in its control instead.
-        let banner = app.buttons.matching(identifier: SurroundUITestContract.AccessibilityID.liveGameBanner).firstMatch
+        // Root screens show the live game on your move in the Activity bar,
+        // or in the Now section on an iPad with its sidebar shown; a game
+        // shows it in its control instead.
+        let bar = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.activityBar).firstMatch
+        let liveGameRow = "game-\(SurroundUITestContract.fixtureGameID)"
 
         func assertLiveGameOpened() {
             element(
                 SurroundUITestContract.AccessibilityID.gameDetail(SurroundUITestContract.fixtureGameID),
                 in: app
             )
-            XCTAssertFalse(banner.exists, "The live-game banner must disappear on the live board.")
+            XCTAssertTrue(pollUntil(timeout: 10) { !bar.exists }, "A game shows no Activity bar.")
             XCTAssertFalse(carousel.exists, "The correspondence carousel must not remain on the only live game.")
             XCTAssertFalse(app.navigationBars.buttons["Close"].exists, "Active games must open in the navigation stack.")
             XCTAssertFalse(
@@ -2873,9 +2865,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             )
         }
 
-        func openLiveGameFromBanner() {
-            XCTAssertTrue(banner.waitForExistence(timeout: 10), "A root screen shows the live-game banner.")
-            tap(banner, description: "Open active live game", in: app)
+        func openLiveGameFromBar() {
+            let lead = activityLead(nowRow: liveGameRow, in: app)
+            tap(lead, description: "Open active live game", in: app)
             assertLiveGameOpened()
         }
 
@@ -2886,7 +2878,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             let control = app.buttons.matching(identifier: identifier).firstMatch
             XCTAssertTrue(control.waitForExistence(timeout: 10), description)
             XCTAssertTrue(waitUntilHittable(control, timeout: 10), description)
-            XCTAssertFalse(banner.exists, "A game shows no live-game banner.")
+            XCTAssertTrue(pollUntil(timeout: 10) { !bar.exists }, "A game shows no Activity bar.")
             activate(control, at: CGVector(dx: 0.5, dy: 0.5))
             assertLiveGameOpened()
         }
@@ -2916,48 +2908,10 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         keepScreenshot("Zen control – replaces correspondence detail", in: app)
         backToHome()
 
-        // Leave Home for a tab the live banner does not cover: on an 11-inch
-        // iPad in portrait it sits over Public games and most of Messages.
-        let aboutTabs = app.descendants(matching: .any)
-            .matching(identifier: SurroundUITestContract.AccessibilityID.navigationAbout)
-        // Still use the sidebar when the tab is unavailable, and account for
-        // duplicate accessibility nodes in adaptive tabs.
-        let openedSidebar = !aboutTabs.allElementsBoundByIndex.contains { $0.isHittable }
-        if openedSidebar {
-            keepScreenshot("Live banner – About tab unavailable", in: app)
-            if let sidebar = nativeSidebarToggle(in: app) {
-                tap(sidebar, description: "Show navigation sidebar", in: app)
-            }
-        }
-        var aboutTab: XCUIElement?
-        let aboutReady = XCTNSPredicateExpectation(
-            predicate: NSPredicate { _, _ in
-                aboutTab = aboutTabs.allElementsBoundByIndex.first(where: { $0.isHittable })
-                return aboutTab != nil
-            },
-            object: nil
-        )
-        guard waitWithFinalCheck(for: [aboutReady], timeout: 10) == .completed,
-              let aboutTab else {
-            let hierarchy = XCTAttachment(string: app.debugDescription)
-            hierarchy.name = "Accessibility hierarchy – About navigation unavailable"
-            hierarchy.lifetime = .keepAlways
-            add(hierarchy)
-            keepScreenshot("Live banner – About navigation unavailable", in: app)
-            XCTFail("Expected a hittable About tab or sidebar item.")
-            return
-        }
-        tap(aboutTab, description: "Open About", in: app)
-        element(SurroundUITestContract.AccessibilityID.screenAbout, in: app)
-        if openedSidebar && app.descendants(matching: .any)
-            .matching(identifier: SurroundUITestContract.AccessibilityID.navigationSettings)
-            .allElementsBoundByIndex.contains(where: { $0.isHittable }) {
-            // Restore the initial sidebar state so it cannot affect later tests.
-            if let sidebar = nativeSidebarToggle(in: app) {
-                tap(sidebar, description: "Hide navigation sidebar", in: app)
-            }
-        }
-        openLiveGameFromBanner()
+        // From another tab, the bar's live game opens on Home's route.
+        selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationPublicGames, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenPublicGames, in: app)
+        openLiveGameFromBar()
         backToHome()
 
         func openGameHistory() {
@@ -2972,10 +2926,10 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         }
 
         openGameHistory()
-        openLiveGameFromBanner()
+        openLiveGameFromBar()
         backToHome()
 
-        // Two levels deep. The banner has to pop Game history *and* its detail
+        // Two levels deep. The chip has to pop Game history *and* its detail
         // while pushing Home's own destination in the same update.
         openGameHistory()
         let historyGameID = SurroundUITestContract.liveBannerHistoryGameID

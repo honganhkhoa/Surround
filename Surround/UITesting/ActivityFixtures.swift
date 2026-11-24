@@ -198,7 +198,7 @@ enum ActivityFixtures {
         return build.seed
     }
 
-    /// After the service exists: the waiting pill's count, read markers, then
+    /// After the service exists: the live waiting count, read markers, then
     /// the moderator's superchat, unless `startsSuperchat` is false (the app
     /// starts it once per process).
     static func finish(_ selected: State, service: OGSService, startsSuperchat: Bool = true) {

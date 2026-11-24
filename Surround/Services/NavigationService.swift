@@ -103,10 +103,12 @@ struct PendingGameOpen: Identifiable, Equatable {
     }
 }
 
-/// What a visible Game Detail shows, for the app's notices and display sleep.
+/// What a visible Game Detail shows, for display sleep, started games and
+/// the low-time haptic.
 struct GameDetailNotificationContext: Equatable {
-    /// The user's own unfinished live game on screen. The live-game notice
-    /// never points at it, and challenge notices wait during live play.
+    /// The user's own unfinished live game on screen. Started games count it
+    /// as shown, and the low-time haptic stays quiet for it, since its clock
+    /// is in view.
     var ownLiveGame: GameID?
     /// An unfinished live game is on screen, played or watched: its window
     /// keeps the display awake until the game ends.
@@ -341,10 +343,6 @@ class NavigationService: ObservableObject {
         heldInternalNavigation = nil
     }
     #endif
-    /// The app's connection banner is on screen, including its "Connected"
-    /// fade-out. It sits in the title slot of the screen it is over, never a
-    /// game's, so a root screen's themed title gives way.
-    @Published var connectionBannerVisible = false
 
     /// A visible Game Detail shows a live game that has not ended, whoever
     /// plays it, so this window keeps the display awake.
@@ -362,24 +360,6 @@ class NavigationService: ObservableObject {
                 || waitingLiveGames > 0
                 || visibleGameDetailShowsLiveGameInPlay
         )
-    }
-
-    /// The user plays a live game on screen; challenge notices wait for it.
-    /// Visible Game Details report this themselves, so a finished or
-    /// spectated live game opened from Home does not hide notices.
-    var visibleGameDetailPlaysLiveGame: Bool {
-        gameDetailNotificationContexts.values.contains { $0.ownLiveGame != nil }
-    }
-
-    /// The user's unfinished live games that no visible Game Detail shows:
-    /// the ones the live-game notice offers.
-    func liveGamesNeedingNotice(among liveGames: [Game]) -> [Game] {
-        let onScreen = Set(gameDetailNotificationContexts.values.compactMap(\.ownLiveGame))
-        // A `phase` event ends a game before its outcome or the service's
-        // list catches up; it must not be offered in that moment.
-        return liveGames.filter {
-            $0.gameData?.outcome == nil && $0.gamePhase != .finished && !onScreen.contains($0.ID)
-        }
     }
 
     /// Drops a Game Detail's registration, for a Game Detail whose views are

@@ -2239,7 +2239,7 @@ extension OGSService {
                 historyData.phase = .finished
                 // A finished game still reports this user as a participant.
                 // Realtime history must not claim to own the live-game picker
-                // and hide the banner for a different, currently active game.
+                // for a different, currently active game.
                 historyData.timeControl = TimeControlSpeed.live.defaultTimeOptions[0].timeControlObject
                 // Like OGS's game_history endpoint, the fixture feed lists only
                 // games the requested player took part in.

@@ -5,11 +5,10 @@
 //  The only file that names the Activity hosts' iOS 26 and 27 APIs. Each helper
 //  is a pass-through where the SDK or platform lacks the API. Floors, read from
 //  the local SDKs: SwiftUI 7.2.5 = the iOS 26.2 SDK, the oldest that declares
-//  tabViewBottomAccessory(isEnabled:) and every other 26.x API here; 8.0 = the
-//  iOS 27 SDK, as DuoTabContainer's gate; 8.0.85 = 27.1, as
-//  GeometryProxy.messagesDivisionFrames, never for Catalyst, whose SwiftUI in
-//  Xcode 27.1 is 8.0.84. The accessory and minimizing never compile for Mac
-//  Catalyst.
+//  tabViewBottomAccessory(isEnabled:) and every other 26.x API here; 8.0.85 =
+//  27.1, as GeometryProxy.messagesDivisionFrames, never for Catalyst, whose
+//  SwiftUI in Xcode 27.1 is 8.0.84. The accessory and minimizing never compile
+//  for Mac Catalyst.
 //
 
 import SwiftUI
@@ -161,41 +160,6 @@ extension View {
     func activityNavigationSubtitle(_ subtitle: Text) -> some View {
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 7.2.5)
         if #available(iOS 26.0, *) { navigationSubtitle(subtitle) } else { self }
-        #else
-        self
-        #endif
-    }
-
-    /// A toolbar item in the subtitle, or in the large title's subtitle, from
-    /// iOS 26 and on the Mac.
-    @ViewBuilder
-    func activitySubtitleItem<Item: View>(largeTitle: Bool = false, isPresent: Bool = true,
-                                          @ViewBuilder _ item: @escaping () -> Item) -> some View {
-        #if os(iOS) && canImport(SwiftUI, _version: 7.2.5)
-        if #available(iOS 26.0, *) {
-            toolbar {
-                if isPresent {
-                    ToolbarItem(placement: largeTitle ? ToolbarItemPlacement.largeSubtitle : .subtitle,
-                                content: item)
-                }
-            }
-        } else {
-            self
-        }
-        #else
-        self
-        #endif
-    }
-
-    /// Keeps the navigation bar full size while scrolling, from iOS 27.
-    @ViewBuilder
-    func activityNavigationBarNeverMinimizes(_ neverMinimizes: Bool) -> some View {
-        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
-        if #available(iOS 27.0, *) {
-            toolbarMinimizationBehavior(neverMinimizes ? .never : .automatic, for: .navigationBar)
-        } else {
-            self
-        }
         #else
         self
         #endif

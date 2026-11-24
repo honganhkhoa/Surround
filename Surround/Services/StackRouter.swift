@@ -846,9 +846,6 @@ struct AppNavigationStack<Content: View>: View {
     var body: some View {
         NavigationStack(path: $navigation.path) {
             content()
-                #if DEBUG
-                .modifier(NoticesHostProbeRoot(rootView: rootView))
-                #endif
                 // The window's status under the root's title, where the
                 // window says it there; none in a presented stack.
                 .rootConnectionLine(rootView)
@@ -860,9 +857,6 @@ struct AppNavigationStack<Content: View>: View {
                 .environment(\.owningStackRoute, nil)
                 .navigationDestination(for: StackRoute.self) { route in
                     destination(for: route)
-                        #if DEBUG && targetEnvironment(macCatalyst)
-                        .modifier(NoticesHostProbeDestination())
-                        #endif
                         .activityCustomBar(route.drawsActivityBar ? .pushed : nil)
                         .modifier(AppNavigationContentLayout(overlaysIPadSidebar: route.showsGameDetail))
                         .environment(\.owningStackRoute, route)
@@ -870,7 +864,6 @@ struct AppNavigationStack<Content: View>: View {
         }
         .modifier(GameDetailLegacyTint(color: legacyGameDetailTint))
         .environmentObject(navigation)
-        .environment(\.hasGlobalNotificationOverlay, rootView != nil)
         // Presented stacks reset it: a sheet or popover inherits its
         // presenter's environment, but never hides that tab's bar.
         .environment(\.owningTabRoot, rootView)

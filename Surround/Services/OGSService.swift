@@ -1216,7 +1216,7 @@ class OGSService: ObservableObject {
     #if DEBUG && (MAIN_APP || TESTING)
     /// An Activity state's service installs no observers, so it counts its
     /// own live searches and challenges once, as the observer counts them,
-    /// for the waiting pill.
+    /// for display sleep and App Review.
     func countWaitingLiveGamesForActivityFixture() {
         waitingLiveGames = challengesSent.filter { OGSService.isWaitingLive($0.game) }.count
             + openChallengeSentById.values.filter { OGSService.isWaitingLive($0.game) }.count

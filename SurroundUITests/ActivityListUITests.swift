@@ -138,21 +138,25 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         keepScreenshot("Activity – the accepted live game opened", in: app)
     }
 
+    /// From the bar's "3 waiting" on Public games, or the Now section's row
+    /// on an iPad with its sidebar shown: CedarWave's correspondence
+    /// challenge and two unread conversations. Its Accept keeps the list,
+    /// Open game shows the game on Home's route, and back on Home the
+    /// challenge has left the count.
     func testAcceptingACorrespondenceChallengeStays() {
         let challengeID = "challenge-\(FixtureID.correspondenceChallengeID)"
         let gameID = FixtureID.acceptedGameID(FixtureID.correspondenceChallengeID)
         let app = launch(.nothingLeads, actions: .succeed)
-        // The challenge pill shows off Home.
         selectMainNavigation(ID.navigationPublicGames, in: app)
         element(ID.screenPublicGames, in: app)
-        tap(ID.challengeBanner, in: app)
+        let waiting = activityLead(nowRow: "waiting", in: app)
+        XCTAssertEqual(activityCount(of: waiting), 3, "3 waiting on Public games")
+        tap(waiting, description: "3 waiting", in: app)
         element(ID.activityList, in: app)
         tap(ID.activityRow(challengeID, .accept), in: app, matching: .button)
         let result = query(ID.activityRowResult(challengeID), in: app)
         XCTAssertTrue(waitForLabel("Game started", of: result), "A correspondence Accept says the game started")
         let openGame = element(ID.activityRow(challengeID, .openGame), in: app, matching: .button)
-        XCTAssertTrue(waitForAbsence(query(ID.challengeBanner, in: app), timeout: stateSettleTimeout),
-                      "The challenge has gone, and so has its pill")
         XCTAssertTrue(query(ID.activityList, in: app).exists, "The list stays for a correspondence game")
         keepScreenshot("Activity – Game started with Open game", in: app)
 
@@ -161,6 +165,12 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
                       "Open game closes the list")
         element(ID.gameDetail(gameID), in: app)
         keepScreenshot("Activity – the started correspondence game", in: app)
+
+        backToHome(from: gameID, in: app)
+        let left = activityLead(nowRow: "waiting", in: app)
+        XCTAssertTrue(pollUntil(timeout: stateSettleTimeout) { self.activityCount(of: left) == 2 },
+                      "The challenge has left the count: 2 waiting")
+        keepScreenshot("Activity – 2 waiting after the Accept", in: app)
     }
 
     // MARK: Withdrawing
@@ -274,8 +284,8 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
     // MARK: Popovers that outlive their openers
 
     /// The state's only live waiting item is the sent rematch, which OGS
-    /// can withdraw; `waiting`'s live search would keep the pill, since the
-    /// socket never confirms a cancel offline.
+    /// can withdraw; `waiting`'s live search would stay, since the socket
+    /// never confirms a cancel offline.
     /// In a game, the in-game control opens Activity as a popover, which
     /// stays once the item it was opened for resolves. The finished game's
     /// control leads with the rematch card; the sent rematch waits below.
@@ -284,8 +294,8 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         let app = launch(.rematchBothAsked, actions: .succeed)
         tap(ID.homeGame(baseGameID), in: app)
         element(ID.gameDetail(baseGameID), in: app)
-        XCTAssertTrue(pollUntil(timeout: 10) { !query(ID.waitingBanner, in: app).exists },
-                      "A game shows no waiting pill")
+        XCTAssertTrue(pollUntil(timeout: 10) { !query(ID.activityBar, in: app).exists },
+                      "A game shows no Activity bar")
         _ = openGameControlPopover(in: app)
         let popover = app.popovers.firstMatch
         XCTAssertTrue(popover.waitForExistence(timeout: 10), "In a game, the control opens a popover")
@@ -774,6 +784,26 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         tap(back, description: "Back to Activity", in: app, file: file, line: line)
         XCTAssertTrue(waitForAbsence(pushed, timeout: stateSettleTimeout), "Back shows the list", file: file, line: line)
         element(ID.activityList, in: app, file: file, line: line)
+    }
+
+    /// Back from a game on Home's route to Home. iOS 18 names Back after
+    /// Home's title, which the in-game control's base form shares.
+    private func backToHome(from gameID: Int, in app: XCUIApplication,
+                            file: StaticString = #filePath, line: UInt = #line) {
+        let backs = app.navigationBars.buttons.matching(NSPredicate(
+            format: "identifier == %@ OR (identifier != %@ AND (label == %@ OR label == %@))",
+            "BackButton", ID.gameActiveGamesButton, "Active games", "Back"
+        ))
+        var back: XCUIElement?
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            back = backs.allElementsBoundByIndex.first { $0.isHittable }
+            return back != nil
+        }, "Expected the game's Back", file: file, line: line)
+        guard let back else { return }
+        tap(back, description: "Back to Home", in: app, file: file, line: line)
+        element(ID.screenHome, in: app, file: file, line: line)
+        XCTAssertTrue(waitForAbsence(query(ID.gameDetail(gameID), in: app), timeout: stateSettleTimeout),
+                      "Back leaves the game", file: file, line: line)
     }
 
     /// Scrolls the list until `row` can be tapped, toward the list's middle.

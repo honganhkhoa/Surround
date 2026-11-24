@@ -283,71 +283,31 @@ extension ActivityHostPolicyTests {
         XCTAssertNil(try Probe.parse([]))
     }
 
-    func testNoticesHostProbeParsesEachFlag() throws {
-        let arguments = ["Surround",
-                         C.noticesPlaceholderBarLaunchArgument,
-                         C.noticesPlaceholderBarOrderLaunchArgument, "deferred",
-                         C.noticesPlaceholderBarKeyboardLaunchArgument, "hide",
-                         C.noticesTabBarMinimizeLaunchArgument, "on-scroll-down-after-launch",
-                         C.noticesPlaceholderNowLaunchArgument,
-                         C.noticesPlaceholderSubtitleLaunchArgument, "cycle",
-                         C.noticesNavigationBarMinimizeLaunchArgument, "never"]
-        let expected = Probe(showsBar: true, forcesCustomBar: false, barOrder: .deferred, barKeyboard: .hide,
-                             tabBarMinimize: .onScrollDownAfterLaunch, showsNow: true, subtitle: .cycle,
-                             navigationBarMinimize: .never)
-        XCTAssertEqual(try Probe.parse(arguments), expected)
-        var forced = expected
-        forced.forcesCustomBar = true
-        XCTAssertEqual(try Probe.parse(arguments + [C.noticesForceCustomBarLaunchArgument]), forced)
-    }
-
-    func testForcingTheCustomBarShowsThePlaceholderBar() throws {
-        XCTAssertEqual(try Probe.parse([C.noticesForceCustomBarLaunchArgument]),
-                       Probe(showsBar: true, forcesCustomBar: true))
-        XCTAssertEqual(try Probe.parse([C.noticesForceCustomBarLaunchArgument,
-                                        C.noticesPlaceholderBarOrderLaunchArgument, "after"])?.barOrder, .after)
-    }
-
-    func testCompanionFlagsNeedTheirPrimary() {
-        let cases: [([String], Probe.ParseError)] = [
-            ([C.noticesPlaceholderBarOrderLaunchArgument, "after"],
-             .needs(flag: C.noticesPlaceholderBarOrderLaunchArgument, primary: C.noticesPlaceholderBarLaunchArgument)),
-            ([C.noticesPlaceholderBarKeyboardLaunchArgument, "ignore"],
-             .needs(flag: C.noticesPlaceholderBarKeyboardLaunchArgument, primary: C.noticesPlaceholderBarLaunchArgument)),
-            ([C.noticesNavigationBarMinimizeLaunchArgument, "never"],
-             .needs(flag: C.noticesNavigationBarMinimizeLaunchArgument,
-                    primary: C.noticesPlaceholderSubtitleLaunchArgument)),
-        ]
-        for (arguments, error) in cases {
-            XCTAssertThrowsError(try Probe.parse(arguments), "\(arguments)") {
-                XCTAssertEqual($0 as? Probe.ParseError, error)
-            }
-        }
+    func testNoticesHostProbeParsesBothFlags() throws {
+        let arguments = ["Surround", C.noticesTabBarMinimizeLaunchArgument, "on-scroll-down-after-launch"]
+        XCTAssertEqual(try Probe.parse(arguments), Probe(forcesCustomBar: false, tabBarMinimize: .onScrollDownAfterLaunch))
+        XCTAssertEqual(try Probe.parse(arguments + [C.noticesForceCustomBarLaunchArgument]),
+                       Probe(forcesCustomBar: true, tabBarMinimize: .onScrollDownAfterLaunch))
+        XCTAssertEqual(try Probe.parse([C.noticesForceCustomBarLaunchArgument]), Probe(forcesCustomBar: true))
     }
 
     func testMalformedProbeValuesThrow() {
         let flag = C.noticesTabBarMinimizeLaunchArgument
-        XCTAssertThrowsError(try Probe.parse([C.noticesPlaceholderBarLaunchArgument, flag])) {
+        XCTAssertThrowsError(try Probe.parse([C.noticesForceCustomBarLaunchArgument, flag])) {
             XCTAssertEqual($0 as? Probe.ParseError, .missingValue(flag: flag))
         }
         XCTAssertThrowsError(try Probe.parse([flag, "sometimes"])) {
             XCTAssertEqual($0 as? Probe.ParseError, .invalidValue(flag: flag, value: "sometimes"))
         }
-        XCTAssertThrowsError(try Probe.parse([flag, C.noticesPlaceholderBarLaunchArgument])) {
+        XCTAssertThrowsError(try Probe.parse([flag, C.noticesForceCustomBarLaunchArgument])) {
             XCTAssertEqual($0 as? Probe.ParseError,
-                           .invalidValue(flag: flag, value: C.noticesPlaceholderBarLaunchArgument))
-        }
-        XCTAssertThrowsError(try Probe.parse([C.noticesPlaceholderSubtitleLaunchArgument, "Status"])) {
-            XCTAssertEqual($0 as? Probe.ParseError,
-                           .invalidValue(flag: C.noticesPlaceholderSubtitleLaunchArgument, value: "Status"))
+                           .invalidValue(flag: flag, value: C.noticesForceCustomBarLaunchArgument))
         }
     }
 
     func testTheFirstFlagOccurrenceWins() throws {
         let flag = C.noticesTabBarMinimizeLaunchArgument
         XCTAssertEqual(try Probe.parse([flag, "never", flag, "automatic"])?.tabBarMinimize, .never)
-        XCTAssertEqual(try Probe.parse([C.noticesPlaceholderSubtitleLaunchArgument, "retry",
-                                        C.noticesPlaceholderSubtitleLaunchArgument, "cycle"])?.subtitle, .retry)
     }
 
     func testProbeOverridesSwitchMinimizingAfterLaunch() throws {

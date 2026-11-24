@@ -3,11 +3,12 @@
 //  SurroundUITests
 //
 //  Conversations in the Activity list, and friend requests that keep their
-//  place in Messages' inbox. The Messages button opens the list at
-//  Messages, or straight into the only unread conversation; a draft typed in
-//  the list is Messages' draft too. Offline UI tests can't send, so a reply
-//  is checked up to Send. CI runs the class with the list's journeys, in
-//  its Activity phase.
+//  place in Messages' inbox. The Activity bar's "3 waiting", or the Now
+//  section's row on an iPad with its sidebar shown, opens the list, and a
+//  conversation read there leaves the count; a draft typed in the list is
+//  Messages' draft too. Offline UI tests can't send, so a reply is checked
+//  up to Send. CI runs the class with the list's journeys, in its Activity
+//  phase.
 //
 
 import XCTest
@@ -24,32 +25,32 @@ final class ActivityConversationUITests: SurroundJourneyUITestCase {
 
     // MARK: Journeys
 
+    /// "3 waiting": CedarWave's correspondence challenge and two unread
+    /// conversations. The list opens at its top, and opens no conversation
+    /// by itself; reading one makes it "2 waiting", and All messages closes
+    /// the list on Messages.
     func testMessagesButtonOpensActivityAtMessages() {
         let app = launch(.nothingLeads)
-        let button = element(ID.messagesButton, in: app, matching: .button)
-        XCTAssertEqual(unread(button), 2, "The state has two unread conversations")
-        tap(button, description: "The Messages button", in: app)
+        let waiting = activityLead(nowRow: "waiting", in: app)
+        XCTAssertEqual(activityCount(of: waiting), 3, "The state has a challenge and two unread conversations")
+        tap(waiting, description: "3 waiting", in: app)
         element(ID.activityList, in: app)
         element(ID.activitySection("messages"), in: app)
         let newest = element(ID.activityRow("conversation-\(tenukiTomID)"), in: app)
-        XCTAssertTrue(waitUntilHittable(newest, timeout: 10), "The list opens at Messages")
+        element(ID.activityRow("conversation-\(quietPineID)"), in: app)
         let conversation = query("messages.conversation", in: app)
-        XCTAssertFalse(conversation.exists, "With two unread conversations, neither opens by itself")
-        keepScreenshot("Activity at Messages from the Messages button", in: app)
+        XCTAssertFalse(conversation.exists, "Neither unread conversation opens by itself")
+        keepScreenshot("Activity from 3 waiting", in: app)
 
-        tap(newest, description: "tenuki_tom's conversation", in: app)
+        tap(revealInList(newest, in: app), description: "tenuki_tom's conversation", in: app)
         element("messages.conversation.profile.\(tenukiTomID)", in: app)
         backToList(leaving: conversation, in: app)
         closeList(in: app)
-        XCTAssertTrue(pollUntil(timeout: 10) { self.unread(button) == 1 }, "Reading it in Activity marks it read")
+        XCTAssertTrue(pollUntil(timeout: 10) { self.activityCount(of: waiting) == 2 },
+                      "Reading it in Activity makes it 2 waiting")
+        keepScreenshot("2 waiting after reading a conversation", in: app)
 
-        tap(button, description: "The Messages button, one unread", in: app)
-        element("messages.conversation.profile.\(quietPineID)", in: app)
-        keepScreenshot("Activity opened straight into the only unread conversation", in: app)
-        backToList(leaving: conversation, in: app)
-        element(ID.activityRow("conversation-\(quietPineID)"), in: app)
-        keepScreenshot("Back from the conversation: the list at Messages", in: app)
-
+        tap(waiting, description: "2 waiting", in: app)
         tap(revealInList(query(ID.activityAllMessages, in: app), in: app),
             description: "All messages", in: app)
         XCTAssertTrue(waitForAbsence(query(ID.activityList, in: app), timeout: stateSettleTimeout),
@@ -60,9 +61,9 @@ final class ActivityConversationUITests: SurroundJourneyUITestCase {
     func testAConversationRepliesInPlaceAndKeepsItsDraft() {
         let draft = "Rematch tomorrow at nine?"
         let app = launch(.nothingLeads)
-        tap(ID.messagesButton, in: app, matching: .button)
+        tap(activityLead(nowRow: "waiting", in: app), description: "3 waiting", in: app)
         let row = element(ID.activityRow("conversation-\(tenukiTomID)"), in: app)
-        tap(row, description: "tenuki_tom's conversation", in: app)
+        tap(revealInList(row, in: app), description: "tenuki_tom's conversation", in: app)
         let conversation = element("messages.conversation", in: app)
         let field = element(ID.privateMessageComposer, in: app, matching: .textField)
         tap(field, description: "The reply field", in: app)
@@ -151,11 +152,6 @@ final class ActivityConversationUITests: SurroundJourneyUITestCase {
 
     private func query(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
-    }
-
-    /// The Messages button's unread count.
-    private func unread(_ button: XCUIElement) -> Int {
-        Int(button.value as? String ?? "") ?? 0
     }
 
     /// Back inside the list's own stack, never the screen's under it, until

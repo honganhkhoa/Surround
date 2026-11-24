@@ -316,7 +316,7 @@ final class AppRouteTests: XCTestCase {
             gameId: .OGS(40)
         )
         navigation.home.activeGameShowsCarousel = false
-        navigation.openActivity(source: .waitingPill, anchor: CGRect(x: 100, y: 60, width: 120, height: 44),
+        navigation.openActivity(source: .activityBar, anchor: CGRect(x: 100, y: 60, width: 120, height: 44),
                                 horizontalSizeClass: .regular)
         navigation.home.showingNewGameView = true
         navigation.home.showingPreferredSettings = true
@@ -359,7 +359,7 @@ final class AppRouteTests: XCTestCase {
         let settled = expectation(description: "The place settles a main-queue turn later.")
         DispatchQueue.main.async { settled.fulfill() }
         wait(for: [settled], timeout: 1)
-        navigation.openActivity(source: .waitingPill, horizontalSizeClass: .compact)
+        navigation.openActivity(source: .activityBar, horizontalSizeClass: .compact)
         XCTAssertEqual(navigation.main.activity?.style, .popover, "A game gets a popover at any width.")
         XCTAssertEqual(navigation.main.activity?.place, game)
     }
@@ -367,20 +367,20 @@ final class AppRouteTests: XCTestCase {
     @MainActor
     func testAnActivityPopoverFollowsOnlyItsOwnOpener() {
         let navigation = NavigationService()
-        let pill = CGRect(x: 120, y: 60, width: 140, height: 44)
-        let moved = pill.offsetBy(dx: 200, dy: 0)
-        navigation.openActivity(source: .waitingPill, anchor: pill, horizontalSizeClass: .regular)
+        let bar = CGRect(x: 120, y: 60, width: 140, height: 44)
+        let moved = bar.offsetBy(dx: 200, dy: 0)
+        navigation.openActivity(source: .activityBar, anchor: bar, horizontalSizeClass: .regular)
         let session = navigation.main.activity?.sessionID
 
-        navigation.moveActivityAnchor(to: moved, from: .challengePill)
-        XCTAssertEqual(navigation.main.activity?.anchor, pill, "Another opener moves nothing.")
-        navigation.moveActivityAnchor(to: moved, from: .waitingPill)
+        navigation.moveActivityAnchor(to: moved, from: .nowSection)
+        XCTAssertEqual(navigation.main.activity?.anchor, bar, "Another opener moves nothing.")
+        navigation.moveActivityAnchor(to: moved, from: .activityBar)
         XCTAssertEqual(navigation.main.activity?.anchor, moved, "The popover follows its opener, as on rotation.")
         XCTAssertEqual(navigation.main.activity?.sessionID, session, "It is the same list.")
 
-        navigation.openActivity(source: .homeSearching, anchor: pill, horizontalSizeClass: .compact)
+        navigation.openActivity(source: .homeSearching, anchor: bar, horizontalSizeClass: .compact)
         navigation.moveActivityAnchor(to: moved, from: .homeSearching)
-        XCTAssertEqual(navigation.main.activity?.anchor, pill, "A sheet has nothing to follow.")
+        XCTAssertEqual(navigation.main.activity?.anchor, bar, "A sheet has nothing to follow.")
 
         let game = ActivityModel.Place.game(id: 42, isOwnGame: true, isLive: false, isOver: false)
         navigation.main.activity = ActivityRequest(source: .gameControl, style: .popover, place: game)
@@ -434,9 +434,9 @@ final class AppRouteTests: XCTestCase {
 
     func testCrossingTheSpeedBoundaryRestoresDisplayDefaults() {
         // The in-game control's chip, its Zen circle and its popover's live
-        // rows switch between speed classes in place, as the live-game banner
-        // and resolved routes jump between them; each starts again from the
-        // full game view.
+        // rows switch between speed classes in place, as the Activity bar's
+        // live game and resolved routes jump between them; each starts again
+        // from the full game view.
         XCTAssertTrue(
             GameDetailDisplayReset.restoresDisplayDefaults(
                 from: .correspondence,
@@ -648,7 +648,7 @@ final class AppRouteTests: XCTestCase {
     @MainActor
     func testAGameOpenClosesTheActivityListOverIt() throws {
         let navigation = NavigationService()
-        navigation.openActivity(source: .challengePill, anchor: CGRect(x: 10, y: 20, width: 44, height: 44),
+        navigation.openActivity(source: .nowSection, anchor: CGRect(x: 10, y: 20, width: 44, height: 44),
                                 horizontalSizeClass: .regular)
         navigation.home.showingNewGameView = true
         XCTAssertNotNil(navigation.main.activity)
@@ -855,7 +855,7 @@ final class AppRouteTests: XCTestCase {
         navigation.home.activeGame = homeGame
         navigation.home.showingNewGameView = true
         navigation.home.showingSettings = true
-        let activity = ActivityRequest(source: .challengePill, style: .popover,
+        let activity = ActivityRequest(source: .nowSection, style: .popover,
                                        anchor: CGRect(x: 10, y: 20, width: 44, height: 44))
         navigation.main.activity = activity
         navigation.main.accountSheet = .profile
@@ -977,7 +977,7 @@ final class AppRouteTests: XCTestCase {
         let resets = countResets(of: navigation)
         navigation.main.rootView = .publicGames
         navigation.home.showingNewGameView = true
-        let activity = ActivityRequest(source: .challengePill, style: .popover,
+        let activity = ActivityRequest(source: .nowSection, style: .popover,
                                        anchor: CGRect(x: 10, y: 20, width: 44, height: 44))
         navigation.main.activity = activity
 
@@ -996,7 +996,7 @@ final class AppRouteTests: XCTestCase {
         XCTAssertEqual(navigation.pendingGameOpen?.ogsGameID, 71)
         XCTAssertEqual(resets.value, 0, "As when unheld, the accept resets nothing else.")
 
-        // The live-game pill, after another internal open: only the
+        // The bar's live game, after another internal open: only the
         // window's latest one runs.
         let game = makeGame(72)
         navigation.main.rootView = .settings
@@ -1023,7 +1023,7 @@ final class AppRouteTests: XCTestCase {
         navigation.publicGames.activeGame = makeGame(47)
         navigation.home.showingNewGameView = true
         navigation.main.rootView = .publicGames
-        navigation.main.activity = ActivityRequest(source: .messagesButton, style: .popover,
+        navigation.main.activity = ActivityRequest(source: .activityBar, style: .popover,
                                                    anchor: CGRect(x: 10, y: 20, width: 44, height: 44))
         let resets = countResets(of: navigation)
 

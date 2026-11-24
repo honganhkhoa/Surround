@@ -729,12 +729,10 @@ final class GameControlUITests: SurroundJourneyUITestCase {
     }
 
     /// Opens a game from Home's list once bounded drags of Home's own
-    /// content have brought the row's centre clear of the bars and of the
-    /// root notices, which at the largest text sizes cover a third of a
-    /// phone's screen. A row not yet in the tree lies below, and once a drag
-    /// no longer moves the list, above: at the largest text sizes it can lie
-    /// seven drags down, past the three drags after which `HomeRowSearch`
-    /// turns.
+    /// content have brought the row's centre clear of the bars. A row not
+    /// yet in the tree lies below, and once a drag no longer moves the list,
+    /// above: at the largest text sizes it can lie seven drags down, past
+    /// the three drags after which `HomeRowSearch` turns.
     private func openFromHome(_ gameID: Int, in app: XCUIApplication,
                               file: StaticString = #filePath, line: UInt = #line) {
         let home = app.scrollViews.matching(identifier: ID.screenHome).firstMatch
@@ -802,7 +800,7 @@ final class GameControlUITests: SurroundJourneyUITestCase {
             start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.3)
             #endif
         }
-        XCTFail("Expected game \(gameID) on Home, clear of its bars and notices", file: file, line: line)
+        XCTFail("Expected game \(gameID) on Home, clear of its bars", file: file, line: line)
     }
 
     /// Every frame in Home's list, from one snapshot.
@@ -823,27 +821,17 @@ final class GameControlUITests: SurroundJourneyUITestCase {
         return zip(list, before).allSatisfy { abs($0.minY - $1.minY) < 1 }
     }
 
-    /// Home's visible content: its clipped frame in the window, below any
-    /// root notice over its top half, and above the bottom chrome, a tab
-    /// bar, the Activity bar or a docked keyboard, wherever Home's frame
-    /// ends.
+    /// Home's visible content: its clipped frame in the window, from its top
+    /// edge, since nothing floats over the top of Home's content, to above
+    /// the bottom chrome, a tab bar, the Activity bar or a docked keyboard,
+    /// wherever Home's frame ends.
     private func homeViewport(in app: XCUIApplication) -> CGRect {
         let window = windowFrame(in: app)
-        let content = app.descendants(matching: .any).matching(identifier: ID.screenHome)
+        var viewport = app.descendants(matching: .any).matching(identifier: ID.screenHome)
             .allElementsBoundByIndex.map(\.frame)
             .filter { !$0.isEmpty && $0.intersects(window) }
             .reduce(window) { $0.intersection($1) }
             .insetBy(dx: 8, dy: 8)
-        let notices = app.descendants(matching: .any).matching(NSPredicate(
-            format: "identifier IN %@",
-            [ID.liveGameBanner, ID.waitingBanner, ID.challengeBanner, ID.connectionBanner, ID.messagesButton]
-        )).allElementsBoundByIndex.map(\.frame)
-            .filter { !$0.isEmpty && $0.intersects(content) && $0.midY < content.midY }
-        var viewport = content
-        if let bottom = notices.map(\.maxY).max(), bottom + 8 < content.maxY {
-            viewport = CGRect(x: content.minX, y: max(content.minY, bottom + 8), width: content.width,
-                              height: content.maxY - max(content.minY, bottom + 8))
-        }
         if let chromeTop = bottomChromeTop(over: viewport, in: app), chromeTop - 8 < viewport.maxY {
             viewport.size.height = max(0, chromeTop - 8 - viewport.minY)
         }

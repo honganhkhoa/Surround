@@ -44,10 +44,6 @@ struct ActivityRequest: Identifiable, Equatable {
     /// What opened the list.
     enum Source: Equatable {
         case homeSearching
-        case waitingPill
-        case challengePill
-        case livePill
-        case messagesButton
         case debug
         /// Game Detail's in-game control, which presents the list as its own
         /// popover.
@@ -65,24 +61,10 @@ struct ActivityRequest: Identifiable, Equatable {
     /// Where the list starts.
     enum Focus: Equatable {
         case top
-        /// Scrolled to Messages, as the Messages button opens it. With
-        /// exactly one unread conversation, that one opens at once.
-        case messages
         /// With this item's full card pushed, as View in the bar or a Now
         /// row asks: a challenge sent to the user, or one of the user's own
         /// waiting items, by its `ActivityModel.Item.id`.
         case item(String)
-
-        /// The peer whose conversation the list opens at once: with
-        /// Messages in focus and exactly one unread conversation listed.
-        func conversationToOpen(in list: [ActivityModel.Item]) -> Int? {
-            guard self == .messages else { return nil }
-            let unread = list.compactMap { item -> Int? in
-                guard case .conversation(let conversation) = item, conversation.isUnread else { return nil }
-                return conversation.peerID
-            }
-            return unread.count == 1 ? unread[0] : nil
-        }
 
         /// The item whose card the list pushes at once
         /// (`StackRoute.activityItem`): the item in focus, while the list
@@ -97,9 +79,6 @@ struct ActivityRequest: Identifiable, Equatable {
         /// What the list does as it first appears with this focus.
         enum Opening: Equatable {
             case none
-            /// Scrolls to Messages, and opens the conversation with this
-            /// peer at once where it is the one unread.
-            case messages(conversation: Int?)
             /// Pushes this item's full card (`StackRoute.activityItem`), as
             /// View in the bar or a Now row asks.
             case card(String)
@@ -109,7 +88,6 @@ struct ActivityRequest: Identifiable, Equatable {
         func opening(in list: [ActivityModel.Item]) -> Opening {
             switch self {
             case .top: .none
-            case .messages: .messages(conversation: conversationToOpen(in: list))
             case .item: cardToOpen(in: list).map(Opening.card) ?? .none
             }
         }

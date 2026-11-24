@@ -820,15 +820,52 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         return bottomChrome.map(\.minY).min()
     }
 
-    /// The bottom bars journeys measure by identifier: the Activity bar, and
-    /// until it goes the notices probes' placeholder bar, which stands in
-    /// for it in probe runs.
-    private static var bottomBarIdentifiers: Set<String> {
-        var identifiers: Set<String> = [SurroundUITestContract.AccessibilityID.activityBar]
-        #if DEBUG
-        identifiers.insert(SurroundUITestContract.NoticesHostProbe.AccessibilityID.bar)
-        #endif
-        return identifiers
+    /// The bottom bars journeys measure by identifier: the Activity bar.
+    private static let bottomBarIdentifiers: Set<String> = [SurroundUITestContract.AccessibilityID.activityBar]
+
+    // MARK: Activity on root screens
+
+    /// What leads Activity on a root screen, where a person taps it: the
+    /// Activity bar's lead, or the Now section's row for `nowRow` on an iPad
+    /// with its sidebar shown, where no floating bar shows. `nowRow` is an
+    /// item's id, such as `game-26268404`, or `waiting` for "N waiting".
+    /// Waits for whichever can be tapped.
+    func activityLead(nowRow: String, in app: XCUIApplication,
+                      file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
+        let id = SurroundUITestContract.AccessibilityID.self
+        let lead = app.buttons.matching(identifier: id.activityBarLead).firstMatch
+        let row = app.descendants(matching: .any).matching(identifier: id.activityNowRow(nowRow)).firstMatch
+        var shown: XCUIElement?
+        let found = pollUntil(timeout: 10) {
+            shown = [lead, row].first { $0.exists && $0.isHittable }
+            return shown != nil
+        }
+        XCTAssertTrue(found, "Expected the Activity bar's lead, or the Now section's \(nowRow) row",
+                      file: file, line: line)
+        return shown ?? lead
+    }
+
+    /// The count an Activity element's label starts with, as in "3 waiting
+    /// for you: …" or "2 more waiting for you: …". Nil while the element
+    /// isn't there, or its label has none.
+    func activityCount(of element: XCUIElement) -> Int? {
+        (try? element.snapshot()).flatMap { Self.leadingCount($0.label) }
+    }
+
+    /// What +N counts on a root screen: the Activity bar's +N, or the Now
+    /// section's All activity, whose value says it, on an iPad with its
+    /// sidebar shown. Nil while neither shows a count.
+    func activityPlusN(in app: XCUIApplication) -> Int? {
+        let id = SurroundUITestContract.AccessibilityID.self
+        let all = app.descendants(matching: .any).matching(identifier: id.activityNowAll).firstMatch
+        if all.exists, all.isHittable, let value = (try? all.snapshot())?.value as? String {
+            return Self.leadingCount(value)
+        }
+        return activityCount(of: app.buttons.matching(identifier: id.activityBarMore).firstMatch)
+    }
+
+    private static func leadingCount(_ text: String) -> Int? {
+        Int(text.prefix { $0.isNumber })
     }
 
     /// Where a search of Home's list drags for a row that isn't in the tree
@@ -945,7 +982,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
 
     /// iPadOS remembers a resized window across launches. Each case needs the
     /// full screen, so restore it with the system's double tap on the window's
-    /// top edge, away from Home's live-game banner at the top center.
+    /// top edge.
     func restoreFullSizeWindow(in app: XCUIApplication) {
         let window = app.windows.firstMatch
         func isFull() -> Bool {
