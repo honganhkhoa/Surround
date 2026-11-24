@@ -1013,6 +1013,8 @@ struct GameDetailView: View {
         .statusBarHidden(hidesZenChrome && hidesStatusBarInZen)
         // Typing never changes the scene's geometry. The conversation places
         // its composer above the keyboard using the owning window's overlap.
+        // The navigation host tracks no keyboard region either: see
+        // GameDetailWindowGeometryReader.GeometryController.
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
@@ -1342,6 +1344,43 @@ private struct GameDetailWindowGeometryReader: UIViewControllerRepresentable {
             view = geometryView
         }
 
+        #if !targetEnvironment(macCatalyst)
+        override func didMove(toParent parent: UIViewController?) {
+            super.didMove(toParent: parent)
+            removeHostKeyboardRegion()
+        }
+
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            // In case SwiftUI added this controller before it put the host
+            // in its navigation stack.
+            removeHostKeyboardRegion()
+        }
+
+        /// Game Detail never takes SwiftUI's keyboard region: its body ignores
+        /// it, and the conversation places its composer with the overlap this
+        /// bridge measures. So the host of the navigation stack level that
+        /// shows it tracks no keyboard region either. During a push or pop,
+        /// SwiftUI can give that host a stale region taller than its view
+        /// (iPadOS 26.5 and 27.0, after a turn from landscape, a docked keyboard
+        /// shown and dismissed in another tab and a window resize). Other screens
+        /// collapse until the transition ends; Game Detail, which ignores the
+        /// region, grew past the bottom of its window and stayed there. The
+        /// host is SwiftUI's own and is reached through public API, whatever
+        /// view it hosts. Its other regions are kept, and Game Detail hosted
+        /// any other way is left alone.
+        private func removeHostKeyboardRegion() {
+            var ancestor = parent
+            while let controller = ancestor, !(controller is any SafeAreaRegionsHost) {
+                ancestor = controller.parent
+            }
+            guard let host = ancestor as? any SafeAreaRegionsHost,
+                  host.parent is UINavigationController,
+                  host.safeAreaRegions.contains(.keyboard) else { return }
+            host.safeAreaRegions.remove(.keyboard)
+        }
+        #endif
+
         override func viewWillTransition(to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator) {
             let completion = view.window?.isKeyWindow == true ? beginSizeTransition?() : nil
             super.viewWillTransition(to: size, with: coordinator)
@@ -1394,6 +1433,17 @@ private struct GameDetailWindowGeometryReader: UIViewControllerRepresentable {
         }
     }
 }
+
+#if !targetEnvironment(macCatalyst)
+/// A UIHostingController, whatever view it hosts: SwiftUI hosts each level of
+/// a navigation stack in a private subclass.
+@MainActor
+private protocol SafeAreaRegionsHost: UIViewController {
+    var safeAreaRegions: SafeAreaRegions { get set }
+}
+
+extension UIHostingController: SafeAreaRegionsHost {}
+#endif
 
 private struct CompactGameModesInToolbarKey: EnvironmentKey {
     static let defaultValue = false

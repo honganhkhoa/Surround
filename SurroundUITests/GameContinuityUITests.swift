@@ -346,6 +346,105 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         )
     }
 
+    /// After an iPad turns from landscape, a docked keyboard comes and goes in
+    /// another tab and the window is resized, SwiftUI can give the hosts of a
+    /// navigation stack a stale keyboard region during a push (iPadOS 26.5
+    /// and 27.0; not 26.1). Game Detail ignores the keyboard region, so it was
+    /// laid out past the bottom of its window, its bottom actions below it.
+    /// Its host now tracks no keyboard region (GameDetailWindowGeometryReader).
+    func testGameDetailFitsAResizedWindowAfterAKeyboardInAnotherTab() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("Needs an iPad window, which resizes.")
+        }
+        guard #available(iOS 26.0, *) else {
+            throw XCTSkip("Needs iPadOS 26, whose app windows resize.")
+        }
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
+        ], orientation: .landscapeLeft)
+        // iPadOS keeps a window's size across launches: give it back, and
+        // turn the device back.
+        addTeardownBlock { [weak self] in
+            XCUIDevice.shared.orientation = .portrait
+            if app.state != .runningForeground { app.launch() }
+            self?.restoreFullSizeWindow(in: app)
+        }
+        element(ID.screenHome, in: app)
+
+        XCUIDevice.shared.orientation = .portrait
+        var previous: CGRect?
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            let window = self.windowFrame(in: app)
+            defer { previous = window }
+            return window.height > window.width && window == previous
+        }, "The window turns to portrait: \(windowFrame(in: app))")
+        // iPadOS also keeps the size a window was resized to, and a turn to
+        // portrait gives it back, even after a double tap filled the window:
+        // here a size kept from an earlier resize, and after this case, the
+        // one it resizes to, in a later case's turn. So start from the full
+        // window, and before the fill above, grow the window back with its
+        // grabber, which replaces that size (teardown blocks run last added
+        // first).
+        restoreFullSizeWindow(in: app)
+        let fullWindow = windowFrame(in: app)
+        addTeardownBlock { [weak self] in
+            guard let self, app.state == .runningForeground,
+                  self.windowFrame(in: app).width < fullWindow.width - 1 else { return }
+            _ = self.resizeWindow(to: fullWindow.size, in: app)
+        }
+
+        // A docked software keyboard: taller than a hardware keyboard's bar,
+        // along the window's bottom edge.
+        func keyboardIsDocked() -> Bool {
+            let keyboard = app.keyboards.firstMatch
+            guard keyboard.exists else { return false }
+            let frame = keyboard.frame, window = windowFrame(in: app)
+            return frame.height > 100 && frame.width >= window.width * 0.6
+                && abs(window.maxY - frame.maxY) <= 100
+        }
+        selectMainNavigation(ID.navigationMessages, in: app)
+        let search = element("messages.playerSearchField", in: app, matching: .textField)
+        tap(search, description: "Messages' player search", in: app)
+        search.typeText(" ")
+        guard pollUntil(timeout: 10, condition: keyboardIsDocked) else {
+            throw XCTSkip("Needs a docked software keyboard; detach the simulator's hardware keyboard.")
+        }
+        tap("messages.cancelPlayerSearch", in: app, matching: .button)
+        XCTAssertTrue(pollUntil(timeout: 10) { !keyboardIsDocked() }, "Cancel takes the keyboard away")
+        selectMainNavigation(ID.navigationHome, in: app)
+        element(ID.screenHome, in: app)
+
+        let window = resizeWindow(to: CGSize(width: 375, height: 548), in: app)
+        XCTAssertEqual(window.width, 375, accuracy: 1, "The window reaches its minimum width")
+        let banner = app.buttons.matching(identifier: ID.liveGameBanner).firstMatch
+        XCTAssertTrue(banner.waitForExistence(timeout: 10), "Home shows the live-game banner")
+        tap(banner, description: "Open the live game", in: app)
+        element(ID.gameDetail(SurroundUITestContract.fixtureGameID), in: app)
+
+        // Game Detail's frame in its window's own space, once it has held for
+        // a second.
+        func contentFrame(_ diagnostic: String) -> CGRect? {
+            guard let start = diagnostic.range(of: ";global=(")?.upperBound,
+                  let end = diagnostic[start...].firstIndex(of: ")") else { return nil }
+            let values = diagnostic[start..<end].split(separator: ",")
+                .compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+            return values.count == 4 ? CGRect(x: values[0], y: values[1], width: values[2], height: values[3]) : nil
+        }
+        let geometry = element("game.layout.geometry", in: app)
+        var diagnostic = "", content: CGRect?, heldSince = Date()
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            let current = geometry.value as? String ?? ""
+            if current != diagnostic { diagnostic = current; heldSince = Date() }
+            content = contentFrame(diagnostic)
+            return content != nil && Date().timeIntervalSince(heldSince) >= 1
+        }, "Expected Game Detail's layout geometry to settle; got \(diagnostic)")
+        keepScreenshot("Game Detail in the resized window", in: app)
+        if let content {
+            XCTAssertLessThanOrEqual(content.maxY, windowFrame(in: app).height + 1,
+                                     "Game Detail must lie inside its window: \(diagnostic)")
+        }
+    }
+
     func testBackToHomeAndReopeningOwnGameKeepsChannelDrafts() throws {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
