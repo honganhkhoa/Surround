@@ -71,7 +71,8 @@ enum ActivityFixtures {
         }
     }
 
-    /// Captures, other roots, and flags that rewrite the data a state owns.
+    /// Captures, other roots, and flags that rewrite the data a state owns,
+    /// the signed-out launch's user included.
     static let conflictingArguments: [String] = [
         Contract.screenshotLaunchArgument, Contract.compatibilityScreenshotLaunchArgument,
         Contract.appReviewPresentationLaunchArgument,
@@ -81,6 +82,7 @@ enum ActivityFixtures {
         Contract.messagesMarketingLaunchArgument, Contract.messagesOverflowLaunchArgument,
         Contract.messagesShortHistoryLaunchArgument, Contract.messagesDelayedHistoryLaunchArgument,
         Contract.messagesIncomingLaunchArgument, Contract.messagesLoadingLaunchArgument,
+        Contract.signedOutOfflineLaunchArgument,
     ]
 
     /// Nil without `--surround-activity-state`. The reference is floored to a second.
@@ -120,6 +122,40 @@ enum ActivityFixtures {
         }
         return Launch(state: state, clock: Clock(reference: reference.rounded(.down), isFrozen: isFrozen),
                       connection: connection)
+    }
+
+    // MARK: Plain journeys
+
+    /// Game 26268404 as plain journeys show it: still live and on the
+    /// user's move, both players with the 30 minutes its Fischer clock
+    /// starts with, and the turn starting at `reference`, recomputed there
+    /// as a state's games are, so it reads 30:00 and stands still. Its
+    /// bundled clock last moved in 2020, so it read 0:00, low on time. The
+    /// live-game banner fixture's ticking clocks and the Activity states
+    /// time it again themselves.
+    static func startPlainJourneyTurn(of game: Game, at reference: TimeInterval) {
+        guard var clock = game.clock, let system = game.gameData?.timeControl.system,
+              case .Fischer(let initialTime, _, _) = system else { return }
+        let seconds = TimeInterval(initialTime)
+        let start = reference.rounded(.down) * 1_000
+        clock.blackTime = ThinkingTime(thinkingTime: seconds, thinkingTimeLeft: seconds)
+        clock.whiteTime = ThinkingTime(thinkingTime: seconds, thinkingTimeLeft: seconds)
+        clock.lastMoveTime = start
+        clock.expiration = start + seconds * 1_000
+        clock.timeUntilExpiration = nil
+        game.clock = clock
+        game.clock?.calculateTimeLeft(with: system, pauseControl: game.pauseControl, now: start)
+    }
+
+    /// Where the time searched stands still (`ActivityElapsed.stopsAt`): in
+    /// UI-test runs, at the launch's reference second, as they show search
+    /// spinners stopped (`SearchSpinner`), so a screen that shows it never
+    /// redraws for it; but it moves in an Activity state whose clock runs,
+    /// and outside UI tests.
+    static func timeSearchedStop(isUITesting: Bool, selected: Launch?, launchSecond: TimeInterval) -> TimeInterval? {
+        guard isUITesting else { return nil }
+        guard let selected else { return launchSecond }
+        return selected.clock.isFrozen ? selected.clock.reference : nil
     }
 
     // MARK: Building
@@ -180,7 +216,9 @@ enum ActivityFixtures {
     /// How a state's service answers Accept, Reject and Withdraw itself
     /// (`--surround-activity-actions`): `delay` after each is sent, with the
     /// change OGS's next update would bring, except that under `fail-once`
-    /// each challenge's first action fails. Quick Match searches keep the socket.
+    /// each challenge's first action fails, and under `succeed-listed` the
+    /// item stays in the service's lists, as OGS keeps it until that update.
+    /// Quick Match searches keep the socket.
     struct Actions: Equatable {
         var mode: SurroundUITestContract.ActivityActions
         /// The state's clock. A game an accepted challenge starts begins at its now.
@@ -600,6 +638,18 @@ extension ActivityFixtures {
             preconditionFailure("\(error)")
         }
     }()
+
+    /// The launch's reference second, shared by every window: the selected
+    /// state's own, or else the second the first offline service was made
+    /// in (`OGSService.offlineUITestInstance()` reads it first). Plain
+    /// journeys time game 26268404 from it, and UI tests stop the time
+    /// searched there.
+    static let launchSecond: TimeInterval = selected?.clock.reference ?? Date().timeIntervalSince1970.rounded(.down)
+
+    /// Where this launch stops the time searched; nil where it moves.
+    static var timeSearchedStopsAt: TimeInterval? {
+        timeSearchedStop(isUITesting: SurroundUITestContract.isEnabled, selected: selected, launchSecond: launchSecond)
+    }
 
     /// The selected state's seed, once a window has built it.
     private(set) static var selectedSeed: Seed?

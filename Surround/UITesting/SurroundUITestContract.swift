@@ -778,6 +778,14 @@ enum SurroundUITestContract {
         }
         return actions
     }()
+
+    /// Whether this UI-testing launch starts signed out and offline, read
+    /// once. A combination it can't take stops the launch.
+    static let startsSignedOutOffline: Bool = {
+        guard isEnabled else { return false }
+        do { return try parseSignedOutOffline(ProcessInfo.processInfo.arguments) }
+        catch { preconditionFailure("\(error)") }
+    }()
     #else
     static let isEnabled = false
     static let isCapturingAppStoreScreenshots = false
@@ -944,6 +952,9 @@ enum SurroundUITestContract {
         }
         /// A row's result or failure line, which replaces its actions.
         static func activityRowResult(_ itemID: String) -> String { "activity.row.\(itemID).result" }
+        /// The Activity bar, the same on every host. Journeys measure it
+        /// with the tab bar as the screen's bottom chrome.
+        static let activityBar = "activity.bar"
 
         static let profileRengoMenuPrefix = "profile.menu.rengo."
         static let profileActiveGames = "profile.active-games"
@@ -1466,16 +1477,23 @@ extension SurroundUITestContract {
 
     /// The offline service answers Accept, Reject and Withdraw itself, 0.35 s
     /// after each is sent, where it would fail at once: `--surround-activity-actions
-    /// succeed`, or `fail-once`, where each challenge's first action fails and
-    /// later ones succeed. An accepted challenge starts an active game
+    /// succeed`; `fail-once`, where each challenge's first action fails and
+    /// later ones succeed; or `succeed-listed`, which answers as `succeed`
+    /// does but leaves each item in the service's lists, as OGS does until
+    /// its next update. An accepted challenge starts an active game
     /// (`ActivityFixtureID.acceptedGameID`); a rejected or withdrawn one leaves
-    /// its list. A Quick Match withdraw still goes to the socket, which never
-    /// confirms it. It needs an Activity state (`--surround-activity-state`).
+    /// its list, but under `succeed-listed`. A Quick Match withdraw still goes
+    /// to the socket, which never confirms it. It needs an Activity state
+    /// (`--surround-activity-state`).
     static let activityActionsLaunchArgument = "--surround-activity-actions"
 
     enum ActivityActions: String, CaseIterable {
         case succeed
         case failOnce = "fail-once"
+        case succeedListed = "succeed-listed"
+
+        /// Whether an item an action succeeded on leaves the service's lists.
+        var removesTheItem: Bool { self != .succeedListed }
     }
 
     enum ActivityActionsError: Error, Equatable, CustomStringConvertible {
@@ -1504,6 +1522,41 @@ extension SurroundUITestContract {
         guard let actions = ActivityActions(rawValue: raw) else { throw ActivityActionsError.unknownValue(raw) }
         guard arguments.contains(activityStateLaunchArgument) else { throw ActivityActionsError.needsActivityState }
         return actions
+    }
+
+    /// Starts a plain offline launch signed out, with every window's socket
+    /// down (`.reconnecting`), as after the connection is lost: root screens
+    /// with no account and no connection. Public games stay, as OGS shows
+    /// them to anyone; the user's games, challenges and conversations go.
+    /// The Debug connection commands bring the socket back.
+    static let signedOutOfflineLaunchArgument = "--surround-signed-out-offline"
+
+    enum SignedOutOfflineError: Error, Equatable, CustomStringConvertible {
+        case cannotCombine(String)
+
+        var description: String {
+            switch self {
+            case .cannotCombine(let flag): "\(signedOutOfflineLaunchArgument) can't be combined with \(flag)."
+            }
+        }
+    }
+
+    /// Captures, which keep their own data and connection; the App Review
+    /// presentation, another root; and Activity states, which build on the
+    /// plain journey's signed-in user.
+    static let signedOutOfflineConflictingArguments = [
+        screenshotLaunchArgument, compatibilityScreenshotLaunchArgument, appReviewPresentationLaunchArgument,
+        activityStateLaunchArgument,
+    ]
+
+    /// Whether the launch starts signed out and offline. Combined with a
+    /// capture, the App Review presentation or an Activity state, it throws.
+    static func parseSignedOutOffline(_ arguments: [String]) throws -> Bool {
+        guard arguments.contains(signedOutOfflineLaunchArgument) else { return false }
+        if let flag = signedOutOfflineConflictingArguments.first(where: { arguments.contains($0) }) {
+            throw SignedOutOfflineError.cannotCombine(flag)
+        }
+        return true
     }
 
     // MARK: The in-game control's drivers

@@ -207,12 +207,15 @@ struct ActivityListSource {
         }
     }
 
+    /// A waiting row's content, its time searched at `now`, or where UI
+    /// tests stop it (`ActivityElapsed.stopsAt`).
     func content(of target: WaitingTarget, waiting: ActivityModel.Waiting, now: TimeInterval) -> ActivityRowContent {
-        switch target {
+        let waited = ActivityElapsed.waited(since: waiting.since, now: now)
+        return switch target {
         case .search(let entry):
-            ActivityRowContents.quickMatch(entry, waited: now - waiting.since)
+            ActivityRowContents.quickMatch(entry, waited: waited)
         case .openChallenge(let challenge):
-            ActivityRowContents.openChallenge(challenge, isLive: waiting.isLive, waited: now - waiting.since)
+            ActivityRowContents.openChallenge(challenge, isLive: waiting.isLive, waited: waited)
         case .sentChallenge(let challenge):
             ActivityRowContents.sentChallenge(challenge, isLive: waiting.isLive)
         case .rengo(let challenge):

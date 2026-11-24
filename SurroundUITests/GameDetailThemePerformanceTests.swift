@@ -261,7 +261,9 @@ final class GameDetailThemePerformanceTests: SurroundJourneyUITestCase {
         Thread.sleep(forTimeInterval: 1)
     }
 
-    /// The fixture's Home card, scrolled fully into view.
+    /// The fixture's Home card, scrolled fully into view: below the bar,
+    /// above the bottom chrome, or 90 pt up from the window's bottom where
+    /// none is measured.
     private func revealedGame(in app: XCUIApplication) -> XCUIElement {
         let game = element(ID.homeGame(SurroundUITestContract.screenshotPrimaryGameID),
                            in: app, matching: .button)
@@ -269,8 +271,8 @@ final class GameDetailThemePerformanceTests: SurroundJourneyUITestCase {
         for _ in 0..<4 {
             let window = app.windows.firstMatch.frame
             let top = max(window.minY + 8, app.navigationBars.firstMatch.frame.maxY + 8)
-            let bottom = window.maxY - 90
             let target = game.frame
+            let bottom = bottomChromeTop(over: target, in: app).map { $0 - 8 } ?? window.maxY - 90
             if game.isHittable && target.minY >= top && target.maxY <= bottom { break }
             let upper = home.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.35))
             let lower = home.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.70))

@@ -490,24 +490,28 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
         _ button: XCUIElement,
         in app: XCUIApplication
     ) -> Bool {
-        // Home scrolls beneath its native navigation bar. Checking only the
-        // application's bounds can leave this small button near the header,
-        // where a tap may instead activate the containing game row.
-        func visibleContentFrame(window: CGRect, navigationBars: [CGRect]) -> CGRect {
+        // Home scrolls beneath its native navigation bar and above its
+        // bottom chrome. Checking only the application's bounds can leave
+        // this small button near the header, where a tap may instead
+        // activate the containing game row, or under a bar at the bottom.
+        // With no bottom chrome measured, it keeps 120 pt from the bottom.
+        func visibleContentFrame(window: CGRect, navigationBars: [CGRect], chromeTop: CGFloat?) -> CGRect {
             let barBottom = navigationBars
                 .filter { $0.width > 1 && $0.height > 1 && window.intersects($0) }
                 .map { $0.maxY }
                 .max() ?? window.minY
             let top = max(window.minY, barBottom) + 24
-            let bottom = window.maxY - 120
+            let bottom = chromeTop.map { $0 - 24 } ?? window.maxY - 120
             return CGRect(x: window.minX, y: top, width: window.width,
                           height: max(0, bottom - top))
         }
 
         func visibleContentFrame() -> CGRect {
-            visibleContentFrame(window: app.windows.firstMatch.frame,
-                                navigationBars: app.navigationBars.allElementsBoundByIndex
-                                    .filter { $0.exists }.map { $0.frame })
+            let window = app.windows.firstMatch.frame
+            return visibleContentFrame(window: window,
+                                       navigationBars: app.navigationBars.allElementsBoundByIndex
+                                           .filter { $0.exists }.map { $0.frame },
+                                       chromeTop: bottomChromeTop(over: window, in: app))
         }
 
         func visibleContentFrame(in root: XCUIElementSnapshot) -> CGRect {
@@ -518,7 +522,8 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
                 pending.append(contentsOf: node.children)
             }
             let window = root.children.first { $0.elementType == .window }?.frame ?? .null
-            return visibleContentFrame(window: window, navigationBars: navigationBars)
+            return visibleContentFrame(window: window, navigationBars: navigationBars,
+                                       chromeTop: bottomChromeTop(over: window, in: root))
         }
 
         for _ in 0..<8 {

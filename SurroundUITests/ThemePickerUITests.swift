@@ -684,19 +684,19 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
 
     /// Scrolls Home down by dragging inside its content: below the live-game
     /// banner, which can cover most of a small window at large text sizes
-    /// (and opens the game when touched), and clear of a bottom tab bar and
-    /// of the window's bottom edge, where a drag goes to the Home Screen.
+    /// (and opens the game when touched), and clear of the bottom chrome (a
+    /// bottom tab bar, the Activity bar or a docked keyboard) and of the
+    /// window's bottom edge, where a drag goes to the Home Screen.
     /// Returns whether Home moved; when it all fits there is nothing to scroll.
     private func scrollHomeDown(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) -> Bool {
         let window = app.windows.firstMatch
         let frame = window.frame
         let home = app.scrollViews.matching(identifier: ID.screenHome).firstMatch.frame
         let banner = app.buttons.matching(identifier: ID.liveGameBanner).firstMatch
-        // A tab bar counts only at the bottom: iPad floats its tab bar at the top.
-        let tabBar = app.tabBars.firstMatch
-        let tabBarTop = tabBar.exists && tabBar.frame.minY > frame.midY ? tabBar.frame.minY : frame.maxY - 60
+        // With no bottom chrome measured, 60 pt up from the window's bottom.
+        let chromeTop = bottomChromeTop(over: home, in: app) ?? frame.maxY - 60
         let top = max(home.minY, banner.exists ? banner.frame.maxY : home.minY) + 12
-        let bottom = min(home.maxY, tabBarTop) - 12
+        let bottom = min(home.maxY, chromeTop) - 12
         guard bottom - top > 40 else { return false }
         let newGame = app.descendants(matching: .any).matching(identifier: ID.homeNewGame).firstMatch
         let before = newGame.frame.minY

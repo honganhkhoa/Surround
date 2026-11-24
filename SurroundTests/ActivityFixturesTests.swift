@@ -35,13 +35,15 @@ final class ActivityFixturesTests: XCTestCase {
         return try decoder.decode(OGSGame.self, from: Data(contentsOf: url))
     }
 
-    /// The plain offline journey's start, as `OGSService.offlineUITestInstance()` builds it.
-    private func journeyState() throws -> OGSService.BootstrapState {
+    /// The plain offline journey's start, as `OGSService.offlineUITestInstance()`
+    /// builds it, with the launch's reference second at `reference`.
+    private func journeyState(at reference: TimeInterval? = nil) throws -> OGSService.BootstrapState {
         var data = try decodedGame("game-26268404")
         data.players.black.username = "OrbitFox"
         data.players.white.username = "PuzzleHeron"
         let game = Game(ogsGame: data)
         game.ogsRawData = [:]
+        Fixtures.startPlainJourneyTurn(of: game, at: reference ?? clock.reference)
         var state = OGSService.BootstrapState()
         state.user = try XCTUnwrap(game.whitePlayer)
         state.isLoggedIn = true
@@ -66,15 +68,20 @@ final class ActivityFixturesTests: XCTestCase {
         var state = try journeyState()
         let seed = Fixtures.apply(selected, to: &state, clock: clock ?? self.clock)
         state.activityActions = actions
-        let service = OGSService(
+        let service = offlineService(state, suite: suite)
+        service.superchatStore = store
+        Fixtures.finish(selected, service: service, startsSuperchat: startsSuperchat)
+        return (service, seed)
+    }
+
+    /// An offline service on `state`, as a window's in a UI-testing launch.
+    private func offlineService(_ state: OGSService.BootstrapState, suite: String? = nil) -> OGSService {
+        OGSService(
             environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
             httpClient: OGSOfflineRejectingHTTPClient(), preferences: UserDefaults(suiteName: suite ?? newSuite())!,
             ogsWebsocket: OGSOfflineNoOpWebsocket(), connectsAutomatically: false,
             usesSurroundOverviewService: false, enablesAppSideEffects: false, startsTimers: false,
             installsObservers: false, initialState: state)
-        service.superchatStore = store
-        Fixtures.finish(selected, service: service, startsSuperchat: startsSuperchat)
-        return (service, seed)
     }
 
     private func input(_ ogs: OGSService, _ place: ActivityModel.Place, _ seed: Fixtures.Seed) -> ActivityModel.Input {
@@ -262,6 +269,54 @@ final class ActivityFixturesTests: XCTestCase {
             XCTAssertEqual(white.periodsLeft, 5)
             XCTAssertEqual(white.periodTimeLeft, 30)
         }
+    }
+
+    /// Plain journeys' 26268404 is live and on the user's move, with 30
+    /// minutes from the launch second that stand still, so Activity reads
+    /// it calmly, never as low on time, as its bundled 0:00 was.
+    func testThePlainJourneysGameHasThirtyMinutesOnTheUsersMove() throws {
+        for reference in [clock.reference, clock.reference + 86_400.75] {
+            let state = try journeyState(at: reference)
+            let game = try XCTUnwrap(state.activeGames[baseID])
+            let gameClock = try XCTUnwrap(game.clock)
+            XCTAssertEqual(gameClock.currentPlayerColor, .white, "The user, White, is to move")
+            XCTAssertEqual(gameClock.whiteTime.thinkingTimeLeft, 1_800)
+            XCTAssertEqual(gameClock.blackTime.thinkingTimeLeft, 1_800)
+            XCTAssertEqual(gameClock.lastMoveTime, reference.rounded(.down) * 1_000, "The turn starts at the second")
+            XCTAssertEqual(gameClock.timeUntilExpiration, 1_800)
+
+            let ogs = offlineService(state)
+            XCTAssertTrue(ogs.liveGames.contains { $0.ogsID == baseID }, "It is still live")
+            let input = ActivityModel.Input(ogs: ogs, place: .root(isMessagesTab: false), startedGames: [:],
+                                            firstSeen: [:], sessionStart: 0, now: reference.rounded(.down))
+            let root = ActivityModel.snapshot(input)
+            XCTAssertEqual(describe(root.lead), "game-\(baseID)", "The user's move leads")
+            XCTAssertTrue(root.lowTimeGameIDs.isEmpty, "Thirty minutes aren't low on time")
+        }
+    }
+
+    /// UI tests show the time searched stopped, as they show search spinners
+    /// stopped, at the launch's reference second; an Activity state whose
+    /// clock runs keeps it moving, and so does every run outside UI tests.
+    func testUITestsStopTheTimeSearchedUnlessAStatesClockRuns() {
+        let frozen = Fixtures.Launch(state: .searching, clock: clock)
+        let running = Fixtures.Launch(state: .searching, clock: Fixtures.Clock(reference: clock.reference, isFrozen: false))
+        let second = clock.reference + 5
+        XCTAssertNil(Fixtures.timeSearchedStop(isUITesting: false, selected: nil, launchSecond: second))
+        XCTAssertNil(Fixtures.timeSearchedStop(isUITesting: false, selected: frozen, launchSecond: second))
+        XCTAssertEqual(Fixtures.timeSearchedStop(isUITesting: true, selected: nil, launchSecond: second), second,
+                       "Plain journeys and captures stop it at the launch's second")
+        XCTAssertEqual(Fixtures.timeSearchedStop(isUITesting: true, selected: frozen, launchSecond: second),
+                       clock.reference, "A frozen state stops it at its own reference")
+        XCTAssertNil(Fixtures.timeSearchedStop(isUITesting: true, selected: running, launchSecond: second),
+                     "A running state's time searched moves")
+
+        let since = clock.reference - 72   // the searching state's live search
+        XCTAssertEqual(ActivityElapsed.waited(since: since, now: clock.reference + 30, stopsAt: nil), 102)
+        XCTAssertEqual(ActivityElapsed.waited(since: since, now: clock.reference + 30, stopsAt: clock.reference), 72)
+        XCTAssertEqual(ActivityElapsed.waited(since: clock.reference + 2, now: clock.reference + 30,
+                                              stopsAt: clock.reference), 0, "A search made after the stop reads 0:00")
+        XCTAssertNil(ActivityElapsed.stopsAt, "Outside the app's UI-testing launch it moves")
     }
 
     func testLowTimeIsTheLastByoyomiPeriod() throws {
@@ -571,7 +626,8 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertTrue(Fixtures.LaunchError.unknownConnection("x").description.contains("offline"))
         for flag in [SurroundUITestContract.screenshotLaunchArgument,
                      SurroundUITestContract.compatibilityScreenshotLaunchArgument,
-                     SurroundUITestContract.homeStatesLaunchArgument] {
+                     SurroundUITestContract.homeStatesLaunchArgument,
+                     SurroundUITestContract.signedOutOfflineLaunchArgument] {
             XCTAssertEqual(failure([state, "several", flag]), .cannotCombine(flag))
         }
         XCTAssertEqual(failure([state, "several", ticks]), .cannotCombine(ticks))
@@ -620,6 +676,31 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertTrue(unknown.contains("sheet") && unknown.contains("game-popover"))
     }
 
+    /// The signed-out offline launch is the plain journey's: it refuses the
+    /// captures, the App Review presentation and the Activity states.
+    func testTheSignedOutOfflineFlagTakesAPlainLaunchOnly() throws {
+        let flag = Contract.signedOutOfflineLaunchArgument
+        let testing = Contract.launchArgument
+        func failure(_ arguments: [String]) -> Contract.SignedOutOfflineError? {
+            do {
+                _ = try Contract.parseSignedOutOffline(arguments)
+                return nil
+            } catch {
+                return error as? Contract.SignedOutOfflineError
+            }
+        }
+
+        XCTAssertFalse(try Contract.parseSignedOutOffline([testing]))
+        XCTAssertTrue(try Contract.parseSignedOutOffline([testing, flag]))
+        XCTAssertTrue(try Contract.parseSignedOutOffline([flag, testing, Contract.emptyMessagesLaunchArgument]))
+        for other in [Contract.screenshotLaunchArgument, Contract.compatibilityScreenshotLaunchArgument,
+                      Contract.appReviewPresentationLaunchArgument, Contract.activityStateLaunchArgument] {
+            XCTAssertEqual(failure([testing, flag, other]), .cannotCombine(other), other)
+        }
+        let description = Contract.SignedOutOfflineError.cannotCombine(Contract.activityStateLaunchArgument).description
+        XCTAssertTrue(description.contains(flag) && description.contains(Contract.activityStateLaunchArgument))
+    }
+
     func testTheActionFlagNeedsAStateAndAKnownMode() throws {
         let actions = Contract.activityActionsLaunchArgument
         let state = Contract.activityStateLaunchArgument
@@ -639,12 +720,15 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertNil(try parse([state, "waiting"]), "A state alone leaves its actions to OGS.")
         XCTAssertEqual(try parse([state, "waiting", actions, "succeed"]), .succeed)
         XCTAssertEqual(try parse([actions, "fail-once", state, "challenge-received"]), .failOnce)
+        XCTAssertEqual(try parse([state, "challenge-received", actions, "succeed-listed"]), .succeedListed)
 
         XCTAssertEqual(failure([state, "waiting", actions]), .missingValue)
         XCTAssertEqual(failure([state, "waiting", actions, "fail"]), .unknownValue("fail"))
         XCTAssertEqual(failure([actions, "succeed"]), .needsActivityState)
+        XCTAssertEqual(failure([actions, "succeed-listed"]), .needsActivityState)
         let unknown = Contract.ActivityActionsError.unknownValue("x").description
-        XCTAssertTrue(unknown.contains("succeed") && unknown.contains("fail-once"))
+        XCTAssertTrue(unknown.contains("succeed") && unknown.contains("fail-once") && unknown.contains("succeed-listed"))
+        XCTAssertEqual(Contract.ActivityActions.allCases.filter(\.removesTheItem), [.succeed, .failOnce])
     }
 
     func testTheActionFixtureAnswersAsOGSWould() throws {
@@ -693,6 +777,44 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertTrue(rejecting.challengesReceived.isEmpty)
     }
 
+    /// `succeed-listed` answers as `succeed` does, but every item stays in
+    /// the service's lists, as OGS keeps it until its next update: only the
+    /// app's own hiding takes it off the bar and the list.
+    func testSucceedListedAnswersButKeepsEachItemListed() throws {
+        let actions = Fixtures.Actions(mode: .succeedListed, clock: clock, delay: 0)
+
+        // Accept starts the game; the challenge stays listed.
+        let (received, receivedSeed) = try service(.challengeReceived, actions: actions)
+        let usual = try XCTUnwrap(received.challengesReceived.first { $0.id == ID.usualChallengeID })
+        let liveID = ID.acceptedGameID(ID.usualChallengeID)
+        XCTAssertEqual(try answer(received.acceptChallenge(challenge: usual)), liveID)
+        XCTAssertTrue(received.liveGames.contains { $0.ogsID == liveID }, "The accepted challenge's game starts.")
+        XCTAssertEqual(received.challengesReceived.map(\.id), [ID.usualChallengeID], "The service still lists it.")
+        let challengeItem = "challenge-\(ID.usualChallengeID)"
+        let listed = ActivityModel.snapshot(input(received, .root(isMessagesTab: false), receivedSeed))
+        XCTAssertTrue(listed.list.map(\.id).contains(challengeItem))
+        let hidden = ActivityModel.snapshot(input(received, .root(isMessagesTab: false), receivedSeed)
+            .hiding([challengeItem]))
+        XCTAssertFalse(hidden.list.map(\.id).contains(challengeItem), "Hidden, it neither leads nor counts.")
+
+        // Withdrawn and rejected challenges answer, and stay in their lists.
+        let (waiting, _) = try service(.waiting, actions: actions)
+        let open = try XCTUnwrap(waiting.openChallengeSentById[ID.openChallengeID])
+        try answer(waiting.withdrawOrDeclineChallenge(challenge: open))
+        let sent = try XCTUnwrap(waiting.challengesSent.first)
+        try answer(waiting.withdrawOrDeclineChallenge(challenge: sent))
+        XCTAssertNotNil(waiting.openChallengeSentById[ID.openChallengeID])
+        XCTAssertEqual(waiting.challengesSent.map(\.id), [sent.id])
+        XCTAssertEqual(waiting.waitingLiveGames, 3, "Nothing left its list, so nothing leaves the count.")
+
+        let (rejecting, _) = try service(.unusualChallenge, actions: actions)
+        let unusual = try XCTUnwrap(rejecting.challengesReceived.first)
+        try answer(rejecting.withdrawOrDeclineChallenge(challenge: unusual))
+        XCTAssertEqual(rejecting.challengesReceived.map(\.id), [unusual.id])
+        // Nothing fails, as under succeed: a second answer comes too.
+        try answer(rejecting.withdrawOrDeclineChallenge(challenge: unusual))
+    }
+
     func testFailOnceFailsEachChallengesFirstAction() throws {
         let (waiting, _) = try service(.waiting, actions: Fixtures.Actions(mode: .failOnce, clock: clock, delay: 0))
         let open = try XCTUnwrap(waiting.openChallengeSentById[ID.openChallengeID])
@@ -715,9 +837,10 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertEqual(plain.challengesReceived.count, 1)
     }
 
-    func testTheWaitingPillCountsEachStatesLiveSearchesAndChallenges() throws {
-        // As the observer counts them: sent and open challenges and Quick
-        // Match searches that aren't correspondence. Rengo doesn't count.
+    func testWaitingLiveGamesCountsEachStatesLiveSearchesAndChallenges() throws {
+        // As the observer counts them, for display sleep and App Review:
+        // sent and open challenges and Quick Match searches that aren't
+        // correspondence. Rengo doesn't count.
         let expected: [State: Int] = [.searching: 1, .waiting: 3, .several: 2, .rematchBothAsked: 1]
         for state in State.allCases {
             let (service, _) = try service(state)

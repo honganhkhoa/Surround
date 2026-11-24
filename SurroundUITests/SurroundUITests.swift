@@ -2470,15 +2470,26 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 [id.liveGameBanner, id.waitingBanner, id.challengeBanner, id.connectionBanner, id.messagesButton]
             )).allElementsBoundByIndex.map(\.frame)
                 .filter { !$0.isEmpty && $0.intersects(content) && $0.midY < content.midY }
-            guard let bottom = notices.map(\.maxY).max(), bottom + 8 < content.maxY else { return content }
-            return CGRect(x: content.minX, y: max(content.minY, bottom + 8), width: content.width,
-                          height: content.maxY - max(content.minY, bottom + 8))
+            var viewport = content
+            if let bottom = notices.map(\.maxY).max(), bottom + 8 < content.maxY {
+                viewport = CGRect(x: content.minX, y: max(content.minY, bottom + 8), width: content.width,
+                                  height: content.maxY - max(content.minY, bottom + 8))
+            }
+            // It ends above the bottom chrome, a tab bar, the Activity bar or
+            // a docked keyboard, wherever Home's frame ends: a drag that
+            // starts on one doesn't move Home, and a tap reaches it.
+            if let chromeTop = bottomChromeTop(over: viewport, in: app), chromeTop - 8 < viewport.maxY {
+                viewport.size.height = max(0, chromeTop - 8 - viewport.minY)
+            }
+            return viewport
         }
 
         /// Taps one of Home's buttons once a bounded drag of Home's own
-        /// content has brought its centre clear of both bars. A button not
-        /// in the tree yet lies off screen, above for games and below for the
-        /// history list's button, and Home drags toward it.
+        /// content has brought its centre clear of the bars above and below.
+        /// A button not in the tree yet lies off screen, above for games and
+        /// below for the history list's button, and Home drags toward it,
+        /// then the other way after three drags that didn't find it
+        /// (`HomeRowSearch`).
         func tapOnHome(_ identifier: String, description: String, liesAbove: Bool) {
             let home = app.scrollViews.matching(identifier: id.screenHome).firstMatch
             guard requireWithEvidence(home.waitForExistence(timeout: 10),
@@ -2488,7 +2499,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             // by shorter ones the other way, so the search settles.
             var damping: CGFloat = 1
             var draggedUp: Bool?
-            for attempt in 0...8 {
+            var search = HomeRowSearch(liesAbove: liesAbove)
+            for attempt in 0...12 {
                 // Resolve again after every rotation/scroll. Existence alone
                 // also matches cards clipped below the landscape tab bar.
                 let target = matches.firstMatch
@@ -2515,10 +2527,13 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                         return
                     }
                 }
-                guard attempt < 8 else { break }
+                guard attempt < 12 else { break }
                 let before = target.exists ? target.frame : nil
-                let delta = before.map { $0.midY - viewport.midY } ?? (liesAbove ? -viewport.height : viewport.height)
-                if let draggedUp, draggedUp != (delta >= 0) { damping /= 2 }
+                let delta = before.map { $0.midY - viewport.midY }
+                    ?? (search.dragForMissingRow() ? -viewport.height : viewport.height)
+                // Only a found button's correction shortens the next drag;
+                // turning a search the other way doesn't.
+                if before != nil, let draggedUp, draggedUp != (delta >= 0) { damping /= 2 }
                 draggedUp = delta >= 0
                 let distance = max(40, min(abs(delta), viewport.height * (before == nil ? 0.8 : 0.6)) * damping)
                 let startY = delta >= 0 ? viewport.maxY : viewport.minY

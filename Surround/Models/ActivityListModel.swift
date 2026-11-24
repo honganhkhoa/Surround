@@ -456,6 +456,27 @@ enum ActivityElapsed {
         formatter.maximumUnitCount = 2
         return formatter.string(from: whole) ?? ""
     }
+
+    /// The time searched: how long a search or one of the user's own
+    /// challenges has waited at `now`, from its `since`, or at `stopsAt`
+    /// where that stands still.
+    static func waited(since: TimeInterval, now: TimeInterval,
+                       stopsAt: TimeInterval? = ActivityElapsed.stopsAt) -> TimeInterval {
+        max(0, (stopsAt ?? now) - since)
+    }
+
+    /// Nil, so the time searched moves; in a Debug UI-test run, the second
+    /// it stands still at, as search spinners stop there (`SearchSpinner`),
+    /// so a screen that shows it never redraws each second for it. An
+    /// Activity state whose clock runs (`--surround-activity-clock running`)
+    /// keeps it moving.
+    static var stopsAt: TimeInterval? {
+        #if DEBUG && MAIN_APP
+        return ActivityFixtures.timeSearchedStopsAt
+        #else
+        return nil
+        #endif
+    }
 }
 
 /// A Quick Match row withdraws in place only when its search is one size at

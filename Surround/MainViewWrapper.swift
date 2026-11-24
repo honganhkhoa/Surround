@@ -262,6 +262,9 @@ private struct OfflineWindowHosts: ViewModifier {
 extension MainViewWrapper {
     /// Called once at launch, before any window's first update (AppDelegate).
     static func prepareOfflineUITestRoot() {
+        // A signed-out launch's flags stop the launch here when it can't
+        // take them, also under roots that make no offline service.
+        _ = SurroundUITestContract.startsSignedOutOffline
         OfflineUITestRootView.prepareFirstService()
     }
 }

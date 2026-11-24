@@ -731,12 +731,17 @@ final class GameControlUITests: SurroundJourneyUITestCase {
     /// Opens a game from Home's list once bounded drags of Home's own
     /// content have brought the row's centre clear of the bars and of the
     /// root notices, which at the largest text sizes cover a third of a
-    /// phone's screen. A row not yet in the tree lies below.
+    /// phone's screen. A row not yet in the tree lies below, and once a drag
+    /// no longer moves the list, above: at the largest text sizes it can lie
+    /// seven drags down, past the three drags after which `HomeRowSearch`
+    /// turns.
     private func openFromHome(_ gameID: Int, in app: XCUIApplication,
                               file: StaticString = #filePath, line: UInt = #line) {
         let home = app.scrollViews.matching(identifier: ID.screenHome).firstMatch
         XCTAssertTrue(home.waitForExistence(timeout: 10), "Expected Home's list", file: file, line: line)
         let row = home.buttons.matching(identifier: ID.homeGame(gameID)).firstMatch
+        var liesAbove = false
+        var listBeforeDrag: [CGRect]?
         #if !targetEnvironment(macCatalyst)
         // A drag that carries the row past the viewport is followed by
         // shorter ones the other way, so the search settles.
@@ -762,7 +767,17 @@ final class GameControlUITests: SurroundJourneyUITestCase {
             }
             #endif
             guard attempt < 10, !viewport.isEmpty else { break }
-            let delta = row.exists ? row.frame.midY - viewport.midY : viewport.height
+            let delta: CGFloat
+            if row.exists {
+                delta = row.frame.midY - viewport.midY
+                listBeforeDrag = nil
+            } else {
+                // A list dragged at its end springs back to where it stood.
+                let list = homeListFrames(home)
+                if listStoodStill(list, since: listBeforeDrag) { liesAbove.toggle() }
+                listBeforeDrag = list
+                delta = liesAbove ? -viewport.height : viewport.height
+            }
             #if targetEnvironment(macCatalyst)
             // A scroll at a point in Home's visible list. On the Mac XCTest
             // finds no hit point for Home's scroll view, nor for the app,
@@ -774,7 +789,9 @@ final class GameControlUITests: SurroundJourneyUITestCase {
             let distance = max(40, min(abs(delta), viewport.height * 0.6))
             point.scroll(byDeltaX: 0, deltaY: delta >= 0 ? -distance : distance)
             #else
-            if let draggedUp, draggedUp != (delta >= 0) { damping /= 2 }
+            // Only a found row's correction shortens the next drag; turning
+            // a search the other way doesn't.
+            if row.exists, let draggedUp, draggedUp != (delta >= 0) { damping /= 2 }
             draggedUp = delta >= 0
             let distance = max(40, min(abs(delta), viewport.height * (row.exists ? 0.6 : 0.8)) * damping)
             let startY = delta >= 0 ? viewport.maxY - 4 : viewport.minY + 4
@@ -788,8 +805,28 @@ final class GameControlUITests: SurroundJourneyUITestCase {
         XCTFail("Expected game \(gameID) on Home, clear of its bars and notices", file: file, line: line)
     }
 
+    /// Every frame in Home's list, from one snapshot.
+    private func homeListFrames(_ home: XCUIElement) -> [CGRect] {
+        guard let root = try? home.snapshot() else { return [] }
+        var frames = [CGRect]()
+        var pending: [XCUIElementSnapshot] = [root]
+        while let node = pending.popLast() {
+            frames.append(node.frame)
+            pending.append(contentsOf: node.children)
+        }
+        return frames
+    }
+
+    /// Whether a drag left Home's list where it stood, as at the list's end.
+    private func listStoodStill(_ list: [CGRect], since before: [CGRect]?) -> Bool {
+        guard let before, !list.isEmpty, list.count == before.count else { return false }
+        return zip(list, before).allSatisfy { abs($0.minY - $1.minY) < 1 }
+    }
+
     /// Home's visible content: its clipped frame in the window, below any
-    /// root notice over its top half.
+    /// root notice over its top half, and above the bottom chrome, a tab
+    /// bar, the Activity bar or a docked keyboard, wherever Home's frame
+    /// ends.
     private func homeViewport(in app: XCUIApplication) -> CGRect {
         let window = windowFrame(in: app)
         let content = app.descendants(matching: .any).matching(identifier: ID.screenHome)
@@ -802,9 +839,15 @@ final class GameControlUITests: SurroundJourneyUITestCase {
             [ID.liveGameBanner, ID.waitingBanner, ID.challengeBanner, ID.connectionBanner, ID.messagesButton]
         )).allElementsBoundByIndex.map(\.frame)
             .filter { !$0.isEmpty && $0.intersects(content) && $0.midY < content.midY }
-        guard let bottom = notices.map(\.maxY).max(), bottom + 8 < content.maxY else { return content }
-        return CGRect(x: content.minX, y: max(content.minY, bottom + 8), width: content.width,
-                      height: content.maxY - max(content.minY, bottom + 8))
+        var viewport = content
+        if let bottom = notices.map(\.maxY).max(), bottom + 8 < content.maxY {
+            viewport = CGRect(x: content.minX, y: max(content.minY, bottom + 8), width: content.width,
+                              height: content.maxY - max(content.minY, bottom + 8))
+        }
+        if let chromeTop = bottomChromeTop(over: viewport, in: app), chromeTop - 8 < viewport.maxY {
+            viewport.size.height = max(0, chromeTop - 8 - viewport.minY)
+        }
+        return viewport
     }
 
     private func openTheGameFromHome(in app: XCUIApplication) {

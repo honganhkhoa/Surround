@@ -692,18 +692,21 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             app.swipeUp()
             #else
             let frame = element.frame
-            // Only a target near the top can sit under a bar, so others skip
-            // the snapshot. A tap lands at the target's center; under a bar,
-            // it reaches the bar.
+            // Only a target near the top can sit under a bar, and only one
+            // in the bottom half under the bottom chrome, so others skip the
+            // snapshots. A tap lands at the target's center; under a bar or
+            // the keyboard, it reaches that. With no bottom chrome measured,
+            // the target keeps 100 pt clear of the window's bottom edge.
             let safeTop = frame.midY < app.frame.minY + 240
                 ? topChromeBottom(over: frame, in: app) : app.frame.minY
-            let safeBottom = app.frame.maxY - 100
+            let safeBottom = (frame.maxY > app.frame.midY ? bottomChromeTop(over: frame, in: app) : nil)
+                ?? app.frame.maxY - 100
             let overlapsTopEdge = frame.minY < app.frame.minY || frame.midY < safeTop
-            let overlapsTabBar = frame.maxY > safeBottom
+            let overlapsBottomChrome = frame.maxY > safeBottom
 
             guard !element.isHittable
                     || overlapsTopEdge
-                    || overlapsTabBar else {
+                    || overlapsBottomChrome else {
                 return
             }
 
@@ -762,6 +765,91 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
                 && $0.minX < target.maxX && target.minX < $0.maxX
         }
         return max(window.minY, topBars.map(\.maxY).max() ?? window.minY)
+    }
+
+    /// The top edge of the bottom chrome over a target's column: a tab bar
+    /// in the window's bottom half, the Activity bar and a docked keyboard,
+    /// whichever reaches highest. XCTest reports a row that scrolled under
+    /// them as hittable, but a tap or a drag there reaches the chrome. At
+    /// accessibility text sizes XCTest reports the bar taller than it draws,
+    /// which only shortens the viewport. A control that belongs to the
+    /// chrome has none over it, so it gets the window's bottom edge.
+    /// - Returns: Nil when the snapshot fails or finds no bottom chrome over
+    ///   the column: callers then keep a fixed margin from the window's
+    ///   bottom edge, as their last fallback.
+    func bottomChromeTop(over target: CGRect, in app: XCUIApplication) -> CGFloat? {
+        // One snapshot instead of a query per kind of chrome.
+        guard let root = try? app.snapshot() else { return nil }
+        // In a resized iPad window a snapshot gives the window's own frames,
+        // at the screen's origin, where queries give the screen's: the
+        // target goes into the snapshot's space and the answer comes back.
+        let snapshotWindow = root.children.first { $0.elementType == .window }?.frame ?? root.frame
+        let window = windowFrame(in: app)
+        guard !window.isNull, !snapshotWindow.isNull else { return bottomChromeTop(over: target, in: root) }
+        let dx = window.minX - snapshotWindow.minX, dy = window.minY - snapshotWindow.minY
+        return bottomChromeTop(over: target.offsetBy(dx: -dx, dy: -dy), in: root).map { $0 + dy }
+    }
+
+    /// `bottomChromeTop(over:in:)` from a snapshot of the application the
+    /// caller already holds.
+    func bottomChromeTop(over target: CGRect, in root: XCUIElementSnapshot) -> CGFloat? {
+        let window = root.children.first { $0.elementType == .window }?.frame ?? root.frame
+        var chrome = [CGRect]()
+        var chromeMembers = [CGRect]()
+        var pending = [(node: XCUIElementSnapshot, inChrome: Bool)]()
+        pending.append((root, false))
+        while let (node, inChrome) = pending.popLast() {
+            let isChrome = node.elementType == .tabBar || node.elementType == .keyboard
+                || Self.bottomBarIdentifiers.contains(node.identifier)
+            if isChrome { chrome.append(node.frame) }
+            if inChrome || isChrome { chromeMembers.append(node.frame) }
+            pending.append(contentsOf: node.children.map { (node: $0, inChrome: inChrome || isChrome) })
+        }
+        let isChromeMember = chromeMembers.contains {
+            abs($0.minX - target.minX) < 1 && abs($0.minY - target.minY) < 1
+                && abs($0.width - target.width) < 1 && abs($0.height - target.height) < 1
+        }
+        guard !isChromeMember else { return window.maxY }
+        // A tab bar counts only at the bottom: iPad floats its tab bar at
+        // the top, and a rail beside the content, such as the Duo's, runs
+        // the window's height.
+        let bottomChrome = chrome.filter {
+            !$0.isEmpty && $0.intersects(window) && $0.midY > window.midY
+                && $0.minX < target.maxX && target.minX < $0.maxX
+        }
+        return bottomChrome.map(\.minY).min()
+    }
+
+    /// The bottom bars journeys measure by identifier: the Activity bar, and
+    /// until it goes the notices probes' placeholder bar, which stands in
+    /// for it in probe runs.
+    private static var bottomBarIdentifiers: Set<String> {
+        var identifiers: Set<String> = [SurroundUITestContract.AccessibilityID.activityBar]
+        #if DEBUG
+        identifiers.insert(SurroundUITestContract.NoticesHostProbe.AccessibilityID.bar)
+        #endif
+        return identifiers
+    }
+
+    /// Where a search of Home's list drags for a row that isn't in the tree
+    /// yet: where the search expects it, above or below, and after three
+    /// drags that found nothing, the other way. Once a bar shortens Home's
+    /// viewport, a row can sit just past the edge the search left behind.
+    struct HomeRowSearch {
+        private(set) var liesAbove: Bool
+        private var missingDrags = 0
+
+        init(liesAbove: Bool) {
+            self.liesAbove = liesAbove
+        }
+
+        /// Counts one more drag for the missing row.
+        /// - Returns: Whether that drag looks above.
+        mutating func dragForMissingRow() -> Bool {
+            missingDrags += 1
+            if missingDrags == 4 { liesAbove.toggle() }
+            return liesAbove
+        }
     }
 
     @discardableResult
@@ -951,11 +1039,16 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         if dismissRegion.exists && dismissRegion.isHittable {
             dismissRegion.tap()
         } else {
-            // The window corner farthest from the popover.
+            // The window corner farthest from the popover. At the bottom, a
+            // tap on the bottom chrome would reach it, so the tap goes above
+            // the chrome over that corner, or 80 pt up where none is measured.
             let window = app.windows.firstMatch.frame
             let frame = popover.frame
             let x = frame.midX < window.midX ? window.maxX - 24 : window.minX + 24
-            let y = frame.midY < window.midY ? window.maxY - 80 : window.minY + 80
+            let corner = CGRect(x: x - 1, y: window.midY, width: 2, height: window.height / 2)
+            let y = frame.midY < window.midY
+                ? (bottomChromeTop(over: corner, in: app).map { max(window.midY, $0 - 24) } ?? window.maxY - 80)
+                : window.minY + 80
             app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
                 .withOffset(CGVector(dx: x - window.minX, dy: y - window.minY)).tap()
         }
@@ -1155,6 +1248,10 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in visibleEntry() }, object: nil)
             return waitWithFinalCheck(for: [ready], timeout: 10) == .completed
         }
+        // A tab bar that minimized on scroll lists no other tab: expand it.
+        if !visibleEntry() {
+            expandMinimizedTabBar(in: app)
+        }
         if !waitForEntry(), let sidebar = nativeSidebarToggle(in: app) {
             tap(sidebar, description: "Show navigation sidebar", in: app)
             _ = waitForEntry()
@@ -1186,6 +1283,32 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             activate(entry)
         }
         #endif
+    }
+
+    /// Expands a tab bar that minimized on scroll. Minimized, it shows the
+    /// selected tab alone, as one collapsed button, and XCTest lists no
+    /// other tab's button, so a tab can't be tapped. A tap on that button
+    /// expands it; so does a scroll back up, tried if the tap didn't.
+    /// - Returns: Whether the tab bar was minimized.
+    @discardableResult
+    func expandMinimizedTabBar(in app: XCUIApplication) -> Bool {
+        let tabBar = app.tabBars.firstMatch
+        // Only a bottom tab bar minimizes: iPad floats its tab bar at the top.
+        guard tabBar.exists, tabBar.frame.midY > windowFrame(in: app).midY else { return false }
+        let buttons = tabBar.buttons.allElementsBoundByIndex
+        // Every tab bar here has three tabs at least, signed out too.
+        guard buttons.count == 1, let collapsed = buttons.first, collapsed.isHittable else { return false }
+        XCTContext.runActivity(named: "Expand the minimized tab bar") { _ in
+            activate(collapsed)
+            guard !pollUntil(timeout: 5, condition: { tabBar.buttons.count > 1 }) else { return }
+            let window = app.windows.firstMatch
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
+                .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55)),
+                       withVelocity: .slow, thenHoldForDuration: 0.1)
+            XCTAssertTrue(pollUntil(timeout: 5, condition: { tabBar.buttons.count > 1 }),
+                          "A minimized tab bar expands for a tab tap")
+        }
+        return true
     }
 
     /// Turns a switch row to `value` by tapping its trailing control.

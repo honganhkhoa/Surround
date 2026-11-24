@@ -1251,8 +1251,11 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
 
-    /// A challenge the user withdrew, rejected or accepted leaves its list.
-    private func removeChallengeForActivityFixture(_ id: Int) {
+    /// A challenge the user withdrew, rejected or accepted leaves its list,
+    /// as OGS's next update takes it, but under `succeed-listed`, where it
+    /// stays listed, as OGS keeps it until then.
+    private func removeChallengeForActivityFixture(_ id: Int, actions: ActivityFixtures.Actions) {
+        guard actions.mode.removesTheItem else { return }
         if challengesReceived.contains(where: { $0.id == id }) { challengesReceived.removeAll { $0.id == id } }
         if challengesSent.contains(where: { $0.id == id }) { challengesSent.removeAll { $0.id == id } }
         if openChallengeSentById[id] != nil { openChallengeSentById[id] = nil }
@@ -1262,7 +1265,7 @@ class OGSService: ObservableObject {
     }
 
     /// The game an accepted challenge starts joins the active games, and the
-    /// challenge goes; the game's id answers.
+    /// challenge goes, but under `succeed-listed`; the game's id answers.
     private func startGameForActivityFixture(from challenge: any OGSSubmittedChallenge,
                                              actions: ActivityFixtures.Actions) -> Int? {
         guard let user, let template = activeGames[SurroundUITestContract.fixtureGameID],
@@ -1271,7 +1274,7 @@ class OGSService: ObservableObject {
         game.ogs = self
         activeGames[gameID] = game
         sortActiveGames(activeGames: activeGames.values)
-        removeChallengeForActivityFixture(challenge.id)
+        removeChallengeForActivityFixture(challenge.id, actions: actions)
         return gameID
     }
     #endif
@@ -4734,7 +4737,9 @@ class OGSService: ObservableObject {
         #if DEBUG && (MAIN_APP || TESTING)
         if let actions = activityActions {
             let id = challenge.id
-            return answerForActivityFixture(challenge, actions: actions) { $0.removeChallengeForActivityFixture(id) }
+            return answerForActivityFixture(challenge, actions: actions) {
+                $0.removeChallengeForActivityFixture(id, actions: actions)
+            }
         }
         #endif
         return Future<Void, Error> { promise in

@@ -988,6 +988,8 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                                in: app, matching: .scrollView)
         let hideRatings = settings.switches["Hide ranks and ratings"].firstMatch
         XCTAssertTrue(hideRatings.waitForExistence(timeout: 10))
+        // Settings' visible part: below its bar, above the bottom chrome, or
+        // 100 pt up from the window's bottom where none is measured.
         func settingsViewport() -> CGRect {
             let window = app.windows.firstMatch.frame
             let scroll = settings.frame.intersection(window)
@@ -995,7 +997,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                 .filter { $0.exists && $0.frame.intersects(scroll) }
                 .map { $0.frame.maxY }.max() ?? scroll.minY
             let top = max(scroll.minY, barBottom) + 8
-            let bottom = min(scroll.maxY, window.maxY - 100)
+            let bottom = min(scroll.maxY, bottomChromeTop(over: scroll, in: app) ?? window.maxY - 100)
             return CGRect(x: scroll.minX + 8, y: top, width: scroll.width - 16,
                           height: max(0, bottom - top))
         }
@@ -1782,13 +1784,15 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                 return nil
             }
             for _ in 0..<6 {
+                // Below the bar, above the bottom chrome, or 80 pt up from
+                // the window's bottom where none is measured.
                 let window = app.windows.firstMatch.frame
                 let pane = settings.frame.intersection(window)
                 let barBottom = app.navigationBars.allElementsBoundByIndex
                     .filter { $0.exists && $0.frame.intersects(pane) }
                     .map { $0.frame.maxY }.max() ?? max(pane.minY, window.minY + 80)
                 let top = max(pane.minY, barBottom) + 8
-                let bottom = min(pane.maxY, window.maxY - 80)
+                let bottom = min(pane.maxY, bottomChromeTop(over: pane, in: app) ?? window.maxY - 80)
                 let viewport = CGRect(x: pane.minX + 8, y: top,
                     width: max(0, pane.width - 16), height: max(0, bottom - top))
                 let frame = toggle.frame

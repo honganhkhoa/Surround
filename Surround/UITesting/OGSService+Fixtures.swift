@@ -1728,6 +1728,10 @@ extension OGSService {
     }
 
     static func offlineUITestInstance() -> OGSService {
+        // The first window fixes the launch's reference second before any
+        // service exists.
+        let launchSecond = ActivityFixtures.launchSecond
+        let startsSignedOutOffline = SurroundUITestContract.startsSignedOutOffline
         func makeService(from bootstrapState: BootstrapState) -> OGSService {
             var state = bootstrapState
             if ProcessInfo.processInfo.arguments.contains(SurroundUITestContract.emptyMessagesLaunchArgument) {
@@ -2115,7 +2119,8 @@ extension OGSService {
             // Captures keep their own data: no Activity state, superchat or Debug commands.
             let isCapture = SurroundUITestContract.isCapturingAppStoreScreenshots
                 || SurroundUITestContract.isCapturingCompatibilityScreenshots
-            let startsOffline = !isCapture && ActivityFixtures.selected?.connection == .offline
+            let startsOffline = !isCapture
+                && (ActivityFixtures.selected?.connection == .offline || startsSignedOutOffline)
             if startsOffline {
                 state.socketStatus = .reconnecting
             }
@@ -2195,6 +2200,9 @@ extension OGSService {
                 whiteUsername: "PuzzleHeron"
             )
             precondition(fixtureGame.ogsID == SurroundUITestContract.fixtureGameID)
+            // Its bundled clock would read 0:00, low on time: a frozen 30
+            // minutes on the user's move, from the launch's second.
+            ActivityFixtures.startPlainJourneyTurn(of: fixtureGame, at: launchSecond)
 
             guard let fixtureUser = fixtureGame.whitePlayer else {
                 preconditionFailure("The bundled UI-test fixture must contain a white player.")
@@ -2386,6 +2394,17 @@ extension OGSService {
                 // Default to a deterministic empty history. A journey that
                 // installed its own rows above keeps them.
                 state.finishedGamesSnapshot = []
+            }
+            if startsSignedOutOffline {
+                // No account: the public games, which OGS shows anyone, and
+                // nothing of the user's. makeService starts the socket down.
+                var signedOut = BootstrapState()
+                signedOut.isLoadingOverview = false
+                signedOut.publicGames = state.publicGames
+                signedOut.sortedPublicGames = state.sortedPublicGames
+                signedOut.cachedUsersById = state.cachedUsersById
+                signedOut.finishedGamesSnapshot = []
+                state = signedOut
             }
             if let service = ActivityFixtures.selectedService(from: state, make: { makeService(from: $0) }) {
                 return service
