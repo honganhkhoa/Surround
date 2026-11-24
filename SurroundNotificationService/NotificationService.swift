@@ -83,7 +83,7 @@ class NotificationService: UNNotificationServiceExtension {
                let opponentName = notificationContent.userInfo["opponentName"] as? String {
                 switch category {
                 case SettingKey<Any>.notificationOnNewGame.mainName:
-                    notificationContent.title = String(localized: "Game started", comment: "Notification title")
+                    notificationContent.title = String(localized: "Game started", comment: "Notification title. Also the Activity bar's first line when a live game that started elsewhere leads, and an Activity row's result once its game starts")
                     notificationContent.body = String(localized: "Your game with \(opponentName) has started.", comment: "Notification body")
                 case SettingKey<Any>.notificationOnUserTurn.mainName:
                     notificationContent.title = String(localized: "Your turn", comment: "Notification title")

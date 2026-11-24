@@ -182,7 +182,7 @@ class SurroundNotificationService {
         if let userId = userId {
             let opponentName = newGame.stoneColor(ofPlayerWithId: userId) == .black ? newGame.whiteName : newGame.blackName
             self.scheduleNotification(
-                title: String(localized: "Game started", comment: "Notification title"),
+                title: String(localized: "Game started", comment: "Notification title. Also the Activity bar's first line when a live game that started elsewhere leads, and an Activity row's result once its game starts"),
                 message: String(localized: "Your game with \(opponentName) has started.", comment: "Notification body"),
                 game: newGame,
                 setting: .notificationOnNewGame

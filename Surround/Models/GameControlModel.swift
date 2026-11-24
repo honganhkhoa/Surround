@@ -1185,13 +1185,13 @@ extension GameControlAccessibility {
 
         static func challenge(from name: String) -> String {
             String(localized: "Challenge from \(name)",
-                   comment: "In-game control, VoiceOver, after a game ends: the opponent sent the user a challenge. The value is the opponent's name")
+                   comment: "In-game control, VoiceOver, after a game ends: the opponent sent the user a challenge. Also spoken once on root screens when a live challenge first leads the Activity bar or the Now section. The value is the player's name")
         }
 
         static var activeGames: String { String(localized: "Active games") }
 
         static var activity: String {
-            String(localized: "Activity", comment: "Title of the list of the user's games, challenges, searches and messages")
+            String(localized: "Activity", comment: "Title of the list of the user's games, challenges, searches and messages. Also the Activity bar's VoiceOver name and the Mac's View menu command that opens the list")
         }
 
         /// What waits beyond the chip's or a started game's game.
@@ -1216,7 +1216,7 @@ extension GameControlAccessibility {
 
         static func waiting(_ count: Int) -> String {
             String(localized: "\(count) waiting",
-                   comment: "In-game control, VoiceOver: how many games, challenges and messages wait in Activity")
+                   comment: "In-game control, VoiceOver: how many games, challenges and messages wait in Activity. The Activity bar also shows it, as its first line when nothing live leads")
         }
 
         static var newActivityWaiting: String {

@@ -17,12 +17,11 @@
 //  row keeps at least the first ten characters of its line one, or all of
 //  it, with its clock and its action; the actions drawn as their symbols,
 //  and the Mac's taller status rows, are listed by name. The text is the
-//  hosted app bundle's own. The bar's new strings have only Malay and
-//  Indonesian so far, so in the other languages they read as English here,
-//  as they do on screen until they are translated; the strings the bar
-//  measures (the actions, the status words, "SD", ranks) are translated in
-//  every language already. The bar's own colours read at 4.5:1 on the
-//  backgrounds measured under them.
+//  hosted app bundle's own, and every string it measures, the actions, the
+//  status words, the rows' titles, "SD", ranks and the lines' samples, is
+//  translated in all 13 of the app's languages, so each language is measured
+//  in its own words. The bar's own colours read at 4.5:1 on the backgrounds
+//  measured under them.
 //
 
 import UIKit
@@ -734,7 +733,7 @@ final class ActivityBarFitTests: XCTestCase {
             suddenDeath = GameControlSuddenDeathMark(bottomBar: word("SD"))
             lineOneSamples = ["HarborMist", word("Game started"), word("Searching for a game"), word("Can’t reach OGS"),
                               word("Couldn’t withdraw"), count("%lld waiting", 3), word("Reconnecting…")]
-            lineTwoSamples = ["\(word("Your move")) · 19×19", "\(word("Challenge")) · 19×19 · \(word("Live"))",
+            lineTwoSamples = ["\(word("Your move")) · 19×19", "\(word("activity.lead.challenge")) · 19×19 · \(word("Live"))",
                               word("Reconnecting…"), count("%lld conversations", 2),
                               count("%lld correspondence challenges", 2)]
         }

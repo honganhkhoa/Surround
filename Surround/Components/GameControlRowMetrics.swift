@@ -70,7 +70,7 @@ struct GameControlRowMetrics {
         if relabelsOffline {
             labels.append(String(localized: "Reconnecting…", locale: locale))
             labels.append(String(localized: "Connecting…", locale: locale,
-                                 comment: "Clock badge while the app first connects to OGS"))
+                                 comment: "While the app first connects to OGS: a game's clock badge and title capsule, and the connection status in the Activity bar, the Now section, under root titles, in the Activity list and on the moderator cover"))
         }
         self.font = font
         let statusFont = UIFont.preferredFont(

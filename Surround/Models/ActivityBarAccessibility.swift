@@ -262,7 +262,7 @@ extension ActivityBarAccessibility {
         }
 
         static var activity: String {
-            String(localized: "Activity", comment: "Title of the list of the user's games, challenges, searches and messages")
+            String(localized: "Activity", comment: "Title of the list of the user's games, challenges, searches and messages. Also the Activity bar's VoiceOver name and the Mac's View menu command that opens the list")
         }
 
         static var reconnectingToOGS: String {
@@ -377,7 +377,7 @@ enum ActivityBarWords {
     static var reconnecting: String { String(localized: "Reconnecting…") }
 
     static var connecting: String {
-        String(localized: "Connecting…", comment: "Clock badge while the app first connects to OGS")
+        String(localized: "Connecting…", comment: "While the app first connects to OGS: a game's clock badge and title capsule, and the connection status in the Activity bar, the Now section, under root titles, in the Activity list and on the moderator cover")
     }
 
     static var connected: String { String(localized: "Connected", comment: "Connection status") }
@@ -407,7 +407,8 @@ enum ActivityBarWords {
     static var gameStarted: String { String(localized: "Game started") }
 
     static var challenge: String {
-        String(localized: "Challenge", comment: "Button and destination title for inviting this player to a Go game.")
+        String(localized: "activity.lead.challenge", defaultValue: "Challenge",
+               comment: "The first word of a challenge's line two in the Activity bar and the Now section, before its details. A noun, the challenge itself, not the profile's button that sends one")
     }
 
     static var searching: String {
@@ -416,7 +417,7 @@ enum ActivityBarWords {
 
     static func waiting(_ count: Int) -> String {
         String(localized: "\(count) waiting",
-               comment: "In-game control, VoiceOver: how many games, challenges and messages wait in Activity")
+               comment: "In-game control, VoiceOver: how many games, challenges and messages wait in Activity. The Activity bar also shows it, as its first line when nothing live leads")
     }
 }
 

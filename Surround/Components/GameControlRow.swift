@@ -254,7 +254,7 @@ struct GameControlRow: View {
 
     private func connectionText(_ words: RootConnectionLine.Words) -> Text {
         words == .connecting
-            ? Text("Connecting…", comment: "Clock badge while the app first connects to OGS")
+            ? Text("Connecting…", comment: "While the app first connects to OGS: a game's clock badge and title capsule, and the connection status in the Activity bar, the Now section, under root titles, in the Activity list and on the moderator cover")
             : Text("Reconnecting…")
     }
 

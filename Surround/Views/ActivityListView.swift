@@ -338,7 +338,7 @@ private struct ActivityListContent: View {
                 }
             }
         }
-        .navigationTitle(Text("Activity", comment: "Title of the list of the user's games, challenges, searches and messages"))
+        .navigationTitle(Text("Activity", comment: "Title of the list of the user's games, challenges, searches and messages. Also the Activity bar's VoiceOver name and the Mac's View menu command that opens the list"))
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: cardChallengeID, initial: true) { _, challengeID in card.remember(challengeID) }
         .onAppear {
