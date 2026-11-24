@@ -369,7 +369,6 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             if app.state != .runningForeground { app.launch() }
             self?.restoreFullSizeWindow(in: app)
         }
-        restoreFullSizeWindow(in: app)
         element(ID.screenHome, in: app)
 
         XCUIDevice.shared.orientation = .portrait
@@ -379,6 +378,20 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             defer { previous = window }
             return window.height > window.width && window == previous
         }, "The window turns to portrait: \(windowFrame(in: app))")
+        // iPadOS also keeps the size a window was resized to, and a turn to
+        // portrait gives it back, even after a double tap filled the window:
+        // here a size kept from an earlier resize, and after this case, the
+        // one it resizes to, in a later case's turn. So start from the full
+        // window, and before the fill above, grow the window back with its
+        // grabber, which replaces that size (teardown blocks run last added
+        // first).
+        restoreFullSizeWindow(in: app)
+        let fullWindow = windowFrame(in: app)
+        addTeardownBlock { [weak self] in
+            guard let self, app.state == .runningForeground,
+                  self.windowFrame(in: app).width < fullWindow.width - 1 else { return }
+            _ = self.resizeWindow(to: fullWindow.size, in: app)
+        }
 
         // A docked software keyboard: taller than a hardware keyboard's bar,
         // along the window's bottom edge.
