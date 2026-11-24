@@ -2038,7 +2038,7 @@ private struct GameToolbarLayout: ViewModifier {
         let model = GameControlItemModel(
             slot: value, windowClass: gameControl.windowClass, modeCount: 2,
             sizeCategory: UIContentSizeCategory(dynamicTypeSize), allowsPicker: allowsPicker,
-            game: other, challenger: nil, show: gameControl.show, openPopover: {}, isZen: true
+            game: other, challenger: nil, show: gameControl.show, openPopover: {}, role: .zen
         )
         if exitsZenFromContent { return (.hidden, model) }
         // Where the chip and Exit would reach over the board, the content

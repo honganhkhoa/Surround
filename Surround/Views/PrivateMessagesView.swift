@@ -553,12 +553,19 @@ private struct MessagesConversationRow: View {
 
 /// Wide conversation actions belong to the content header. Compact actions use
 /// native navigation chrome; Profile and Challenge retain the stack's Back.
+/// While a live game needs you, a control before Challenge and Profile shows
+/// it (`ConversationGameControlPlacement`); a tap opens it through Home, and
+/// the draft stays.
 struct MessagesConversationView: View {
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
     @EnvironmentObject private var navigation: StackRouter
     @Environment(\.owningStackRoute) private var owningStackRoute
     @Environment(\.isVerticalToolbar) private var isVerticalToolbar
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.gameControlWindowClass) private var gameControlWindowClass
     /// Set only in a stack with an Activity list, whose status turns the
     /// composer off while offline.
     @Environment(\.activityConnection) private var activityConnection
@@ -566,14 +573,25 @@ struct MessagesConversationView: View {
     @Environment(\.connectionStatus) private var windowConnection
     @Environment(\.iPadTabContext) private var iPadTabContext
     @Environment(\.duoTabContext) private var duoTabContext
+    /// Redraws the control where time alone changes it: as a started game's
+    /// lead ends.
+    @StateObject private var gameControlDeadlines = GameControlDeadlines()
     let peer: OGSUser
     var isPane = false
 
     var body: some View {
-        conversationContent
+        // One read of the window's state for the control, in the pass that
+        // builds the bar. A pushed conversation's is the pass that hides the
+        // tab bar, so the item is there or not from the first frame, and a
+        // pass inside that call gives the same answer.
+        let control = gameControl()
+        conversationContent(headingControl: control.item(at: .headingChip))
         .modifier(MessagesConversationNavigation(isPane: isPane, title: peer.username))
         .toolbar {
             if isPane && isVerticalToolbar {
+                if let rail = control.item(at: .railIcon) {
+                    AppVerticalToolbarGroup { rail }
+                }
                 AppVerticalToolbarGroup {
                     challengeButton
                     profileButton
@@ -581,11 +599,22 @@ struct MessagesConversationView: View {
             } else if !isPane {
                 ToolbarItem(placement: .principal) { peerHeading }
                 if isVerticalToolbar {
+                    if let rail = control.item(at: .railIcon) {
+                        AppVerticalToolbarGroup { rail }
+                    }
                     AppVerticalToolbarGroup {
                         challengeButton
                         profileButton
                     }
                 } else {
+                    // Independent conditions (one is true at most), so the
+                    // icon and the chip are each an item of their own.
+                    if let icon = control.item(at: .barIcon) ?? control.item(at: .macToolbarIcon) {
+                        ToolbarItem(placement: .topBarTrailing) { icon }
+                    }
+                    if let chip = control.item(at: .barChip) {
+                        ToolbarItem(placement: .topBarTrailing) { chip }
+                    }
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         challengeButton
                         profileButton
@@ -597,11 +626,81 @@ struct MessagesConversationView: View {
         // Pushed or in the side pane, a conversation hides Activity's bar.
         // The pane keeps the tab bar.
         .activityPlace(.conversation)
+        // Off screen no deadline, which stops the control's timer.
+        .onChange(of: isOnScreen ? control.deadlines : GameControlDeadlines.Plan(), initial: true) { _, plan in
+            gameControlDeadlines.follow(plan, now: control.now)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("messages.conversation")
     }
 
-    private var conversationContent: some View {
+    private static var isCatalyst: Bool {
+        #if targetEnvironment(macCatalyst)
+        true
+        #else
+        false
+        #endif
+    }
+
+    /// On top of its stack, in the window's selected tab, as the thread is
+    /// marked read.
+    private var isOnScreen: Bool {
+        navigation.path.last == owningStackRoute && navigation.isActive
+    }
+
+    /// The control from one read of the window's state
+    /// (`ActivityModel.conversationControl`), where its placement shows one.
+    /// The window's traits choose the placement, never a measured width.
+    private func gameControl() -> ConversationGameControl {
+        let placement = ConversationGameControlPlacement(.init(
+            isPane: isPane, isInActivityStack: activityConnection != nil, isVerticalToolbar: isVerticalToolbar,
+            isCompactWidth: horizontalSizeClass == .compact, isCompactHeight: verticalSizeClass == .compact,
+            isCatalyst: Self.isCatalyst))
+        guard let form = placement.form else {
+            return ConversationGameControl(placement: placement, item: nil, deadlines: .init(), now: 0)
+        }
+        let input = ActivityModel.Input.window(ogs: ogs, nav: nav, place: .conversation)
+        let slot = GameControlSlot(conversation: input)
+        var control = ConversationGameControl(placement: placement, item: nil,
+                                              deadlines: .init(conversation: input, slot: slot), now: input.now)
+        guard let slot, let gameID = slot.gameID,
+              let game = ogs.liveGames.first(where: { $0.ogsID == gameID }) else { return control }
+        // Through Home, as every route but Home's own shows another game:
+        // the stacks pop, and the draft stays in the window's store.
+        let show: (Int) -> Void = { [ogs, nav] id in
+            guard let game = ogs.liveGames.first(where: { $0.ogsID == id }) else { return }
+            GameControlSwitch.throughHome.perform(game, navigation: nav) { _ in }
+        }
+        if form.isNative, let native = GameControlNativeItem(slot, allowsPicker: false) {
+            // Spoken as Zen's: no time in the label, and a tap shows the game.
+            let spoken = GameControlAccessibility(slot, form: form, isZen: true, allowsPicker: false,
+                                                  name: Self.opponentName(in: game))
+            if #available(iOS 26.0, *) {
+                control.item = AnyView(GameControlZenNativeButton(item: native, label: spoken.label,
+                                                                  hint: spoken.hint, role: .conversation) {
+                    show(gameID)
+                })
+            } else {
+                control.item = AnyView(GameControlBadgedIconButton(item: native, label: spoken.label,
+                                                                   hint: spoken.hint, role: .conversation) {
+                    show(gameID)
+                })
+            }
+        } else {
+            control.item = AnyView(GameControlZenTopBarItem(model: GameControlItemModel(
+                slot: slot, windowClass: gameControlWindowClass, modeCount: 0,
+                sizeCategory: UIContentSizeCategory(dynamicTypeSize), allowsPicker: false, game: game,
+                challenger: nil, show: show, openPopover: {}, role: .conversation)))
+        }
+        return control
+    }
+
+    private static func opponentName(in game: Game) -> String {
+        guard let color = game.userStoneColor else { return "" }
+        return game.currentPlayer(with: color.opponentColor())?.username ?? ""
+    }
+
+    private func conversationContent(headingControl: AnyView?) -> some View {
         VStack(spacing: 0) {
             if isPane {
                 HStack(spacing: 10) {
@@ -610,6 +709,7 @@ struct MessagesConversationView: View {
                     Spacer(minLength: 0)
                     if !isVerticalToolbar {
                         HStack(spacing: 0) {
+                            if let headingControl { headingControl }
                             challengeButton
                             profileButton
                         }
@@ -714,6 +814,23 @@ struct MessagesConversationView: View {
         }
         .accessibilityLabel(Text("View \(peer.username)’s profile"))
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileMessageToolbarEntry(peer.id))
+    }
+}
+
+/// A conversation's control in one pass: where it goes and the item it
+/// draws there.
+private struct ConversationGameControl {
+    var placement: ConversationGameControlPlacement
+    /// Nil while no live game needs you, or where no control goes.
+    var item: AnyView?
+    /// When time alone changes the control.
+    var deadlines: GameControlDeadlines.Plan
+    /// When the state was read, in seconds since 1970.
+    var now: TimeInterval
+
+    /// The item, where the control goes at `placement`.
+    func item(at placement: ConversationGameControlPlacement) -> AnyView? {
+        self.placement == placement ? item : nil
     }
 }
 

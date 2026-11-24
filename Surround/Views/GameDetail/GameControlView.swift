@@ -15,7 +15,9 @@
 //  In Zen only another live game on your move shows, beside Exit: a circle
 //  where Exit is drawn in the game's content, the top-bar chip before a
 //  native Exit, and the system's icon on the Mac and the Duo's rail. A tap
-//  shows that game; Zen has no popover.
+//  shows that game; Zen has no popover. A conversation's top bar shows a
+//  live game that needs you with Zen's items, its own identifier and a tap
+//  that opens the game through Home.
 //  GameControlModel.swift holds the rules each form follows.
 //
 
@@ -47,8 +49,10 @@ struct GameControlItemModel {
     var show: (Int) -> Void
     /// Opens the control's popover.
     var openPopover: () -> Void
-    /// Zen's control, whose tap shows the chip's game and nothing else.
-    var isZen = false
+    /// Which control the item is, and the identifier XCTest finds it by:
+    /// Game Detail's Active games slot, or Zen's or a conversation's, whose
+    /// tap shows the game and nothing else.
+    var role = GameControlItemRole.activeGames
     /// The item's popover is open, as its bar item says. A hold that opened
     /// it has ended when it closes.
     var isPopoverPresented = false
@@ -95,7 +99,9 @@ struct GameControlTopBarItem: View {
 
 /// Zen's control in a top bar, before a native Exit: the top-bar chip for
 /// another live game on your move, in the chip's fixed 96 pt frame, which a
-/// tap shows. Zen has no popover.
+/// tap shows. Zen has no popover. A conversation's top bar and its pane's
+/// heading show a live game that needs you with it too, under the role
+/// its model names.
 struct GameControlZenTopBarItem: View {
     let model: GameControlItemModel
 
@@ -165,7 +171,8 @@ private struct GameControlIconButton: View {
 }
 
 /// A custom item's button, and the Zen circle's: a tap does the state's tap
-/// and a touch and hold opens the popover, or in Zen does nothing. Its press
+/// and a touch and hold opens the popover, or does nothing where a tap only
+/// shows the game, as in Zen and in a conversation. Its press
 /// timing keeps a release 0.5 s or more after the press began from ever
 /// switching games, even where the hold didn't fire.
 private struct GameControlButton<Label: View>: View {
@@ -201,9 +208,7 @@ private struct GameControlButton<Label: View>: View {
                 Button(GameControlAccessibility.openActivity) { perform(.openPopover) }
             }
         }
-        .accessibilityIdentifier(model.isZen
-            ? SurroundUITestContract.AccessibilityID.gameZenControl
-            : SurroundUITestContract.AccessibilityID.gameActiveGamesButton)
+        .accessibilityIdentifier(model.role.accessibilityIdentifier)
     }
 
     private func perform(_ action: GameControlAction) {
@@ -314,9 +319,9 @@ extension GameControlFace {
         board = game?.currentPosition
         challenger = model.challenger
         interaction = GameControlInteraction(model.slot, form: form, windowClass: model.windowClass,
-                                             isZen: model.isZen)
+                                             isZen: model.role.isTapOnly)
         accessibility = GameControlAccessibility(
-            model.slot, form: form, windowClass: model.windowClass, isZen: model.isZen,
+            model.slot, form: form, windowClass: model.windowClass, isZen: model.role.isTapOnly,
             allowsPicker: model.allowsPicker, name: name, timeLeft: timeLeft, isSuddenDeath: isSuddenDeath
         )
     }
@@ -514,12 +519,16 @@ struct GameControlNativeButton: View {
 
 /// Zen's control on the Mac and on the Duo's rail in Closed portrait,
 /// before Exit: the system's grid icon with a badge of 1 for another live
-/// game on your move. A tap or a click shows that game. Its label names the
-/// game without its time, and on the Mac it is also the tooltip.
+/// game on your move. A conversation shows a live game that needs you with
+/// it too, in a top bar, on the rail and in the Mac's toolbar. A tap or a
+/// click shows that game. Its label names the game without its time, and on
+/// the Mac it is also the tooltip.
 struct GameControlZenNativeButton: View {
     let item: GameControlNativeItem
     let label: String
     let hint: String?
+    /// Zen's control or a conversation's: the identifier XCTest finds it by.
+    var role = GameControlItemRole.zen
     let show: () -> Void
 
     var body: some View {
@@ -538,7 +547,53 @@ struct GameControlZenNativeButton: View {
         .help(Text(verbatim: label))
         #endif
         .accessibilityHint(Text(verbatim: hint ?? ""))
-        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenControl)
+        .accessibilityIdentifier(role.accessibilityIdentifier)
+    }
+}
+
+/// A conversation's control as the small icon in a top bar before iOS 26,
+/// whose bars badge no item: the system's grid icon with the badge drawn as
+/// the system draws one, in the native item's 44 pt frame. A tap shows that
+/// game. Its label names the game without its time.
+struct GameControlBadgedIconButton: View {
+    let item: GameControlNativeItem
+    let label: String
+    let hint: String?
+    let role: GameControlItemRole
+    let show: () -> Void
+
+    var body: some View {
+        // The container keeps the toolbar from synthesizing a native item
+        // out of the label, which would drop the badge.
+        ZStack {
+            Button(action: show) {
+                Image(systemName: item.icon.systemName)
+                    .font(.body)
+                    .imageScale(.large)
+                    .frame(width: 44, height: 44)
+                    .overlay(alignment: .topTrailing) { badge }
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(Text(verbatim: label))
+            .accessibilityHint(Text(verbatim: hint ?? ""))
+            .accessibilityIdentifier(role.accessibilityIdentifier)
+        }
+        .frame(width: 44, height: 44)
+    }
+
+    /// Fixed in size, as the system's badge is, so the 44 pt frame holds it
+    /// at every text size.
+    @ViewBuilder private var badge: some View {
+        if case .count(let count) = item.badge {
+            Text(count, format: .number)
+                .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.white)
+                .padding(.horizontal, 5)
+                .frame(minWidth: 18, minHeight: 18)
+                .background(Capsule().fill(Color(uiColor: .systemRed)))
+                .padding(.top, 2)
+                .accessibilityHidden(true)
+        }
     }
 }
 
@@ -803,6 +858,22 @@ final class GameControlDeadlines: ObservableObject {
 
     deinit {
         timer?.invalidate()
+    }
+}
+
+extension GameControlDeadlines.Plan {
+    /// A conversation's control (`ActivityModel.conversationControl`): at
+    /// the latest started game's end, and each second while a started game
+    /// leads and a live game is on your move, which takes the lead once low
+    /// on time. Running clocks keep the order of the games on your move, so
+    /// nothing else changes with time alone.
+    @MainActor
+    init(conversation input: ActivityModel.Input, slot: GameControlSlot?) {
+        var startedLeads = false
+        if case .gameStarted? = slot { startedLeads = true }
+        self.init(leadEnds: input.startedGames.values.max().map { $0 + ActivityModel.startedLeadDuration },
+                  ticksEachSecond: !ActivityListSource.isClockFrozen && startedLeads
+                      && input.liveGames.contains(where: \.isYourMove))
     }
 }
 
