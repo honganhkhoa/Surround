@@ -302,71 +302,13 @@ struct NoticesPlaceholderNow: View {
     }
 }
 
-// MARK: - SwiftUI TabView
-
-/// MainView.swiftUITabs: SwiftUI's bottom accessory, the tab bar's minimize
-/// behavior and the Mac sidebar's Now section.
-struct NoticesHostProbeTabs: ViewModifier {
-    let places: ActivityPlaceRegistry
-    let root: RootView
-
-    func body(content: Content) -> some View {
-        if let probe = SurroundUITestContract.noticesHostProbe {
-            content.modifier(Probed(probe: probe, places: places, root: root))
-        } else {
-            content
-        }
-    }
-
-    private struct Probed: ViewModifier {
-        let probe: SurroundUITestContract.NoticesHostProbe
-        @ObservedObject var places: ActivityPlaceRegistry
-        let root: RootView
-        @State private var afterLaunch = false
-
-        func body(content: Content) -> some View {
-            let facts = ActivityHostPolicy.Facts.current(.swiftUITabView)
-            let hosts = ActivityHostPolicy.hosts(for: facts, overrides: .init(probe, afterLaunch: afterLaunch))
-            let isEnabled = probe.showsBar && hosts.bar == .swiftUIAccessory && !places.hidesActivity(in: root)
-            content
-                .activityBottomAccessory(isEnabled: isEnabled) {
-                    NoticesPlaceholderBar(host: .swiftUIAccessory, root: nil)
-                }
-                .activityTabBarMinimizeBehavior(hosts.minimize)
-                .modifier(MacNow(shows: probe.showsNow))
-                .onChange(of: isEnabled, initial: true) { _, isEnabled in
-                    NoticesHostProbeLog.event("bar.accessory", [
-                        ("container", ActivityHostPolicy.Container.swiftUITabView.rawValue),
-                        ("action", isEnabled ? "set" : "cleared"), ("reason", "state"), ("root", root.rawValue),
-                    ])
-                }
-                .onChange(of: hosts, initial: true) { _, hosts in
-                    NoticesHostProbeLog.event("host.decision", NoticesHostProbeLog.fields(facts, hosts),
-                                              key: "decision.swiftUITabView")
-                }
-                .onAppear { DispatchQueue.main.async { afterLaunch = true } }
-        }
-    }
-
-    /// Branches on a launch constant, so the TabView keeps its identity.
-    private struct MacNow: ViewModifier {
-        let shows: Bool
-
-        func body(content: Content) -> some View {
-            if shows {
-                content.activityMacSidebarBottomBar { NoticesPlaceholderNow(host: .macSidebar) }
-            } else {
-                content
-            }
-        }
-    }
-}
-
 // MARK: - Root screens
 
-/// AppNavigationStack's root content: the custom bar and the root subtitle.
-/// Plain content without a probe, in presented stacks and in roots without
-/// tabs.
+/// AppNavigationStack's root content: the placeholder custom bar in the iPad
+/// and iOS 27 containers, whose real bars aren't built yet, and the root
+/// subtitle. The iPhone's SwiftUI TabView has its real bars
+/// (ActivityBarHosts.swift). Plain content without a probe, in presented
+/// stacks and in roots without tabs.
 struct NoticesHostProbeRoot: ViewModifier {
     let rootView: RootView?
 
@@ -411,8 +353,8 @@ struct NoticesHostProbeRoot: ViewModifier {
 
         func body(content: Content) -> some View {
             let hosts = ActivityHostPolicy.hosts(for: facts, overrides: .init(probe, afterLaunch: true))
-            let shows = probe.showsBar && hosts.bar == .customBar && !places.hidesActivity(in: root)
-                && !(probe.barKeyboard == .hide && keyboardShows)
+            let shows = probe.showsBar && hosts.bar == .customBar && facts.container != .swiftUITabView
+                && !places.hidesActivity(in: root) && !(probe.barKeyboard == .hide && keyboardShows)
             let subtitled = probe.subtitle != nil && facts.showsPlaceholderSubtitle
             content
                 .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { insets in

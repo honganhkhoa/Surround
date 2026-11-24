@@ -29,6 +29,17 @@ extension StackRoute {
         default: false
         }
     }
+
+    /// Whether the screen draws Activity's custom bar where its window hosts
+    /// one: every pushed screen but Game Detail's routes, a linked game's
+    /// loading and error screens included, and conversations.
+    var drawsActivityBar: Bool {
+        switch self {
+        case .homeGame, .historyGame, .publicGame, .game, .messagesConversation, .conversation: false
+        case .gameHistory, .waitingGames, .playerHistory, .playerActiveGames, .playerAbout, .profile, .challenge,
+             .opponentPicker, .activityItem: true
+        }
+    }
 }
 
 enum OpponentSelectionAction: Equatable {
@@ -698,6 +709,7 @@ struct AppNavigationLink<Label: View, Destination: View>: View {
     var body: some View {
         NavigationLink {
             destination()
+                .activityCustomBar(.pushed)
                 .modifier(AppNavigationContentLayout())
         } label: {
             label
@@ -714,6 +726,7 @@ extension View {
     ) -> some View {
         navigationDestination(isPresented: isPresented) {
             destination()
+                .activityCustomBar(.pushed)
                 .modifier(AppNavigationContentLayout())
         }
     }
@@ -802,6 +815,10 @@ struct AppNavigationStack<Content: View>: View {
                 #if DEBUG
                 .modifier(NoticesHostProbeRoot(rootView: rootView))
                 #endif
+                // Each screen draws its own custom bar, so it slides with
+                // each push and pop; a route that shows a game or a
+                // conversation draws none.
+                .activityCustomBar(.root)
                 .modifier(AppNavigationContentLayout())
                 .environment(\.owningStackRoute, nil)
                 .navigationDestination(for: StackRoute.self) { route in
@@ -809,6 +826,7 @@ struct AppNavigationStack<Content: View>: View {
                         #if DEBUG && targetEnvironment(macCatalyst)
                         .modifier(NoticesHostProbeDestination())
                         #endif
+                        .activityCustomBar(route.drawsActivityBar ? .pushed : nil)
                         .modifier(AppNavigationContentLayout(overlaysIPadSidebar: route.showsGameDetail))
                         .environment(\.owningStackRoute, route)
                 }

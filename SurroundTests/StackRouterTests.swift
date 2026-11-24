@@ -254,6 +254,24 @@ final class StackRouterTests: XCTestCase {
         XCTAssertFalse(StackRoute.activityItem("challenge-95002").showsGameDetail)
     }
 
+    func testOnlyGamesAndConversationsDrawNoActivityBar() {
+        let id = UUID()
+        let noBar: [StackRoute] = [.homeGame, .historyGame, .publicGame, .game(26268404),
+                                   .messagesConversation(765826), .conversation(765826)]
+        let bar: [StackRoute] = [.gameHistory, .waitingGames, .playerHistory(playerID: 101, opponentID: nil),
+                                 .playerActiveGames(101), .playerAbout(101), .profile(playerID: 101, selectionID: nil),
+                                 .challenge(id), .opponentPicker(id), .activityItem("challenge-95002")]
+        for route in noBar {
+            XCTAssertFalse(route.drawsActivityBar, "\(route) hides the bar")
+        }
+        for route in bar {
+            XCTAssertTrue(route.drawsActivityBar, "\(route) draws the bar")
+        }
+        // Every route that shows a game hides it, so a push never adds an
+        // inset under a game.
+        XCTAssertTrue((noBar + bar).filter(\.showsGameDetail).allSatisfy { !$0.drawsActivityBar })
+    }
+
     func testProfileListsRetainOnlyTheirOwnPayloads() throws {
         let router = Router()
         let service = OGSService.previewInstance(user: firstPlayer)

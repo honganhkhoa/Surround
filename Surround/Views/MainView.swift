@@ -325,8 +325,10 @@ struct MainView: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .modifier(MainTabPlacement(horizontalSizeClass: horizontalSizeClass))
-        #if DEBUG
-        .modifier(NoticesHostProbeTabs(places: nav.activityPlaces, root: nav.main.rootView))
+        // The Mac has no accessory and no minimizing, so it attaches neither.
+        #if !targetEnvironment(macCatalyst)
+        .modifier(ActivityBottomAccessoryHost(bar: nav.activityBar, places: nav.activityPlaces,
+                                              root: nav.main.rootView))
         #endif
     }
 

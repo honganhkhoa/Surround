@@ -72,7 +72,7 @@ private struct ActivityAccessoryPlacementReader: View {
             }
     }
 
-    private static func hostPlacement(
+    static func hostPlacement(
         _ placement: TabViewBottomAccessoryPlacement?
     ) -> ActivityHostPolicy.AccessoryPlacement {
         if placement == nil { return .notInAccessory }
@@ -81,7 +81,41 @@ private struct ActivityAccessoryPlacementReader: View {
         return .unspecified
     }
 }
+
+@available(iOS 26.0, *)
+private struct ActivityAccessoryPlacementEnvironment<Content: View>: View {
+    @Environment(\.tabViewBottomAccessoryPlacement) private var placement
+    let content: (ActivityHostPolicy.AccessoryPlacement) -> Content
+
+    var body: some View {
+        content(ActivityAccessoryPlacementReader.hostPlacement(placement))
+    }
+}
 #endif
+
+/// Draws `content` for where SwiftUI places the bottom accessory it sits
+/// in, read from the environment in body, so it keeps no state of its own:
+/// from iOS 26 with the 26.2 SDK. Elsewhere, Catalyst included, for
+/// `.unavailable`.
+struct ActivityAccessoryPlacementReading<Content: View>: View {
+    private let content: (ActivityHostPolicy.AccessoryPlacement) -> Content
+
+    init(@ViewBuilder content: @escaping (ActivityHostPolicy.AccessoryPlacement) -> Content) {
+        self.content = content
+    }
+
+    var body: some View {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 7.2.5)
+        if #available(iOS 26.0, *) {
+            ActivityAccessoryPlacementEnvironment(content: content)
+        } else {
+            content(.unavailable)
+        }
+        #else
+        content(.unavailable)
+        #endif
+    }
+}
 
 extension View {
     /// SwiftUI's bottom accessory, hidden while `isEnabled` is false: iOS 26.1
