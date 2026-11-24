@@ -60,6 +60,50 @@ final class GameControlModelTests: XCTestCase {
         XCTAssertNil(GameControlSlot(Model.Input(), context: .home), "A root screen has no slot.")
     }
 
+    func testAHiddenChallengeLeavesTheControlsPlusN() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1), yourMove(2, left: 100)]
+        input.challengesReceived = [Model.Challenge(id: 5, isLive: true), Model.Challenge(id: 6, isLive: false)]
+        input.place = .game(id: 90, isOwnGame: true, isLive: false, isOver: false)
+        XCTAssertEqual(GameControlSlot(input, context: .home), .chip(gameID: 2, plusN: 3, hasDot: false))
+        XCTAssertEqual(GameControlSlot(input.hiding(["challenge-5"]), context: .home),
+                       .chip(gameID: 2, plusN: 2, hasDot: false),
+                       "A challenge rejected in the popover leaves +N at once, before OGS's next update.")
+    }
+
+    // MARK: A conversation's control
+
+    func testAConversationsSlotShowsTheGameThatNeedsYouWithNothingBeyondIt() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1, left: 200), yourMove(2, left: 100)]
+        input.challengesReceived = [Model.Challenge(id: 5, isLive: true)]
+        input.place = .conversation
+        XCTAssertEqual(GameControlSlot(conversation: input), .chip(gameID: 2, plusN: 0, hasDot: false),
+                       "Least time first, with no +N and no dot.")
+
+        input.liveGames.append(Model.LiveGame(id: 7, isYourMove: false))
+        input.startedGames = [7: 1_000]
+        input.now = 1_005
+        XCTAssertEqual(GameControlSlot(conversation: input), .gameStarted(gameID: 7, plusN: 0, hasDot: false))
+
+        input.liveGames = [Model.LiveGame(id: 3, isYourMove: false)]
+        input.startedGames = [:]
+        XCTAssertNil(GameControlSlot(conversation: input), "Nothing shows unless a live game needs you.")
+
+        input.liveGames = [yourMove(1)]
+        input.place = .root(isMessagesTab: true)
+        XCTAssertNil(GameControlSlot(conversation: input), "Only a conversation's input gives the slot.")
+    }
+
+    func testEachItemRoleHasItsOwnIdentifier() {
+        typealias ID = SurroundUITestContract.AccessibilityID
+        XCTAssertEqual(GameControlItemRole.activeGames.accessibilityIdentifier, ID.gameActiveGamesButton)
+        XCTAssertEqual(GameControlItemRole.zen.accessibilityIdentifier, ID.gameZenControl)
+        XCTAssertEqual(GameControlItemRole.conversation.accessibilityIdentifier, "messages.conversation.gameControl")
+        XCTAssertEqual(Set(GameControlItemRole.allCases.map(\.accessibilityIdentifier)).count,
+                       GameControlItemRole.allCases.count, "A journey for one control never passes against another.")
+    }
+
     // MARK: The window
 
     private typealias WindowClass = GameControlWindowClass

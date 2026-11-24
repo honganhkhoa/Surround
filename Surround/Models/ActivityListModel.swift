@@ -52,6 +52,11 @@ struct ActivityRequest: Identifiable, Equatable {
         /// Game Detail's in-game control, which presents the list as its own
         /// popover.
         case gameControl
+        /// The Activity bar: its lead, +N or View.
+        case activityBar
+        /// The iPad's and the Mac's Now section: a row, its View, or All
+        /// activity.
+        case nowSection
     }
 
     /// Where the list starts.
@@ -60,6 +65,10 @@ struct ActivityRequest: Identifiable, Equatable {
         /// Scrolled to Messages, as the Messages button opens it. With
         /// exactly one unread conversation, that one opens at once.
         case messages
+        /// With this item's full card pushed, as View in the bar or a Now
+        /// row asks: a challenge sent to the user, or one of the user's own
+        /// waiting items, by its `ActivityModel.Item.id`.
+        case item(String)
 
         /// The peer whose conversation the list opens at once: with
         /// Messages in focus and exactly one unread conversation listed.
@@ -70,6 +79,16 @@ struct ActivityRequest: Identifiable, Equatable {
                 return conversation.peerID
             }
             return unread.count == 1 ? unread[0] : nil
+        }
+
+        /// The item whose card the list pushes at once
+        /// (`StackRoute.activityItem`): the item in focus, while the list
+        /// still has it and it has a card. A card whose item has gone would
+        /// only pop itself.
+        func cardToOpen(in list: [ActivityModel.Item]) -> String? {
+            guard case .item(let itemID) = self, ActivityItemRef.parse(itemID) != nil,
+                  list.contains(where: { $0.id == itemID }) else { return nil }
+            return itemID
         }
     }
 

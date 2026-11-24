@@ -85,6 +85,9 @@
 		5C4E00432026111400000043 /* GameControlUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00422026111400000042 /* GameControlUITests.swift */; };
 		5C4E00512026111400000051 /* MainThreadWatchdog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00502026111400000050 /* MainThreadWatchdog.swift */; };
 		5C4E00532026111400000053 /* GameControlDriverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00522026111400000052 /* GameControlDriverTests.swift */; };
+		5C5E00022026112000000002 /* ActivityBarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00012026112000000001 /* ActivityBarModel.swift */; };
+		5C5E00032026112000000003 /* ActivityBarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00012026112000000001 /* ActivityBarModel.swift */; };
+		5C5E00052026112000000005 /* ActivityBarModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00042026112000000004 /* ActivityBarModelTests.swift */; };
 		5FEB00012026111700000001 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
 		5FEB00032026111700000003 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
 		5FEB00042026111700000004 /* VoiceCountdownAnnouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00052026111700000005 /* VoiceCountdownAnnouncer.swift */; };
@@ -667,6 +670,8 @@
 		5C4E00422026111400000042 /* GameControlUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlUITests.swift; sourceTree = "<group>"; };
 		5C4E00502026111400000050 /* MainThreadWatchdog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainThreadWatchdog.swift; sourceTree = "<group>"; };
 		5C4E00522026111400000052 /* GameControlDriverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlDriverTests.swift; sourceTree = "<group>"; };
+		5C5E00012026112000000001 /* ActivityBarModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarModel.swift; sourceTree = "<group>"; };
+		5C5E00042026112000000004 /* ActivityBarModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarModelTests.swift; sourceTree = "<group>"; };
 		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
 		5FEB00022026111700000002 /* MoveCommitHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveCommitHaptics.swift; sourceTree = "<group>"; };
 		5FEB00052026111700000005 /* VoiceCountdownAnnouncer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCountdownAnnouncer.swift; sourceTree = "<group>"; };
@@ -1104,6 +1109,7 @@
 				1C0AD3E8262AC421242AB561 /* SurroundThemeTests.swift */,
 				517D00052026102700000005 /* StonePlacementSoundTests.swift */,
 				AC7100052026110900000005 /* ActivityModelTests.swift */,
+				5C5E00042026112000000004 /* ActivityBarModelTests.swift */,
 				5C3E000D202611120000000D /* ActivityListModelTests.swift */,
 				5C4E00042026111400000004 /* GameControlModelTests.swift */,
 				5C4E00302026111400000030 /* GameControlChipFitTests.swift */,
@@ -1253,6 +1259,7 @@
 			isa = PBXGroup;
 			children = (
 				AC7100022026110900000002 /* ActivityModel.swift */,
+				5C5E00012026112000000001 /* ActivityBarModel.swift */,
 				5C3E00042026111200000004 /* ActivityListModel.swift */,
 				5C4E00012026111400000001 /* GameControlModel.swift */,
 				6A7E00022026110900000002 /* ActivityHostPolicy.swift */,
@@ -1858,6 +1865,7 @@
 				5FEB00012026111700000001 /* MoveCommitHaptics.swift in Sources */,
 				5FEB00042026111700000004 /* VoiceCountdownAnnouncer.swift in Sources */,
 				AC7100012026110900000001 /* ActivityModel.swift in Sources */,
+				5C5E00022026112000000002 /* ActivityBarModel.swift in Sources */,
 				5C3E00052026111200000005 /* ActivityListModel.swift in Sources */,
 				5C4E00022026111400000002 /* GameControlModel.swift in Sources */,
 				ACA1D0012026110900000001 /* ActivityPlaceRegistry.swift in Sources */,
@@ -2019,9 +2027,11 @@
 				5FEB00062026111700000006 /* VoiceCountdownAnnouncer.swift in Sources */,
 				517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */,
 				AC7100032026110900000003 /* ActivityModel.swift in Sources */,
+				5C5E00032026112000000003 /* ActivityBarModel.swift in Sources */,
 				5C3E00062026111200000006 /* ActivityListModel.swift in Sources */,
 				5C4E00032026111400000003 /* GameControlModel.swift in Sources */,
 				AC7100042026110900000004 /* ActivityModelTests.swift in Sources */,
+				5C5E00052026112000000005 /* ActivityBarModelTests.swift in Sources */,
 				5C3E000E202611120000000E /* ActivityListModelTests.swift in Sources */,
 				5C4E00052026111400000005 /* GameControlModelTests.swift in Sources */,
 				5C4E00312026111400000031 /* GameControlChipFitTests.swift in Sources */,

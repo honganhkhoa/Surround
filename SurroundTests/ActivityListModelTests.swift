@@ -271,6 +271,32 @@ final class ActivityListModelTests: XCTestCase {
         XCTAssertNil(ActivityRequest.Focus.messages.conversationToOpen(in: []))
     }
 
+    func testTheBarAndTheNowSectionOpenTheListAsSourcesOfTheirOwn() {
+        for source in [ActivityRequest.Source.activityBar, .nowSection] {
+            let request = ActivityRequest(source: source, focus: .item("challenge-7"), style: .popover)
+            XCTAssertEqual(request.source, source)
+            XCTAssertEqual(request.focus, .item("challenge-7"))
+            XCTAssertEqual(ActivityRequest(source: source, style: .sheet).focus, .top, "+N and All activity open at the top.")
+        }
+        XCTAssertNotEqual(ActivityRequest.Source.activityBar, .nowSection)
+    }
+
+    func testViewOpensTheListWithTheItemsCardPushed() {
+        let list = [game(1), challenge(7), waiting("open-4"), waiting("quick-match-a", kind: .quickMatch), conversation(31)]
+        XCTAssertEqual(ActivityRequest.Focus.item("challenge-7").cardToOpen(in: list), "challenge-7")
+        XCTAssertEqual(ActivityRequest.Focus.item("waiting-open-4").cardToOpen(in: list), "waiting-open-4")
+        XCTAssertEqual(ActivityRequest.Focus.item("waiting-quick-match-a").cardToOpen(in: list), "waiting-quick-match-a")
+        XCTAssertNil(ActivityRequest.Focus.item("challenge-8").cardToOpen(in: list),
+                     "An item that has gone pushes no card, which would only pop itself.")
+        XCTAssertNil(ActivityRequest.Focus.item("game-1").cardToOpen(in: list), "A live game has no card.")
+        XCTAssertNil(ActivityRequest.Focus.item("conversation-31").cardToOpen(in: list))
+        XCTAssertNil(ActivityRequest.Focus.top.cardToOpen(in: list))
+        XCTAssertNil(ActivityRequest.Focus.messages.cardToOpen(in: list))
+        XCTAssertNil(ActivityRequest.Focus.item("challenge-7").conversationToOpen(in: [conversation(31)]),
+                     "An item's focus opens no conversation.")
+        XCTAssertNotEqual(ActivityRequest.Focus.item("challenge-7"), .item("challenge-8"))
+    }
+
     // MARK: Row controls
 
     func testInlineAcceptOnlyForAUsualChallengeOutsideAGame() {

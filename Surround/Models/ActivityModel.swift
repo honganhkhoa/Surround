@@ -2,11 +2,13 @@
 //  ActivityModel.swift
 //  Surround
 //
-//  What the Activity surfaces show: the bar on root screens, the in-game
-//  control and the Activity list. `ActivityModel.snapshot(_:)` and
-//  `ActivityModel.gameControl(_:context:)` are pure functions of one window's
-//  state, so the design's rules can be tested without a socket.
-//  `ActivityModel.Input(ogs:place:...)` reads that state from an `OGSService`.
+//  What the Activity surfaces show: the bar on root screens, the iPad's and
+//  the Mac's Now sections, the in-game control, a conversation's control and
+//  the Activity list. `ActivityModel.snapshot(_:)`, `nowSection(_:rows:)`,
+//  `gameControl(_:context:)` and `conversationControl(_:)` are pure functions
+//  of one window's state, so the design's rules can be tested without a
+//  socket. `ActivityModel.Input.window(ogs:nav:place:now:)` reads that state
+//  from a window's `OGSService` and stores.
 //
 
 import Foundation
@@ -105,6 +107,14 @@ enum ActivityModel {
         var sessionStart: TimeInterval = 0
         var now: TimeInterval = 0
         var place: Place = .root(isMessagesTab: false)
+        /// The window's selected tab is Messages, whatever the place: with a
+        /// conversation selected in Messages' side pane the place reads
+        /// `.conversation`. Unread conversations don't count there.
+        var isMessagesTabSelected = false
+        /// The ids `hiding(_:)` left out: challenges and waiting items OGS
+        /// confirmed gone that the service still lists. A hidden id not
+        /// among them no longer needs hiding.
+        var hiddenListedIDs: Set<String> = []
     }
 
     // MARK: - Output
@@ -136,6 +146,18 @@ enum ActivityModel {
         case item(Item)
         /// Nothing live leads: the inbox glyph and the count, "3 waiting".
         case waiting(count: Int)
+
+        /// The item that leads; nil for "N waiting".
+        var item: Item? {
+            switch self {
+            case .gameStarted(let game): .liveGame(game)
+            case .item(let item): item
+            case .waiting: nil
+            }
+        }
+
+        /// The leading item's id, as the list names it; nil for "N waiting".
+        var itemID: String? { item?.id }
     }
 
     struct Snapshot: Equatable {
@@ -149,6 +171,23 @@ enum ActivityModel {
         var plusN: Int
         /// Live games on your move that are low on time.
         var lowTimeGameIDs: Set<Int>
+        /// What +N counted beside the lead, or what "N waiting" counts, in
+        /// the list's order (`counts(_:onMessagesTab:)`). The lead never
+        /// counts itself. Empty without a lead.
+        var counted: [Item] = []
+    }
+
+    /// The iPad's and the Mac's Now section (`nowSection(_:rows:)`).
+    struct NowSection: Equatable {
+        /// In the lead order, the first of them what the bar leads with; or
+        /// the one "N waiting" row when nothing that can lead waits. Empty
+        /// when nothing waits.
+        var rows: [Lead]
+        /// All activity's +N: the counted items not in a row. None beside
+        /// the "N waiting" row, which stands for them.
+        var plusN: Int
+        /// What +N counts, or what the "N waiting" row counts.
+        var counted: [Item]
     }
 
     /// The control in Game Detail's Active games slot.
@@ -255,12 +294,8 @@ enum ActivityModel {
     }
 
     static func snapshot(_ input: Input) -> Snapshot {
-        let onScreenGameID = input.place.gameID
-        let live = sortedLiveGames(input.liveGames.filter { $0.id != onScreenGameID })
-        let challenges = input.challengesReceived.sorted { $0.id < $1.id }
-        let waiting = input.waiting.sorted { ($0.since, $0.kind, $0.id) < ($1.since, $1.kind, $1.id) }
-        let correspondence = input.correspondenceGamesOnYourMove.filter { $0.id != onScreenGameID }
-        let mostUrgent = correspondence.min { a, b in
+        let ordered = Ordered(input)
+        let mostUrgent = ordered.correspondence.min { a, b in
             if a.isClockRunning != b.isClockRunning {
                 return a.isClockRunning
             }
@@ -268,50 +303,83 @@ enum ActivityModel {
             let bLeft = b.timeUntilTimeout ?? .infinity
             return aLeft != bLeft ? aLeft < bLeft : a.id < b.id
         }
-        let conversations = orderedConversations(input.conversations, sessionStart: input.sessionStart)
 
-        var list = live.map { Item.liveGame($0) }
-        list += challenges.map { Item.challenge($0) }
-        list += waiting.map { Item.waiting($0) }
+        var list = ordered.live.map { Item.liveGame($0) }
+        list += ordered.challenges.map { Item.challenge($0) }
+        list += ordered.waiting.map { Item.waiting($0) }
         if let mostUrgent {
-            list.append(.correspondenceGames(count: correspondence.count, mostUrgentID: mostUrgent.id))
+            list.append(.correspondenceGames(count: ordered.correspondence.count, mostUrgentID: mostUrgent.id))
         }
-        list += conversations.map { Item.conversation($0) }
-        let lowTime = Set(live.filter(isLowOnTime).map(\.id))
+        list += ordered.conversations.map { Item.conversation($0) }
+        let lowTime = Set(ordered.live.filter(isLowOnTime).map(\.id))
 
         // The bar never shows on Game Detail or in a conversation.
-        guard case .root(let isMessagesTab) = input.place else {
+        guard case .root = input.place else {
             return Snapshot(list: list, lead: nil, plusN: 0, lowTimeGameIDs: lowTime)
         }
 
-        // Only these add to +N. Your own searches and sent challenges, live
-        // games on their move and correspondence games on your move don't.
-        let counted = live.filter(\.isYourMove).map { Item.liveGame($0) }
-            + challenges.map { Item.challenge($0) }
-            + (isMessagesTab ? [] : conversations.filter(\.isUnread).map { Item.conversation($0) })
+        let counted = countedItems(ordered, onMessagesTab: input.isOnMessagesTab)
+        switch leadOrder(input, ordered).first {
+        case let lead?:
+            let beyond = counted.filter { $0.id != lead.itemID }
+            return Snapshot(list: list, lead: lead, plusN: beyond.count, lowTimeGameIDs: lowTime, counted: beyond)
+        case nil where !counted.isEmpty:
+            return Snapshot(list: list, lead: .waiting(count: counted.count), plusN: 0, lowTimeGameIDs: lowTime,
+                            counted: counted)
+        case nil:
+            return Snapshot(list: list, lead: nil, plusN: 0, lowTimeGameIDs: lowTime)
+        }
+    }
 
-        let lead: Lead?
-        var leadItemID: String?
+    /// Whether `item` adds to +N: a live game on your move, any challenge
+    /// sent to you, live or correspondence, and an unread conversation off
+    /// the Messages tab. Your own searches and sent challenges, live games
+    /// on their move and correspondence games on your move never do.
+    static func counts(_ item: Item, onMessagesTab: Bool) -> Bool {
+        switch item {
+        case .liveGame(let game): game.isYourMove
+        case .challenge: true
+        case .conversation(let conversation): conversation.isUnread && !onMessagesTab
+        case .waiting, .correspondenceGames: false
+        }
+    }
+
+    /// How many rows the Now section lists at most, before All activity.
+    static let nowSectionRows = 2
+
+    /// The iPad's and the Mac's Now section: at most `rows` items in the
+    /// order the bar picks its lead, so the first is the bar's lead; the
+    /// "N waiting" row when nothing that can lead waits; and All activity's
+    /// +N, the counted items not in a row. It answers for every place, a
+    /// game and a conversation included, since the iPad's sidebar can show
+    /// over a game and the Mac's never hides, and leaves the game on screen
+    /// out by its id. On the Messages tab, unread conversations don't count.
+    static func nowSection(_ input: Input, rows: Int) -> NowSection {
+        let ordered = Ordered(input)
+        let counted = countedItems(ordered, onMessagesTab: input.isOnMessagesTab)
+        let leads = leadOrder(input, ordered)
+        if leads.isEmpty, rows > 0, !counted.isEmpty {
+            return NowSection(rows: [.waiting(count: counted.count)], plusN: 0, counted: counted)
+        }
+        let shown = Array(leads.prefix(max(0, rows)))
+        let shownIDs = Set(shown.compactMap(\.itemID))
+        let rest = counted.filter { !shownIDs.contains($0.id) }
+        return NowSection(rows: shown, plusN: rest.count, counted: rest)
+    }
+
+    /// The control in a conversation's top bar, which shows only while a
+    /// live game needs you: a live game that started elsewhere, during its
+    /// `startedLeadDuration`, unless a game on your move is low on time;
+    /// otherwise your live game on your move with the least time. Never +N
+    /// or a dot, since the composer owns the screen and Activity is one
+    /// Back away. Nil otherwise, and anywhere but a conversation.
+    static func conversationControl(_ input: Input) -> GameControl? {
+        guard input.place == .conversation else { return nil }
+        let live = sortedLiveGames(input.liveGames)
         if let started = startedLead(input, allLive: live) {
-            lead = .gameStarted(started)
-            leadItemID = Item.liveGame(started).id
-        } else if let item = leadItem(live: live, challenges: challenges, waiting: waiting) {
-            lead = .item(item)
-            leadItemID = item.id
-        } else if !counted.isEmpty {
-            lead = .waiting(count: counted.count)
-        } else {
-            lead = nil
+            return .gameStarted(started, plusN: 0, hasDot: false)
         }
-
-        let plusN: Int
-        switch lead {
-        case .waiting, nil:
-            plusN = 0
-        case .gameStarted, .item:
-            plusN = counted.filter { $0.id != leadItemID }.count
-        }
-        return Snapshot(list: list, lead: lead, plusN: plusN, lowTimeGameIDs: lowTime)
+        return live.first(where: \.isYourMove).map { .chip($0, plusN: 0, hasDot: false) }
     }
 
     /// The in-game control on Home's route outside Zen, with no card.
@@ -385,35 +453,74 @@ enum ActivityModel {
         timeControl.resolvedSpeed(boardWidth: width, boardHeight: height)?.isRealtime == true
     }
 
-    /// A live game on your move, a live challenge, a live game on their
-    /// move, then your own live searches and challenges. Correspondence
-    /// never leads.
-    private static func leadItem(live: [LiveGame], challenges: [Challenge], waiting: [Waiting]) -> Item? {
-        if let game = live.first(where: \.isYourMove) {
-            return .liveGame(game)
+    /// The input's items in the list's order, without the game on screen.
+    private struct Ordered {
+        var live: [LiveGame]
+        var challenges: [Challenge]
+        var waiting: [Waiting]
+        var correspondence: [CorrespondenceGame]
+        var conversations: [Conversation]
+
+        init(_ input: Input) {
+            let onScreenGameID = input.place.gameID
+            live = ActivityModel.sortedLiveGames(input.liveGames.filter { $0.id != onScreenGameID })
+            challenges = input.challengesReceived.sorted { $0.id < $1.id }
+            waiting = input.waiting.sorted { ($0.since, $0.kind, $0.id) < ($1.since, $1.kind, $1.id) }
+            correspondence = input.correspondenceGamesOnYourMove.filter { $0.id != onScreenGameID }
+            conversations = ActivityModel.orderedConversations(input.conversations, sessionStart: input.sessionStart)
         }
-        if let challenge = challenges.first(where: \.isLive) {
-            return .challenge(challenge)
-        }
-        if let game = live.first(where: { !$0.isYourMove }) {
-            return .liveGame(game)
-        }
-        if let item = waiting.first(where: \.isLive) {
-            return .waiting(item)
-        }
-        return nil
+    }
+
+    /// What adds to +N, in the list's order (`counts(_:onMessagesTab:)`).
+    private static func countedItems(_ ordered: Ordered, onMessagesTab: Bool) -> [Item] {
+        var items: [Item] = ordered.live.map { Item.liveGame($0) }
+        items += ordered.challenges.map { Item.challenge($0) }
+        items += ordered.conversations.map { Item.conversation($0) }
+        return items.filter { counts($0, onMessagesTab: onMessagesTab) }
+    }
+
+    /// What can lead, in the order the bar picks its lead: the games that
+    /// started elsewhere, newest first; live games on your move; live
+    /// challenges; live games on their move; then your own live searches
+    /// and challenges. Each item once; correspondence never leads.
+    private static func leadOrder(_ input: Input, _ ordered: Ordered) -> [Lead] {
+        // The game on screen counts for low time, but never as one that
+        // started elsewhere.
+        let started = startedGames(input, allLive: sortedLiveGames(input.liveGames), excluding: input.place.gameID)
+        var items: [Item] = ordered.live.filter(\.isYourMove).map { Item.liveGame($0) }
+        items += ordered.challenges.filter(\.isLive).map { Item.challenge($0) }
+        items += ordered.live.filter { !$0.isYourMove }.map { Item.liveGame($0) }
+        items += ordered.waiting.filter(\.isLive).map { Item.waiting($0) }
+        var seen = Set(started.map { Item.liveGame($0).id })
+        var leads: [Lead] = started.map { Lead.gameStarted($0) }
+        leads += items.filter { seen.insert($0.id).inserted }.map { Lead.item($0) }
+        return leads
     }
 
     /// The newest game that started in the last `startedLeadDuration`,
     /// unless a game on your move is low on time.
     private static func startedLead(_ input: Input, allLive: [LiveGame], excluding gameID: Int? = nil) -> LiveGame? {
-        guard !allLive.contains(where: isLowOnTime) else { return nil }
-        return allLive
-            .filter { $0.id != gameID }
-            .compactMap { game in input.startedGames[game.id].map { (game: game, start: $0) } }
-            .filter { input.now >= $0.start && input.now - $0.start < startedLeadDuration }
-            .max { $0.start < $1.start }?
-            .game
+        startedGames(input, allLive: allLive, excluding: gameID).first
+    }
+
+    /// The games that started in the last `startedLeadDuration`, newest
+    /// first and in `allLive`'s order among equals; none while a game on
+    /// your move is low on time.
+    private static func startedGames(_ input: Input, allLive: [LiveGame], excluding gameID: Int?) -> [LiveGame] {
+        guard !allLive.contains(where: isLowOnTime) else { return [] }
+        struct Started {
+            var game: LiveGame
+            var start: TimeInterval
+            var order: Int
+        }
+        var started = [Started]()
+        for (order, game) in allLive.enumerated() where game.id != gameID {
+            guard let start = input.startedGames[game.id],
+                  input.now >= start, input.now - start < startedLeadDuration else { continue }
+            started.append(Started(game: game, start: start, order: order))
+        }
+        started.sort { a, b in a.start != b.start ? a.start > b.start : a.order < b.order }
+        return started.map(\.game)
     }
 }
 
@@ -608,5 +715,63 @@ extension ActivityModel.Input {
                 lastMessageTime: ogs.privateMessagesByPeerId[peerID]?.last?.content.timestamp ?? 0
             )
         }
+    }
+
+    /// One window's input, which its bar, its Now section, its Activity list
+    /// and Game Detail's control all read: the service, with the window's
+    /// live games that started elsewhere, the app's first-seen times, the
+    /// window's last-known open challenges and its selected tab, less what
+    /// OGS confirmed gone (`hiding(_:)`). In Debug runs with an Activity
+    /// state, that state's input, less the same.
+    /// - Parameter now: Seconds since 1970. A Debug state keeps its own clock.
+    static func window(ogs: OGSService, nav: NavigationService, place: ActivityModel.Place,
+                       now: TimeInterval = Date().timeIntervalSince1970) -> Self {
+        #if DEBUG && MAIN_APP
+        let fixture = ActivityFixtures.selectedInput(ogs, place: place)
+        #else
+        let fixture: Self? = nil
+        #endif
+        return window(ogs: ogs, nav: nav, place: place, now: now, fixture: fixture)
+    }
+
+    /// `window(ogs:nav:place:now:)` with a Debug state's input, if any, in
+    /// place of the service's.
+    static func window(ogs: OGSService, nav: NavigationService, place: ActivityModel.Place, now: TimeInterval,
+                       fixture: Self?) -> Self {
+        // Recent read conversations are the saved peers Messages lists, so
+        // the session starts at the distant past.
+        var input = fixture ?? Self(
+            ogs: ogs, place: place, startedGames: nav.startedGamesRecorder.startedGames,
+            firstSeen: ActivitySession.firstSeen, sessionStart: 0, now: now,
+            openChallenges: nav.activityLastKnown.openChallenges(live: ogs)
+        )
+        input.isMessagesTabSelected = nav.main.rootView == .privateMessages
+        return input.hiding(nav.activityResults.hiddenIDs)
+    }
+
+    /// The input without the challenges sent to you and your own waiting
+    /// items whose ids (`ActivityModel.Item.id`) `hidden` holds: what OGS
+    /// confirmed gone with a 2xx, which the service lists until its next
+    /// overview or seek graph update. So none of them leads, counts or
+    /// shows as a row. `hiddenListedIDs` gains the ids it left out.
+    func hiding(_ hidden: Set<String>) -> Self {
+        guard !hidden.isEmpty else { return self }
+        var input = self
+        var left = Set<String>()
+        func keeps(_ item: ActivityModel.Item) -> Bool {
+            guard hidden.contains(item.id) else { return true }
+            left.insert(item.id)
+            return false
+        }
+        input.challengesReceived = challengesReceived.filter { keeps(.challenge($0)) }
+        input.waiting = waiting.filter { keeps(.waiting($0)) }
+        input.hiddenListedIDs.formUnion(left)
+        return input
+    }
+
+    /// The Messages tab is selected: from a root's place, or from the
+    /// window's selected tab wherever the place is.
+    var isOnMessagesTab: Bool {
+        isMessagesTabSelected || place == .root(isMessagesTab: true)
     }
 }

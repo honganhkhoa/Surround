@@ -27,10 +27,7 @@ extension ActivityHostPolicy.Facts {
     /// This process's platform, OS and SDK, for `container`.
     static func current(_ container: ActivityHostPolicy.Container,
                         sidebar: ActivityHostPolicy.Sidebar = .unavailable) -> Self {
-        let release: ActivityHostPolicy.Release
-        if #available(iOS 26.1, *) { release = .iOS26_1 }
-        else if #available(iOS 26.0, *) { release = .iOS26_0 }
-        else { release = .iOS18 }
+        let release = ActivityHostPolicy.Release(ProcessInfo.processInfo.operatingSystemVersion)
         #if targetEnvironment(macCatalyst)
         let platform = ActivityHostPolicy.Platform.mac
         #else

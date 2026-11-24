@@ -77,6 +77,39 @@ enum GameControlSlot: Equatable {
                                         startedGames: startedGames, now: now)
         self.init(input, context: context)
     }
+
+    /// The control in a conversation's top bar, from the window's input for
+    /// the conversation (`ActivityModel.conversationControl(_:)`): another
+    /// live game on your move, or one that started elsewhere, with no +N and
+    /// no dot. Nil while no live game needs you.
+    init?(conversation input: ActivityModel.Input) {
+        guard let control = ActivityModel.conversationControl(input) else { return nil }
+        self.init(control)
+    }
+}
+
+/// Which control a custom item draws, and the identifier XCTest finds it by.
+enum GameControlItemRole: Equatable, CaseIterable {
+    /// Game Detail's Active games slot: a tap shows the chip's game, and a
+    /// touch and hold opens the popover.
+    case activeGames
+    /// Zen's control beside Exit: a tap shows the game; Zen has no popover.
+    case zen
+    /// A conversation's top bar while a live game needs you: a tap shows the
+    /// game through Home, with no hold and no popover.
+    case conversation
+
+    var accessibilityIdentifier: String {
+        switch self {
+        case .activeGames: SurroundUITestContract.AccessibilityID.gameActiveGamesButton
+        case .zen: SurroundUITestContract.AccessibilityID.gameZenControl
+        case .conversation: Self.conversationIdentifier
+        }
+    }
+
+    /// A conversation's own, never a game's, so a journey that finds Game
+    /// Detail's control can't pass against a conversation's.
+    static let conversationIdentifier = "messages.conversation.gameControl"
 }
 
 // MARK: - The window

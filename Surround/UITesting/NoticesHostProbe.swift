@@ -68,9 +68,12 @@ enum NoticesHostProbeLog {
     }
 }
 
-private extension ActivityHostPolicy.ConnectionStatus {
-    /// Status under a title: root screens' subtitle, or the Mac's window subtitle.
-    var isSubtitle: Bool { self == .rootSubtitle || self == .windowSubtitle }
+private extension ActivityHostPolicy.Facts {
+    /// Where the placeholders put status under a title: root screens from
+    /// iOS 26, and every title on the Mac.
+    var showsPlaceholderSubtitle: Bool {
+        platform == .mac || container == .duoTabContainer || (sdkHasHostAPIs && release >= .iOS26_0)
+    }
 }
 
 // MARK: - Marker
@@ -165,7 +168,7 @@ struct NoticesPlaceholderBar: View {
     private var rootName: String { root?.rawValue ?? "window" }
 
     private var secondLine: String {
-        (connection == .customBar ? "Reconnecting… · " : "") + "placement \(placement.rawValue)"
+        (connection == .floatingBar ? "Reconnecting… · " : "") + "placement \(placement.rawValue)"
     }
 
     var body: some View {
@@ -410,7 +413,7 @@ struct NoticesHostProbeRoot: ViewModifier {
             let hosts = ActivityHostPolicy.hosts(for: facts, overrides: .init(probe, afterLaunch: true))
             let shows = probe.showsBar && hosts.bar == .customBar && !places.hidesActivity(in: root)
                 && !(probe.barKeyboard == .hide && keyboardShows)
-            let subtitled = probe.subtitle != nil && hosts.connectionStatus.isSubtitle
+            let subtitled = probe.subtitle != nil && facts.showsPlaceholderSubtitle
             content
                 .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { insets in
                     NoticesHostProbeLog.event("root.layout", [
@@ -420,7 +423,8 @@ struct NoticesHostProbeRoot: ViewModifier {
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if shows {
-                        NoticesPlaceholderBar(host: .customBar, root: root, connection: hosts.connectionStatus)
+                        NoticesPlaceholderBar(host: .customBar, root: root,
+                                              connection: facts.showsPlaceholderSubtitle ? nil : hosts.connectionStatus)
                     }
                 }
                 .modifier(NoticesProbeSubtitle(variant: subtitled ? probe.subtitle : nil, root: root.rawValue,
@@ -470,7 +474,7 @@ struct NoticesHostProbeDestination: ViewModifier {
 
     func body(content: Content) -> some View {
         if let probe = SurroundUITestContract.noticesHostProbe, let variant = probe.subtitle,
-           ActivityHostPolicy.hosts(for: .current(.swiftUITabView)).connectionStatus.isSubtitle {
+           ActivityHostPolicy.Facts.current(.swiftUITabView).showsPlaceholderSubtitle {
             content.modifier(NoticesProbeSubtitle(variant: variant,
                                                   root: "\(owningTabRoot?.rawValue ?? "window").destination",
                                                   neverMinimizes: probe.navigationBarMinimize == .never))
