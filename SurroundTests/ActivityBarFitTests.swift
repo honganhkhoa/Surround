@@ -8,10 +8,10 @@
 //  parts that never drop still fit once the form's drop order has run, with
 //  line one down to a letter and an ellipsis, or to the ellipsis alone where
 //  it may go. Where the form keeps line two, both lines fit the bar's
-//  height in every language. The Now section's rows keep their clock or
-//  Retry at the iPad's 270 pt and the Mac's 200 pt, but for the Mac's few
-//  long labels the test lists by name. The text is the hosted app bundle's
-//  own. The bar's new strings have only Malay and
+//  height in every language. The Now section's rows keep their clock and
+//  their action at the iPad's 270 pt and the Mac's 200 pt, the Mac's few
+//  long actions as their symbols, which the test lists by name. The text is
+//  the hosted app bundle's own. The bar's new strings have only Malay and
 //  Indonesian so far, so in the other languages they read as English here,
 //  as they do on screen until they are translated; the strings the bar
 //  measures (the actions, the status words, "SD", ranks) are translated in
@@ -59,12 +59,12 @@ final class ActivityBarFitTests: XCTestCase {
     /// 200 pt rows inside its 220 pt sidebar.
     private static let nowRows: [(name: String, width: CGFloat)] = [("iPad Now row", 270), ("Mac Now row", 200)]
 
-    /// Where the Mac's 200 pt row can't hold its trailing part beside a
-    /// letter of its words, even with the hourglass and the tile dropped:
-    /// Retry and Open game in these languages. How the Mac's rows draw these
-    /// is the Mac's Now section's to decide; until then the list is exact,
-    /// so a change of font, padding or translation that moves a case shows.
-    private static let macRowOverflows: Set<String> = [
+    /// Where the Mac's 200 pt row can't hold its action's words beside a
+    /// letter of its own, even with the hourglass and the tile dropped, so
+    /// the action is drawn as its symbol: Retry and Open game in these
+    /// languages. The list is exact, so a change of font, padding or
+    /// translation that moves a case shows. The iPad's rows draw none.
+    private static let macRowSymbols: Set<String> = [
         "de XXL status unreachable",
         "fr XXL started", "id XXL started", "ms XXL started",
         "pt-BR L status unreachable", "pt-BR XXL status unreachable",
@@ -257,7 +257,7 @@ final class ActivityBarFitTests: XCTestCase {
         let statusRows = [NowStatusRow(.unreachable, place: .root(isMessagesTab: false)),
                           NowStatusRow(.reconnecting, place: .root(isMessagesTab: false))].compactMap { $0 }
         var report = [String]()
-        var macOverflows = Set<String>()
+        var symbols = [String: Set<String>]()
         for language in Self.languages {
             let words = try Words(language: language, bundle: try appBundle())
             for size in Self.sizes {
@@ -273,33 +273,70 @@ final class ActivityBarFitTests: XCTestCase {
                          words.text(lineOneMinimum: ActivityBarPartText.letterAndEllipsis, hasRank: false, clock: nil))
                     }
                     for (name, parts, text) in cases {
+                        var drawsSymbol = [Bool]()
                         for direction in Self.directions {
                             var text = text
                             text.direction = direction
-                            let fit = metrics.fit(parts, in: row.width, text: text)
+                            let symbol = metrics.actionDrawsSymbol(parts, in: row.width, text: text)
+                            drawsSymbol.append(symbol)
+                            let fit = metrics.fit(parts, in: row.width, text: text, actionAsSymbol: symbol)
                             let label = "\(language) \(metrics.sizeCategory.rawValue) \(row.name) \(name)"
                                 + (direction == .rightToLeft ? " RTL" : "")
-                            let sizeName = size == .large ? "L" : "XXL"
-                            if row.width < 270, !fit.fits {
-                                macOverflows.insert("\(language) \(sizeName) \(name)")
-                            } else {
-                                XCTAssertTrue(fit.fits, "\(label): \(fit.width) pt in \(row.width)")
-                            }
-                            for part in [ActivityBarPart.clock, .action(.retry)] where parts.contains(part) && fit.fits {
+                            XCTAssertTrue(fit.fits, "\(label): \(fit.width) pt in \(row.width)")
+                            for part in parts where part == .clock || Self.isAction(part) {
                                 XCTAssertTrue(fit.parts.contains(part), "\(label) lost \(part)")
                             }
-                            if direction == .leftToRight, language == "en" || size != .large || !fit.fits {
-                                report.append("\(label): \(fit.parts.map(Self.short).joined(separator: ",")) "
-                                              + "(\(Int(ceil(fit.width))) / \(row.width))")
+                            if symbol {
+                                symbols[row.name, default: []].insert("\(language) \(size == .large ? "L" : "XXL") \(name)")
+                            }
+                            if direction == .leftToRight, language == "en" || size != .large || symbol {
+                                report.append("\(label): \(fit.parts.map(Self.short).joined(separator: ","))"
+                                              + "\(symbol ? " (symbol)" : "") (\(Int(ceil(fit.width))) / \(row.width))")
                             }
                         }
+                        XCTAssertEqual(drawsSymbol.first, drawsSymbol.last,
+                                       "\(language) \(row.name) \(name): right to left draws the action alike")
                     }
                 }
             }
         }
         attach("Now rows", report.joined(separator: "\n"))
-        XCTAssertEqual(macOverflows, Self.macRowOverflows,
-                       "The Mac's 200 pt Now rows that can't hold their trailing part, in either direction")
+        XCTAssertEqual(symbols["Mac Now row"] ?? [], Self.macRowSymbols,
+                       "The Mac's 200 pt Now rows whose action is drawn as its symbol")
+        XCTAssertEqual(symbols["iPad Now row"] ?? [], [], "The iPad's rows keep every action's words")
+    }
+
+    /// An action drawn as its symbol is a pill of at least 44 pt that never
+    /// grows past its words' pill, at every size and for every action, and
+    /// every symbol exists.
+    func testANowActionsSymbolIsAPillNoWiderThanItsWords() throws {
+        let words = try Words(language: "en", bundle: try appBundle())
+        for size in Self.sizes {
+            let metrics = ActivityNowRowMetrics(sizeCategory: size)
+            for action in [ActivityBarAction.openGame, .view, .withdraw, .retry] {
+                XCTAssertNotNil(UIImage(systemName: ActivityNowRowMetrics.symbolName(action)), "\(action)")
+                let symbol = metrics.symbolActionWidth(action)
+                XCTAssertGreaterThanOrEqual(symbol, ActivityBarMetrics.targetSize, "\(action) at \(size.rawValue)")
+                XCTAssertLessThanOrEqual(symbol, ActivityBarMetrics.targetSize + 8, "\(action) at \(size.rawValue)")
+                let text = words.text(lineOneMinimum: ActivityBarPartText.letterAndEllipsis, hasRank: false, clock: nil)
+                XCTAssertEqual(metrics.width(of: .action(action), text, actionAsSymbol: true), symbol)
+                if action != .withdraw {
+                    XCTAssertLessThanOrEqual(symbol, metrics.width(of: .action(action), text), "\(action)")
+                }
+            }
+        }
+        let started = ActivityNowRowMetrics.parts(.gameStarted(gameID: 1))
+        let english = words.text(lineOneMinimum: ActivityBarPartText.letterAndEllipsis, hasRank: false, clock: nil)
+        XCTAssertFalse(ActivityNowRowMetrics(sizeCategory: .large).actionDrawsSymbol(started, in: 200, text: english),
+                       "English keeps Open game's words on the Mac.")
+        let live = ActivityNowRowMetrics.parts(.liveGame(gameID: 1))
+        XCTAssertFalse(ActivityNowRowMetrics(sizeCategory: .large).actionDrawsSymbol(live, in: 1, text: english),
+                       "A row with no action draws no symbol, however narrow.")
+    }
+
+    private static func isAction(_ part: ActivityBarPart) -> Bool {
+        if case .action = part { return true }
+        return false
     }
 
     // MARK: The catalog's words

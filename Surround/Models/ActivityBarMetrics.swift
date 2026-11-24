@@ -327,12 +327,23 @@ extension ActivityBarDrawing {
 /// at XXL, as the bar's does, so the section keeps its height. The lines
 /// truncate first; then, where the trailing part still doesn't fit, the
 /// hourglass drops, then the tile, as in the bar's one-line forms. The
-/// clock and Retry never drop.
+/// clock and the action never drop: an action whose words still don't fit
+/// is drawn as its symbol (`actionDrawsSymbol`).
 struct ActivityNowRowMetrics {
     static let height: CGFloat = 60
     static let tileSize: CGFloat = 32
     static let clockHeight: CGFloat = 28
     static let pillHeight: CGFloat = 32
+
+    /// The narrowest row the platform's section draws: 200 pt inside the
+    /// Mac's sidebar, which is always 220 pt wide, and 270 pt on iPad.
+    static var narrowestRowWidth: CGFloat {
+        #if targetEnvironment(macCatalyst)
+        200
+        #else
+        270
+        #endif
+    }
 
     let sizeCategory: UIContentSizeCategory
     let lineOneFont: UIFont
@@ -373,7 +384,8 @@ struct ActivityNowRowMetrics {
         return ActivityBarDrawing(content, form: .expanded).parts
     }
 
-    func width(of part: ActivityBarPart, _ text: ActivityBarPartText) -> CGFloat {
+    /// - Parameter actionAsSymbol: The action is drawn as its symbol.
+    func width(of part: ActivityBarPart, _ text: ActivityBarPartText, actionAsSymbol: Bool = false) -> CGFloat {
         switch part {
         case .tile: Self.tileSize
         case .lineOne:
@@ -384,6 +396,8 @@ struct ActivityNowRowMetrics {
         case .clock:
             text.clock.map { 2 * clockPadding + measured($0.widestSample, clockFont, text) }
                 ?? 2 * clockPadding + symbolWidth("hourglass")
+        case .action(let action) where actionAsSymbol:
+            symbolActionWidth(action)
         case .action(let action):
             max(ActivityBarMetrics.targetSize,
                 measured(text.actionLabel(action), actionFont, text) + 2 * (action == .withdraw ? withdrawPadding : pillPadding))
@@ -406,10 +420,49 @@ struct ActivityNowRowMetrics {
 
     /// The row's parts in `width`, with line one at its narrowest, after
     /// the drop order.
-    func fit(_ parts: [ActivityBarPart], in width: CGFloat, text: ActivityBarPartText) -> ActivityBarFit {
+    /// - Parameter actionAsSymbol: The action is drawn as its symbol.
+    func fit(_ parts: [ActivityBarPart], in width: CGFloat, text: ActivityBarPartText,
+             actionAsSymbol: Bool = false) -> ActivityBarFit {
         let kept = parts.filter { $0 != .lineTwo && $0 != .plusN && !($0 == .hourglass && text.clock == nil) }
         let drawing = ActivityBarDrawing(parts: kept, dropOrder: Self.dropOrder.filter(kept.contains))
-        return drawing.fit(in: width, spacing: spacing) { self.width(of: $0, text) }
+        return drawing.fit(in: width, spacing: spacing) { self.width(of: $0, text, actionAsSymbol: actionAsSymbol) }
+    }
+
+    // MARK: The action's symbol
+
+    /// Whether the row's action is drawn as its symbol: where its words
+    /// don't fit `width` beside line one at its narrowest, even with the
+    /// hourglass and the tile dropped. Then the symbol sits in the words'
+    /// pill, and the words are its tooltip on the Mac. In the Mac's 200 pt
+    /// rows that is Retry and Open game in a few languages, at the default
+    /// size or at XXL; on iPad never. It comes from the words' measurement
+    /// at the row's text size, which stops growing at XXL, never from the
+    /// row's layout.
+    func actionDrawsSymbol(_ parts: [ActivityBarPart], in width: CGFloat = Self.narrowestRowWidth,
+                           text: ActivityBarPartText) -> Bool {
+        let hasAction = parts.contains { part in
+            if case .action = part { return true }
+            return false
+        }
+        return hasAction && !fit(parts, in: width, text: text).fits
+    }
+
+    /// Each action's symbol.
+    static func symbolName(_ action: ActivityBarAction) -> String {
+        switch action {
+        case .openGame: "arrow.forward"
+        case .view: "eye"
+        case .withdraw: "xmark"
+        case .retry: "arrow.clockwise"
+        }
+    }
+
+    /// The symbol's pill: the symbol at the words' size, padded as their
+    /// pill is, and at least 44 pt wide.
+    func symbolActionWidth(_ action: ActivityBarAction) -> CGFloat {
+        let configuration = UIImage.SymbolConfiguration(pointSize: actionFont.pointSize, weight: .semibold)
+        let image = UIImage(systemName: Self.symbolName(action), withConfiguration: configuration)
+        return max(ActivityBarMetrics.targetSize, ceil(image?.size.width ?? actionFont.pointSize) + 2 * pillPadding)
     }
 }
 
@@ -431,7 +484,9 @@ struct ActivityNowRowMetrics {
 /// launch with two rows), plus 9 pt; 18.6 and 27.0 leave more room. Two
 /// rows at XXL, and in Thai at the default size, start at 834 pt instead,
 /// 1 pt above that height, so that a full-size landscape window keeps the
-/// two rows every measurement found room for.
+/// two rows every measurement found room for. The Mac's window is never
+/// shorter than 600 pt, which leaves room for two rows, so the Mac doesn't
+/// ask.
 enum ActivityNowSectionRows {
     /// The language the sidebar is drawn in. Its titles are the app's own
     /// strings, and iOS sets their lines for the first of the person's

@@ -9,7 +9,9 @@
 //  makes the offline service answer Accept, Reject and Withdraw (TESTING.md).
 //  At regular width every real opener shows a popover, so the journeys find
 //  the list by `activity.list` and check the style only where it is the
-//  point. None of them focuses a text field.
+//  point. None of them focuses a text field. Three run only on the Mac,
+//  signed and under Automation Mode: its sidebar's Now section and its
+//  View > Activity command.
 //
 
 import XCTest
@@ -326,6 +328,380 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(staysPresent(popover), "The popover stays after its card goes")
         keepScreenshot("Activity – the popover after Home's card went", in: app)
     }
+
+    #if targetEnvironment(macCatalyst)
+    // MARK: The Mac's Now section and its Activity command
+
+    /// The Mac's sidebar ends in the Now section: HarborMist's game, then
+    /// CedarWave's challenge with View, and All activity, below the last tab
+    /// row at 900 × 600 and at the window's bottom through a live resize to
+    /// 1200 × 760. XCTest reaches the rows and All activity by their
+    /// identifiers, never the section's, and a click at a frame's centre
+    /// acts: All activity and the challenge's row open Activity as a popover
+    /// in a window of its own, which Escape closes; View pushes the
+    /// challenge's card in it; the game's row opens the game, over which the
+    /// section leaves it out. Every root keeps the window title the desktop
+    /// capture contract pins.
+    func testTheMacsNowSectionOpensActivityAndItsRows() {
+        let app = launchMac([SurroundUITestContract.activityStateLaunchArgument, State.several.rawValue],
+                            size: CGSize(width: 900, height: 600))
+        let game = query(ID.activityNowRow(harborMist), in: app)
+        let challenge = query(ID.activityNowRow(usualChallenge), in: app)
+        let view = query(ID.activityNowRowAction(usualChallenge), in: app)
+        let all = query(ID.activityNowAll, in: app)
+        for (element, name) in [(game, "HarborMist's game"), (challenge, "CedarWave's challenge"),
+                                (view, "its View"), (all, "All activity")] {
+            XCTAssertTrue(element.waitForExistence(timeout: 10), "The Now section shows \(name)")
+        }
+        XCTAssertFalse(query(ID.activityNowRowAction(harborMist), in: app).exists, "A live game's row has no action")
+        attach("label \(all.label)\nvalue \(String(describing: all.value))", name: "All activity")
+        assertNowSection(at: "900 × 600", rows: [game, challenge], all: all, in: app)
+        assertWindowTitle("Active games", in: app)
+        keepWindowScreenshots("The Mac's Now section at 900 × 600", in: app)
+
+        openPopover(byClicking: all, name: "All activity", in: app)
+        openPopover(byClicking: challenge, name: "the challenge's row", in: app)
+        // The card is pushed at once, so the list itself is never in sight.
+        let windows = app.windows.count
+        click(view, name: "View")
+        XCTAssertTrue(app.navigationBars["Challenge"].firstMatch.waitForExistence(timeout: 10),
+                      "View pushes the challenge's card")
+        XCTAssertGreaterThan(app.windows.count, windows, "View opens a popover, a window of its own")
+        keepWindowScreenshots("The challenge's card from View", in: app)
+        closeWithEscape("View's popover", in: app)
+
+        click(game, name: "HarborMist's game")
+        element(ID.gameDetail(FixtureID.harborMistGameID), in: app)
+        XCTAssertTrue(waitForAbsence(game, timeout: stateSettleTimeout), "Over its game the section leaves it out")
+        XCTAssertTrue(challenge.exists && all.exists, "The section keeps the rest over the game")
+        keepWindowScreenshots("The Now section over HarborMist's game", in: app)
+        goBack(in: app)
+        element(ID.screenHome, in: app)
+        XCTAssertTrue(game.waitForExistence(timeout: 10), "Back on Home, the game's row comes back")
+
+        resizeMacWindow(toContent: CGSize(width: 1200, height: 760), in: app)
+        assertNowSection(at: "1200 × 760 after a live resize", rows: [game, challenge], all: all, in: app)
+        keepWindowScreenshots("The Mac's Now section at 1200 × 760", in: app)
+
+        for (entry, title) in Self.macRootTitles {
+            selectSidebarEntry(entry, in: app)
+            assertWindowTitle(title, in: app)
+            XCTAssertTrue(all.waitForExistence(timeout: 10), "The section shows beside \(title)")
+        }
+    }
+
+    /// View > Activity and ⇧⌘A open Activity as All activity does: while the
+    /// Now section shows, a popover where All activity's own opens, which
+    /// Escape closes, and over a game too, with the game left out of it.
+    /// With nothing waiting there is no section, the window's title stays,
+    /// and they open the sheet, which Done closes.
+    func testTheMacsActivityCommandOpensActivity() {
+        var app = launchMac([SurroundUITestContract.activityStateLaunchArgument, State.several.rawValue],
+                            size: CGSize(width: 900, height: 600))
+        let all = query(ID.activityNowAll, in: app)
+        XCTAssertTrue(all.waitForExistence(timeout: 10), "The Now section shows All activity")
+        let fromAllActivity = openPopover(byClicking: all, name: "All activity", in: app)
+
+        chooseActivityInViewMenu(in: app)
+        let fromMenu = assertPopover("View > Activity", in: app)
+        XCTAssertEqual(fromMenu.midX, fromAllActivity.midX, accuracy: 2, "The menu's popover hangs from All activity")
+        XCTAssertEqual(fromMenu.midY, fromAllActivity.midY, accuracy: 2, "The menu's popover hangs from All activity")
+        keepWindowScreenshots("Activity from View > Activity", in: app)
+        closeWithEscape("the menu's popover", in: app)
+
+        app.typeKey("a", modifierFlags: [.command, .shift])
+        let fromShortcut = assertPopover("⇧⌘A", in: app)
+        XCTAssertEqual(fromShortcut.midY, fromAllActivity.midY, accuracy: 2, "The shortcut's popover hangs from All activity")
+        closeWithEscape("the shortcut's popover", in: app)
+
+        click(query(ID.activityNowRow(harborMist), in: app), name: "HarborMist's game")
+        element(ID.gameDetail(FixtureID.harborMistGameID), in: app)
+        app.typeKey("a", modifierFlags: [.command, .shift])
+        assertPopover("⇧⌘A over a game", in: app)
+        XCTAssertFalse(query(ID.activityRow(harborMist), in: app).exists, "The game on screen isn't listed")
+        keepWindowScreenshots("Activity from ⇧⌘A over a game", in: app)
+        closeWithEscape("the game's popover", in: app)
+        app.terminate()
+
+        app = launchMac([SurroundUITestContract.activityStateLaunchArgument, State.nothingWaiting.rawValue],
+                        size: CGSize(width: 900, height: 600))
+        assertNoNowSection("Nothing waiting", in: app)
+        assertWindowTitle("Active games", in: app)
+        keepWindowScreenshots("No Now section with nothing waiting", in: app)
+        chooseActivityInViewMenu(in: app)
+        closeSheet("View > Activity with nothing waiting", in: app)
+        app.typeKey("a", modifierFlags: [.command, .shift])
+        closeSheet("⇧⌘A with nothing waiting", in: app)
+    }
+
+    /// Signed out nothing waits, so the sidebar has no Now section at
+    /// 900 × 600 or after a live resize to 1200 × 760, and the roots keep
+    /// the contract's window titles. There is no Activity either, so View >
+    /// Activity is off and ⇧⌘A opens nothing.
+    func testTheMacsSidebarHasNoNowSectionSignedOut() {
+        let app = launchMac([SurroundUITestContract.signedOutOfflineLaunchArgument],
+                            size: CGSize(width: 900, height: 600), screen: nil)
+        assertWindowTitle("Welcome", in: app)
+        assertNoNowSection("Signed out at 900 × 600", in: app)
+        keepWindowScreenshots("Signed out at 900 × 600", in: app)
+        assertActivityInViewMenuIsOff(in: app)
+        app.typeKey("a", modifierFlags: [.command, .shift])
+        XCTAssertFalse(pollUntil(timeout: 3) { self.query(ID.activityList, in: app).exists },
+                       "Signed out, ⇧⌘A opens no Activity")
+        resizeMacWindow(toContent: CGSize(width: 1200, height: 760), in: app)
+        assertNoNowSection("Signed out at 1200 × 760", in: app)
+        keepWindowScreenshots("Signed out at 1200 × 760", in: app)
+        for (entry, title) in Self.macRootTitles where entry != ID.navigationMessages && entry != ID.navigationHome {
+            selectSidebarEntry(entry, in: app)
+            assertWindowTitle(title, in: app)
+        }
+        assertNoNowSection("Signed out on Web version", in: app)
+    }
+
+    /// The roots the desktop capture contract pins, with their window titles
+    /// (CompatibilityScreenshotTests), Home last.
+    private static let macRootTitles: [(entry: String, title: String)] = [
+        (ID.navigationPublicGames, "Public live games"), (ID.navigationMessages, "Messages"),
+        (ID.navigationSettings, "Settings"), (ID.navigationAbout, "About"),
+        (ID.navigationBrowser, "Web version"), (ID.navigationHome, "Active games"),
+    ]
+
+    private var harborMist: String { "game-\(FixtureID.harborMistGameID)" }
+    private var usualChallenge: String { "challenge-\(FixtureID.usualChallengeID)" }
+
+    /// A launch whose window content has `size`, at Home or `screen`.
+    private func launchMac(_ arguments: [String], size: CGSize, screen: String? = ID.screenHome,
+                           file: StaticString = #filePath, line: UInt = #line) -> XCUIApplication {
+        let app = launchApp(additionalLaunchArguments: arguments + [
+            SurroundUITestContract.catalystWindowSizeLaunchArgument, "\(Int(size.width))x\(Int(size.height))",
+        ])
+        XCTAssertTrue(pollUntil(timeout: 15) { self.contentSize(in: app, isAbout: size) },
+                      "The window's content is \(size): \(String(describing: contentSize(in: app)))",
+                      file: file, line: line)
+        if let screen { element(screen, in: app, file: file, line: line) }
+        return app
+    }
+
+    /// The window's content size, as the app's window geometry element says
+    /// it ("900x600|…").
+    private func contentSize(in app: XCUIApplication) -> CGSize? {
+        let value = query(ID.catalystWindowGeometry, in: app).value as? String ?? ""
+        let size = value.split(separator: "|").first?.split(separator: "x").compactMap { Double($0) } ?? []
+        return size.count == 2 ? CGSize(width: size[0], height: size[1]) : nil
+    }
+
+    /// The app's own window, not a popover's: the scene's, or the largest.
+    private func mainWindow(_ app: XCUIApplication) -> XCUIElement {
+        let scene = app.windows.matching(identifier: "SceneWindow").firstMatch
+        if scene.exists { return scene }
+        let windows = app.windows.allElementsBoundByIndex.filter(\.exists)
+        return windows.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+            ?? app.windows.firstMatch
+    }
+
+    /// A click at the element's centre: on the Mac XCTest calls the content
+    /// unhittable even with nothing over it.
+    private func click(_ element: XCUIElement, name: String, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(element.waitForExistence(timeout: 10), "Expected \(name)", file: file, line: line)
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    }
+
+    /// The toolbar's Back: by its identifier, or by its label, never the
+    /// in-game control.
+    private func goBack(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let backs = app.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier == %@ OR (identifier != %@ AND (label == %@ OR label == %@) AND elementType IN %@)",
+            "BackButton", ID.gameActiveGamesButton, "Back", "Active games",
+            [XCUIElement.ElementType.button.rawValue, XCUIElement.ElementType.toolbarButton.rawValue]
+        ))
+        var back: XCUIElement?
+        let found = pollUntil(timeout: 10) {
+            back = backs.allElementsBoundByIndex.first { $0.exists && !$0.frame.isEmpty }
+            return back != nil
+        }
+        if !found { attach(app.debugDescription, name: "Accessibility hierarchy – no Back") }
+        XCTAssertTrue(found, "Expected the game's Back", file: file, line: line)
+        if let back { click(back, name: "Back", file: file, line: line) }
+    }
+
+    /// The section in the sidebar's 220 pt column: its rows in order below
+    /// the last tab row, then All activity at the window's bottom.
+    private func assertNowSection(at name: String, rows: [XCUIElement], all: XCUIElement, in app: XCUIApplication,
+                                  file: StaticString = #filePath, line: UInt = #line) {
+        let window = mainWindow(app).frame
+        let lastTab = query(ID.navigationBrowser, in: app).frame
+        let frames = (rows + [all]).map(\.frame)
+        attach((["window \(window)", "Web version \(lastTab)"]
+                + zip(rows + [all], frames).map { "\($0.identifier) \($1)" }).joined(separator: "\n"),
+               name: "The Now section at \(name)")
+        for (element, frame) in zip(rows + [all], frames) {
+            XCTAssertTrue(window.insetBy(dx: -1, dy: -1).contains(frame),
+                          "\(name): \(element.identifier) is in the window", file: file, line: line)
+            XCTAssertLessThanOrEqual(frame.maxX, window.minX + 221,
+                                     "\(name): \(element.identifier) is in the sidebar", file: file, line: line)
+        }
+        XCTAssertEqual(frames.map(\.minY), frames.map(\.minY).sorted(), "\(name): the rows, then All activity",
+                       file: file, line: line)
+        XCTAssertFalse(lastTab.isEmpty, "\(name): the sidebar lists Web version", file: file, line: line)
+        if let first = frames.first, !lastTab.isEmpty {
+            XCTAssertGreaterThan(first.minY, lastTab.maxY, "\(name): the section is clear of the last tab row",
+                                 file: file, line: line)
+        }
+        XCTAssertLessThanOrEqual(window.maxY - all.frame.maxY, 20, "\(name): All activity is at the window's bottom",
+                                 file: file, line: line)
+    }
+
+    private func assertNoNowSection(_ name: String, in app: XCUIApplication,
+                                    file: StaticString = #filePath, line: UInt = #line) {
+        let section = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "activity.now.")).firstMatch
+        XCTAssertFalse(pollUntil(timeout: 3) { section.exists }, "\(name): no Now section", file: file, line: line)
+    }
+
+    /// The main window's title, exactly as the desktop capture contract pins
+    /// it: no subtitle joins it.
+    private func assertWindowTitle(_ expected: String, in app: XCUIApplication,
+                                   file: StaticString = #filePath, line: UInt = #line) {
+        var title = ""
+        let found = pollUntil(timeout: 10) {
+            title = self.mainWindow(app).title.trimmingCharacters(in: .whitespacesAndNewlines)
+            return title == expected
+        }
+        XCTAssertTrue(found, "The window's title is '\(expected)'; found '\(title)'", file: file, line: line)
+    }
+
+    /// Clicks `opener`: Activity opens as a popover in a window of its own,
+    /// which Escape closes. The list's frame, where the popover hangs.
+    @discardableResult
+    private func openPopover(byClicking opener: XCUIElement, name: String, in app: XCUIApplication,
+                             file: StaticString = #filePath, line: UInt = #line) -> CGRect {
+        let windows = app.windows.count
+        click(opener, name: name, file: file, line: line)
+        let frame = assertPopover(name, in: app, file: file, line: line)
+        XCTAssertGreaterThan(app.windows.count, windows, "\(name)'s popover is a window of its own",
+                             file: file, line: line)
+        keepWindowScreenshots("Activity from \(name)", in: app)
+        closeWithEscape("\(name)'s popover", in: app, file: file, line: line)
+        return frame
+    }
+
+    /// Activity is open as a popover, which has no Done. The list's frame.
+    @discardableResult
+    private func assertPopover(_ name: String, in app: XCUIApplication,
+                               file: StaticString = #filePath, line: UInt = #line) -> CGRect {
+        let list = element(ID.activityList, in: app, file: file, line: line)
+        XCTAssertFalse(query(ID.activityDone, in: app).exists, "\(name) opens a popover, which has no Done",
+                       file: file, line: line)
+        var frame = CGRect.null
+        _ = pollUntil(timeout: 5) {
+            let current = list.frame
+            defer { frame = current }
+            return !current.isEmpty && current == frame
+        }
+        attach("\(name): list \(frame)\nwindows \(app.windows.allElementsBoundByIndex.map(\.frame))",
+               name: "Activity's popover from \(name)")
+        return frame
+    }
+
+    private func closeWithEscape(_ name: String, in app: XCUIApplication,
+                                 file: StaticString = #filePath, line: UInt = #line) {
+        app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+        XCTAssertTrue(waitForAbsence(query(ID.activityList, in: app), timeout: stateSettleTimeout),
+                      "Escape closes \(name)", file: file, line: line)
+    }
+
+    /// Activity is open as the sheet, with nothing waiting in it; Done
+    /// closes it.
+    private func closeSheet(_ name: String, in app: XCUIApplication,
+                            file: StaticString = #filePath, line: UInt = #line) {
+        let list = element(ID.activityList, in: app, file: file, line: line)
+        let done = query(ID.activityDone, in: app)
+        XCTAssertTrue(done.waitForExistence(timeout: 10), "\(name) opens the sheet, with Done", file: file, line: line)
+        XCTAssertTrue(query(ID.activityEmpty, in: app).waitForExistence(timeout: 10), "\(name): nothing waiting",
+                      file: file, line: line)
+        keepWindowScreenshots("Activity's sheet from \(name)", in: app)
+        click(done, name: "Done", file: file, line: line)
+        XCTAssertTrue(waitForAbsence(list, timeout: stateSettleTimeout), "Done closes \(name)'s sheet",
+                      file: file, line: line)
+    }
+
+    /// Chooses View > Activity in the menu bar.
+    private func chooseActivityInViewMenu(in app: XCUIApplication, file: StaticString = #filePath,
+                                          line: UInt = #line) {
+        let view = app.menuBars.menuBarItems["View"].firstMatch
+        XCTAssertTrue(view.waitForExistence(timeout: 10), "The menu bar has View", file: file, line: line)
+        view.click()
+        let item = view.menuItems["Activity"].firstMatch
+        if !item.waitForExistence(timeout: 5) {
+            attach(app.menuBars.firstMatch.debugDescription, name: "The menu bar")
+        }
+        XCTAssertTrue(item.exists, "View has Activity", file: file, line: line)
+        XCTAssertTrue(item.isEnabled, "View > Activity is enabled", file: file, line: line)
+        item.click()
+    }
+
+    /// View has Activity, off: the window in front has no Activity.
+    private func assertActivityInViewMenuIsOff(in app: XCUIApplication, file: StaticString = #filePath,
+                                               line: UInt = #line) {
+        let view = app.menuBars.menuBarItems["View"].firstMatch
+        XCTAssertTrue(view.waitForExistence(timeout: 10), "The menu bar has View", file: file, line: line)
+        view.click()
+        let item = view.menuItems["Activity"].firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 5), "View has Activity", file: file, line: line)
+        XCTAssertFalse(item.isEnabled, "View > Activity is off signed out", file: file, line: line)
+        app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+    }
+
+    /// Drags the window's bottom right corner until its content is `size`,
+    /// as a person resizes it: a live resize.
+    private func resizeMacWindow(toContent size: CGSize, in app: XCUIApplication,
+                                 file: StaticString = #filePath, line: UInt = #line) {
+        for _ in 0..<4 {
+            guard let current = contentSize(in: app), !contentSize(in: app, isAbout: size) else { break }
+            let delta = CGVector(dx: size.width - current.width, dy: size.height - current.height)
+            let corner = mainWindow(app).coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
+                .withOffset(CGVector(dx: -2, dy: -2))
+            corner.click(forDuration: 0.6, thenDragTo: corner.withOffset(delta))
+            _ = pollUntil(timeout: 3) { self.contentSize(in: app, isAbout: size) }
+        }
+        XCTAssertTrue(contentSize(in: app, isAbout: size),
+                      "A live resize brings the window's content to \(size): \(String(describing: contentSize(in: app)))",
+                      file: file, line: line)
+    }
+
+    /// The window's content is `size` to within 6 points either way: a live
+    /// resize stops a few points short, as it gave 1198 × 759 and 1196 × 758
+    /// for 1200 × 760, and a corrective drag that small doesn't take.
+    private func contentSize(in app: XCUIApplication, isAbout size: CGSize) -> Bool {
+        guard let measured = contentSize(in: app) else { return false }
+        return abs(measured.width - size.width) <= 6 && abs(measured.height - size.height) <= 6
+    }
+
+    /// Selects a root from the sidebar by its identifier, with a click at its
+    /// centre: XCTest calls the Mac's sidebar entries unhittable.
+    private func selectSidebarEntry(_ identifier: String, in app: XCUIApplication,
+                                    file: StaticString = #filePath, line: UInt = #line) {
+        click(app.descendants(matching: .any).matching(identifier: identifier).firstMatch, name: identifier,
+              file: file, line: line)
+    }
+
+    /// The main window, and any window beside it, such as a popover's.
+    private func keepWindowScreenshots(_ name: String, in app: XCUIApplication) {
+        let main = mainWindow(app)
+        guard main.exists else { return }
+        let attachment = XCTAttachment(screenshot: main.screenshot(), quality: .original)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        for (index, other) in app.windows.allElementsBoundByIndex.enumerated()
+        where other.exists && other.frame != main.frame && !other.frame.isEmpty {
+            let extra = XCTAttachment(screenshot: other.screenshot(), quality: .original)
+            extra.name = "\(name) (window \(index))"
+            extra.lifetime = .keepAlways
+            add(extra)
+        }
+    }
+    #endif
 
     // MARK: Launching
 

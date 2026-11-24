@@ -57,6 +57,9 @@ struct ActivityRequest: Identifiable, Equatable {
         /// The iPad's and the Mac's Now section: a row, its View, or All
         /// activity.
         case nowSection
+        /// The Mac's Activity command in its View menu, which opens the list
+        /// as All activity does.
+        case menuCommand
     }
 
     /// Where the list starts.

@@ -1168,4 +1168,49 @@ extension AppRouteTests {
         navigation.closeActivityPopover(openedFrom: .nowSection)
         XCTAssertEqual(navigation.main.activity?.style, .sheet, "A sheet has no opener to lose.")
     }
+
+    /// The Mac's Activity command opens the list as All activity does: a
+    /// popover anchored at All activity while the Now section shows it, which
+    /// follows it and outlives the section's own close; with no section, a
+    /// sheet; over a game, the game's popover at any rate, hanging from the
+    /// window's top.
+    @MainActor
+    func testTheMenuCommandOpensActivityAsAllActivityDoes() {
+        let navigation = NavigationService()
+        let allActivity = CGRect(x: 10, y: 696, width: 200, height: 44)
+        let top = CGRect(x: 600, y: 52, width: 0, height: 0)
+
+        navigation.openActivityFromMenuCommand(allActivity: allActivity, top: top)
+        let popover = navigation.main.activity
+        XCTAssertEqual(popover?.source, .menuCommand)
+        XCTAssertEqual(popover?.style, .popover)
+        XCTAssertEqual(popover?.anchor, allActivity, "It hangs from All activity.")
+        XCTAssertEqual(popover?.focus, .top)
+        XCTAssertEqual(popover?.place, .root(isMessagesTab: false))
+        let moved = allActivity.offsetBy(dx: 0, dy: 160)
+        navigation.moveActivityAnchor(to: moved, from: .nowSection)
+        XCTAssertEqual(navigation.main.activity?.anchor, allActivity, "The section's own popover moves, not this one.")
+        navigation.moveActivityAnchor(to: moved, from: .menuCommand)
+        XCTAssertEqual(navigation.main.activity?.anchor, moved, "It follows All activity as the window resizes.")
+        navigation.closeActivityPopover(openedFrom: .nowSection)
+        XCTAssertEqual(navigation.main.activity?.sessionID, popover?.sessionID, "The section's close leaves it.")
+
+        navigation.openActivityFromMenuCommand(allActivity: nil, top: top)
+        XCTAssertEqual(navigation.main.activity?.style, .sheet, "With no Now section, nothing waiting, a sheet.")
+        XCTAssertEqual(navigation.main.activity?.source, .menuCommand)
+        XCTAssertNotEqual(navigation.main.activity?.sessionID, popover?.sessionID, "Each command is a new session.")
+
+        let game = ActivityModel.Place.game(id: 42, isOwnGame: true, isLive: true, isOver: false)
+        navigation.activityPlaces.set(.init(place: game, root: .home, isOnTop: true), for: UUID())
+        let settled = expectation(description: "The place settles a main-queue turn later.")
+        DispatchQueue.main.async { settled.fulfill() }
+        wait(for: [settled], timeout: 1)
+        navigation.openActivityFromMenuCommand(allActivity: nil, top: top)
+        XCTAssertEqual(navigation.main.activity?.style, .popover, "Over a game, the game's popover.")
+        XCTAssertEqual(navigation.main.activity?.anchor, top, "With no All activity, it hangs from the window's top.")
+        XCTAssertEqual(navigation.main.activity?.place, game)
+        navigation.openActivityFromMenuCommand(allActivity: allActivity, top: top)
+        XCTAssertEqual(navigation.main.activity?.anchor, allActivity, "Over a game too it hangs from All activity.")
+        XCTAssertEqual(navigation.main.activity?.style, .popover)
+    }
 }

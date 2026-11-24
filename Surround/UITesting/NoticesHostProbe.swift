@@ -7,8 +7,8 @@
 //  PLACEHOLDER and logs what its host does with it, so a device run can
 //  answer where connection status can live before the real line exists; it
 //  stays off unless its --surround-notices-* launch flag is present
-//  (TESTING.md). Activity's bar and the iPad's Now section are the real ones
-//  in every container, and log here.
+//  (TESTING.md). Activity's bar and the Now section, on iPad and the Mac,
+//  are the real ones in every container, and log here.
 //
 
 #if DEBUG && MAIN_APP
@@ -262,7 +262,7 @@ private struct NoticesProbeSubtitle: ViewModifier {
         func body(content: Content) -> some View {
             let statusShown = variant == .status || (variant == .cycle && cycleOn)
             content
-                .activityNavigationSubtitle(statusShown ? Text(verbatim: "PLACEHOLDER · Reconnecting…") : nil)
+                .placeholderNavigationSubtitle(statusShown ? Text(verbatim: "PLACEHOLDER · Reconnecting…") : nil)
                 .activitySubtitleItem(isPresent: variant == .retry) { retryItem(largeTitle: false) }
                 .activitySubtitleItem(largeTitle: true, isPresent: variant == .retry) { retryItem(largeTitle: true) }
                 .activityNavigationBarNeverMinimizes(neverMinimizes)
@@ -292,6 +292,22 @@ private struct NoticesProbeSubtitle: ViewModifier {
             .font(.caption)
             .background(NoticesProbeMarker(event: "subtitle", key: "subtitle.\(placement).\(root)"))
         }
+    }
+}
+
+private extension View {
+    /// The placeholder's navigation subtitle: from iOS 26, and on the Mac,
+    /// where SwiftUI draws none. Nil sets an empty subtitle instead of
+    /// removing it, so one that comes and goes keeps its identity.
+    @ViewBuilder
+    func placeholderNavigationSubtitle(_ subtitle: Text?) -> some View {
+        #if targetEnvironment(macCatalyst)
+        navigationSubtitle(subtitle ?? Text(verbatim: ""))
+        #elseif os(iOS) && canImport(SwiftUI, _version: 7.2.5)
+        if #available(iOS 26.0, *) { navigationSubtitle(subtitle ?? Text(verbatim: "")) } else { self }
+        #else
+        self
+        #endif
     }
 }
 

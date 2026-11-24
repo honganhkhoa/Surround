@@ -818,6 +818,18 @@ extension NavigationService {
         main.activity = nil
     }
 
+    /// The Mac's Activity command, for this window: Activity as the Now
+    /// section's All activity opens it, anchored there while the section
+    /// shows it. With no section, as when nothing waits, a sheet; but over a
+    /// game, where the list is always the game's popover, one that hangs
+    /// from `top`.
+    /// - Parameter allActivity: All activity's frame in the window's global
+    ///   space; nil while the section doesn't show it.
+    func openActivityFromMenuCommand(allActivity: CGRect?, top: CGRect) {
+        openActivity(source: .menuCommand, anchor: allActivity ?? top,
+                     horizontalSizeClass: allActivity == nil ? .compact : .regular)
+    }
+
     /// Opens a game from Activity on Home's route: a live Accept, the
     /// correspondence row, Open game, and a game opened from a profile the
     /// list pushed. The account sheet closes, as a game in the iPad Profile

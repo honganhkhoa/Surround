@@ -75,6 +75,10 @@ struct MainView: View {
     /// Records this window's waiting items as they arrive, for Activity's
     /// order. Set once, with the window's Activity stores.
     @State private var activityFirstSeen: ActivityFirstSeenObserver?
+    #if targetEnvironment(macCatalyst)
+    /// This window's Activity command in the Mac's View menu.
+    @State private var activityMenuTarget = ActivityMenuTarget()
+    #endif
 
     @EnvironmentObject var nav: NavigationService
 
@@ -214,8 +218,9 @@ struct MainView: View {
             .environment(\.appReviewPresentationRelay, environment.appReviewPresentationRelay))
     }
 
-    /// The Activity bar in UIKit's accessory, and the iPad's Now section in
-    /// its sidebar's bottom bar, with the window's environment.
+    /// The Activity bar in UIKit's accessory, and the Now section in the
+    /// sidebar's bottom bar on iPad and the Mac, with the window's
+    /// environment.
     private func hostedAccessoryContent(_ bar: AnyView) -> AnyView {
         AnyView(windowEnvironment(bar))
     }
@@ -341,7 +346,18 @@ struct MainView: View {
         .tabViewStyle(.sidebarAdaptable)
         .modifier(MainTabPlacement(horizontalSizeClass: horizontalSizeClass))
         // The Mac has no accessory and no minimizing, so it attaches neither.
-        #if !targetEnvironment(macCatalyst)
+        // Its Now section is the sidebar's bottom bar, set on the TabView's
+        // own controller once the window appears and checked again after
+        // each sign-in change, which changes the tabs.
+        #if targetEnvironment(macCatalyst)
+        .background {
+            ActivityMacNowSectionHost(nav: nav, isLoggedIn: ogs.isLoggedIn, menuTarget: activityMenuTarget) { openers in
+                hostedAccessoryContent(AnyView(ActivityNowSection(bar: nav.activityBar, openers: openers)))
+            }
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
+        }
+        #else
         .modifier(ActivityBottomAccessoryHost(bar: nav.activityBar, places: nav.activityPlaces,
                                               root: nav.main.rootView))
         #endif
@@ -430,6 +446,13 @@ struct MainView: View {
         // This window's place in the app-wide announcer, which speaks and
         // plays haptics once per app, for the window the user is in.
         .modifier(AppAnnouncerWindowRegistration(window: nav.announcerWindow))
+        #if targetEnvironment(macCatalyst)
+        // View > Activity acts on the window in front; the moderator's
+        // cover leaves it nothing to open, and signed out there is no
+        // Activity.
+        .focusedSceneValue(\.activityMenuTarget,
+                           ogs.superchatCover == nil && ogs.isLoggedIn ? activityMenuTarget : nil)
+        #endif
         .onOpenURL { url in
             nav.handle(appURL: url)
         }

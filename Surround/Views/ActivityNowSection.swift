@@ -10,9 +10,11 @@
 //  Activity anchored at it; View opens a challenge's card; Withdraw acts in
 //  place, and its result keeps the row's place for 4 s, as in the bar. Its
 //  text stops growing at XXL, so it keeps its height, and its rows, their
-//  actions and All activity take keyboard focus. The iPad's container hosts
-//  it in UIKit's sidebar bottom bar, which follows its size; it holds no
-//  state that matters.
+//  actions and All activity take keyboard focus. An action whose words
+//  don't fit its row is drawn as its symbol. The iPad's container and, on
+//  the Mac, MainView host it in UIKit's sidebar bottom bar, which follows
+//  its size; it holds no state that matters. The Mac's View menu also
+//  opens Activity as All activity does (`ActivityMenuCommands`).
 //
 
 import SwiftUI
@@ -22,10 +24,13 @@ private typealias ID = SurroundUITestContract.AccessibilityID
 
 struct ActivityNowSection: View {
     @ObservedObject var bar: ActivityBarState
+    /// Where its openers are: on the Mac, the window's, which its Activity
+    /// command reads; nil for the section's own.
+    var openers: ActivityNowOpeners?
     @EnvironmentObject private var nav: NavigationService
 
     var body: some View {
-        ActivityNowSectionBody(bar: bar, results: nav.activityResults)
+        ActivityNowSectionBody(bar: bar, results: nav.activityResults, sharedOpeners: openers)
             .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     }
 }
@@ -35,16 +40,20 @@ struct ActivityNowSection: View {
 private struct ActivityNowSectionBody: View {
     @ObservedObject var bar: ActivityBarState
     @ObservedObject var results: ActivityResults
+    let sharedOpeners: ActivityNowOpeners?
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.displayScale) private var displayScale
-    /// Where each opener is in its window, and which one opened the list.
-    /// Held by reference, so a new frame redraws nothing.
-    @State private var openers = ActivityNowOpeners()
+    /// Where each opener is in its window, and which one opened the list,
+    /// where no host shares its own. Held by reference, so a new frame
+    /// redraws nothing.
+    @State private var ownOpeners = ActivityNowOpeners()
     /// The rows last drawn, so a withdrawn row's result keeps its place.
     @State private var lastDrawn = ActivityNowLastDrawn()
+
+    private var openers: ActivityNowOpeners { sharedOpeners ?? ownOpeners }
 
     var body: some View {
         let section = bar.nowSection
@@ -132,18 +141,22 @@ private struct ActivityNowSectionBody: View {
     /// width, over a game the game's own.
     private func open(_ focus: ActivityRequest.Focus, from opener: String) {
         openers.opened = opener
+        openers.openedSource = .nowSection
         nav.openActivity(source: .nowSection, focus: focus, anchor: openers.frames[opener] ?? .zero,
                          horizontalSizeClass: horizontalSizeClass)
     }
 }
 
-/// The openers' frames in their window. Inside the sidebar's bottom bar
-/// SwiftUI's global space is the window's, once laid out.
+/// The openers' frames in their window, while each is drawn. Inside the
+/// sidebar's bottom bar SwiftUI's global space is the window's, once laid
+/// out.
 final class ActivityNowOpeners {
     static let allActivity = "all"
     var frames: [String: CGRect] = [:]
-    /// The opener the window's list last opened from.
+    /// The opener the window's list last opened from, and what opened it
+    /// there: the section, or the Mac's Activity command at All activity.
     var opened: String?
+    var openedSource = ActivityRequest.Source.nowSection
 }
 
 /// What the section last drew, by its rows' ids in order.
@@ -156,21 +169,26 @@ final class ActivityNowLastDrawn {
     }
 }
 
-/// Records an opener's frame, and moves the popover it opened as it moves,
-/// a main-queue turn later: only while that popover is open
-/// (`moveActivityAnchor`). Nothing it reads decides what the section shows.
+/// Records an opener's frame while it is drawn, and moves the popover it
+/// opened as it moves, a main-queue turn later: only while that popover is
+/// open (`moveActivityAnchor`). Nothing it reads decides what the section
+/// shows.
 private struct ActivityNowOpenerFrame: ViewModifier {
     let openers: ActivityNowOpeners
     let opener: String
     @EnvironmentObject private var nav: NavigationService
 
     func body(content: Content) -> some View {
-        content.onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
-            openers.frames[opener] = frame
-            guard openers.opened == opener else { return }
-            let nav = nav
-            DispatchQueue.main.async { nav.moveActivityAnchor(to: frame, from: .nowSection) }
-        }
+        content
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                openers.frames[opener] = frame
+                guard openers.opened == opener else { return }
+                let nav = nav, source = openers.openedSource
+                DispatchQueue.main.async { nav.moveActivityAnchor(to: frame, from: source) }
+            }
+            // A gone opener anchors nothing: with no All activity, the Mac's
+            // Activity command opens a sheet.
+            .onDisappear { openers.frames[opener] = nil }
     }
 }
 
@@ -552,6 +570,14 @@ private struct ActivityNowRowFace: View {
         ActivityBarPartText(rank: model.rank, clock: model.clock?.time, suddenDeathMark: model.clock?.mark)
     }
 
+    /// The row's parts as it draws them, from the leading edge.
+    private var parts: [ActivityBarPart] {
+        var parts: [ActivityBarPart] = [.tile, .lineOne]
+        if model.clock != nil { parts += [.hourglass, .clock] }
+        if let action = model.action { parts.append(.action(action.action)) }
+        return parts
+    }
+
     private func row(showsHourglass: Bool, showsTile: Bool) -> some View {
         HStack(spacing: 0) {
             lead(showsHourglass: showsHourglass, showsTile: showsTile)
@@ -657,30 +683,43 @@ private struct ActivityNowRowFace: View {
     }
 
     /// View, Open game and Retry as indigo-tinted pills; Withdraw as accent
-    /// text; each in a 44 pt target.
+    /// text; each in a 44 pt target. Where the words don't fit the row, the
+    /// action's symbol in a pill instead, with the words as its tooltip on
+    /// the Mac; VoiceOver reads the same label either way.
     private func actionButton(_ action: ActivityNowActionModel) -> some View {
-        let isPill = action.action != .withdraw
-        let width = metrics.width(of: .action(action.action), ActivityBarPartText(actionLabel: { _ in action.label }))
+        var text = self.text
+        text.actionLabel = { _ in action.label }
+        let drawsSymbol = metrics.actionDrawsSymbol(parts, text: text)
+        let isPill = drawsSymbol || action.action != .withdraw
+        let width = drawsSymbol ? metrics.symbolActionWidth(action.action) : metrics.width(of: .action(action.action), text)
         let opener = Self.actionOpener(model.itemID)
         return Button(action: action.tap) {
-            Text(verbatim: action.label)
-                .font(Font(metrics.actionFont as CTFont))
-                .foregroundStyle(MessagesStyle.accent)
-                .lineLimit(1)
-                .fixedSize()
-                .frame(width: width, height: isPill ? ActivityNowRowMetrics.pillHeight : ActivityBarMetrics.targetSize)
-                .background {
-                    if isPill {
-                        Capsule().fill(MessagesStyle.accent.opacity(0.12))
-                    }
+            Group {
+                if drawsSymbol {
+                    Image(systemName: ActivityNowRowMetrics.symbolName(action.action))
+                        .font(.system(size: metrics.actionFont.pointSize, weight: .semibold))
+                } else {
+                    Text(verbatim: action.label)
+                        .font(Font(metrics.actionFont as CTFont))
+                        .lineLimit(1)
+                        .fixedSize()
                 }
-                .frame(height: ActivityBarMetrics.targetSize)
-                .contentShape(Rectangle())
+            }
+            .foregroundStyle(MessagesStyle.accent)
+            .frame(width: width, height: isPill ? ActivityNowRowMetrics.pillHeight : ActivityBarMetrics.targetSize)
+            .background {
+                if isPill {
+                    Capsule().fill(MessagesStyle.accent.opacity(0.12))
+                }
+            }
+            .frame(height: ActivityBarMetrics.targetSize)
+            .contentShape(Rectangle())
         }
         .buttonStyle(ActivityBarPressStyle())
         .frame(width: width)
         .disabled(!action.isEnabled)
         .focusable()
+        .modifier(ActivityNowSymbolTooltip(words: drawsSymbol ? action.label : nil))
         .accessibilityLabel(Text(verbatim: action.accessibilityLabel))
         .accessibilityValue(Text(verbatim: action.isEnabled ? "" : ActivityBarWords.reconnecting))
         .accessibilityShowsLargeContentViewer {
@@ -688,6 +727,24 @@ private struct ActivityNowRowFace: View {
         }
         .accessibilityIdentifier(ID.activityNowRowAction(model.itemID))
         .modifier(ActivityNowOpenerFrame(openers: context.openers, opener: opener))
+    }
+}
+
+/// The words of an action drawn as its symbol, as its tooltip: on the Mac,
+/// where a pointer rests on it. Nothing for an action drawn in words.
+private struct ActivityNowSymbolTooltip: ViewModifier {
+    let words: String?
+
+    func body(content: Content) -> some View {
+        #if targetEnvironment(macCatalyst)
+        if let words {
+            content.help(Text(verbatim: words))
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
     }
 }
 
@@ -699,3 +756,233 @@ extension ActivityNowRowMetrics {
                                symbolPointSize: (clockFont.pointSize * 0.75).rounded())
     }
 }
+
+// MARK: - The Mac
+
+#if targetEnvironment(macCatalyst)
+/// The Mac's Now section, in UIKit's sidebar bottom bar on the TabView's own
+/// UITabBarController, as the iPad's container hosts its own: SwiftUI's
+/// bottom bar never changes its height after its first layout, so rows that
+/// come or go would never show. A hosting controller sized to its content,
+/// down to nothing, made once, whose root view is replaced in place with the
+/// window's environment; the section observes the window's bar state
+/// itself. It is set once the TabView is in a window, as the window first
+/// appears, and checked again a main-queue turn after each sign-in change,
+/// since signing in or out changes the TabView's tabs and may rebuild its
+/// controller; never from layout or a timer. MainView places it behind its
+/// TabView, and it connects the window's Activity command to the section.
+struct ActivityMacNowSectionHost: UIViewControllerRepresentable {
+    let nav: NavigationService
+    let isLoggedIn: Bool
+    let menuTarget: ActivityMenuTarget
+    /// The section with the window's environment, given the openers it
+    /// shares with the Activity command.
+    let content: (ActivityNowOpeners) -> AnyView
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIViewController(context: Context) -> AnchorController {
+        let anchor = AnchorController()
+        let coordinator = context.coordinator
+        anchor.onAppear = { [weak coordinator] in coordinator?.windowDidAppear() }
+        anchor.onBecameKey = { [weak coordinator] in coordinator?.windowBecameKey() }
+        coordinator.anchor = anchor
+        coordinator.update(self)
+        return anchor
+    }
+
+    func updateUIViewController(_ anchor: AnchorController, context: Context) {
+        context.coordinator.update(self)
+    }
+
+    @MainActor
+    final class Coordinator {
+        private let host = UIHostingController(rootView: AnyView(EmptyView()))
+        private let openers = ActivityNowOpeners()
+        weak var anchor: AnchorController?
+        private var isLoggedIn: Bool?
+        private var isInstalled = false
+
+        init() {
+            host.sizingOptions = .intrinsicContentSize
+            host.view.backgroundColor = .clear
+        }
+
+        func update(_ parent: ActivityMacNowSectionHost) {
+            host.rootView = parent.content(openers)
+            parent.menuTarget.connect(nav: parent.nav, openers: openers) { [weak self] in self?.anchor?.view.window }
+            let signInChanged = isLoggedIn.map { $0 != parent.isLoggedIn } ?? false
+            isLoggedIn = parent.isLoggedIn
+            if signInChanged {
+                // The TabView's new tabs, and any controller SwiftUI builds
+                // for them, are in place a turn later.
+                DispatchQueue.main.async { [weak self] in self?.install(reason: "signIn") }
+            }
+        }
+
+        /// The window has first appeared: the TabView is in it. Should its
+        /// controller join the window after this one, the turn after
+        /// finds it, or the window's first turn as the key window does.
+        func windowDidAppear() {
+            install(reason: "appeared")
+            guard !isInstalled else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !self.isInstalled else { return }
+                self.install(reason: "appeared.turn")
+            }
+        }
+
+        func windowBecameKey() {
+            guard !isInstalled else { return }
+            install(reason: "key")
+        }
+
+        /// Sets the section as the sidebar's bottom bar of the window's
+        /// TabView, unless it already is.
+        private func install(reason: String) {
+            guard let window = anchor?.view.window,
+                  let tabs = Self.tabBarController(under: window.rootViewController, in: window) else {
+                log("notFound", reason: reason)
+                return
+            }
+            isInstalled = true
+            guard tabs.sidebar.bottomBarView !== host.view else {
+                log("kept", reason: reason)
+                return
+            }
+            let replaced = tabs.sidebar.bottomBarView.map { "\(type(of: $0))" } ?? "none"
+            tabs.sidebar.bottomBarView = host.view
+            log("installed", reason: reason, replaced: replaced)
+        }
+
+        private static func tabBarController(under controller: UIViewController?,
+                                             in window: UIWindow) -> UITabBarController? {
+            guard let controller else { return nil }
+            if let tabs = controller as? UITabBarController, tabs.viewIfLoaded?.window === window { return tabs }
+            for child in controller.children {
+                if let found = tabBarController(under: child, in: window) { return found }
+            }
+            return nil
+        }
+
+        private func log(_ action: String, reason: String, replaced: String? = nil) {
+            #if DEBUG && MAIN_APP
+            NoticesHostProbeLog.event("mac.now", [("action", action), ("reason", reason)]
+                                      + (replaced.map { [("replaced", $0)] } ?? []))
+            #endif
+        }
+    }
+
+    /// A controller with no content, whose appearance says that the window
+    /// has first appeared; then, for a window not yet key, its first turn as
+    /// the key window.
+    final class AnchorController: UIViewController {
+        var onAppear: (() -> Void)?
+        var onBecameKey: (() -> Void)?
+        private var hasAppeared = false
+        private var keyObserver: NSObjectProtocol?
+
+        override func loadView() {
+            let view = UIView()
+            view.isUserInteractionEnabled = false
+            view.accessibilityElementsHidden = true
+            self.view = view
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            guard !hasAppeared else { return }
+            hasAppeared = true
+            onAppear?()
+            guard let window = view.window, !window.isKeyWindow else { return }
+            keyObserver = NotificationCenter.default.addObserver(
+                forName: UIWindow.didBecomeKeyNotification, object: window, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.windowBecameKey() }
+            }
+        }
+
+        private func windowBecameKey() {
+            if let keyObserver { NotificationCenter.default.removeObserver(keyObserver) }
+            keyObserver = nil
+            onBecameKey?()
+        }
+
+        deinit {
+            if let keyObserver { NotificationCenter.default.removeObserver(keyObserver) }
+        }
+    }
+}
+
+/// The Mac's Activity command for one window, which MainView publishes to
+/// the menu bar as its scene's focused value: Activity as the Now section's
+/// All activity opens it, anchored there while the section shows it, and
+/// otherwise as `openActivityFromMenuCommand(allActivity:top:)` says, from
+/// the window's top edge where a popover needs an anchor.
+@MainActor
+final class ActivityMenuTarget {
+    private weak var nav: NavigationService?
+    private weak var openers: ActivityNowOpeners?
+    private var window: () -> UIWindow? = { nil }
+
+    func connect(nav: NavigationService, openers: ActivityNowOpeners, window: @escaping () -> UIWindow?) {
+        self.nav = nav
+        self.openers = openers
+        self.window = window
+    }
+
+    func open() {
+        guard let nav else { return }
+        let allActivity = openers?.frames[ActivityNowOpeners.allActivity]
+        if allActivity != nil {
+            openers?.opened = ActivityNowOpeners.allActivity
+            openers?.openedSource = .menuCommand
+        }
+        #if DEBUG && MAIN_APP
+        NoticesHostProbeLog.event("mac.activityCommand", [
+            ("allActivity", NoticesHostProbeLog.rect(allActivity)),
+        ])
+        #endif
+        nav.openActivityFromMenuCommand(allActivity: allActivity, top: top)
+    }
+
+    /// The middle of the window's top edge, below its toolbar.
+    private var top: CGRect {
+        guard let window = window() else { return .zero }
+        return CGRect(x: window.bounds.midX, y: window.safeAreaInsets.top, width: 0, height: 0)
+    }
+}
+
+private struct ActivityMenuTargetKey: FocusedValueKey {
+    typealias Value = ActivityMenuTarget
+}
+
+extension FocusedValues {
+    /// The Activity command of the window in front, on the Mac.
+    var activityMenuTarget: ActivityMenuTarget? {
+        get { self[ActivityMenuTargetKey.self] }
+        set { self[ActivityMenuTargetKey.self] = newValue }
+    }
+}
+
+/// View > Activity, ⇧⌘A, on the Mac: Activity in the window in front
+/// (`ActivityMenuTarget`), the keyboard's way to it, since Tab never reaches
+/// the sidebar's Now section. Off while no main window is in front, while
+/// the moderator's cover is up, and while the window in front is signed
+/// out, which has no Activity.
+struct ActivityMenuCommands: Commands {
+    @FocusedValue(\.activityMenuTarget) private var target
+
+    var body: some Commands {
+        CommandGroup(after: .sidebar) {
+            Button {
+                target?.open()
+            } label: {
+                Text(verbatim: ActivityBarAccessibility.listTitle)
+            }
+            .keyboardShortcut("a", modifiers: [.command, .shift])
+            .disabled(target == nil)
+        }
+    }
+}
+#endif

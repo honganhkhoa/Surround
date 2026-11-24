@@ -35,6 +35,10 @@ extension ActivityBarAccessibility {
     /// The bar, a container: "Activity".
     static var barLabel: String { Words.activity }
 
+    /// The list's title, "Activity", which also names the Mac's command
+    /// that opens it.
+    static var listTitle: String { Words.activity }
+
     /// A live game's lead, or its Now row: "Live game with HarborMist, 1d.
     /// Your move", and "42 seconds left" as the value, which changes each
     /// second while the user's clock runs. Sudden death comes before the

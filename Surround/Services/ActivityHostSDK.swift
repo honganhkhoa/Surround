@@ -153,20 +153,6 @@ extension View {
         #endif
     }
 
-    /// The navigation subtitle: from iOS 26, and on the Mac. Nil sets an empty
-    /// subtitle instead of removing it, so a subtitle that comes and goes keeps
-    /// its identity.
-    @ViewBuilder
-    func activityNavigationSubtitle(_ subtitle: Text?) -> some View {
-        #if targetEnvironment(macCatalyst)
-        navigationSubtitle(subtitle ?? Text(verbatim: ""))
-        #elseif os(iOS) && canImport(SwiftUI, _version: 7.2.5)
-        if #available(iOS 26.0, *) { navigationSubtitle(subtitle ?? Text(verbatim: "")) } else { self }
-        #else
-        self
-        #endif
-    }
-
     /// A toolbar item in the subtitle, or in the large title's subtitle, from
     /// iOS 26 and on the Mac.
     @ViewBuilder
@@ -197,17 +183,6 @@ extension View {
         } else {
             self
         }
-        #else
-        self
-        #endif
-    }
-
-    /// The Mac sidebar's bottom bar. Apply it unconditionally and vary only
-    /// its content. Elsewhere, unchanged.
-    @ViewBuilder
-    func activityMacSidebarBottomBar<Bar: View>(@ViewBuilder content: () -> Bar) -> some View {
-        #if targetEnvironment(macCatalyst)
-        tabViewSidebarBottomBar(content: content)
         #else
         self
         #endif
