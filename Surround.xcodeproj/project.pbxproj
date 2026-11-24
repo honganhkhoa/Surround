@@ -100,6 +100,7 @@
 		5C5E00312026112100000031 /* ActivityAccessoryHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00302026112100000030 /* ActivityAccessoryHost.swift */; };
 		5C5E00412026112100000041 /* ActivityNowSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00402026112100000040 /* ActivityNowSection.swift */; };
 		5C5E00512026112300000051 /* RootConnectionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00502026112300000050 /* RootConnectionStatus.swift */; };
+		5C5E00612026112400000061 /* ActivityBarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00602026112400000060 /* ActivityBarUITests.swift */; };
 		5C5E00812026112000000081 /* ActivityBarHosts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00802026112000000080 /* ActivityBarHosts.swift */; };
 		5FEB00012026111700000001 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
 		5FEB00032026111700000003 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
@@ -693,6 +694,7 @@
 		5C5E00302026112100000030 /* ActivityAccessoryHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityAccessoryHost.swift; sourceTree = "<group>"; };
 		5C5E00402026112100000040 /* ActivityNowSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityNowSection.swift; sourceTree = "<group>"; };
 		5C5E00502026112300000050 /* RootConnectionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootConnectionStatus.swift; sourceTree = "<group>"; };
+		5C5E00602026112400000060 /* ActivityBarUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarUITests.swift; sourceTree = "<group>"; };
 		5C5E00802026112000000080 /* ActivityBarHosts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarHosts.swift; sourceTree = "<group>"; };
 		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
 		5FEB00022026111700000002 /* MoveCommitHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveCommitHaptics.swift; sourceTree = "<group>"; };
@@ -1225,6 +1227,7 @@
 				5C2E00132026111100000013 /* SuperchatCoverUITests.swift */,
 				5C3E001E202611120000001E /* ActivityListUITests.swift */,
 				5C3E00202026111200000020 /* ActivityConversationUITests.swift */,
+				5C5E00602026112400000060 /* ActivityBarUITests.swift */,
 				5C4E00422026111400000042 /* GameControlUITests.swift */,
 				BC042B1124AB2CFA0050B2D1 /* Info.plist */,
 			);
@@ -2233,6 +2236,7 @@
 				5C2E00142026111100000014 /* SuperchatCoverUITests.swift in Sources */,
 				5C3E001F202611120000001F /* ActivityListUITests.swift in Sources */,
 				5C3E00212026111200000021 /* ActivityConversationUITests.swift in Sources */,
+				5C5E00612026112400000061 /* ActivityBarUITests.swift in Sources */,
 				5C4E00432026111400000043 /* GameControlUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

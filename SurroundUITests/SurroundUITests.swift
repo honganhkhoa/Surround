@@ -2321,7 +2321,14 @@ final class SurroundUITests: SurroundJourneyUITestCase {
     /// control's popover, open the live game and a finished one. Debug
     /// drivers keep the live game's clock ticking and step the control's
     /// state as each screen closes, or opens, so every hide meets every form
-    /// of the control and its absence.
+    /// of the control and its absence. After each Back, Home's Activity bar,
+    /// or the Now section on an iPad with its sidebar shown, shows what the
+    /// state leads with, and no game shows a bar, as the bar's Debug element
+    /// says, so every hide also meets the bar, whose content changes inside
+    /// it with on-appear. On the Duo every cycle keeps the pose Device Hub
+    /// set, so the journey never turns it; its games show the control as the
+    /// rail's native item, whose countdown isn't read, and in the wide poses
+    /// draw their own Back.
     func testOwnGameNavigationAndSwitchingRemainResponsive() throws {
         #if targetEnvironment(macCatalyst)
         throw XCTSkip("This regression exercises native iOS tab-bar layout.")
@@ -2383,7 +2390,19 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             windowSize = CGSize(width: width, height: height)
         }
         let app = launchApp(additionalLaunchArguments: arguments, orientation: .portrait)
-        defer { XCUIDevice.shared.orientation = .portrait }
+        // The Duo keeps the pose Device Hub set, which XCUIDevice can't
+        // turn: every cycle runs in the orientation the pose launched in,
+        // which XCTest is told too.
+        var orientation = UIDeviceOrientation.portrait
+        if isDuo {
+            element(Contract.AccessibilityID.screenHome, in: app)
+            let window = windowFrame(in: app)
+            if window.width > window.height {
+                orientation = .landscapeLeft
+                XCUIDevice.shared.orientation = orientation
+            }
+        }
+        defer { XCUIDevice.shared.orientation = orientation }
         if let windowSize {
             // iPadOS keeps a window's size across launches: give it back.
             addTeardownBlock { [weak self] in
@@ -2416,6 +2435,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         // the chip and steps as each game's screen closes, or opens.
         typealias CycleState = Contract.GameControlCycleState
         var cycleState = CycleState.chip
+        // Each state Home's Activity was seen to show after a Back.
+        var statesOnHome = Set<CycleState>()
 
         func checkpoint(_ phase: String, cycle: Int) {
             let message = "[OwnGameFreezeRegression] cycle=\(cycle)/\(cycles) phase=\(phase) "
@@ -2587,13 +2608,15 @@ final class SurroundUITests: SurroundJourneyUITestCase {
 
         /// The screen's one visible Back, which iOS 18 names after the
         /// screen it returns to. The control's base form shares Home's
-        /// title as its label, so it never counts.
+        /// title as its label, so it never counts. In the Duo's wide poses a
+        /// game hides its navigation bar and draws its own Back.
         func tapBack(to title: String, description: String) {
             let identifiedBacks = app.buttons.matching(identifier: "BackButton")
             let navigationBacks = app.navigationBars.buttons.matching(NSPredicate(
                 format: "identifier != %@ AND (label == %@ OR label == %@)",
                 id.gameActiveGamesButton, title, "Back"
             ))
+            let gameBacks = app.buttons.matching(identifier: id.gameBack)
             var visibleBack: XCUIElement?
             XCTAssertTrue(pollUntil(timeout: 10) {
                 let identified = identifiedBacks.allElementsBoundByIndex.filter { $0.isHittable }
@@ -2601,7 +2624,14 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                     visibleBack = identified[0]
                 } else if identified.isEmpty {
                     let titled = navigationBacks.allElementsBoundByIndex.filter { $0.isHittable }
-                    visibleBack = titled.count == 1 ? titled[0] : nil
+                    if titled.count == 1 {
+                        visibleBack = titled[0]
+                    } else if titled.isEmpty, isDuo {
+                        let drawn = gameBacks.allElementsBoundByIndex.filter { $0.isHittable }
+                        visibleBack = drawn.count == 1 ? drawn[0] : nil
+                    } else {
+                        visibleBack = nil
+                    }
                 } else {
                     visibleBack = nil
                 }
@@ -2653,9 +2683,10 @@ final class SurroundUITests: SurroundJourneyUITestCase {
 
         /// In the chip state the chip's countdown, which its label speaks,
         /// moves between two reads. In the outage the screens show a frozen
-        /// clock, so it isn't read there.
+        /// clock, so it isn't read there. The Duo's game shows the control
+        /// on its rail as the native item, whose label speaks no time.
         func checkTheChipTicks(in gameID: Int, cycle: Int) {
-            guard cycleState == .chip, gameID != liveGameID else { return }
+            guard cycleState == .chip, gameID != liveGameID, !isDuo else { return }
             guard requireWithEvidence(control.waitForExistence(timeout: 10),
                                       "Cycle \(cycle): expected the chip in game \(gameID).") else { return }
             let before = control.label
@@ -2664,16 +2695,125 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             requireWithEvidence(after != before, "Cycle \(cycle): the chip's countdown ticks: '\(before)', then '\(after)'.")
         }
 
+        // The Activity bar on Home, read from one snapshot: the floating
+        // bar's applied state and its lead's words, or, where an iPad's
+        // sidebar shows instead, the Now section's rows on screen, top
+        // first, and its status row.
+        struct HomeActivity: CustomStringConvertible {
+            var applied: String?
+            var lead = ""
+            var rows: [(id: String, words: String)] = []
+            var status: String?
+
+            /// A floating bar is applied: a UIKit accessory clearing says "none".
+            var hasBar: Bool { applied.map { $0 != "none" } ?? false }
+
+            var description: String {
+                hasBar ? "bar \(applied ?? "") lead '\(lead)'"
+                    : "Now rows \(rows.map { "\($0.id) '\($0.words)'" }) status \(status ?? "none")"
+                        + (applied.map { ", bar \($0)" } ?? "")
+            }
+        }
+
+        func homeActivity() -> HomeActivity {
+            var reading = HomeActivity()
+            guard let root = try? app.snapshot() else { return reading }
+            let window = root.children.first { $0.elementType == .window }?.frame ?? root.frame
+            var rows = [(id: String, words: String, top: CGFloat)]()
+            var pending: [XCUIElementSnapshot] = [root]
+            while let node = pending.popLast() {
+                let words = node.label + " " + (node.value as? String ?? "")
+                switch node.identifier {
+                case id.activityBarState where reading.applied == nil:
+                    reading.applied = node.value as? String
+                case id.activityBarLead where reading.lead.isEmpty:
+                    reading.lead = words
+                case id.rootConnectionStatus where reading.status == nil:
+                    reading.status = node.label
+                case let row where row.hasPrefix("activity.now.row.") && !row.hasSuffix(".action")
+                    && node.frame.intersects(window) && node.frame.minX >= window.minX - 1:
+                    rows.append((id: row, words: words, top: node.frame.minY))
+                default:
+                    break
+                }
+                pending.append(contentsOf: node.children)
+            }
+            reading.rows = rows.sorted { $0.top < $1.top }.map { (id: $0.id, words: $0.words) }
+            return reading
+        }
+
+        /// What leads Home in each state: 26268404 on your move, then on
+        /// their move, the live challenge the dot state brings, which leads
+        /// before a game on their move, and the outage, whose game lead says
+        /// "Reconnecting to OGS" from 2 s in, and from 30 s in the bar Can’t
+        /// reach OGS. The Now section says the outage in its status row,
+        /// above the game's row.
+        func homeShows(_ state: CycleState, _ reading: HomeActivity) -> Bool {
+            let reconnecting = "Reconnecting to OGS"
+            let liveGame = "game-\(liveGameID)"
+            let challenge = "challenge-\(Contract.ActivityFixtureID.usualChallengeID)"
+            if reading.hasBar, let applied = reading.applied {
+                let kind = applied.split(separator: " ").prefix(2).joined(separator: " ")
+                switch state {
+                case .chip:
+                    return kind == "live \(liveGame)" && reading.lead.contains("Your move")
+                        && !reading.lead.contains(reconnecting)
+                case .base:
+                    return kind == "live \(liveGame)" && reading.lead.contains("Their move")
+                        && !reading.lead.contains(reconnecting)
+                case .dot:
+                    return kind == "challenge \(challenge)"
+                case .outage:
+                    return (kind == "live \(liveGame)" && reading.lead.contains(reconnecting))
+                        || applied.hasPrefix("unreachable ")
+                }
+            }
+            guard let first = reading.rows.first else { return false }
+            let isDown = [reconnecting, "Can’t reach OGS"].contains(reading.status ?? "")
+            switch state {
+            case .chip: return !isDown && first.id == id.activityNowRow(liveGame) && first.words.contains("Your move")
+            case .base: return !isDown && first.id == id.activityNowRow(liveGame) && first.words.contains("Their move")
+            case .dot: return !isDown && first.id == id.activityNowRow(challenge)
+            case .outage: return isDown && first.id == id.activityNowRow(liveGame)
+            }
+        }
+
+        /// After each Back to Home, the bar, or on an iPad with its sidebar
+        /// shown the Now section, shows what leads in the cycle's state, as
+        /// the bar's Debug element says what its host applied. With
+        /// on-appear the state stepped inside the game's hide, so Home must
+        /// show the new content.
+        func checkTheBarOnHome(cycle: Int, after back: String) {
+            var reading = HomeActivity()
+            let shows = pollUntil(timeout: 10) {
+                reading = homeActivity()
+                return homeShows(cycleState, reading)
+            }
+            if shows { statesOnHome.insert(cycleState) }
+            requireWithEvidence(shows, "Cycle \(cycle): after \(back), Home's Activity shows the \(cycleState) state: \(reading).")
+        }
+
+        /// In each game, no floating bar: no host applies one.
+        func checkNoBarInTheGame(_ gameID: Int, cycle: Int) {
+            var applied: String?
+            requireWithEvidence(pollUntil(timeout: 10) {
+                applied = self.activityBarAppliedState(in: app)
+                return applied == nil || applied == "none"
+            }, "Cycle \(cycle): game \(gameID) shows no Activity bar, but its host applied \(applied ?? "none").")
+        }
+
         /// Opens a game as `navigate` does, a hide, and checks the state the
-        /// open met. Two seconds into an outage the status shows, so an
-        /// open that meets one waits on Home first: the opened screen has
-        /// the status from its first frame, during its hide.
+        /// open met, and that the game shows no bar. Two seconds into an
+        /// outage the status shows, so an open that meets one waits on Home
+        /// first: the opened screen has the status from its first frame,
+        /// during its hide.
         func openGame(_ gameID: Int, cycle: Int, by navigate: () -> Void) {
             let met = cycleState
             if met == .outage { Thread.sleep(forTimeInterval: 3) }
             navigate()
             waitForGame(gameID)
             checkFirstState(in: gameID, meeting: met, cycle: cycle)
+            checkNoBarInTheGame(gameID, cycle: cycle)
             if step == .onAppear { cycleState = cycleState.next }
             checkTheChipTicks(in: gameID, cycle: cycle)
         }
@@ -2689,8 +2829,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         }
 
         for cycle in 1...cycles {
-            // A resized iPad window keeps its shape when the device turns.
-            if windowSize == nil, cycle == cycles / 2 + 1 {
+            // A resized iPad window keeps its shape when the device turns,
+            // and the Duo its pose.
+            if windowSize == nil, !isDuo, cycle == cycles / 2 + 1 {
                 XCUIDevice.shared.orientation = .landscapeLeft
                 var previousViewport: CGRect?
                 requireWithEvidence(pollUntil(timeout: 10) {
@@ -2723,12 +2864,14 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 waitForGame(gameIDs[1])
                 // A switch in place draws the state the screen shows now.
                 checkFirstState(in: gameIDs[1], meeting: cycleState, cycle: cycle)
+                checkNoBarInTheGame(gameIDs[1], cycle: cycle)
 
                 // A new navigation action must still work after the popover
                 // disappears. A screenshot or the visible board is not enough.
                 checkpoint("return-home", cycle: cycle)
                 returnHome(from: gameIDs[1])
                 stepOnClose()
+                checkTheBarOnHome(cycle: cycle, after: "Back from game \(gameIDs[1])")
 
                 checkpoint("open-live-game", cycle: cycle)
                 openGame(liveGameID, cycle: cycle) {
@@ -2737,6 +2880,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 checkpoint("return-from-live-game", cycle: cycle)
                 returnHome(from: liveGameID)
                 stepOnClose()
+                checkTheBarOnHome(cycle: cycle, after: "Back from the live game")
 
                 checkpoint("open-history-game", cycle: cycle)
                 openGame(historyGameID, cycle: cycle, by: openHistoryGame)
@@ -2751,6 +2895,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 XCTAssertTrue(pollUntil(timeout: 10) {
                     !app.descendants(matching: .any).matching(identifier: id.screenGameHistory).firstMatch.exists
                 }, "Back must leave Game history.")
+                checkTheBarOnHome(cycle: cycle, after: "Back from Game history")
                 checkpoint("complete", cycle: cycle)
             }
         }
@@ -2759,6 +2904,10 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                       liesAbove: true)
         }
         returnHome(from: gameIDs[1])
+        stepOnClose()
+        checkTheBarOnHome(cycle: cycles + 1, after: "Back from game \(gameIDs[1])")
+        XCTAssertEqual(statesOnHome, Set(CycleState.allCases),
+                       "After its Backs Home's Activity showed every state of the cycle: \(statesOnHome)")
         keepScreenshot("Own-game navigation remained responsive after \(cycles) cycles", in: app)
         #endif
     }

@@ -14,11 +14,13 @@ permissions:
 
 # Every "part N of M" step below, and each composer step, keeps a 50-minute
 # limit: run-ipad-ui-tests.sh interrupts xcodebuild at 46 minutes and needs
-# the rest to save the result bundle and failure evidence. The game control
-# and continuity steps keep 45 minutes, interrupted at 41, and the Activity
-# steps 30, interrupted at 26. Change part_deadline_seconds,
-# isolated_phase_deadline_seconds and activity_phase_deadline_seconds with
-# these limits.
+# the rest to save the result bundle and failure evidence. The game control,
+# iPad Activity bar and continuity steps keep 45 minutes, interrupted at 41,
+# and the iPad Activity steps keep 30, interrupted at 26. Change
+# part_deadline_seconds, isolated_phase_deadline_seconds and
+# activity_phase_deadline_seconds with these limits. The iPhone lanes' Activity
+# bar step keeps 30 minutes and runs xcodebuild directly, with five minutes a
+# test and no interruption.
 jobs:
   test:
     runs-on: macos-26
@@ -64,7 +66,7 @@ jobs:
   iphone-navigation-ui-tests:
     name: iOS ${{ matrix.ios }} iPhone navigation
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 70
+    timeout-minutes: 100
     strategy:
       fail-fast: false
       matrix:
@@ -182,6 +184,33 @@ jobs:
             -maximum-test-execution-time-allowance 900 \
             -resultBundlePath "TestResults/SurroundUITests-iPhone-iOS${{ matrix.ios }}-GameControl.xcresult"
 
+      - name: Run Activity bar tests
+        if: ${{ !cancelled() && steps.iphone_ui_build.outcome == 'success' }}
+        timeout-minutes: 30
+        shell: bash
+        run: |
+          test_class="ActivityBarUITests"
+          test_source="SurroundUITests/${test_class}.swift"
+          class_count="$(grep -Ec "^[[:space:]]*final[[:space:]]+class[[:space:]]+${test_class}[[:space:]]*:[[:space:]]*SurroundJourneyUITestCase[[:space:]]*\{" "$test_source" || true)"
+          declaration_count="$(grep -Ec "^[[:space:]]*func[[:space:]]+test[[:alnum:]_]*[[:space:]]*\(" "$test_source" || true)"
+          if [[ "$class_count" != "1" || "$declaration_count" == "0" ]]; then
+            echo "Expected exactly one ${test_class} class, with test declarations, in ${test_source}. Update the iPhone Activity bar selection when renaming or moving it." >&2
+            exit 1
+          fi
+          mkdir -p TestResults
+          xcodebuild test-without-building \
+            -scheme Surround \
+            -project Surround.xcodeproj \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
+            -parallel-testing-enabled NO \
+            "-only-testing:SurroundUITests/${test_class}" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 300 \
+            -maximum-test-execution-time-allowance 300 \
+            -resultBundlePath "TestResults/SurroundUITests-iPhone-iOS${{ matrix.ios }}-ActivityBar.xcresult"
+
       - name: Upload iPhone navigation UI test results
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -255,7 +284,7 @@ jobs:
 
   ipad-messages-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 265
+    timeout-minutes: 310
 
     steps:
       - uses: actions/checkout@v4
@@ -320,6 +349,14 @@ jobs:
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh activity \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run iPad Activity bar UI tests
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh activity-bar \
             "${{ steps.simulator.outputs.id }}" iPad
 
       - name: Upload iPad Messages UI test results
@@ -574,7 +611,7 @@ jobs:
 
   minimum-ios-18-messages-ui-tests:
     runs-on: macos-15
-    timeout-minutes: 265
+    timeout-minutes: 310
 
     steps:
       - uses: actions/checkout@v4
@@ -645,6 +682,14 @@ jobs:
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh activity \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run iPad Activity bar UI tests on iPadOS 18
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh activity-bar \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
       - name: Upload iPadOS 18 Messages UI test results

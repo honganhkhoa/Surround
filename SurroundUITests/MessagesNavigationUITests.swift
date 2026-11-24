@@ -1628,11 +1628,14 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         }
         let app = launchMessages()
         restoreFullSizeWindow(in: app)
-        // iPadOS keeps a window's size across launches: give it back, after a
-        // relaunch should the app have stopped.
+        let fullWindow = windowFrame(in: app)
+        // iPadOS keeps a window's size across launches and gives it back on a
+        // later turn, even after the double tap below fills the window: grow
+        // it back with its grabber, after a relaunch should the app have
+        // stopped.
         addTeardownBlock { [weak self] in
             if app.state != .runningForeground { app.launch() }
-            self?.restoreFullSizeWindow(in: app)
+            self?.growWindowBack(to: fullWindow, in: app)
         }
         let window = resizeWindow(to: CGSize(width: 420, height: 760), in: app)
         XCTAssertLessThan(window.width, 500, "The window reaches a compact width.")
