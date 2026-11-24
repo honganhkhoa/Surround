@@ -5,16 +5,23 @@
 //  The sidebar's Now section: what needs the user now, below the sidebar's
 //  tab rows. "Now", the rows the window's bar state lists, two or one in a
 //  short window, and All activity with what else waits, at the third row
-//  density (`ActivityNowRowMetrics`). It draws nothing when nothing waits,
-//  and over a game it leaves that game out. A row opens its game, or
-//  Activity anchored at it; View opens a challenge's card; Withdraw acts in
-//  place, and its result keeps the row's place for 4 s, as in the bar. Its
-//  text stops growing at XXL, so it keeps its height, and its rows, their
-//  actions and All activity take keyboard focus. An action whose words
-//  don't fit its row is drawn as its symbol. The iPad's container and, on
-//  the Mac, MainView host it in UIKit's sidebar bottom bar, which follows
-//  its size; it holds no state that matters. The Mac's View menu also
-//  opens Activity as All activity does (`ActivityMenuCommands`).
+//  density (`ActivityNowRowMetrics`). During an outage the window's status
+//  takes its first row, with Retry once OGS can't be reached, on every
+//  screen but a game, which says its status itself; signed out, or with
+//  nothing waiting, the section is that row alone. It draws nothing when
+//  nothing waits and nothing is to be said, and over a game it leaves that
+//  game out. A row opens its game, or Activity anchored at it; View opens
+//  Activity with a challenge's card pushed; Withdraw acts in place, and its
+//  result keeps the row's place for 4 s, as in the bar. Its text stops
+//  growing at XXL, so it keeps its height, and its rows, their
+//  actions and All activity take keyboard focus. A row keeps at least the
+//  first ten characters of its line one, the hourglass, the tile and the
+//  rank giving way first and its action drawn as its symbol last, and the
+//  status row's words read whole (`ActivityNowRowMetrics`). The iPad's
+//  container and, on the Mac, MainView host it in UIKit's sidebar bottom
+//  bar, which follows its size; it holds no state that matters. The Mac's
+//  View menu also opens Activity as All activity does
+//  (`ActivityMenuCommands`).
 //
 
 import SwiftUI
@@ -62,7 +69,7 @@ private struct ActivityNowSectionBody: View {
         let room = NowStatusRow.activityRows(beside: section.statusRow, of: bar.nowSectionRows)
         let entries = lastDrawn.keep(ActivityNowEntry.entries(rows: section.rows, results: results.chromeResults,
                                                               room: room, previous: lastDrawn.ids))
-        if !entries.isEmpty {
+        if !entries.isEmpty || section.statusRow != nil {
             let context = ActivityNowContext(
                 metrics: ActivityNowRowMetrics(sizeCategory: UIContentSizeCategory(dynamicTypeSize)),
                 isOffline: ActivityBarHosting.isOffline(bar), counted: section.counted, openers: openers,
@@ -76,10 +83,15 @@ private struct ActivityNowSectionBody: View {
                     .padding(.horizontal, 12)
                     .frame(height: 40)
                     .accessibilityAddTraits(.isHeader)
+                if let statusRow = section.statusRow {
+                    ActivityNowStatusRow(row: statusRow, context: context)
+                }
                 ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                     ActivityNowRow(entry: entry, isLead: index == 0, context: context)
                 }
-                allActivity(section)
+                if !entries.isEmpty || section.hasActivity {
+                    allActivity(section)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 10)
@@ -106,7 +118,7 @@ private struct ActivityNowSectionBody: View {
             HStack(spacing: 6) {
                 Text(verbatim: ActivityBarAccessibility.allActivityTitle)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(MessagesStyle.accent)
+                    .foregroundStyle(ActivityBarStyle.accent)
                     .lineLimit(1)
                 if section.plusN > 0 {
                     Text(verbatim: ActivityBarMetrics.countText(section.plusN))
@@ -466,6 +478,42 @@ private struct ActivityNowNothingLeadsRow: View {
     }
 }
 
+/// The window's status in the section's first row: "Reconnecting…",
+/// "Connecting…" before the window's first connection, "Can’t reach OGS"
+/// with Retry, or "Connected" for 2 s after an outage someone saw. Status,
+/// not a button; Retry has the window's source retry.
+private struct ActivityNowStatusRow: View {
+    let row: NowStatusRow
+    let context: ActivityNowContext
+    @Environment(\.connectionStatus) private var connection
+
+    var body: some View {
+        let words = row.words
+        let text = ActivityBarWords.status(words)
+        let connection = connection
+        ActivityNowRowFace(
+            model: ActivityNowRowModel(
+                itemID: Self.opener,
+                tile: .glyph(ActivityBarStatusGlyph.name(words), tint: ActivityBarStatusGlyph.tint(words),
+                             background: Color(uiColor: .tertiarySystemFill)),
+                lineOne: text, lineTwo: "",
+                accessibility: .status(words), largeContent: text, tap: nil,
+                action: row.offersRetry ? ActivityNowActionModel(
+                    action: .retry, label: ActivityBarWords.action(.retry),
+                    accessibilityLabel: ActivityBarAccessibility.retry,
+                    identifier: ID.rootConnectionStatusRetry,
+                    tap: { connection?.retry() }
+                ) : nil,
+                identifier: ID.rootConnectionStatus, isStatus: true
+            ),
+            isLead: false, context: context
+        )
+    }
+
+    /// Its opener name among the rows', which no item has.
+    static let opener = "status"
+}
+
 /// An action taken from the bar or the section: "Withdrawing…" with a grey
 /// hourglass and no action, then "Withdrawn", or "Couldn’t withdraw" with
 /// Retry, for 4 s after it settles.
@@ -521,9 +569,13 @@ private struct ActivityNowRowModel {
     var accessibility: ActivityBarAccessibility
     /// What the Large Content Viewer shows for the row.
     var largeContent: String
-    /// Nil for a result, which isn't a button.
+    /// Nil for a result and the status row, which aren't buttons.
     var tap: (() -> Void)?
     var action: ActivityNowActionModel?
+    /// The row's identifier, where it isn't its item's: the status row's.
+    var identifier: String?
+    /// The status row, whose words read whole.
+    var isStatus = false
 }
 
 private struct ActivityNowActionModel {
@@ -531,14 +583,19 @@ private struct ActivityNowActionModel {
     var label: String
     var accessibilityLabel: String
     var isEnabled = true
+    /// The action's identifier, where it isn't its row's: the status row's
+    /// Retry.
+    var identifier: String?
     var tap: () -> Void
 }
 
 /// A 60 pt row: the tile, the name with its rank and line two, then one
-/// trailing part, a live game's clock or the row's action. Where the
-/// trailing part doesn't fit beside the narrowest line one, the hourglass
-/// drops, then the tile; the clock and Retry never drop. The lead's row is
-/// tinted.
+/// trailing part, a live game's clock or the row's action. Line one keeps
+/// its floor (`ActivityNowRowMetrics.floor(of:)`): where it wouldn't, the
+/// hourglass drops, then the tile, then the rank, and last the action is
+/// drawn as its symbol; the clock and the action never drop. The status
+/// row's words read whole, on as many lines as `statusLayout` gives them.
+/// The lead's row is tinted.
 private struct ActivityNowRowFace: View {
     let model: ActivityNowRowModel
     let isLead: Bool
@@ -550,12 +607,19 @@ private struct ActivityNowRowFace: View {
     static func actionOpener(_ itemID: String) -> String { "\(itemID).action" }
 
     var body: some View {
+        let text = self.text
+        let status = model.isStatus ? metrics.statusLayout(parts, text: text) : nil
+        let face = Face(drawsSymbol: status?.actionAsSymbol ?? metrics.actionDrawsSymbol(parts, text: text),
+                        lines: status?.lines ?? 1, text: text)
         ViewThatFits(in: .horizontal) {
-            row(showsHourglass: true, showsTile: true)
-            row(showsHourglass: false, showsTile: true)
-            row(showsHourglass: false, showsTile: false)
+            row(face, showsHourglass: true, showsTile: true, showsRank: true)
+            row(face, showsHourglass: false, showsTile: true, showsRank: true)
+            row(face, showsHourglass: false, showsTile: false, showsRank: true)
+            if model.rank?.isEmpty == false {
+                row(face, showsHourglass: false, showsTile: false, showsRank: false)
+            }
         }
-        .frame(height: ActivityNowRowMetrics.height)
+        .frame(height: status?.height ?? ActivityNowRowMetrics.height)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             if isLead {
@@ -566,8 +630,23 @@ private struct ActivityNowRowFace: View {
         }
     }
 
+    /// What every variant of the row draws alike: the action as words or
+    /// its symbol, the lines line one may take, and the measured text.
+    private struct Face {
+        var drawsSymbol: Bool
+        var lines: Int
+        var text: ActivityBarPartText
+    }
+
+    /// The row's measured text: line one at its floor, the status words
+    /// whole, and the action's words.
     private var text: ActivityBarPartText {
-        ActivityBarPartText(rank: model.rank, clock: model.clock?.time, suddenDeathMark: model.clock?.mark)
+        var text = ActivityBarPartText(
+            lineOneMinimum: model.isStatus ? model.lineOne : ActivityNowRowMetrics.floor(of: model.lineOne),
+            rank: model.rank, clock: model.clock?.time, suddenDeathMark: model.clock?.mark
+        )
+        if let label = model.action?.label { text.actionLabel = { _ in label } }
+        return text
     }
 
     /// The row's parts as it draws them, from the leading edge.
@@ -578,11 +657,11 @@ private struct ActivityNowRowFace: View {
         return parts
     }
 
-    private func row(showsHourglass: Bool, showsTile: Bool) -> some View {
+    private func row(_ face: Face, showsHourglass: Bool, showsTile: Bool, showsRank: Bool) -> some View {
         HStack(spacing: 0) {
-            lead(showsHourglass: showsHourglass, showsTile: showsTile)
+            lead(face, showsHourglass: showsHourglass, showsTile: showsTile, showsRank: showsRank)
             if let action = model.action {
-                actionButton(action)
+                actionButton(action, face: face)
                     .padding(.leading, metrics.spacing.between)
             }
         }
@@ -591,17 +670,17 @@ private struct ActivityNowRowFace: View {
     }
 
     @ViewBuilder
-    private func lead(showsHourglass: Bool, showsTile: Bool) -> some View {
+    private func lead(_ face: Face, showsHourglass: Bool, showsTile: Bool, showsRank: Bool) -> some View {
         let accessibility = model.accessibility
-        let face = HStack(spacing: metrics.spacing.between) {
+        let floor = lineOneFloor(face, showsRank: showsRank)
+        let row = HStack(spacing: metrics.spacing.between) {
             if showsTile {
                 tile
             }
-            // Ideal at its narrowest, so the variant that fits is the one
-            // the fit test proves; the lines then take the rest.
-            lines
-                .frame(minWidth: metrics.width(of: .lineOne, text), idealWidth: metrics.width(of: .lineOne, text),
-                       maxWidth: .infinity, alignment: .leading)
+            // Ideal at its floor, so the variant that fits is the one the
+            // fit test proves; the lines then take the rest.
+            lines(showsRank: showsRank, lineOneLines: face.lines)
+                .frame(minWidth: floor, idealWidth: floor, maxWidth: .infinity, alignment: .leading)
             if let clock = model.clock {
                 ActivityBarClockChip(clock: clock, sizes: metrics.clockChip, showsHourglass: showsHourglass)
                     .fixedSize()
@@ -614,7 +693,7 @@ private struct ActivityNowRowFace: View {
                 Button {
                     tap()
                 } label: {
-                    face
+                    row
                 }
                 .buttonStyle(ActivityBarPressStyle())
                 .focusable()
@@ -623,15 +702,23 @@ private struct ActivityNowRowFace: View {
                     Text(verbatim: model.largeContent)
                 }
             } else {
-                face
+                row
                     .accessibilityElement(children: .ignore)
             }
         }
         .accessibilityLabel(Text(verbatim: accessibility.label))
         .accessibilityValue(Text(verbatim: accessibility.value))
         .accessibilityAddTraits(accessibility.updatesFrequently ? .updatesFrequently : [])
-        .accessibilityIdentifier(ID.activityNowRow(model.itemID))
+        .accessibilityIdentifier(model.identifier ?? ID.activityNowRow(model.itemID))
         .modifier(ActivityNowOpenerFrame(openers: context.openers, opener: model.itemID))
+    }
+
+    /// Line one's column at its floor, with the rank where the variant
+    /// keeps it.
+    private func lineOneFloor(_ face: Face, showsRank: Bool) -> CGFloat {
+        var measured = face.text
+        if !showsRank { measured.rank = nil }
+        return metrics.width(of: .lineOne, measured, lineOneLines: face.lines)
     }
 
     private var tile: some View {
@@ -655,15 +742,15 @@ private struct ActivityNowRowFace: View {
         .accessibilityHidden(true)
     }
 
-    private var lines: some View {
+    private func lines(showsRank: Bool, lineOneLines: Int) -> some View {
         VStack(alignment: .leading, spacing: ActivityBarMetrics.lineGap) {
             HStack(alignment: .firstTextBaseline, spacing: ActivityBarMetrics.rankGap) {
                 Text(verbatim: model.lineOne)
                     .font(Font(metrics.lineOneFont as CTFont))
                     .foregroundStyle(.primary)
-                    .lineLimit(1)
+                    .lineLimit(lineOneLines)
                     .truncationMode(.tail)
-                if let rank = model.rank, !rank.isEmpty {
+                if showsRank, let rank = model.rank, !rank.isEmpty {
                     Text(verbatim: rank)
                         .font(Font(metrics.detailFont as CTFont))
                         .foregroundStyle(.secondary)
@@ -683,15 +770,15 @@ private struct ActivityNowRowFace: View {
     }
 
     /// View, Open game and Retry as indigo-tinted pills; Withdraw as accent
-    /// text; each in a 44 pt target. Where the words don't fit the row, the
-    /// action's symbol in a pill instead, with the words as its tooltip on
-    /// the Mac; VoiceOver reads the same label either way.
-    private func actionButton(_ action: ActivityNowActionModel) -> some View {
-        var text = self.text
-        text.actionLabel = { _ in action.label }
-        let drawsSymbol = metrics.actionDrawsSymbol(parts, text: text)
+    /// text; each in a 44 pt target, in the bar's own tint. Where the words
+    /// would leave line one short of its floor, the action's symbol in a pill
+    /// instead, with the words as its tooltip on the Mac and its Large
+    /// Content Viewer; VoiceOver reads the same label either way.
+    private func actionButton(_ action: ActivityNowActionModel, face: Face) -> some View {
+        let drawsSymbol = face.drawsSymbol
         let isPill = drawsSymbol || action.action != .withdraw
-        let width = drawsSymbol ? metrics.symbolActionWidth(action.action) : metrics.width(of: .action(action.action), text)
+        let width = drawsSymbol ? metrics.symbolActionWidth(action.action)
+            : metrics.width(of: .action(action.action), face.text)
         let opener = Self.actionOpener(model.itemID)
         return Button(action: action.tap) {
             Group {
@@ -705,7 +792,7 @@ private struct ActivityNowRowFace: View {
                         .fixedSize()
                 }
             }
-            .foregroundStyle(MessagesStyle.accent)
+            .foregroundStyle(ActivityBarStyle.accent)
             .frame(width: width, height: isPill ? ActivityNowRowMetrics.pillHeight : ActivityBarMetrics.targetSize)
             .background {
                 if isPill {
@@ -725,7 +812,7 @@ private struct ActivityNowRowFace: View {
         .accessibilityShowsLargeContentViewer {
             Text(verbatim: action.label)
         }
-        .accessibilityIdentifier(ID.activityNowRowAction(model.itemID))
+        .accessibilityIdentifier(action.identifier ?? ID.activityNowRowAction(model.itemID))
         .modifier(ActivityNowOpenerFrame(openers: context.openers, opener: opener))
     }
 }

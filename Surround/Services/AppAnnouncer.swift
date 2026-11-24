@@ -94,10 +94,16 @@ extension AppAnnouncement.Key {
         Self("quick-match.not-confirmed.\(entryIDs.sorted().joined(separator: ","))")
     }
 
-    /// A live game started. "Game found" uses it now, and Activity's
-    /// "Game started" will, so the two are never both spoken.
+    /// A live game started. "Game found", Game Detail's control and a root
+    /// screen's "Game started" use it, so the game is spoken once.
     static func gameStarted(_ gameID: Int) -> Self {
         Self("game.started.\(gameID)")
+    }
+
+    /// A live challenge sent to the user first leads a root screen's bar or
+    /// Now section. Every window's socket hears the challenge.
+    static func challengeReceived(_ challengeID: Int) -> Self {
+        Self("challenge.received.\(challengeID)")
     }
 
     /// One of the user's live games reached its last seconds on their move

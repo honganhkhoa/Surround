@@ -739,6 +739,9 @@ struct AppNavigationLink<Label: View, Destination: View>: View {
     var body: some View {
         NavigationLink {
             destination()
+                // A pushed screen has no line under its title, though it
+                // was built inside the root.
+                .environment(\.sceneTitleConnectionLine, nil)
                 .activityCustomBar(.pushed)
                 .modifier(AppNavigationContentLayout())
         } label: {
@@ -756,6 +759,7 @@ extension View {
     ) -> some View {
         navigationDestination(isPresented: isPresented) {
             destination()
+                .environment(\.sceneTitleConnectionLine, nil)
                 .activityCustomBar(.pushed)
                 .modifier(AppNavigationContentLayout())
         }
@@ -845,6 +849,9 @@ struct AppNavigationStack<Content: View>: View {
                 #if DEBUG
                 .modifier(NoticesHostProbeRoot(rootView: rootView))
                 #endif
+                // The window's status under the root's title, where the
+                // window says it there; none in a presented stack.
+                .rootConnectionLine(rootView)
                 // Each screen draws its own custom bar, so it slides with
                 // each push and pop; a route that shows a game or a
                 // conversation draws none.

@@ -116,8 +116,9 @@ struct MainView: View {
     /// Connects the window's Activity stores and producers to its service,
     /// and its list to this presenter, once. The window's bar state comes
     /// last, so its first value, computed here before the first layout,
-    /// reads the stores attached before it. Roots built without MainView
-    /// never attach it, so it publishes nothing there.
+    /// reads the stores attached before it, and it speaks the root's first
+    /// leads. Roots built without MainView never attach it, so it publishes
+    /// nothing there.
     private func attachActivity() {
         guard activityFirstSeen == nil else { return }
         nav.activityResults.attach(client: .live(ogs), navigator: nav,
@@ -135,7 +136,13 @@ struct MainView: View {
         )
         // The Now section says the window's status where the bar does.
         nav.activityBar.nowSectionSaysStatus = ActivityBarHosting.carriesConnectionStatus
-        nav.activityBar.attach(ogs: ogs, nav: nav, connection: environment.connectionStatus)
+        // VoiceOver hears a started game or a live challenge as it first
+        // leads a root screen, once per app from the window in front.
+        nav.activityBar.postsFirstLeads = true
+        nav.activityBar.attach(ogs: ogs, nav: nav, connection: environment.connectionStatus) { [weak nav, weak ogs] in
+            guard let nav, let ogs, let announcement = ActivityBarState.appAnnouncement($0, in: ogs) else { return }
+            nav.announce(announcement)
+        }
     }
 
     /// Another account's list, results, drafts and last-known rows don't

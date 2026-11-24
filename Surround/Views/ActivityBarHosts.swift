@@ -20,11 +20,12 @@ import SwiftUI
 // MARK: - What the hosts draw
 
 enum ActivityBarHosting {
-    /// Whether the bar carries the window's connection status. It doesn't
-    /// yet: NotificationPopup's banner still says it on root screens, so the
-    /// bar shows Activity alone, a result or a lead, with no status kind and
-    /// no outage on a game's line two.
-    static let carriesConnectionStatus = false
+    /// Whether the bar carries the window's connection status, as far as its
+    /// host does (`ActivityHostPolicy.ConnectionStatus`): all of it in the
+    /// custom bar before iOS 26 and in the iPad's floating bar, "Can’t reach
+    /// OGS" with Retry on iPhones and the Duo from iOS 26, beside the line
+    /// under root titles. The Now section's first row says it too.
+    static let carriesConnectionStatus = true
 
     /// What the bar shows where the policy puts the window's status at
     /// `placement`; nil for no bar.

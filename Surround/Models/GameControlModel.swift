@@ -979,6 +979,12 @@ struct GameControlAccessibility: Equatable {
     static func gameStarted(with name: String) -> String {
         Words.gameStarted(with: name)
     }
+
+    /// What a root screen says once as a live challenge from `name` first
+    /// leads its bar or its Now section: the game-over card's label.
+    static func challenge(from name: String) -> String {
+        Words.challenge(from: name)
+    }
 }
 
 extension GameControlAccessibility {
@@ -1551,7 +1557,9 @@ struct GameConnectionPlacement: Equatable {
 
     /// What the actions that need the connection show: Pass, Submit move,
     /// Accept removed stones and Rematch, which disable at once from the
-    /// socket in every layout.
+    /// socket in every layout. While the status shows they say
+    /// "Reconnecting…", or "Connecting…" before the window's first
+    /// connection (`ConnectionStatusModel.Status.gameActionWords`).
     enum Action: Equatable {
         /// The user doesn't play, so none of them shows.
         case none
@@ -1604,6 +1612,43 @@ extension ConnectionStatusModel.Status {
         case .reconnecting, .unreachable: true
         case .hidden, .connected: false
         }
+    }
+
+    /// What a game's title-slot capsule says while the outage shows, in the
+    /// words every carrier of the window's status says
+    /// (`RootConnectionLine.words(status:hasConnected:socket:)`): "Can’t
+    /// reach OGS" once the window gives up waiting, else "Reconnecting…", or
+    /// "Connecting…" before the window's first connection, while its socket
+    /// is on its first attempt. Never "Connected"; nil while nothing shows.
+    func gameCapsuleWords(hasConnected: Bool, socket: OGSWebsocketStatus) -> RootConnectionLine.Words? {
+        guard showsInGame else { return nil }
+        return RootConnectionLine.words(status: self, hasConnected: hasConnected, socket: socket)
+    }
+
+    /// What a game's actions that need the connection say while the outage
+    /// shows (`GameConnectionPlacement.Action`), as the clocks and the
+    /// capsule say it: "Connecting…" while the window has never connected
+    /// and its socket is on its first attempt, else "Reconnecting…". Never
+    /// "Can’t reach OGS": a relabelled action keeps one word. Nil while
+    /// nothing shows.
+    func gameActionWords(hasConnected: Bool, socket: OGSWebsocketStatus) -> RootConnectionLine.Words? {
+        guard showsInGame else { return nil }
+        return GameDetailClockState.recoversConnection(hasConnected: hasConnected, socket: socket)
+            ? .reconnecting : .connecting
+    }
+}
+
+extension GameConnectionPlacement.Action {
+    /// The VoiceOver value of each action that needs the connection while
+    /// `words` show: nil where the user doesn't play, so none shows.
+    func value(_ words: RootConnectionLine.Words?) -> RootConnectionLine.Words? {
+        self == .none ? nil : words
+    }
+
+    /// What the main action reads in place of its name while `words` show:
+    /// only where the game relabels it.
+    func relabel(_ words: RootConnectionLine.Words?) -> RootConnectionLine.Words? {
+        self == .relabelled ? words : nil
     }
 }
 

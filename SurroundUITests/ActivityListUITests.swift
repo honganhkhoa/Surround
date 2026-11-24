@@ -434,8 +434,9 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         closeSheet("⇧⌘A with nothing waiting", in: app)
     }
 
-    /// Signed out nothing waits, so the sidebar has no Now section at
-    /// 900 × 600 or after a live resize to 1200 × 760, and the roots keep
+    /// Signed out nothing waits, so the sidebar's Now section has no rows and
+    /// no All activity at 900 × 600 or after a live resize to 1200 × 760,
+    /// only, as the launch is offline, its status row; and the roots keep
     /// the contract's window titles. There is no Activity either, so View >
     /// Activity is off and ⇧⌘A opens nothing.
     func testTheMacsSidebarHasNoNowSectionSignedOut() {
@@ -443,6 +444,8 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
                             size: CGSize(width: 900, height: 600), screen: nil)
         assertWindowTitle("Welcome", in: app)
         assertNoNowSection("Signed out at 900 × 600", in: app)
+        let status = query(ID.rootConnectionStatus, in: app)
+        XCTAssertTrue(waitForLabel("Reconnecting to OGS", of: status), "Offline, the Now section's status row alone")
         keepWindowScreenshots("Signed out at 900 × 600", in: app)
         assertActivityInViewMenuIsOff(in: app)
         app.typeKey("a", modifierFlags: [.command, .shift])

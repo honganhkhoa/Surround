@@ -62,14 +62,13 @@ extension EnvironmentValues {
     }
 }
 
-/// Share the popup's row priority with inline titles that occupy its space.
+/// Which of the popup's pills and its Messages button show.
 @MainActor
 struct NotificationPopupVisibility {
     let showsLiveGames: Bool
     let showsWaitingGames: Bool
     let showsChallenge: Bool
     let showsPrivateMessages: Bool
-    let occupiesNavigationTitle: Bool
 
     init(ogs: OGSService, nav: NavigationService) {
         let connected = ogs.socketStatus == .connected
@@ -79,12 +78,13 @@ struct NotificationPopupVisibility {
         showsChallenge = connected && !showsLiveGames && !showsWaitingGames
             && !viewingHome && !nav.visibleGameDetailPlaysLiveGame && !ogs.challengesReceived.isEmpty
         showsPrivateMessages = PrivateMessageNotificationButton.isVisible(ogs: ogs, nav: nav)
-        // MainView mounts the global popup only for a signed-in account.
-        occupiesNavigationTitle = ogs.isLoggedIn && (nav.connectionBannerVisible
-            || showsLiveGames || showsWaitingGames || showsChallenge || showsPrivateMessages)
     }
 }
 
+/// The live, waiting and challenge pills and the Messages button, while
+/// connected. The window's connection status is said by each platform's own
+/// carriers instead: the line under root titles, the Activity bar, the Now
+/// section, a game's own status and a conversation's line.
 struct NotificationPopup: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
@@ -93,58 +93,6 @@ struct NotificationPopup: View {
     /// live games wait.
     @State private var livePillFrame = ActivityOpenerFrame()
 
-    /// When a banner already on screen starts to fade in after the socket
-    /// leaves `.connected` (2 s, so a short blip shows nothing). One mounted
-    /// while offline is opaque at once and has none.
-    @State private var connectionBannerFadeIn: ContinuousClock.Instant?
-
-
-    var connectionPopup: some View {
-        ZStack {
-            HStack(spacing: 5) {
-                if ogs.socketStatus == .connecting || ogs.socketStatus == .reconnecting {
-                    ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
-                } else {
-                    EmptyView()
-                }
-                Text(ogs.socketStatus.localizedString).bold().foregroundColor(.white)
-            }
-            .animation(.easeInOut, value: ogs.socketStatus.localizedString)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(Color(.systemIndigo))
-        .cornerRadius(10)
-        .opacity(ogs.socketStatus == .connected ? 0 : 1)
-        .animation(Animation.easeInOut.delay(2), value: ogs.socketStatus)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.connectionBanner)
-        .accessibilityHidden(ogs.socketStatus == .connected)
-        .allowsHitTesting(false)
-    }
-
-    private var connectionBannerShown: Bool {
-        ogs.socketStatus != .connected
-    }
-
-    /// Tells the game when the banner occupies its title slot: from the
-    /// moment it becomes visible until "Connected" has faded (2 s delay,
-    /// 0.35 s fade), so the title never blanks while the banner is clear.
-    private func publishConnectionBanner() async {
-        if connectionBannerShown && !nav.connectionBannerVisible,
-           let fadeIn = connectionBannerFadeIn, fadeIn > ContinuousClock.now {
-            try? await Task.sleep(until: fadeIn)
-            guard !Task.isCancelled else { return }
-        }
-        if !connectionBannerShown && nav.connectionBannerVisible {
-            try? await Task.sleep(for: .seconds(2.4))
-            guard !Task.isCancelled else { return }
-        }
-        if nav.connectionBannerVisible != connectionBannerShown {
-            nav.connectionBannerVisible = connectionBannerShown
-        }
-    }
-    
     var liveGamesElsewhere: [Game] {
         nav.liveGamesNeedingNotice(among: ogs.liveGames)
     }
@@ -230,21 +178,6 @@ struct NotificationPopup: View {
                     }
                 }
             }
-            connectionPopup
-        }
-        .onChange(of: ogs.socketStatus) { oldStatus, newStatus in
-            if newStatus == .connected {
-                connectionBannerFadeIn = nil
-            } else if oldStatus == .connected {
-                connectionBannerFadeIn = ContinuousClock.now + .seconds(2)
-            }
-        }
-        .task(id: connectionBannerShown) { await publishConnectionBanner() }
-        // Unmounted over a game, which says its own status: a root screen's
-        // title no longer gives way, and back on one while offline the
-        // banner shows at once.
-        .onDisappear {
-            if nav.connectionBannerVisible { nav.connectionBannerVisible = false }
         }
     }
 }
@@ -299,13 +232,6 @@ private func notificationPopupPreview(
             user: OGSUser(username: "hakhoa", id: 765826),
             challengesReceived: [OGSChallengeSampleData.sampleChallenge]
         )
-    )
-}
-
-#Preview("Connecting") {
-    notificationPopupPreview(
-        ogs: OGSService.previewInstance(socketStatus: .connecting),
-        showsNavigationBackground: false
     )
 }
 #endif

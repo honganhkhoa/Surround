@@ -483,6 +483,57 @@ final class AppAnnouncerTests: XCTestCase {
         XCTAssertEqual(output.events, [.haptic(.warning), .speech("Reconnecting to OGS", .normal)])
     }
 
+    /// The window's root posts what its connection source reports from
+    /// every screen, which each says the status somewhere, and on the Mac
+    /// too: once per app, from the window in front.
+    func testTheWindowPostsItsConnectionFromEveryScreenAndOnTheMac() {
+        typealias Change = ConnectionStatusModel.Announcement
+        let places: [ActivityModel.Place] = [
+            .root(isMessagesTab: false), .root(isMessagesTab: true), .conversation,
+            .game(id: 901, isOwnGame: true, isLive: true, isOver: false),
+            .game(id: 902, isOwnGame: false, isLive: true, isOver: false),
+        ]
+        for place in places {
+            for platform in ActivityHostPolicy.Platform.allCases {
+                XCTAssertTrue(Change.windowPosts(from: place, on: platform), "\(place) \(platform)")
+            }
+        }
+
+        let clock = Clock(), output = Output()
+        let front = scenes(open: [windowA, windowB], frontmost: windowA)
+        let announcer = makeAnnouncer(clock, front, output)
+        let outage = Change.reconnecting.appAnnouncement
+        XCTAssertEqual(announcer.post(outage, from: windowB), .notFrontmost, "A window behind stays silent.")
+        XCTAssertEqual(announcer.post(outage, from: windowA), .posted)
+        clock.now += 1
+        XCTAssertEqual(announcer.post(outage, from: windowA), .duplicate, "Once per outage.")
+        XCTAssertEqual(output.spoken, ["Reconnecting to OGS"])
+    }
+
+    /// A live challenge that first leads a root screen is its own event, so
+    /// every window's copy of it is said once, and a game started apart
+    /// from it.
+    func testAChallengeThatLeadsIsSaidOncePerApp() {
+        typealias Key = AppAnnouncement.Key
+        XCTAssertEqual(Key.challengeReceived(95_001).rawValue, "challenge.received.95001")
+        XCTAssertEqual(Key.challengeReceived(95_001), .challengeReceived(95_001))
+        XCTAssertNotEqual(Key.challengeReceived(95_001), .challengeReceived(95_002))
+        XCTAssertNotEqual(Key.challengeReceived(901), .gameStarted(901))
+
+        let clock = Clock(), output = Output()
+        let front = scenes(open: [windowA, windowB], frontmost: windowA)
+        let announcer = makeAnnouncer(clock, front, output)
+        let challenge = ActivityBarAnnouncement.challenge(challengeID: 95_001).appAnnouncement(name: "CedarWave")
+        XCTAssertEqual(announcer.post(challenge, from: windowB), .notFrontmost)
+        XCTAssertEqual(announcer.post(challenge, from: windowA), .posted)
+        front.frontmostWindow = windowB
+        clock.now += 0.5
+        XCTAssertEqual(announcer.post(challenge, from: windowB), .duplicate, "Both windows' sockets hear it.")
+        let started = ActivityBarAnnouncement.gameStarted(gameID: 901).appAnnouncement(name: "CedarWave")
+        XCTAssertEqual(announcer.post(started, from: windowB), .posted)
+        XCTAssertEqual(output.spoken, ["Challenge from CedarWave", "Game started with CedarWave"])
+    }
+
     func testEachNavigationServiceIsItsOwnWindow() {
         let first = NavigationService(), second = NavigationService()
         XCTAssertNotEqual(first.announcerWindow, second.announcerWindow)

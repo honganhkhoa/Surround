@@ -153,6 +153,19 @@ extension View {
         #endif
     }
 
+    /// The navigation item's subtitle text, from iOS 26, which the line under
+    /// root titles is: always set, empty while it says nothing, so it keeps
+    /// one identity. Never on the Mac, where UIKit's subtitle changes the
+    /// window's title, and unchanged before iOS 26.
+    @ViewBuilder
+    func activityNavigationSubtitle(_ subtitle: Text) -> some View {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 7.2.5)
+        if #available(iOS 26.0, *) { navigationSubtitle(subtitle) } else { self }
+        #else
+        self
+        #endif
+    }
+
     /// A toolbar item in the subtitle, or in the large title's subtitle, from
     /// iOS 26 and on the Mac.
     @ViewBuilder

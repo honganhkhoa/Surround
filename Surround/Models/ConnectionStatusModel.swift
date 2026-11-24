@@ -6,8 +6,10 @@
 //  design: nothing while connected or during a short drop, "Reconnecting…"
 //  once a drop lasts `revealDelay`, "Can't reach OGS · Retry" after
 //  `unreachableDelay` or when the device has no network, and "Connected"
-//  briefly after an outage someone saw. `reduce`, `status` and
-//  `nextDeadline` are pure, so every rule is tested without a socket;
+//  briefly after an outage someone saw. A window's first connection is no
+//  outage someone saw: while it waits, VoiceOver hears only "Can't reach
+//  OGS", when that first shows, and its end says nothing. `reduce`, `status`
+//  and `nextDeadline` are pure, so every rule is tested without a socket;
 //  `ConnectionStatusSource` feeds them from a window's `OGSService`.
 //
 
@@ -69,11 +71,15 @@ enum ConnectionStatusModel {
     /// What VoiceOver hears, once per outage. The source only reports these;
     /// the app posts them once per app, from the frontmost window.
     enum Announcement: Equatable {
-        /// "Reconnecting to OGS", when an outage first shows as reconnecting.
+        /// "Reconnecting to OGS", when an outage first shows as reconnecting,
+        /// once the window has connected.
         case reconnecting
-        /// "Can't reach OGS", when an outage first shows as unreachable.
+        /// "Can't reach OGS", when an outage first shows as unreachable; before
+        /// the window's first connection, when it first says so, the 30 s turn
+        /// included.
         case unreachable
-        /// "Connected", at low priority, when an outage that showed ends.
+        /// "Connected", at low priority, when an outage that showed ends, once
+        /// the window has connected before it.
         case connected
     }
 
@@ -118,19 +124,49 @@ enum ConnectionStatusModel {
         /// Until then, a window with no network says so at once.
         var hasConnected = false
         var phase = Phase.idle
+        /// Before the first connection: the outage on screen has said "Can't
+        /// reach OGS", which it says once.
+        var hasSaidUnreachable = false
     }
 
     // MARK: - Rules as functions
 
     static func reduce(_ state: inout State, _ event: Event, now: TimeInterval) -> [Effect] {
+        var effects = apply(&state, event, now: now)
+        guard !state.hasConnected else { return effects }
+        // Before the window's first connection a launch, not an outage
+        // someone saw, keeps the screen waiting: VoiceOver hears only "Can't
+        // reach OGS", once, when the status first says so, whether at once
+        // with no network, as the network goes, or at the 30 s turn.
+        // Otherwise a launch with a network but OGS down would never be
+        // spoken, since an outage speaks only as it first shows.
+        effects.removeAll {
+            if case .announce = $0 { return true }
+            return false
+        }
+        if case .shown = state.phase, status(state, now: now).offersRetry, !state.hasSaidUnreachable {
+            state.hasSaidUnreachable = true
+            effects.append(.announce(.unreachable))
+        }
+        return effects
+    }
+
+    /// The rules for any outage; `reduce` applies the first connection's.
+    private static func apply(_ state: inout State, _ event: Event, now: TimeInterval) -> [Effect] {
         switch event {
         case .socket(let isConnected):
             guard isConnected != state.isSocketConnected else { return [] }
             state.isSocketConnected = isConnected
             if isConnected {
+                let isFirstConnection = !state.hasConnected
                 state.hasConnected = true
+                state.hasSaidUnreachable = false
                 switch state.phase {
                 case .pending:
+                    state.phase = .idle
+                case .shown where isFirstConnection:
+                    // A first connection ends no outage someone saw: the
+                    // status goes, with no "Connected".
                     state.phase = .idle
                 case .shown:
                     state.phase = .confirming(until: now + confirmationDuration)
@@ -173,6 +209,7 @@ enum ConnectionStatusModel {
             guard isVisible else {
                 // Off screen, nobody sees the outage or its end.
                 state.phase = .idle
+                state.hasSaidUnreachable = false
                 return []
             }
             return state.isSocketConnected ? [] : beginOutage(&state, now: now)
@@ -232,6 +269,7 @@ enum ConnectionStatusModel {
     /// A window that has never connected and has no network says so at once.
     /// Any other drop waits `revealDelay`, so a short one shows nothing.
     private static func beginOutage(_ state: inout State, now: TimeInterval) -> [Effect] {
+        state.hasSaidUnreachable = false
         if !state.hasConnected && state.path == .unsatisfied {
             state.phase = .shown(since: now, retriedAt: nil)
             return [.announce(.unreachable)]

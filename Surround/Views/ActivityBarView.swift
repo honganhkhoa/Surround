@@ -482,7 +482,8 @@ private struct ActivityBarResultRow: View {
     }
 }
 
-private enum ActivityBarStatusGlyph {
+/// The status kinds' glyph: the bar's and the Now section's status row.
+enum ActivityBarStatusGlyph {
     static func name(_ words: RootConnectionLine.Words) -> String {
         words == .connected ? "checkmark" : "arrow.triangle.2.circlepath"
     }

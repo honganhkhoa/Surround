@@ -3,11 +3,12 @@
 //  Surround
 //
 //  What a window's root hands every view in the window: the window's one
-//  connection source, which Game Detail reads for what a game says while
-//  the connection is down, the in-game control's popover shares, and the
-//  moderator superchat cover reads instead of making its own; and the
-//  window's width class and shape, which the in-game control's frames
-//  follow. MainView forwards both into its UIKit-hosted tabs, and the
+//  connection source, which root screens' carriers say (the line under
+//  their titles, the Activity bar and the Now section, through the window's
+//  bar state), Game Detail reads for what a game says while the connection
+//  is down, Activity's lists and conversations share, and the moderator
+//  superchat cover reads instead of making its own; and the window's width
+//  class and shape, which the in-game control's frames follow. MainView forwards both into its UIKit-hosted tabs, and the
 //  cover's mount passes the source into the cover's own window. Previews
 //  have no root, so both read nil there. Captures get the window's width
 //  class and shape, so a capture in a narrow window draws the frames a
@@ -50,10 +51,11 @@ extension EnvironmentValues {
 ///
 /// It also speaks for the source, once per app from the window in front:
 /// "Reconnecting to OGS" and "Can’t reach OGS" when an outage first shows,
-/// "Connected" at low priority when one that showed ends. Only while the
-/// selected tab shows a game, which says the same in its title slot, clocks
-/// or action; a root screen's banner still says the socket's own words.
-/// Nothing on the Mac. Activity's lists and the cover never post.
+/// "Connected" at low priority when one that showed ends, and before the
+/// window's first connection only "Can’t reach OGS". From every screen,
+/// each of which says the status somewhere, and on the Mac too
+/// (`ConnectionStatusModel.Announcement.windowPosts(from:on:)`). Activity's
+/// lists and the cover never post.
 struct ConnectionStatusHost: ViewModifier {
     @StateObject private var source: ConnectionStatusSource
     @Environment(\.scenePhase) private var scenePhase
@@ -80,13 +82,12 @@ struct ConnectionStatusHost: ViewModifier {
             .onChange(of: scenePhase, initial: true) { _, phase in
                 source.setVisible(phase != .background)
             }
-            #if !targetEnvironment(macCatalyst)
             .onReceive(source.announcements) { announcement in
-                let places = navigation.activityPlaces
-                guard places.place(in: navigation.main.rootView).gameID != nil else { return }
+                let place = navigation.activityPlaces.place(in: navigation.main.rootView)
+                let platform = ActivityHostPolicy.Facts.current(.swiftUITabView).platform
+                guard ConnectionStatusModel.Announcement.windowPosts(from: place, on: platform) else { return }
                 navigation.announce(announcement.appAnnouncement)
             }
-            #endif
     }
 }
 

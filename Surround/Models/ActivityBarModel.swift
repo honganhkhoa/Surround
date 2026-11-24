@@ -48,7 +48,14 @@ enum RootConnectionLine: Equatable {
     ///   background.
     init(status: ConnectionStatusModel.Status, hasConnected: Bool, socket: OGSWebsocketStatus,
          shownThisVisit: Bool) {
-        if let words = Self.words(status: status, hasConnected: hasConnected, socket: socket) {
+        self.init(words: Self.words(status: status, hasConnected: hasConnected, socket: socket),
+                  shownThisVisit: shownThisVisit)
+    }
+
+    /// The line for what every carrier says (`words(status:hasConnected:socket:)`),
+    /// as the window's bar state publishes it.
+    init(words: Words?, shownThisVisit: Bool) {
+        if let words {
             self = .says(words)
         } else {
             self = shownThisVisit ? .space : .empty
@@ -79,6 +86,87 @@ enum RootConnectionLine: Equatable {
     var words: Words? {
         if case .says(let words) = self { return words }
         return nil
+    }
+
+    /// The line's text: the words, a space, or nothing. A navigation item's
+    /// subtitle that is empty from launch reserves nothing; a space after
+    /// words keeps the line and the title still.
+    var text: String {
+        switch self {
+        case .says(let words): ActivityBarWords.status(words)
+        case .space: " "
+        case .empty: ""
+        }
+    }
+}
+
+// MARK: - Who draws the line
+
+/// Who draws a root's line under its title. Only a tab's root on iPhones and
+/// the Duo from iOS 26 has one (`ActivityHostPolicy.ConnectionStatus.rootSubtitle`):
+/// never the iPad, whose inline root titles under the top tab bar aren't
+/// drawn, nor the Mac, a pushed screen, Game Detail or a conversation.
+enum RootConnectionLineCarrier: Equatable {
+    case none
+    /// The navigation item's subtitle text, never an item.
+    case navigationSubtitle
+    /// The theme's own scene title draws the line under itself, with its
+    /// legibility backing, inside its title's toolbar item, which is always
+    /// there; the navigation item's subtitle stays empty. The system's
+    /// subtitle would push such a title over the account button on iOS 26,
+    /// and draws plain grey on the art on iOS 27.
+    case sceneTitle
+
+    /// - Parameters:
+    ///   - root: The tab whose stack's root this is; nil off a tab's root.
+    ///   - theme: The theme the root's screen wears.
+    init(placement: ActivityHostPolicy.ConnectionStatus, root: RootView?, theme: SurroundTheme) {
+        guard let root, placement == .rootSubtitle else {
+            self = .none
+            return
+        }
+        self = root.titleIsThemeScene && theme.showsSceneArt ? .sceneTitle : .navigationSubtitle
+    }
+}
+
+extension RootView {
+    /// The roots whose title is the theme's scene title, with its own large
+    /// title over scene art (`ThemeSceneNavigationTitle`): Home, Public games
+    /// and Settings.
+    var titleIsThemeScene: Bool {
+        switch self {
+        case .home, .publicGames, .settings: true
+        case .privateMessages, .profile, .about, .browser, .forums: false
+        }
+    }
+}
+
+// MARK: - A conversation's own line
+
+/// Whether a conversation shows its own status line above its composer
+/// while the window's connection is down or not yet up: one line per screen,
+/// with Retry in reach. It shows unless a root carrier of the same window
+/// says the status beside it: Messages' title line beside a pane
+/// conversation on iPhones and the Duo from iOS 26, but for "Can’t reach
+/// OGS", where that line has no Retry and the bar hides beside a pane
+/// conversation; or the Now section's status row while the sidebar shows,
+/// on iPad and the Mac, with its own Retry. Send dims either way.
+enum ConversationStatusLine {
+    /// - Parameters:
+    ///   - words: What the window's connection says
+    ///     (`RootConnectionLine.words(status:hasConnected:socket:)`).
+    ///   - isPane: The conversation is in Messages' side pane, beside
+    ///     Messages' title.
+    ///   - placement: Where the window says its status.
+    ///   - nowRowSaysStatus: The window's Now section shows its status row
+    ///     beside the conversation: on the Mac, or on iPad while the sidebar
+    ///     shows and the window has room for a row.
+    static func shows(_ words: RootConnectionLine.Words?, isPane: Bool,
+                      placement: ActivityHostPolicy.ConnectionStatus, nowRowSaysStatus: Bool) -> Bool {
+        guard let words, words != .connected else { return false }
+        if nowRowSaysStatus { return false }
+        if isPane, placement == .rootSubtitle { return words == .unreachable }
+        return true
     }
 }
 
@@ -560,6 +648,9 @@ struct ActivityBarFit: Equatable {
     var width: CGFloat
     /// The parts that never drop fit.
     var fits: Bool
+    /// The name keeps its rank beside it. A Now row drops the rank last,
+    /// after the hourglass and the tile; VoiceOver still reads it.
+    var keepsRank = true
 }
 
 extension ActivityBarDrawing {
@@ -736,6 +827,22 @@ enum ActivityAccessoryOrder {
 enum ActivityBarAnnouncement: Equatable {
     case gameStarted(gameID: Int)
     case challenge(challengeID: Int)
+
+    /// What the app posts for it, once per app, from the window in front:
+    /// "Game started with CedarWave" under the key Game Detail's control and
+    /// "Game found" use, so one game is spoken once, and "Challenge from
+    /// CedarWave" under the challenge's own key.
+    /// - Parameter name: The opponent's or the challenger's name.
+    func appAnnouncement(name: String) -> AppAnnouncement {
+        switch self {
+        case .gameStarted(let gameID):
+            AppAnnouncement(.gameStarted(gameID), audience: .frontmostWindow,
+                            speech: GameControlAccessibility.gameStarted(with: name))
+        case .challenge(let challengeID):
+            AppAnnouncement(.challengeReceived(challengeID), audience: .frontmostWindow,
+                            speech: GameControlAccessibility.challenge(from: name))
+        }
+    }
 }
 
 /// The window's claims on what a lead has said, so each is said once: a

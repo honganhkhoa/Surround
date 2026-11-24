@@ -32,13 +32,17 @@ struct ActivityBarNowSection: Equatable {
     var plusN = 0
     /// What +N counts, or what the "N waiting" row counts.
     var counted: [ActivityBarCountedItem] = []
+    /// Something waits, listed or not: All activity shows. Without it the
+    /// section is the status row alone, as signed out, or nothing.
+    var hasActivity = false
 
     init(statusRow: NowStatusRow? = nil, rows: [ActivityBarLead] = [], plusN: Int = 0,
-         counted: [ActivityBarCountedItem] = []) {
+         counted: [ActivityBarCountedItem] = [], hasActivity: Bool = false) {
         self.statusRow = statusRow
         self.rows = rows
         self.plusN = plusN
         self.counted = counted
+        self.hasActivity = hasActivity
     }
 
     /// The section for the window's input (`ActivityModel.nowSection(_:rows:)`),
@@ -56,11 +60,16 @@ struct ActivityBarNowSection: Equatable {
             self = ActivityBarNowSection()
             return
         }
-        let section = ActivityModel.nowSection(input, rows: NowStatusRow.activityRows(beside: statusRow, of: room))
+        let activityRows = NowStatusRow.activityRows(beside: statusRow, of: room)
+        let section = ActivityModel.nowSection(input, rows: activityRows)
         self.statusRow = statusRow
         rows = section.rows.compactMap { ActivityBarLead($0, searchWithdrawsInPlace: searchWithdrawsInPlace) }
         plusN = section.plusN
         counted = section.counted.compactMap(ActivityBarCountedItem.init)
+        // With a row of room, the model lists one whenever something waits,
+        // though the status row takes that room.
+        hasActivity = !rows.isEmpty || plusN > 0
+            || (activityRows < room && !ActivityModel.nowSection(input, rows: room).rows.isEmpty)
     }
 }
 
@@ -96,14 +105,13 @@ final class ActivityBarState: ObservableObject {
     @Published private(set) var connection = ActivityBarConnection()
 
     /// Whether the state says a lead as it first leads on a root screen,
-    /// through the sink `attach` was given. Off for now: root screens speak
-    /// Activity once they also say the window's connection. While off it
-    /// claims nothing either, so the in-game control still says a started
-    /// game.
+    /// through the sink `attach` was given. MainView turns it on for its
+    /// window. While off it claims nothing either, so the in-game control
+    /// still says a started game.
     var postsFirstLeads = false
 
     /// Whether the Now section's first row says the window's status during
-    /// an outage, taking one of its rows. MainView turns it off while the
+    /// an outage, taking one of its rows. MainView turns it off where the
     /// window's bar carries no status (`ActivityBarHosting`), so the section
     /// lists Activity alone, with all its rows.
     var nowSectionSaysStatus = true {
@@ -235,6 +243,21 @@ final class ActivityBarState: ObservableObject {
     }
 
     // MARK: First leads
+
+    /// What the app posts for `announcement` in this window, with the name
+    /// its service holds: the started game's opponent, or the challenger.
+    /// Nil once the service no longer lists it.
+    static func appAnnouncement(_ announcement: ActivityBarAnnouncement, in ogs: OGSService) -> AppAnnouncement? {
+        let name: String? = switch announcement {
+        case .gameStarted(let gameID):
+            ogs.liveGames.first { $0.ogsID == gameID }.flatMap { game in
+                game.userStoneColor.flatMap { game.currentPlayer(with: $0.opponentColor())?.username }
+            }
+        case .challenge(let challengeID):
+            ogs.challengesReceived.first { $0.id == challengeID }?.challenger?.username
+        }
+        return name.map { announcement.appAnnouncement(name: $0) }
+    }
 
     /// "Game started with …" or "Challenge from …" as the root's lead first
     /// leads, claimed so each is said once. A game or a conversation on top,

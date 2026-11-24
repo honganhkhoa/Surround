@@ -784,7 +784,8 @@ struct SingleGameView: View {
                        pendingMove: $pendingMove, pendingPosition: $pendingPosition,
                        goToNextGame: goToNextGame, stoneRemovalOption: $stoneRemovalOption,
                        connectionAction: connectionPlacement.action,
-                       connectionStatusShows: connection.status.showsInGame)
+                       connectionWords: connection.status.gameActionWords(hasConnected: connection.hasConnected,
+                                                                          socket: ogs.socketStatus))
     }
 
 

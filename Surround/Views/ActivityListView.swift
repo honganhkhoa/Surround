@@ -56,8 +56,9 @@ struct ActivityListView: View {
     /// Detail does, in place on Home's route; nil opens the game on Home's
     /// route and resets the window's stacks.
     var switchGame: ((Game) -> Void)?
-    /// The window's connection status, which a game's popover shares with
-    /// its game. Nil makes the list's own.
+    /// The window's connection status, which root lists and a game's
+    /// popover share with the window's other carriers. Nil makes the list's
+    /// own, as in captures, which have no window source.
     var connection: ConnectionStatusSource?
 
     @EnvironmentObject private var ogs: OGSService
@@ -478,10 +479,11 @@ private struct ActivityListContent: View {
         }
     }
 
-    /// Under the title: "Reconnecting…", or "Can’t reach OGS" with Retry.
+    /// Under the title: "Reconnecting…", "Connecting…" before the window's
+    /// first connection, or "Can’t reach OGS" with Retry.
     @ViewBuilder private var statusLine: some View {
         if isOffline {
-            ActivityStatusLine(connection: connection)
+            ActivityStatusLine(connection: connection, socket: ogs.socketStatus)
                 .padding(.top, 4)
         }
     }
@@ -972,14 +974,18 @@ private struct ActivityItemCardContent: View {
     }
 }
 
-/// The list's offline line: "Reconnecting…", or "Can’t reach OGS" with
-/// Retry. It shows under the list's title, and above the composer of a
-/// conversation the list pushed, where the list's own line is out of sight.
-/// At accessibility sizes Retry goes under the words, so neither breaks
-/// inside a word.
+/// The list's offline line: "Reconnecting…", "Connecting…" before the
+/// window's first connection, or "Can’t reach OGS" with Retry, in the words
+/// every carrier of the window's status says (`RootConnectionLine`). It
+/// shows under the list's title, and above the composer of a conversation,
+/// where the list's own line is out of sight or none shows. At
+/// accessibility sizes Retry goes under the words, so neither breaks inside
+/// a word.
 struct ActivityStatusLine: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var connection: ConnectionStatusSource
+    /// The window's socket, which tells a first attempt from a reconnect.
+    let socket: OGSWebsocketStatus
     var statusIdentifier = ID.activityStatus
     var retryIdentifier = ID.activityStatusRetry
 
@@ -1000,7 +1006,7 @@ struct ActivityStatusLine: View {
                 ProgressView()
                     .controlSize(.mini)
                     .accessibilityHidden(true)
-                Text("Reconnecting…")
+                Text(verbatim: waitingWords)
                     .accessibilityIdentifier(statusIdentifier)
             }
         }
@@ -1008,6 +1014,14 @@ struct ActivityStatusLine: View {
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity, minHeight: 32)
+    }
+
+    /// "Connecting…" before the window's first connection, while its socket
+    /// is on its first attempt; "Reconnecting…" otherwise.
+    private var waitingWords: String {
+        let words = RootConnectionLine.words(status: connection.status, hasConnected: connection.hasConnected,
+                                             socket: socket)
+        return words == .connecting ? ActivityBarWords.connecting : ActivityBarWords.reconnecting
     }
 }
 
@@ -1036,9 +1050,11 @@ extension ConnectionStatusSource {
 /// is shown it has a session of its own.
 struct ActivityRouteList: View {
     @State private var session = UUID()
+    /// The window's source; none in the capture scene, which makes its own.
+    @Environment(\.connectionStatus) private var connection
 
     var body: some View {
-        ActivityListView(session: session, placement: .route, focus: .top)
+        ActivityListView(session: session, placement: .route, focus: .top, connection: connection)
     }
 }
 
@@ -1049,6 +1065,8 @@ struct ActivityRouteList: View {
 struct ActivitySheetPresenter: ViewModifier {
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
+    /// The window's source, which the list says, as every root carrier does.
+    @Environment(\.connectionStatus) private var connection
 
     private var request: Binding<ActivityRequest?> {
         Binding(
@@ -1065,7 +1083,8 @@ struct ActivitySheetPresenter: ViewModifier {
         content
             .sheet(item: request) { request in
                 AppNavigationStack {
-                    ActivityListView(session: request.sessionID, placement: .sheet, focus: request.focus)
+                    ActivityListView(session: request.sessionID, placement: .sheet, focus: request.focus,
+                                     connection: connection)
                         .toolbar {
                             ToolbarItem(placement: .confirmationAction) {
                                 Button("Done") { nav.main.activity = nil }
@@ -1090,6 +1109,8 @@ struct ActivitySheetPresenter: ViewModifier {
 struct ActivityPopoverPresenter: View {
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
+    /// The window's source, which the list says, as every root carrier does.
+    @Environment(\.connectionStatus) private var connection
     /// The latest popover request, whose content stays while it closes.
     @State private var latest: ActivityRequest?
 
@@ -1139,7 +1160,8 @@ struct ActivityPopoverPresenter: View {
             ActivityListView(
                 session: request.sessionID,
                 placement: request.place.gameID == nil ? .popover : .gamePopover,
-                focus: request.focus
+                focus: request.focus,
+                connection: connection
             )
         }
         .environmentObject(ogs)

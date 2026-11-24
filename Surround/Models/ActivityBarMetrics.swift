@@ -10,7 +10,9 @@
 //  The Now section's rows draw the same parts at the third row density.
 //  The drawing and its drop order are the model's (`ActivityBarDrawing`);
 //  SurroundTests' fit test proves that every kind's parts that never drop
-//  fit each host's narrowest bar in every language.
+//  fit each host's narrowest bar in every language, with the words that
+//  must read whole kept whole. The bar's and the Now section's own colours
+//  are here too, so the same test checks their contrast.
 //
 
 import UIKit
@@ -324,25 +326,53 @@ extension ActivityBarDrawing {
 /// tile in a 60 pt row, the name in 15 pt semibold with the rank and line
 /// two in 13 pt, then one trailing part: a live game's 28 pt clock, View,
 /// Withdraw, Open game, or the status row's Retry. Its text stops growing
-/// at XXL, as the bar's does, so the section keeps its height. The lines
-/// truncate first; then, where the trailing part still doesn't fit, the
-/// hourglass drops, then the tile, as in the bar's one-line forms. The
-/// clock and the action never drop: an action whose words still don't fit
-/// is drawn as its symbol (`actionDrawsSymbol`).
+/// at XXL, as the bar's does, so the section keeps its height.
+///
+/// Line one keeps at least its first ten characters, or all of it
+/// (`floor(of:)`). Where it wouldn't, the row's other parts give way in
+/// this order: the hourglass, the tile, then the rank, which VoiceOver
+/// still reads, and last the action's words, drawn as its symbol in their
+/// pill (`actionDrawsSymbol`), beside which the hourglass, the tile and the
+/// rank come back where they fit. The clock and the action never drop. The
+/// clock chip keeps its width, and line two, which shares line one's
+/// column, frees no room, so neither gives way.
+///
+/// The status row's words read whole, since nothing else on screen says
+/// them: they take line two's place, the tile gives way, then Retry is
+/// drawn as its symbol, and only then do they take a third line, which in
+/// the Mac's rows at the larger sizes makes the row taller
+/// (`statusLayout`). An iPad's row stays 60 pt.
 struct ActivityNowRowMetrics {
     static let height: CGFloat = 60
     static let tileSize: CGFloat = 32
     static let clockHeight: CGFloat = 28
     static let pillHeight: CGFloat = 32
+    /// Above and below the status row's words when they take three lines.
+    static let statusPadding: CGFloat = 3
 
     /// The narrowest row the platform's section draws: 200 pt inside the
-    /// Mac's sidebar, which is always 220 pt wide, and 270 pt on iPad.
+    /// Mac's sidebar, which is always 220 pt wide. On iPad, 232 pt, what
+    /// iPadOS 26.5's rows leave for their content inside their own insets,
+    /// taken as the whole row, so a choice made here keeps 18 pt in hand;
+    /// 27.0's rows are 10 pt wider and 18.6's 50. A row decides its action's
+    /// symbol and its status words' lines at this width.
     static var narrowestRowWidth: CGFloat {
         #if targetEnvironment(macCatalyst)
         200
         #else
-        270
+        232
         #endif
+    }
+
+    /// The characters of line one a row keeps at least.
+    static let keptCharacters = 10
+
+    /// Line one at its narrowest: its first ten characters and an ellipsis,
+    /// or all of it where it is no longer. A character is what a reader
+    /// counts as one, a letter with its marks.
+    static func floor(of lineOne: String) -> String {
+        lineOne.count <= keptCharacters ? lineOne
+            : String(lineOne.prefix(keptCharacters)) + ActivityBarPartText.ellipsis
     }
 
     let sizeCategory: UIContentSizeCategory
@@ -384,12 +414,16 @@ struct ActivityNowRowMetrics {
         return ActivityBarDrawing(content, form: .expanded).parts
     }
 
-    /// - Parameter actionAsSymbol: The action is drawn as its symbol.
-    func width(of part: ActivityBarPart, _ text: ActivityBarPartText, actionAsSymbol: Bool = false) -> CGFloat {
+    /// - Parameters:
+    ///   - actionAsSymbol: The action is drawn as its symbol.
+    ///   - lineOneLines: The lines line one may take.
+    func width(of part: ActivityBarPart, _ text: ActivityBarPartText, actionAsSymbol: Bool = false,
+               lineOneLines: Int = 1) -> CGFloat {
         switch part {
         case .tile: Self.tileSize
         case .lineOne:
-            measured(text.lineOneMinimum, lineOneFont, text)
+            ActivityBarMetrics.columnWidth(text.lineOneMinimum, font: lineOneFont, lines: lineOneLines,
+                                           direction: text.direction)
                 + (text.rank.map { ActivityBarMetrics.rankGap + measured($0, detailFont, text) } ?? 0)
         case .lineTwo, .plusN: 0
         case .hourglass: symbolWidth("hourglass") + clockInnerGap - spacing.between
@@ -416,35 +450,88 @@ struct ActivityNowRowMetrics {
     }
 
     /// The parts that drop where the rest doesn't fit, the first first.
+    /// The rank goes after them.
     static let dropOrder: [ActivityBarPart] = [.hourglass, .tile]
 
     /// The row's parts in `width`, with line one at its narrowest, after
-    /// the drop order.
-    /// - Parameter actionAsSymbol: The action is drawn as its symbol.
+    /// the drop order; where they still don't fit, without the rank too.
+    /// - Parameters:
+    ///   - actionAsSymbol: The action is drawn as its symbol.
+    ///   - lineOneLines: The lines line one may take.
     func fit(_ parts: [ActivityBarPart], in width: CGFloat, text: ActivityBarPartText,
-             actionAsSymbol: Bool = false) -> ActivityBarFit {
+             actionAsSymbol: Bool = false, lineOneLines: Int = 1) -> ActivityBarFit {
         let kept = parts.filter { $0 != .lineTwo && $0 != .plusN && !($0 == .hourglass && text.clock == nil) }
         let drawing = ActivityBarDrawing(parts: kept, dropOrder: Self.dropOrder.filter(kept.contains))
-        return drawing.fit(in: width, spacing: spacing) { self.width(of: $0, text, actionAsSymbol: actionAsSymbol) }
+        let fit = drawing.fit(in: width, spacing: spacing) {
+            self.width(of: $0, text, actionAsSymbol: actionAsSymbol, lineOneLines: lineOneLines)
+        }
+        guard !fit.fits, let rank = text.rank, !rank.isEmpty else { return fit }
+        var bare = text
+        bare.rank = nil
+        let rest = kept.filter { !Self.dropOrder.contains($0) }
+        let total = spacing.width(of: rest) {
+            self.width(of: $0, bare, actionAsSymbol: actionAsSymbol, lineOneLines: lineOneLines)
+        }
+        return ActivityBarFit(parts: rest, width: total, fits: total <= width, keepsRank: false)
     }
 
     // MARK: The action's symbol
 
     /// Whether the row's action is drawn as its symbol: where its words
-    /// don't fit `width` beside line one at its narrowest, even with the
-    /// hourglass and the tile dropped. Then the symbol sits in the words'
-    /// pill, and the words are its tooltip on the Mac. In the Mac's 200 pt
-    /// rows that is Retry and Open game in a few languages, at the default
-    /// size or at XXL; on iPad never. It comes from the words' measurement
-    /// at the row's text size, which stops growing at XXL, never from the
-    /// row's layout.
+    /// don't leave line one its floor in `width`, even with the hourglass,
+    /// the tile and the rank dropped. Then the symbol sits in the words'
+    /// pill, and the words are its tooltip on the Mac and its Large Content
+    /// Viewer. It comes from the words' measurement at the row's text size,
+    /// which stops growing at XXL, at the platform's narrowest row, never
+    /// from the row's layout.
     func actionDrawsSymbol(_ parts: [ActivityBarPart], in width: CGFloat = Self.narrowestRowWidth,
-                           text: ActivityBarPartText) -> Bool {
-        let hasAction = parts.contains { part in
+                           text: ActivityBarPartText, lineOneLines: Int = 1) -> Bool {
+        Self.hasAction(parts) && !fit(parts, in: width, text: text, lineOneLines: lineOneLines).fits
+    }
+
+    private static func hasAction(_ parts: [ActivityBarPart]) -> Bool {
+        parts.contains { part in
             if case .action = part { return true }
             return false
         }
-        return hasAction && !fit(parts, in: width, text: text).fits
+    }
+
+    // MARK: The status row
+
+    /// How the status row draws its words.
+    struct StatusLayout: Equatable {
+        /// The lines its words may take.
+        var lines: Int
+        /// Retry is drawn as its symbol.
+        var actionAsSymbol: Bool
+        /// The row's height: 60 pt, or more where three lines need it.
+        var height: CGFloat
+    }
+
+    /// The status row's words whole in `width`, `text.lineOneMinimum` being
+    /// all of them: on two lines, with Retry's words where they fit beside
+    /// them once the tile has given way, else with Retry as its symbol; and
+    /// only then on three lines, the row as tall as they need. From the
+    /// words' measurement at the platform's narrowest row, never the row's
+    /// layout.
+    func statusLayout(_ parts: [ActivityBarPart], text: ActivityBarPartText,
+                      in width: CGFloat = Self.narrowestRowWidth) -> StatusLayout {
+        let symbols = Self.hasAction(parts) ? [false, true] : [false]
+        for lines in [2, 3] {
+            for symbol in symbols
+            where fit(parts, in: width, text: text, actionAsSymbol: symbol, lineOneLines: lines).fits {
+                return StatusLayout(lines: lines, actionAsSymbol: symbol,
+                                    height: statusRowHeight(lines: lines, text: text))
+            }
+        }
+        return StatusLayout(lines: 3, actionAsSymbol: symbols.count > 1, height: statusRowHeight(lines: 3, text: text))
+    }
+
+    /// The row's 60 pt, or the words' lines with a little room above and
+    /// below them where that is taller.
+    private func statusRowHeight(lines: Int, text: ActivityBarPartText) -> CGFloat {
+        let words = ActivityBarMetrics.lineHeight(text.lineOneMinimum, font: lineOneFont) * CGFloat(lines)
+        return max(Self.height, ceil(words) + 2 * Self.statusPadding)
     }
 
     /// Each action's symbol.

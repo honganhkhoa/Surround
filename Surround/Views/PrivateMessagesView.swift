@@ -562,6 +562,10 @@ struct MessagesConversationView: View {
     /// Set only in a stack with an Activity list, whose status turns the
     /// composer off while offline.
     @Environment(\.activityConnection) private var activityConnection
+    /// The window's, which turns the composer off elsewhere.
+    @Environment(\.connectionStatus) private var windowConnection
+    @Environment(\.iPadTabContext) private var iPadTabContext
+    @Environment(\.duoTabContext) private var duoTabContext
     let peer: OGSUser
     var isPane = false
 
@@ -619,7 +623,8 @@ struct MessagesConversationView: View {
                 Divider()
             }
             MessagesConversationLog(drafts: nav.conversationDrafts,
-                connection: activityConnection ?? .neverOffline, peer: peer,
+                connection: activityConnection ?? windowConnection ?? .neverOffline,
+                socket: ogs.socketStatus, statusLine: statusLinePlace, peer: peer,
                 accountID: ogs.user?.id,
                 marksThreadAsRead: navigation.path.last == owningStackRoute
                     && navigation.isActive,
@@ -629,6 +634,34 @@ struct MessagesConversationView: View {
                 header: endedLine)
         }
         .background(Color(uiColor: .systemBackground))
+    }
+
+    /// What the composer's status line shows beside. Inside Activity's
+    /// stack nothing of the root's shows beside it, so its line always does.
+    private var statusLinePlace: MessagesConversationLog.StatusLinePlace {
+        guard activityConnection == nil else { return .alone }
+        return .besideRoot(isPane: isPane, placement: connectionPlacement, nowRowSaysStatus: nowRowSaysStatus)
+    }
+
+    /// Where the window says its status, from its container's facts.
+    private var connectionPlacement: ActivityHostPolicy.ConnectionStatus {
+        let container: ActivityHostPolicy.Container = iPadTabContext != nil ? .iPadTabContainer
+            : duoTabContext != nil ? .duoTabContainer : .swiftUITabView
+        return ActivityHostPolicy.hosts(for: .current(container), overrides: ActivityBarHosting.overrides(afterLaunch: true))
+            .connectionStatus
+    }
+
+    /// The window's Now section says the status beside the conversation: on
+    /// the Mac, whose sidebar always shows, or on iPad while the sidebar's
+    /// copy says it shows and the window has room for a row.
+    private var nowRowSaysStatus: Bool {
+        let bar = nav.activityBar
+        guard bar.nowSectionSaysStatus, bar.nowSectionRows > 0 else { return false }
+        #if targetEnvironment(macCatalyst)
+        return true
+        #else
+        return iPadTabContext?.activitySidebar == .shown
+        #endif
     }
 
     /// Above the composer while this session's superchat ending for the
@@ -687,13 +720,25 @@ struct MessagesConversationView: View {
 /// The transcript and composer, with the draft and reading position from
 /// the window's store. Only this view observes the store, so a keystroke
 /// redraws the window's conversations, including a second composer for the
-/// same peer, and never the stacks or games around them. Inside Activity's
-/// stack the composer is off while the list is offline, as the moderator
-/// cover's is, and the list's offline line above it says why; elsewhere
-/// `connection` is never offline.
+/// same peer, and never the stacks or games around them. The composer is
+/// off while the window's connection is down or not yet up (inside
+/// Activity's stack, the list's), as the moderator cover's is, and Activity's
+/// offline line above it says why, unless a root carrier beside it says so
+/// (`ConversationStatusLine`).
 private struct MessagesConversationLog: View {
+    /// What the composer's status line shows beside.
+    enum StatusLinePlace {
+        /// Nothing of the root's: inside Activity's stack.
+        case alone
+        /// The window's root carriers, as `ConversationStatusLine` reads them.
+        case besideRoot(isPane: Bool, placement: ActivityHostPolicy.ConnectionStatus, nowRowSaysStatus: Bool)
+    }
+
     @ObservedObject var drafts: ConversationDraftStore
     @ObservedObject var connection: ConnectionStatusSource
+    /// The window's socket, which tells a first attempt from a reconnect.
+    let socket: OGSWebsocketStatus
+    let statusLine: StatusLinePlace
     let peer: OGSUser
     let accountID: Int?
     let marksThreadAsRead: Bool
@@ -712,16 +757,29 @@ private struct MessagesConversationLog: View {
             composer: .init(isOffline: connection.dimsActivityActions, header: composerHeader))
     }
 
-    /// Offline, the list's line, then Messages' ended line if any.
+    /// Offline, Activity's line where no root carrier beside says the
+    /// status, then Messages' ended line if any.
     private var composerHeader: AnyView? {
-        guard connection.dimsActivityActions else { return header }
+        guard connection.dimsActivityActions, showsStatusLine else { return header }
         return AnyView(VStack(spacing: 6) {
             ActivityStatusLine(
-                connection: connection,
+                connection: connection, socket: socket,
                 statusIdentifier: SurroundUITestContract.AccessibilityID.activityConversationStatus,
                 retryIdentifier: SurroundUITestContract.AccessibilityID.activityConversationStatusRetry)
             if let header { header }
         })
+    }
+
+    private var showsStatusLine: Bool {
+        switch statusLine {
+        case .alone:
+            return true
+        case .besideRoot(let isPane, let placement, let nowRowSaysStatus):
+            let words = RootConnectionLine.words(status: connection.status, hasConnected: connection.hasConnected,
+                                                 socket: socket)
+            return ConversationStatusLine.shows(words, isPane: isPane, placement: placement,
+                                                nowRowSaysStatus: nowRowSaysStatus)
+        }
     }
 }
 

@@ -620,6 +620,51 @@ extension ActivityBarStateTests {
         XCTAssertEqual(bar.nowSection.rows, [], "One row of room is the status row's.")
     }
 
+    /// Signed out, or with nothing waiting, the Now section is the status
+    /// row alone during an outage: no All activity. With something waiting
+    /// and room for one row, the status row takes it and All activity stays.
+    func testWithNothingWaitingTheNowSectionIsTheStatusRowAlone() throws {
+        prepareWindow(service(OGSService.BootstrapState()))
+        attach()
+        XCTAssertNil(ogs.user, "Signed out")
+        socket.send(false)
+        uptime.now += ConnectionStatusModel.revealDelay
+        sourceScheduler.advance()
+        barScheduler.turn()
+        XCTAssertEqual(bar.nowSection, ActivityBarNowSection(
+            statusRow: NowStatusRow(.reconnecting, place: .root(isMessagesTab: false))),
+                       "The status row, no rows, no +N and no All activity.")
+
+        try prepare(.challengeReceived)
+        attach()
+        XCTAssertTrue(bar.nowSection.hasActivity)
+        bar.setNowSectionRows(1)
+        barScheduler.turn()
+        socket.send(false)
+        uptime.now += ConnectionStatusModel.revealDelay
+        sourceScheduler.advance()
+        barScheduler.turn()
+        XCTAssertNotNil(bar.nowSection.statusRow)
+        XCTAssertEqual(bar.nowSection.rows, [], "The one row of room is the status row's.")
+        XCTAssertTrue(bar.nowSection.hasActivity, "All activity still opens what waits.")
+    }
+
+    /// What MainView's sink posts: the started game's opponent and the
+    /// challenger by name, from the window's service; nothing once the
+    /// service no longer lists them.
+    func testTheFirstLeadsAreSaidWithTheNamesTheServiceHolds() throws {
+        try prepare(.challengeReceived)
+        XCTAssertEqual(ActivityBarState.appAnnouncement(.challenge(challengeID: ID.usualChallengeID), in: ogs),
+                       AppAnnouncement(.challengeReceived(ID.usualChallengeID), audience: .frontmostWindow,
+                                       speech: "Challenge from CedarWave"))
+        XCTAssertNil(ActivityBarState.appAnnouncement(.challenge(challengeID: 1), in: ogs))
+        try prepare(.gameStarted)
+        XCTAssertEqual(ActivityBarState.appAnnouncement(.gameStarted(gameID: ID.startedGameID), in: ogs),
+                       AppAnnouncement(.gameStarted(ID.startedGameID), audience: .frontmostWindow,
+                                       speech: "Game started with CedarWave"))
+        XCTAssertNil(ActivityBarState.appAnnouncement(.gameStarted(gameID: 1), in: ogs))
+    }
+
     /// While the window's bar says no status, the Now section's rows stay
     /// Activity's during an outage.
     func testTheNowSectionCanLeaveTheWindowsStatusOut() throws {

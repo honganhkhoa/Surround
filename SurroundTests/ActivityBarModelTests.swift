@@ -1241,3 +1241,156 @@ extension ActivityBarModelTests {
                        "Nothing waits: no section.")
     }
 }
+
+// MARK: - Every carrier at once
+
+extension ActivityBarModelTests {
+    private typealias Carrier = RootConnectionLineCarrier
+
+    /// The line's text, which the navigation item's subtitle holds: the
+    /// words, a space after them this visit, or nothing.
+    func testTheLinesTextIsItsWordsASpaceOrNothing() {
+        XCTAssertEqual(RootConnectionLine(words: .reconnecting, shownThisVisit: false).text, "Reconnecting…")
+        XCTAssertEqual(RootConnectionLine(words: .connecting, shownThisVisit: true).text, "Connecting…")
+        XCTAssertEqual(RootConnectionLine(words: .unreachable, shownThisVisit: false).text, "Can’t reach OGS")
+        XCTAssertEqual(RootConnectionLine(words: .connected, shownThisVisit: true).text, "Connected")
+        XCTAssertEqual(RootConnectionLine(words: nil, shownThisVisit: true), .space)
+        XCTAssertEqual(RootConnectionLine.space.text, " ", "A space keeps the line and the title still.")
+        XCTAssertEqual(RootConnectionLine(words: nil, shownThisVisit: false), .empty)
+        XCTAssertEqual(RootConnectionLine.empty.text, "", "Empty from launch, it reserves nothing.")
+        for words in everyWords {
+            for shown in [false, true] {
+                XCTAssertEqual(RootConnectionLine(words: words, shownThisVisit: shown),
+                               RootConnectionLine(status: status(saying: words), hasConnected: words != .connecting,
+                                                  socket: words == .connecting ? .connecting : .reconnecting,
+                                                  shownThisVisit: shown),
+                               "The bar state's words give the same line: \(String(describing: words)) \(shown)")
+            }
+        }
+    }
+
+    /// A status that gives `words` once the window has connected, or before
+    /// it for "Connecting…".
+    private func status(saying words: Words?) -> ConnectionStatusModel.Status {
+        switch words {
+        case nil: .hidden
+        case .connecting?, .reconnecting?: .reconnecting
+        case .unreachable?: .unreachable(.timedOut)
+        case .connected?: .connected
+        }
+    }
+
+    /// Only a tab's root on iPhones and the Duo from iOS 26 has a line under
+    /// its title; a root whose title is the theme's scene title draws it
+    /// under that title, and every other root in the subtitle's text.
+    func testOnlyRootsOnIPhonesAndTheDuoFromIOS26DrawTheLine() {
+        for root in RootView.allCases {
+            for theme in [SurroundTheme.standard, .rakedGarden, .flowingInkPlain] {
+                XCTAssertEqual(Carrier(placement: .floatingBar, root: root, theme: theme), .none,
+                               "The custom bar before iOS 26 and the iPad's bar carry it: \(root) \(theme)")
+                XCTAssertEqual(Carrier(placement: .nowSectionFirstRow, root: root, theme: theme), .none,
+                               "The Now section carries it: \(root) \(theme)")
+                XCTAssertEqual(Carrier(placement: .rootSubtitle, root: nil, theme: theme), .none,
+                               "Off a tab's root, as in a sheet: \(theme)")
+                let drawsItsOwn = root.titleIsThemeScene && theme.showsSceneArt
+                XCTAssertEqual(Carrier(placement: .rootSubtitle, root: root, theme: theme),
+                               drawsItsOwn ? .sceneTitle : .navigationSubtitle, "\(root) \(theme)")
+            }
+        }
+        XCTAssertEqual(RootView.allCases.filter(\.titleIsThemeScene), [.home, .publicGames, .settings])
+        XCTAssertTrue(SurroundTheme.rakedGarden.showsSceneArt)
+        XCTAssertFalse(SurroundTheme.flowingInkPlain.showsSceneArt, "A plain theme keeps the system's line.")
+
+        func placement(_ platform: Policy.Platform, _ container: Policy.Container, _ release: Policy.Release,
+                       sdk: Bool = true, sidebar: Policy.Sidebar = .unavailable) -> Policy.ConnectionStatus {
+            Policy.hosts(for: .init(platform: platform, container: container, release: release, sdkHasHostAPIs: sdk,
+                                    sidebar: sidebar)).connectionStatus
+        }
+        for (container, release) in [(Policy.Container.swiftUITabView, Policy.Release.iOS26_0),
+                                      (.swiftUITabView, .iOS26_1), (.duoTabContainer, .iOS27_0),
+                                      (.duoTabContainer, .iOS27_2)] {
+            XCTAssertEqual(Carrier(placement: placement(.iPhone, container, release), root: .home, theme: .standard),
+                           .navigationSubtitle, "\(container) \(release)")
+        }
+        XCTAssertEqual(Carrier(placement: placement(.iPhone, .swiftUITabView, .iOS18), root: .home, theme: .standard),
+                       .none)
+        XCTAssertEqual(Carrier(placement: placement(.iPhone, .swiftUITabView, .iOS26_1, sdk: false), root: .home,
+                               theme: .standard), .none, "Built without the iOS 26.2 SDK, as on iOS 18.")
+        for release in Policy.Release.allCases {
+            for sidebar in Policy.Sidebar.allCases {
+                XCTAssertEqual(Carrier(placement: placement(.iPad, .iPadTabContainer, release, sidebar: sidebar),
+                                       root: .home, theme: .standard), .none, "No iPad: \(release) \(sidebar)")
+            }
+        }
+        XCTAssertEqual(Carrier(placement: placement(.mac, .swiftUITabView, .iOS27_2), root: .home, theme: .standard),
+                       .none, "The Mac's window titles never change.")
+    }
+
+    /// For each host, every carrier of a window's status says the same
+    /// words, and each status shows in one place on a root, but "Can’t reach
+    /// OGS", which the line and the bar both say from iOS 26.
+    func testEveryCarrierOfAWindowSaysTheSameWords() {
+        let nothing = Activity()
+        let root = Model.Place.root(isMessagesTab: false)
+        for words in [Words.connecting, .reconnecting, .unreachable, .connected] {
+            // iPhones and the Duo from iOS 26: the line says each, and the
+            // bar only Can’t reach OGS, with Retry.
+            XCTAssertEqual(RootConnectionLine(words: words, shownThisVisit: false), .says(words))
+            XCTAssertEqual(content(nothing, words, .rootSubtitle), words == .unreachable ? .unreachable(counted: []) : nil,
+                           "\(words)")
+            // The custom bar before iOS 26 and the iPad's bar: every kind.
+            XCTAssertEqual(content(nothing, words, .floatingBar),
+                           words == .unreachable ? .unreachable(counted: []) : .status(words), "\(words)")
+            // The Now section's first row on iPad and the Mac, the bar none.
+            XCTAssertNil(content(nothing, words, .nowSectionFirstRow), "\(words)")
+            XCTAssertEqual(NowStatusRow(words, place: root)?.words, words)
+            XCTAssertEqual(NowStatusRow(words, place: root)?.offersRetry, words == .unreachable)
+        }
+        for placement in everyPlacement {
+            XCTAssertNil(content(nothing, nil, placement), "Connected, no carrier shows: \(placement)")
+        }
+        XCTAssertNil(NowStatusRow(nil, place: root))
+        XCTAssertEqual(RootConnectionLine(words: nil, shownThisVisit: false), .empty)
+    }
+
+    /// A conversation's own line above its composer shows unless a root
+    /// carrier beside it says the status: Messages' title line beside a
+    /// pane conversation from iOS 26, but at Can’t reach OGS, which needs
+    /// the conversation's Retry; or the Now section's status row.
+    func testAConversationsLineShowsUnlessARootCarrierBesideItSaysTheStatus() {
+        typealias Line = ConversationStatusLine
+        for placement in everyPlacement {
+            for isPane in [false, true] {
+                XCTAssertFalse(Line.shows(nil, isPane: isPane, placement: placement, nowRowSaysStatus: false),
+                               "Connected: \(placement) \(isPane)")
+                XCTAssertFalse(Line.shows(.connected, isPane: isPane, placement: placement, nowRowSaysStatus: false),
+                               "Connected for 2 s needs no line: \(placement) \(isPane)")
+                for words in [Words.connecting, .reconnecting, .unreachable] {
+                    XCTAssertFalse(Line.shows(words, isPane: isPane, placement: placement, nowRowSaysStatus: true),
+                                   "The Now row says it with its Retry: \(words) \(placement) \(isPane)")
+                }
+            }
+        }
+        for words in [Words.connecting, .reconnecting, .unreachable] {
+            for placement in everyPlacement {
+                XCTAssertTrue(Line.shows(words, isPane: false, placement: placement, nowRowSaysStatus: false),
+                              "A pushed conversation has no root carrier beside it: \(words) \(placement)")
+            }
+            XCTAssertEqual(Line.shows(words, isPane: true, placement: .rootSubtitle, nowRowSaysStatus: false),
+                           words == .unreachable,
+                           "Messages' title line says it beside the pane, but has no Retry: \(words)")
+            XCTAssertTrue(Line.shows(words, isPane: true, placement: .floatingBar, nowRowSaysStatus: false),
+                          "No line under Messages' title before iOS 26 or on iPad: \(words)")
+        }
+    }
+
+    /// What VoiceOver hears as a root's lead first leads, once per app from
+    /// the window in front, with the opponent's or the challenger's name.
+    func testARootsFirstLeadsAreSaidWithTheirNames() {
+        XCTAssertEqual(ActivityBarAnnouncement.gameStarted(gameID: 7).appAnnouncement(name: "CedarWave"),
+                       AppAnnouncement(.gameStarted(7), audience: .frontmostWindow, speech: "Game started with CedarWave"))
+        XCTAssertEqual(ActivityBarAnnouncement.challenge(challengeID: 9).appAnnouncement(name: "CedarWave"),
+                       AppAnnouncement(.challengeReceived(9), audience: .frontmostWindow,
+                                       speech: "Challenge from CedarWave"))
+    }
+}

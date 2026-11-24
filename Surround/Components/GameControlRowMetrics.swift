@@ -18,10 +18,11 @@ struct GameControlRowMetrics {
     /// small circle beside a large pill.
     let moreButtonDiameter: CGFloat
 
-    /// - Parameter relabelsOffline: The main action reads "Reconnecting…"
-    ///   while the window's connection status shows, as it does where the
-    ///   layout has no title slot and no clock is in play. Only there is
-    ///   that label reserved, so no other layout's pill changes.
+    /// - Parameter relabelsOffline: The main action reads "Reconnecting…",
+    ///   or "Connecting…" before the window's first connection, while the
+    ///   window's connection status shows, as it does where the layout has
+    ///   no title slot and no clock is in play. Only there are those labels
+    ///   reserved, so no other layout's pill changes.
     init(dynamicTypeSize: DynamicTypeSize, locale: Locale = .current,
          phase: OGSGamePhase? = .play,
          localizedLabels: [String]? = nil,
@@ -68,6 +69,8 @@ struct GameControlRowMetrics {
         }
         if relabelsOffline {
             labels.append(String(localized: "Reconnecting…", locale: locale))
+            labels.append(String(localized: "Connecting…", locale: locale,
+                                 comment: "Clock badge while the app first connects to OGS"))
         }
         self.font = font
         let statusFont = UIFont.preferredFont(

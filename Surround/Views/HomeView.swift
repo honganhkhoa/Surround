@@ -1143,11 +1143,14 @@ struct ThemeSceneBackdrop: View {
 /// Keep native large-title expansion and collapse while backing only the
 /// words. Earlier systems expose custom inline titles only. Native title
 /// metadata remains available for Back, accessibility and Mac windows.
+/// On a tab's root from iOS 26 the scene's large title also draws the line
+/// under root titles beneath itself, with the same backing, since the
+/// system's subtitle would push it over the account button or draw plain
+/// grey on the art (`RootConnectionLineCarrier.sceneTitle`).
 struct ThemeSceneNavigationTitle: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.hasGlobalNotificationOverlay) private var hasGlobalNotificationOverlay
-    @EnvironmentObject private var ogs: OGSService
-    @EnvironmentObject private var nav: NavigationService
+    /// The root's line where this title draws it; nil elsewhere.
+    @Environment(\.sceneTitleConnectionLine) private var connectionLine
     let title: Text
     let theme: SurroundTheme
 
@@ -1167,9 +1170,25 @@ struct ThemeSceneNavigationTitle: ViewModifier {
             .accessibilityAddTraits(.isHeader)
     }
 
+    /// The line under the scene's large title: the words on the title's
+    /// backing, then, until the root leaves the screen, a line's room with
+    /// nothing drawn in it, so the title stays still; empty, it takes no
+    /// room. One text whose words change.
+    private func legibleLine(_ line: RootConnectionLine) -> some View {
+        Text(verbatim: line.text)
+            .font(.subheadline)
+            .foregroundColor(theme.foreground.opacity(0.8))
+            .lineLimit(1)
+            .modifier(HomeSceneLegibility())
+            .environment(\.surroundTheme, theme)
+            .environment(\.colorScheme, theme.colorScheme ?? colorScheme)
+            .opacity(line.words == nil ? 0 : 1)
+            .frame(height: line == .empty ? 0 : nil, alignment: .top)
+            .padding(.top, line == .empty ? 0 : 2)
+            .accessibilityHidden(line.words == nil)
+    }
+
     func body(content: Content) -> some View {
-        let coveredByNotice = hasGlobalNotificationOverlay
-            && NotificationPopupVisibility(ogs: ogs, nav: nav).occupiesNavigationTitle
         content
             .navigationTitle(title)
             .toolbarTitleDisplayMode(displayMode)
@@ -1177,14 +1196,17 @@ struct ThemeSceneNavigationTitle: ViewModifier {
                 if theme.showsSceneArt {
                     if #available(iOS 26.0, *) {
                         ToolbarItem(placement: .largeTitle) {
-                            legibleTitle(font: .largeTitle.bold())
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 0) {
+                                legibleTitle(font: .largeTitle.bold())
+                                if let connectionLine {
+                                    legibleLine(connectionLine)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     } else {
                         ToolbarItem(placement: .principal) {
                             legibleTitle(font: .headline)
-                                .opacity(coveredByNotice ? 0 : 1)
-                                .accessibilityHidden(coveredByNotice)
                         }
                     }
                 }
@@ -1195,8 +1217,7 @@ struct ThemeSceneNavigationTitle: ViewModifier {
                         enabled: theme.showsSceneArt,
                         foreground: theme.foreground,
                         backdrop: theme.pageBackground,
-                        colorScheme: theme.colorScheme ?? colorScheme,
-                        hidden: coveredByNotice
+                        colorScheme: theme.colorScheme ?? colorScheme
                     )
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
@@ -1213,12 +1234,10 @@ private struct ThemeNativeInlineTitleStyle: UIViewControllerRepresentable {
     let foreground: Color
     let backdrop: Color
     let colorScheme: ColorScheme
-    let hidden: Bool
 
     struct Style: Equatable {
         let foreground: UIColor
         let backdrop: UIColor
-        let hidden: Bool
     }
 
     func makeUIViewController(context: Context) -> Controller { Controller() }
@@ -1227,8 +1246,7 @@ private struct ThemeNativeInlineTitleStyle: UIViewControllerRepresentable {
         let traits = UITraitCollection(userInterfaceStyle: colorScheme == .dark ? .dark : .light)
         controller.style = enabled ? Style(
             foreground: UIColor(foreground).resolvedColor(with: traits),
-            backdrop: UIColor(backdrop).resolvedColor(with: traits),
-            hidden: hidden
+            backdrop: UIColor(backdrop).resolvedColor(with: traits)
         ) : nil
     }
 
@@ -1305,10 +1323,10 @@ private struct ThemeNativeInlineTitleStyle: UIViewControllerRepresentable {
                 }
                 let appearance = source.copy()
                 let shadow = NSShadow()
-                shadow.shadowColor = style.hidden ? UIColor.clear : style.backdrop.withAlphaComponent(0.95)
-                shadow.shadowBlurRadius = style.hidden ? 0 : 3
+                shadow.shadowColor = style.backdrop.withAlphaComponent(0.95)
+                shadow.shadowBlurRadius = 3
                 shadow.shadowOffset = .zero
-                appearance.titleTextAttributes[.foregroundColor] = style.hidden ? UIColor.clear : style.foreground
+                appearance.titleTextAttributes[.foregroundColor] = style.foreground
                 appearance.titleTextAttributes[.shadow] = shadow
                 item[keyPath: Self.slots[index]] = appearance
             }
