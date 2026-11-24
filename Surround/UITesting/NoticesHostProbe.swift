@@ -305,10 +305,11 @@ struct NoticesPlaceholderNow: View {
 // MARK: - Root screens
 
 /// AppNavigationStack's root content: the placeholder custom bar in the iPad
-/// and iOS 27 containers, whose real bars aren't built yet, and the root
-/// subtitle. The iPhone's SwiftUI TabView has its real bars
-/// (ActivityBarHosts.swift). Plain content without a probe, in presented
-/// stacks and in roots without tabs.
+/// container, whose real bars aren't built yet, and the root subtitle. The
+/// iPhone's SwiftUI TabView and the iOS 27 container have their real bars
+/// (ActivityBarHosts.swift, ActivityAccessoryHost.swift), which the force
+/// flag reaches too. Plain content without a probe, in presented stacks and
+/// in roots without tabs.
 struct NoticesHostProbeRoot: ViewModifier {
     let rootView: RootView?
 
@@ -353,7 +354,7 @@ struct NoticesHostProbeRoot: ViewModifier {
 
         func body(content: Content) -> some View {
             let hosts = ActivityHostPolicy.hosts(for: facts, overrides: .init(probe, afterLaunch: true))
-            let shows = probe.showsBar && hosts.bar == .customBar && facts.container != .swiftUITabView
+            let shows = probe.showsBar && hosts.bar == .customBar && facts.container == .iPadTabContainer
                 && !places.hidesActivity(in: root) && !(probe.barKeyboard == .hide && keyboardShows)
             let subtitled = probe.subtitle != nil && facts.showsPlaceholderSubtitle
             content
@@ -509,11 +510,11 @@ final class NoticesPlaceholderAccessoryView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
-/// Owned by DuoTabContainer's and IPadTabContainer's coordinators: sets and
-/// clears the UIKit accessory, applies the Duo's minimize behavior and puts
-/// the Now section in the iPad sidebar's bottom bar. It decides from state
-/// (the tab bar request, the registry's settled state, a settled sidebar
-/// transition), never from geometry.
+/// Owned by IPadTabContainer's coordinator: sets and clears the UIKit
+/// accessory and puts the Now section in the sidebar's bottom bar. It
+/// decides from state (the tab bar request, the registry's settled state, a
+/// settled sidebar transition), never from geometry. The iOS 27 container
+/// hosts the real bar (ActivityAccessoryHost.swift).
 @MainActor
 final class NoticesHostProbeUIKit {
     struct State {
@@ -541,8 +542,6 @@ final class NoticesHostProbeUIKit {
     private var subscription: AnyCancellable?
     private var nowHost: UIHostingController<NoticesPlaceholderNow>?
     private lazy var accessory = NoticesPlaceholderAccessoryView()
-    private var afterLaunch = false
-    private var afterLaunchScheduled = false
 
     private init(probe: SurroundUITestContract.NoticesHostProbe, container: ActivityHostPolicy.Container,
                  places: ActivityPlaceRegistry?) {
@@ -554,7 +553,6 @@ final class NoticesHostProbeUIKit {
     func install(on controller: UITabBarController, state: @escaping () -> State?) {
         self.controller = controller
         self.state = state
-        if container == .duoTabContainer { applyMinimize(phase: "install") }
         if container == .iPadTabContainer, probe.showsNow {
             let host = UIHostingController(rootView: NoticesPlaceholderNow(host: .iPadSidebar) { [weak self] in
                 self?.reassignNow()
@@ -597,19 +595,6 @@ final class NoticesHostProbeUIKit {
         apply(tabBarHidden: state.tabBarHidden, reason: reason)
     }
 
-    /// The Duo with on-scroll-down-after-launch: once the controller is in a
-    /// window, switch to .onScrollDown a main turn later.
-    func controllerDidLayout() {
-        guard container == .duoTabContainer, probe.tabBarMinimize == .onScrollDownAfterLaunch,
-              !afterLaunchScheduled, controller?.view.window != nil else { return }
-        afterLaunchScheduled = true
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.afterLaunch = true
-            self.applyMinimize(phase: "afterLaunch")
-        }
-    }
-
     /// IPadTabContainer's closed-baseline sampling, logged from measureLayout.
     /// It only logs.
     func baselineSample(root: RootView, insets: UIEdgeInsets, recorded: Bool, revealing: Bool,
@@ -624,20 +609,11 @@ final class NoticesHostProbeUIKit {
         ], key: "ipad.baseline.\(root.rawValue)")
     }
 
-    private func applyMinimize(phase: String) {
-        guard let controller else { return }
-        let minimize = ActivityHostPolicy.hosts(for: .current(container),
-                                                overrides: .init(probe, afterLaunch: afterLaunch)).minimize
-        controller.setActivityMinimizeBehavior(minimize)
-        NoticesHostProbeLog.event("minimize.applied", [
-            ("container", container.rawValue), ("minimize", minimize?.rawValue ?? "untouched"), ("phase", phase),
-        ])
-    }
-
     private func apply(tabBarHidden: Bool, reason: String) {
         guard let controller, let state = state?() else { return }
         let facts = ActivityHostPolicy.Facts.current(container, sidebar: state.sidebar)
-        let hosts = ActivityHostPolicy.hosts(for: facts, overrides: .init(probe, afterLaunch: afterLaunch))
+        // The iPad's tab bar never minimizes, so the launch doesn't matter.
+        let hosts = ActivityHostPolicy.hosts(for: facts, overrides: .init(probe, afterLaunch: true))
         let hides = places?.hidesActivity(in: state.root) ?? false
         let wanted = probe.showsBar && hosts.bar == .uiKitAccessory && !tabBarHidden && !hides
         let had = controller.hasActivityAccessory

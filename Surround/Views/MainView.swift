@@ -182,9 +182,10 @@ struct MainView: View {
         })
     }
     
-    private func hostedTabContent(_ root: RootView) -> AnyView {
-        AnyView(root.navigationView
-            .id(root == .privateMessages || root == .profile ? ogs.user?.id : nil)
+    /// The window's environment for content that UIKit hosts outside this
+    /// view's tree: the UIKit containers' tabs and their Activity bar.
+    private func windowEnvironment(_ content: some View) -> some View {
+        content
             .environmentObject(ogs)
             .environmentObject(sgs)
             .environmentObject(nav)
@@ -201,9 +202,19 @@ struct MainView: View {
             // and the window's measured width class and shape.
             .environment(\.connectionStatus, environment.connectionStatus)
             .environment(\.gameControlWindowClass, environment.gameControlWindowClass)
+    }
+
+    private func hostedTabContent(_ root: RootView) -> AnyView {
+        AnyView(windowEnvironment(root.navigationView
+            .id(root == .privateMessages || root == .profile ? ogs.user?.id : nil))
             .modifier(AppReviewHostedPresentation(root: root))
             .environment(\.appReviewCoordinator, environment.appReviewCoordinator)
             .environment(\.appReviewPresentationRelay, environment.appReviewPresentationRelay))
+    }
+
+    /// The Activity bar in UIKit's accessory, with the window's environment.
+    private func hostedAccessoryContent(_ bar: AnyView) -> AnyView {
+        AnyView(windowEnvironment(bar))
     }
 
     @ViewBuilder
@@ -232,11 +243,11 @@ struct MainView: View {
                     selection: navigationCurrentView,
                     isLoggedIn: ogs.isLoggedIn,
                     messagesBadgeCount: messagesBadgeCount,
-                    content: hostedTabContent
+                    content: hostedTabContent,
+                    activityPlaces: nav.activityPlaces,
+                    activityBar: nav.activityBar,
+                    accessoryContent: hostedAccessoryContent
                 )
-                #if DEBUG
-                .withNoticesHostProbe(places: nav.activityPlaces)
-                #endif
                 // UIKit owns the window and keyboard avoidance.
                 .ignoresSafeArea()
             } else {

@@ -97,6 +97,7 @@
 		5C5E00252026112000000025 /* ActivityBarMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00232026112000000023 /* ActivityBarMetrics.swift */; };
 		5C5E00272026112000000027 /* ActivityBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00262026112000000026 /* ActivityBarView.swift */; };
 		5C5E00292026112000000029 /* ActivityBarFitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00282026112000000028 /* ActivityBarFitTests.swift */; };
+		5C5E00312026112100000031 /* ActivityAccessoryHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00302026112100000030 /* ActivityAccessoryHost.swift */; };
 		5C5E00812026112000000081 /* ActivityBarHosts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00802026112000000080 /* ActivityBarHosts.swift */; };
 		5FEB00012026111700000001 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
 		5FEB00032026111700000003 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
@@ -688,6 +689,7 @@
 		5C5E00232026112000000023 /* ActivityBarMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarMetrics.swift; sourceTree = "<group>"; };
 		5C5E00262026112000000026 /* ActivityBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarView.swift; sourceTree = "<group>"; };
 		5C5E00282026112000000028 /* ActivityBarFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarFitTests.swift; sourceTree = "<group>"; };
+		5C5E00302026112100000030 /* ActivityAccessoryHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityAccessoryHost.swift; sourceTree = "<group>"; };
 		5C5E00802026112000000080 /* ActivityBarHosts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarHosts.swift; sourceTree = "<group>"; };
 		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
 		5FEB00022026111700000002 /* MoveCommitHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveCommitHaptics.swift; sourceTree = "<group>"; };
@@ -1379,6 +1381,7 @@
 				AA1600022026091600000002 /* StackRouter.swift */,
 				ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */,
 				6A7E00072026110900000007 /* ActivityHostSDK.swift */,
+				5C5E00302026112100000030 /* ActivityAccessoryHost.swift */,
 				8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */,
 				D90700022026090700000002 /* AppReviewPolicy.swift */,
 				D90700092026090700000009 /* AppReviewGameActivity.swift */,
@@ -1897,6 +1900,7 @@
 				ACA1D0012026110900000001 /* ActivityPlaceRegistry.swift in Sources */,
 				6A7E00012026110900000001 /* ActivityHostPolicy.swift in Sources */,
 				6A7E00062026110900000006 /* ActivityHostSDK.swift in Sources */,
+				5C5E00312026112100000031 /* ActivityAccessoryHost.swift in Sources */,
 				6A7E00082026110900000008 /* NoticesHostProbe.swift in Sources */,
 				5C0E00012026110900000001 /* SceneCover.swift in Sources */,
 				5C0E00032026110900000003 /* SceneCoverPolicy.swift in Sources */,

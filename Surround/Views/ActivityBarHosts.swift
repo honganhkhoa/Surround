@@ -95,10 +95,11 @@ enum ActivityCustomBarPlace {
 extension View {
     /// The custom bar at the screen's bottom, 16 pt from each side and 8 pt
     /// above the tab bar, on iPhones whose SwiftUI TabView hosts it: iOS 18
-    /// to 26.0, and later releases built without the iOS 26.2 SDK. Only in a
-    /// tab's stack (`owningTabRoot`), so sheets, popovers, compatibility
-    /// scenes and previews draw none. Nil draws none: Game Detail's routes
-    /// and conversations.
+    /// to 26.0, and later releases built without the iOS 26.2 SDK; and in
+    /// Debug wherever the force flag puts it, the iOS 27 container
+    /// included. Only in a tab's stack (`owningTabRoot`), so sheets,
+    /// popovers, compatibility scenes and previews draw none. Nil draws
+    /// none: Game Detail's routes and conversations.
     func activityCustomBar(_ place: ActivityCustomBarPlace?) -> some View {
         modifier(ActivityCustomBarHost(place: place))
     }
@@ -113,18 +114,23 @@ private struct ActivityCustomBarHost: ViewModifier {
     #endif
     @EnvironmentObject private var nav: NavigationService
 
-    /// Whether this window's iPhone TabView hosts the custom bar: what the
-    /// policy says for its OS and SDK, and the force flag. The same for the
-    /// window's life, as the screen's environment is, so each screen keeps
-    /// one identity, with the inset always there inside a hosting window.
-    private var windowHostsCustomBar: Bool {
-        // The iPad's floating bar and the iOS 27 container's are their
-        // containers' own.
-        guard iPadTabContext == nil else { return false }
+    /// The iPhone container this screen's tab is in.
+    private var container: ActivityHostPolicy.Container {
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
-        guard duoTabContext == nil else { return false }
+        if duoTabContext != nil { return .duoTabContainer }
         #endif
-        let facts = ActivityHostPolicy.Facts.current(.swiftUITabView)
+        return .swiftUITabView
+    }
+
+    /// Whether this window's iPhone container hosts the custom bar: what the
+    /// policy says for its OS and SDK, and the force flag, which alone gives
+    /// it to the iOS 27 container. The same for the window's life, as the
+    /// screen's environment is, so each screen keeps one identity, with the
+    /// inset always there inside a hosting window.
+    private var windowHostsCustomBar: Bool {
+        // The iPad's floating bar is its container's own.
+        guard iPadTabContext == nil else { return false }
+        let facts = ActivityHostPolicy.Facts.current(container)
         return facts.platform == .iPhone
             && ActivityHostPolicy.hosts(for: facts, overrides: ActivityBarHosting.overrides(afterLaunch: true)).bar
                 == .customBar
@@ -132,8 +138,9 @@ private struct ActivityCustomBarHost: ViewModifier {
 
     func body(content: Content) -> some View {
         if let place, let root = owningTabRoot, windowHostsCustomBar {
-            content.modifier(ActivityCustomBarInset(place: place, root: root, bar: nav.activityBar,
-                                                    places: nav.activityPlaces, keyboard: .shared))
+            content.modifier(ActivityCustomBarInset(place: place, root: root, container: container,
+                                                    bar: nav.activityBar, places: nav.activityPlaces,
+                                                    keyboard: .shared))
         } else {
             content
         }
@@ -147,6 +154,7 @@ private struct ActivityCustomBarHost: ViewModifier {
 private struct ActivityCustomBarInset: ViewModifier {
     let place: ActivityCustomBarPlace
     let root: RootView
+    let container: ActivityHostPolicy.Container
     @ObservedObject var bar: ActivityBarState
     @ObservedObject var places: ActivityPlaceRegistry
     @ObservedObject var keyboard: ActivityDockedKeyboard
@@ -155,7 +163,7 @@ private struct ActivityCustomBarInset: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
-        let facts = ActivityHostPolicy.Facts.current(.swiftUITabView)
+        let facts = ActivityHostPolicy.Facts.current(container)
         let overrides = ActivityBarHosting.overrides(afterLaunch: true)
         let barContent = ActivityBarHosting.content(
             bar, placement: ActivityHostPolicy.hosts(for: facts, overrides: overrides).connectionStatus
@@ -166,7 +174,7 @@ private struct ActivityCustomBarInset: ViewModifier {
         let shown = state.shownBar == .customBar ? barContent : nil
         // The form comes from the vertical size class: one 48 pt line in
         // compact height, else two lines in 56 pt.
-        let traits = ActivityBarTraits(bar: .customBar, container: .swiftUITabView,
+        let traits = ActivityBarTraits(bar: .customBar, container: container,
                                        isCompactWidth: horizontalSizeClass != .regular,
                                        isCompactHeight: verticalSizeClass == .compact)
         let transition: AnyTransition = reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity)

@@ -3,6 +3,7 @@
 //  Surround
 //
 
+import Combine
 import SwiftUI
 import UIKit
 import Observation
@@ -90,28 +91,32 @@ private struct DuoHostBaselineKey: Hashable {
 /// Owns the native groups while the hosted SwiftUI stacks continue to own all
 /// navigation. Neither the tabs nor their hosting controllers are recreated
 /// when the phone folds or a different account destination becomes available.
+/// It also hosts the window's Activity bar in UIKit's bottom accessory.
 @available(iOS 27.0, *)
 struct DuoTabContainer: UIViewControllerRepresentable {
     @Binding var selection: RootView
     let isLoggedIn: Bool
     var messagesBadgeCount = 0
     let content: (RootView) -> AnyView
-    #if DEBUG
-    var noticesProbePlaces: ActivityPlaceRegistry? = nil
-    #endif
+    /// The window's registry: its settled place for the selected tab hides
+    /// the Activity bar.
+    let activityPlaces: ActivityPlaceRegistry
+    /// The window's bar state, observed, so each change of it calls the
+    /// coordinator's `update(...)`.
+    @ObservedObject var activityBar: ActivityBarState
+    /// Gives the bar the window's environment: MainView's function, the one
+    /// its tabs' content goes through.
+    let accessoryContent: (AnyView) -> AnyView
 
     func makeCoordinator() -> Coordinator {
         Coordinator(selection: $selection, isLoggedIn: isLoggedIn, content: content)
     }
 
     func makeUIViewController(context: Context) -> UITabBarController {
-        #if DEBUG
-        context.coordinator.noticesProbe = NoticesHostProbeUIKit.make(container: .duoTabContainer,
-                                                                      places: noticesProbePlaces)
-        #endif
-        return context.coordinator.makeController(
+        context.coordinator.makeController(
             regularWidth: context.environment.horizontalSizeClass == .regular,
-            layoutDirection: context.environment.layoutDirection
+            layoutDirection: context.environment.layoutDirection,
+            activity: activity
         )
     }
 
@@ -121,9 +126,14 @@ struct DuoTabContainer: UIViewControllerRepresentable {
             isLoggedIn: isLoggedIn,
             messagesBadgeCount: messagesBadgeCount,
             content: content,
+            activity: activity,
             regularWidth: context.environment.horizontalSizeClass == .regular,
             layoutDirection: context.environment.layoutDirection
         )
+    }
+
+    private var activity: Coordinator.Activity {
+        Coordinator.Activity(places: activityPlaces, bar: activityBar, content: accessoryContent)
     }
 
     @MainActor
@@ -151,8 +161,54 @@ struct DuoTabContainer: UIViewControllerRepresentable {
         private var hiddenHostBaselines = [DuoHostBaselineKey: UIEdgeInsets]()
         #if DEBUG
         private var previousDiagnostic = ""
-        var noticesProbe: NoticesHostProbeUIKit?
         #endif
+
+        // MARK: The Activity bar's records
+        //
+        // UIKit's accessory follows these and the window's bar state
+        // (`ActivityBarHostState`), never isTabBarHidden, the drawer's
+        // isHidden or a frame. Each changes only outside layout: around
+        // setTabBarHidden, a main-queue turn after a notification, a trait
+        // change or the drawer starting to show, or at a timer.
+
+        /// What MainView gives the bar.
+        struct Activity {
+            let places: ActivityPlaceRegistry
+            let bar: ActivityBarState
+            let content: (AnyView) -> AnyView
+        }
+
+        private let accessory = ActivityAccessoryHost(container: .duoTabContainer)
+        private var activityPlaces: ActivityPlaceRegistry?
+        private var activityBar: ActivityBarState?
+        private var registrySubscription: AnyCancellable?
+        private var keyboardSubscription: AnyCancellable?
+        /// The tab-bar state last asked of UIKit: hidden just before
+        /// setTabBarHidden(true), shown just after setTabBarHidden(false).
+        private var requestedTabBar = ActivityTabBarRecord.shown
+        /// A setTabBarHidden call runs. A request made inside its layout
+        /// waits for it to return, so the record never changes mid-call.
+        private var tabBarChangeInProgress = false
+        private var tabBarRequestWaits = false
+        /// The container's view has come into a window: the first set waits
+        /// for it, or the closed Duo's accessory would be a short capsule.
+        private var isInWindow = false
+        /// The drawer as the accessory sees it: shown a main-queue turn after
+        /// it starts to show, until `ActivityAccessoryOrder.drawerReturnDelay`
+        /// after its close completes.
+        private var isDrawerShown = false
+        /// The close whose completion started the drawer record's return.
+        private var drawerReturn: UUID?
+        /// The running drawer transition opens the drawer.
+        private var sidebarTransitionShows = false
+        private var isKeyboardOverWindow = false
+        private var barTraits = DuoBarTraits()
+        private var barTraitsReadScheduled = false
+        /// The traits each running size transition began with, oldest first.
+        private var transitionStarts: [DuoBarTraits] = []
+        /// The window has first appeared, for the Debug minimize flag's
+        /// after-launch value.
+        private var afterLaunch = false
 
         init(selection: Binding<RootView>, isLoggedIn: Bool, content: @escaping (RootView) -> AnyView) {
             self.selection = selection
@@ -160,7 +216,8 @@ struct DuoTabContainer: UIViewControllerRepresentable {
             self.content = content
         }
 
-        func makeController(regularWidth: Bool, layoutDirection: LayoutDirection) -> UITabBarController {
+        func makeController(regularWidth: Bool, layoutDirection: LayoutDirection,
+                            activity: Activity) -> UITabBarController {
             let controller = DuoTabBarController()
             self.controller = controller
             #if DEBUG
@@ -177,9 +234,20 @@ struct DuoTabContainer: UIViewControllerRepresentable {
                 self?.hiddenHostBaselines.removeAll()
                 self?.applyTabs(regularWidth: regular)
             }
-            controller.onWillTransition = { [weak controller] in
+            controller.onWillTransition = { [weak self, weak controller] in
                 controller?.sidebar.isHidden = true
+                if let self { self.transitionStarts.append(self.barTraits) }
             }
+            controller.onIsAppearing = { [weak self] in self?.viewIsAppearing() }
+            controller.onTransitionCompleted = { [weak self] in self?.sizeTransitionCompleted() }
+            controller.onBarTraitsChange = { [weak self] in self?.scheduleBarTraitsRead() }
+            connect(activity)
+            // The minimize behavior here; never the accessory, which waits
+            // for the view to be in a window.
+            applyMinimize(phase: "make")
+            isKeyboardOverWindow = ActivityDockedKeyboard.shared.isShown
+            keyboardSubscription = ActivityDockedKeyboard.shared.$isShown.dropFirst()
+                .sink { [weak self] shown in self?.keyboardDidChange(shown) }
 
             for root in RootView.allCases {
                 let tabContext = DuoTabContext()
@@ -215,31 +283,22 @@ struct DuoTabContainer: UIViewControllerRepresentable {
             ogsGroup.sidebarAppearance = .rootSection
             applyLayoutDirection(layoutDirection)
             applyTabs(regularWidth: regularWidth)
-            #if DEBUG
-            noticesProbe?.install(on: controller) { [weak self] in self?.noticesProbeState() }
-            #endif
             return controller
         }
-
-        #if DEBUG
-        private func noticesProbeState() -> NoticesHostProbeUIKit.State? {
-            guard let controller else { return nil }
-            return .init(root: controller.selectedTab.flatMap { RootView(rawValue: $0.identifier) } ?? selectedRoot,
-                         tabBarHidden: controller.isTabBarHidden, sidebar: .unavailable)
-        }
-        #endif
 
         func update(
             selection: Binding<RootView>,
             isLoggedIn: Bool,
             messagesBadgeCount: Int,
             content: @escaping (RootView) -> AnyView,
+            activity: Activity,
             regularWidth: Bool,
             layoutDirection: LayoutDirection
         ) {
             self.selection = selection
             self.isLoggedIn = isLoggedIn
             self.content = content
+            connect(activity)
             applyLayoutDirection(layoutDirection)
             for (root, host) in hosts {
                 host.rootView = hostedContent(root)
@@ -247,7 +306,26 @@ struct DuoTabContainer: UIViewControllerRepresentable {
             }
             tabs[.privateMessages]?.badgeValue = messagesBadgeCount > 0 ? String(messagesBadgeCount) : nil
             applyTabs(regularWidth: regularWidth)
+            // The bar state, sign-in or a tab's content changed.
+            recomputeAccessory(reason: "update")
             measureLayout()
+        }
+
+        /// MainView's inputs; the registry is subscribed to once.
+        private func connect(_ activity: Activity) {
+            if activityPlaces !== activity.places {
+                activityPlaces = activity.places
+                // Sent after the settled state is stored, a main-queue turn
+                // after the screens change.
+                registrySubscription = activity.places.stateDidChange
+                    .sink { [weak self] _ in self?.recomputeAccessory(reason: "registry") }
+            }
+            activityBar = activity.bar
+            accessory.setEnvironment(activity.content)
+        }
+
+        private func selectedTabRoot(of controller: UITabBarController) -> RootView {
+            controller.selectedTab.flatMap { RootView(rawValue: $0.identifier) } ?? selectedRoot
         }
 
         private func hostedContent(_ root: RootView) -> AnyView {
@@ -349,26 +427,50 @@ struct DuoTabContainer: UIViewControllerRepresentable {
             controller.sidebar.isHidden.toggle()
         }
 
+        /// Shows or hides the tab bar as the selected tab asks, in
+        /// `ActivityAccessoryOrder`'s order: a hide records hidden and clears
+        /// the accessory before setTabBarHidden(true); a show records shown
+        /// and sets it after setTabBarHidden(false). The tab bar changes only
+        /// where UIKit's differs from the request, as it always has; every
+        /// call recomputes, since a tab switch to Messages with a
+        /// conversation in its pane changes no tab bar but clears the bar.
         private func applyTabBarVisibility() {
             guard let controller else { return }
-            let root = controller.selectedTab.flatMap { RootView(rawValue: $0.identifier) } ?? selectedRoot
-            let hidden = contexts[root]?.prefersTabBarHidden ?? false
-            if controller.isTabBarHidden != hidden {
-                // Toolbar changes require their own closed baseline; they must
-                // never be misclassified as sidebar occlusion.
-                controller.sidebar.isHidden = true
-                hiddenHostBaselines.removeAll()
-                #if DEBUG
-                noticesProbe?.tabBarWillChange(hidden: hidden)
-                #endif
-                controller.setTabBarHidden(hidden, animated: controller.view.window != nil)
-                #if DEBUG
-                noticesProbe?.tabBarDidChange(hidden: hidden)
-                #endif
+            guard !tabBarChangeInProgress else {
+                // Asked inside setTabBarHidden's own layout: the record holds
+                // until the call returns, and the request is applied then.
+                tabBarRequestWaits = true
+                recomputeAccessory(reason: "tabs.duringChange")
+                return
             }
-            #if DEBUG
-            noticesProbe?.refresh(reason: "tabs")
-            #endif
+            let root = selectedTabRoot(of: controller)
+            let hidden = contexts[root]?.prefersTabBarHidden ?? false
+            let requested: ActivityTabBarRecord = hidden ? .hidden : .shown
+            let from = controller.isTabBarHidden == hidden ? requestedTabBar : (hidden ? .shown : .hidden)
+            let reason = from == requested ? "tabs" : hidden ? "tabBar.hide" : "tabBar.show"
+            for step in ActivityAccessoryOrder.tabBar(from: from, to: requested) {
+                switch step {
+                case .record(let record):
+                    requestedTabBar = record
+                case .recompute:
+                    recomputeAccessory(reason: reason)
+                case .clearWithoutAnimation:
+                    accessory.clearWithoutAnimation(on: controller, reason: reason)
+                case .changeTabBar(let hidden):
+                    guard controller.isTabBarHidden != hidden else { continue }
+                    // Toolbar changes require their own closed baseline; they must
+                    // never be misclassified as sidebar occlusion.
+                    controller.sidebar.isHidden = true
+                    hiddenHostBaselines.removeAll()
+                    tabBarChangeInProgress = true
+                    controller.setTabBarHidden(hidden, animated: controller.view.window != nil)
+                    tabBarChangeInProgress = false
+                }
+            }
+            if tabBarRequestWaits {
+                tabBarRequestWaits = false
+                applyTabBarVisibility()
+            }
         }
 
         func tabBarController(_ tabBarController: UITabBarController, didSelectTab selectedTab: UITab, previousTab: UITab?) {
@@ -380,7 +482,12 @@ struct DuoTabContainer: UIViewControllerRepresentable {
         }
 
         func tabBarController(_ tabBarController: UITabBarController, sidebarAvailabilityDidChange sidebar: UITabBarController.Sidebar) {
-            if !sidebar.isAvailable { sidebar.isHidden = true }
+            if !sidebar.isAvailable {
+                sidebar.isHidden = true
+                // A drawer that goes with its availability may send no
+                // transition; the record follows UIKit a turn later.
+                DispatchQueue.main.async { [weak self] in self?.seedDrawerRecord(reason: "drawer.unavailable") }
+            }
             applyTabs(regularWidth: tabBarController.traitCollection.horizontalSizeClass == .regular)
             measureLayout()
         }
@@ -392,7 +499,24 @@ struct DuoTabContainer: UIViewControllerRepresentable {
             sidebarTransitionID = UUID()
             sidebarTransitionInProgress = true
             let transitionID = sidebarTransitionID
+            // isHidden already holds where the drawer is going.
+            let showing = !sidebar.isHidden
+            sidebarTransitionShows = showing
             for context in contexts.values { context.setSidebarTransitionInProgress(true) }
+            #if DEBUG && MAIN_APP
+            NoticesHostProbeLog.event("bar.drawer", [("event", "willChange"),
+                                                     ("showing", NoticesHostProbeLog.flag(showing))])
+            #endif
+            if showing {
+                // The bar steps aside a main-queue turn later: a change to
+                // the accessory inside this call snaps the drawer open and
+                // loses its completion.
+                drawerReturn = nil
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.sidebarTransitionID == transitionID else { return }
+                    self.setDrawerRecord(true, reason: "drawer.willShow")
+                }
+            }
             animator.addAnimations { [weak self] in self?.measureLayout() }
             animator.addCompletion { [weak self] in
                 DispatchQueue.main.async { [weak self] in
@@ -406,6 +530,11 @@ struct DuoTabContainer: UIViewControllerRepresentable {
                     self.sidebarTransitionInProgress = false
                     for context in self.contexts.values { context.setSidebarTransitionInProgress(false) }
                     self.measureLayout()
+                    #if DEBUG && MAIN_APP
+                    NoticesHostProbeLog.event("bar.drawer", [("event", "completed"),
+                                                             ("showing", NoticesHostProbeLog.flag(showing))])
+                    #endif
+                    if !showing { self.scheduleDrawerReturn(after: transitionID) }
                 }
             }
         }
@@ -419,8 +548,181 @@ struct DuoTabContainer: UIViewControllerRepresentable {
             }
             previousBoundsSize = size
             measureLayout()
-            #if DEBUG
-            noticesProbe?.controllerDidLayout()
+            #if DEBUG && MAIN_APP
+            // Only logs.
+            accessory.logFrame()
+            if let window = controller.view.window {
+                let divisions = controller.view.activityDivisionFrames.map { controller.view.convert($0, to: window) }
+                NoticesHostProbeLog.event("duo.divisions", [
+                    ("divisions", divisions.map { NoticesHostProbeLog.rect($0) }.joined(separator: ";")),
+                ], key: "duo.divisions")
+            }
+            #endif
+        }
+
+        // MARK: The Activity bar
+
+        /// Sets UIKit's accessory where `ActivityBarHostState` says it shows,
+        /// from the records, the registry's settled place for the selected
+        /// tab and the window's bar state, and clears it otherwise. A call
+        /// inside a layout reads the same records, so it gives the same
+        /// answer.
+        private func recomputeAccessory(reason: String) {
+            guard let controller else { return }
+            let facts = ActivityHostPolicy.Facts.current(.duoTabContainer)
+            let overrides = ActivityBarHosting.overrides(afterLaunch: afterLaunch)
+            let placement = ActivityHostPolicy.hosts(for: facts, overrides: overrides).connectionStatus
+            let content = activityBar.flatMap { ActivityBarHosting.content($0, placement: placement) }
+            var state = ActivityBarHostState(facts: facts, overrides: overrides)
+            state.placeHidesBar = activityPlaces?.hidesActivity(in: selectedTabRoot(of: controller)) ?? false
+            state.hasContent = content != nil
+            state.requestedTabBar = requestedTabBar
+            state.isInWindow = isInWindow
+            state.isDrawerShown = isDrawerShown
+            state.isKeyboardOverWindow = isKeyboardOverWindow
+            state.hasBottomTabBar = barTraits.hasBottomTabBar
+            state.isCompactHeight = barTraits.isCompactHeight
+            accessory.apply(state, content: content, traits: barTraits.bar,
+                            isOffline: activityBar.map(ActivityBarHosting.isOffline) ?? false,
+                            to: controller, animated: controller.view.window != nil, reason: reason)
+        }
+
+        /// The first set comes here, once the view is in a window, with the
+        /// traits and the drawer as UIKit has them then.
+        private func viewIsAppearing() {
+            guard let controller else { return }
+            recordBarTraits(controller.traitCollection, reason: "isAppearing", recomputes: false)
+            if !isInWindow {
+                isInWindow = true
+                // UIKit restores an open drawer at launch.
+                seedDrawerRecord(reason: "isAppearing", recomputes: false)
+                #if DEBUG && MAIN_APP
+                DispatchQueue.main.async { [weak self] in
+                    self?.afterLaunch = true
+                    self?.applyMinimize(phase: "afterLaunch")
+                }
+                #endif
+            }
+            recomputeAccessory(reason: "isAppearing")
+        }
+
+        /// After each fold, unfold or turn: cleared without animation, then
+        /// set again sized for the new pose, unless a record holds it
+        /// cleared. Set before, an accessory keeps the width UIKit gave it,
+        /// such as a short capsule after a fold from a tall pose. An iPhone's
+        /// turn with its bottom tab bar on both sides only recomputes: UIKit
+        /// sizes that accessory itself, and a set again would blink it out
+        /// and fade it back in as the turn ends.
+        private func sizeTransitionCompleted() {
+            guard let controller else { return }
+            let start = transitionStarts.isEmpty ? barTraits : transitionStarts.removeFirst()
+            recordBarTraits(controller.traitCollection, reason: "transition", recomputes: false)
+            // The transition closed the drawer before it began.
+            seedDrawerRecord(reason: "transition", recomputes: false)
+            let setsAgain = !(start.hasBottomTabBar && barTraits.hasBottomTabBar)
+            #if DEBUG && MAIN_APP
+            NoticesHostProbeLog.event("bar.transition", [("event", "completed"),
+                                                         ("setsAgain", NoticesHostProbeLog.flag(setsAgain))])
+            #endif
+            guard setsAgain else {
+                recomputeAccessory(reason: "transition")
+                return
+            }
+            for step in ActivityAccessoryOrder.sizeTransitionCompleted {
+                switch step {
+                case .clearWithoutAnimation: accessory.clearWithoutAnimation(on: controller, reason: "transition")
+                case .recompute: recomputeAccessory(reason: "transition")
+                case .record, .changeTabBar: break
+                }
+            }
+        }
+
+        private func setDrawerRecord(_ shown: Bool, reason: String, recomputes: Bool = true) {
+            guard shown != isDrawerShown else { return }
+            isDrawerShown = shown
+            #if DEBUG && MAIN_APP
+            NoticesHostProbeLog.event("bar.drawer", [("event", "record"), ("shown", NoticesHostProbeLog.flag(shown)),
+                                                     ("reason", reason)])
+            #endif
+            if recomputes { recomputeAccessory(reason: reason) }
+        }
+
+        /// The bar comes back this long after the drawer's close completes,
+        /// which UIKit reports as the slide begins: a set then would snap the
+        /// drawer shut.
+        private func scheduleDrawerReturn(after transitionID: UUID) {
+            drawerReturn = transitionID
+            DispatchQueue.main.asyncAfter(deadline: .now() + ActivityAccessoryOrder.drawerReturnDelay) { [weak self] in
+                guard let self, self.drawerReturn == transitionID, self.sidebarTransitionID == transitionID else { return }
+                self.drawerReturn = nil
+                self.setDrawerRecord(false, reason: "drawer.returned")
+            }
+        }
+
+        /// The drawer as UIKit has it, read only while no drawer transition
+        /// runs or waits to return. While one opens, as UIKit restoring an
+        /// open drawer at launch, the record is shown already, so nothing
+        /// changes the accessory before that slide ends.
+        private func seedDrawerRecord(reason: String, recomputes: Bool = true) {
+            guard let controller, drawerReturn == nil else { return }
+            if sidebarTransitionInProgress {
+                if sidebarTransitionShows { setDrawerRecord(true, reason: reason, recomputes: recomputes) }
+                return
+            }
+            setDrawerRecord(controller.sidebar.isAvailable && !controller.sidebar.isHidden, reason: reason,
+                            recomputes: recomputes)
+        }
+
+        private func keyboardDidChange(_ shown: Bool) {
+            guard shown != isKeyboardOverWindow else { return }
+            isKeyboardOverWindow = shown
+            #if DEBUG && MAIN_APP
+            NoticesHostProbeLog.event("bar.keyboard", [("visible", NoticesHostProbeLog.flag(shown))])
+            #endif
+            recomputeAccessory(reason: "keyboard")
+        }
+
+        /// A size class or the bar edge changed, inside trait propagation:
+        /// read them a main-queue turn later.
+        private func scheduleBarTraitsRead() {
+            guard !barTraitsReadScheduled else { return }
+            barTraitsReadScheduled = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.barTraitsReadScheduled = false
+                guard let controller = self.controller else { return }
+                self.recordBarTraits(controller.traitCollection, reason: "traits", recomputes: true)
+            }
+        }
+
+        private func recordBarTraits(_ traits: UITraitCollection, reason: String, recomputes: Bool) {
+            let next = DuoBarTraits(traits)
+            guard next != barTraits else { return }
+            barTraits = next
+            #if DEBUG && MAIN_APP
+            let flag = NoticesHostProbeLog.flag
+            NoticesHostProbeLog.event("duo.state", [
+                ("reason", reason), ("compactWidth", flag(next.isCompactWidth)),
+                ("compactHeight", flag(next.isCompactHeight)), ("verticalBarEdge", flag(next.hasVerticalBarEdge)),
+                ("bottomTabBar", flag(next.hasBottomTabBar)),
+                ("sidebarAvailable", flag(controller?.sidebar.isAvailable == true)),
+                ("window", NoticesHostProbeLog.rect(controller?.view.window?.bounds)),
+            ])
+            #endif
+            if recomputes { recomputeAccessory(reason: reason) }
+        }
+
+        /// The policy's minimize behavior: on scroll down from iOS 27.0.
+        private func applyMinimize(phase: String) {
+            guard let controller else { return }
+            let minimize = ActivityHostPolicy.hosts(
+                for: .current(.duoTabContainer), overrides: ActivityBarHosting.overrides(afterLaunch: afterLaunch)
+            ).minimize
+            controller.setActivityMinimizeBehavior(minimize)
+            #if DEBUG && MAIN_APP
+            NoticesHostProbeLog.event("minimize.applied", [
+                ("container", "duoTabContainer"), ("minimize", minimize?.rawValue ?? "untouched"), ("phase", phase),
+            ])
             #endif
         }
 
@@ -521,17 +823,32 @@ struct DuoTabContainer: UIViewControllerRepresentable {
     }
 }
 
-#if DEBUG
-@available(iOS 27.0, *)
-extension DuoTabContainer {
-    /// Lets the notices host probe read this window's registry.
-    func withNoticesHostProbe(places: ActivityPlaceRegistry) -> Self {
-        var copy = self
-        copy.noticesProbePlaces = places
-        return copy
+/// The container's traits as the Activity bar reads them: the closed Duo's
+/// one-line form, the keyboard's rule and the drawer's step-aside.
+private struct DuoBarTraits: Equatable {
+    var isCompactWidth = true
+    var isCompactHeight = false
+    /// The tabs run along a vertical edge: the closed Duo's rail.
+    var hasVerticalBarEdge = false
+
+    init() {}
+
+    init(_ traits: UITraitCollection) {
+        isCompactWidth = traits.horizontalSizeClass != .regular
+        isCompactHeight = traits.verticalSizeClass == .compact
+        hasVerticalBarEdge = traits.activityHasVerticalBarEdge
+    }
+
+    /// A bottom tab bar, which a docked keyboard covers with the bar: an
+    /// iPhone in compact width. The Duo has a rail or its drawer, and a Max
+    /// in landscape its drawer.
+    var hasBottomTabBar: Bool { isCompactWidth && !hasVerticalBarEdge }
+
+    var bar: ActivityBarTraits {
+        ActivityBarTraits(bar: .uiKitAccessory, container: .duoTabContainer, isCompactWidth: isCompactWidth,
+                          isCompactHeight: isCompactHeight, hasVerticalBarEdge: hasVerticalBarEdge)
     }
 }
-#endif
 
 @available(iOS 27.0, *)
 private final class DuoTabGroupContentController: UIViewController {
@@ -604,12 +921,28 @@ private final class DuoTabBarController: UITabBarController {
     var onLayout: (() -> Void)?
     var onHorizontalSizeClassChange: ((Bool) -> Void)?
     var onWillTransition: (() -> Void)?
+    /// The view is in a window, with its traits, before its first layout.
+    var onIsAppearing: (() -> Void)?
+    /// A fold, unfold or turn has finished.
+    var onTransitionCompleted: (() -> Void)?
+    /// A size class or the vertical bar edge may have changed.
+    var onBarTraitsChange: (() -> Void)?
 
     override func viewDidLoad() {
         super.viewDidLoad()
         registerForTraitChanges([UITraitHorizontalSizeClass.self]) { (controller: DuoTabBarController, _: UITraitCollection) in
             controller.onHorizontalSizeClassChange?(controller.traitCollection.horizontalSizeClass == .regular)
         }
+        let barTraits: [UITrait] = [UITraitHorizontalSizeClass.self, UITraitVerticalSizeClass.self]
+            + UITraitCollection.activityTraitsAffectingVerticalBarEdge
+        registerForTraitChanges(barTraits) { (controller: DuoTabBarController, _: UITraitCollection) in
+            controller.onBarTraitsChange?()
+        }
+    }
+
+    override func viewIsAppearing(_ animated: Bool) {
+        super.viewIsAppearing(animated)
+        onIsAppearing?()
     }
 
     override func viewDidLayoutSubviews() {
@@ -620,6 +953,9 @@ private final class DuoTabBarController: UITabBarController {
     override func viewWillTransition(to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator) {
         onWillTransition?()
         super.viewWillTransition(to: size, with: coordinator)
+        let queued = coordinator.animate(alongsideTransition: nil) { [weak self] _ in self?.onTransitionCompleted?() }
+        // Not queued, the change happens as this returns: complete after it.
+        if !queued { DispatchQueue.main.async { [weak self] in self?.onTransitionCompleted?() } }
     }
 }
 

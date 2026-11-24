@@ -289,3 +289,23 @@ extension UIView {
         return []
     }
 }
+
+extension UITraitCollection {
+    /// The system puts the tabs on a vertical edge, as the Duo's rail when
+    /// it's closed: from iOS 27.1. False before it and on the Mac.
+    var activityHasVerticalBarEdge: Bool {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+        if #available(iOS 27.1, *) { return verticalBarEdge != .unspecified }
+        #endif
+        return false
+    }
+
+    /// The traits whose changes can change `activityHasVerticalBarEdge`, for
+    /// `registerForTraitChanges`; none before iOS 27.1 and on the Mac.
+    static var activityTraitsAffectingVerticalBarEdge: [UITrait] {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+        if #available(iOS 27.1, *) { return systemTraitsAffectingVerticalBarEdge }
+        #endif
+        return []
+    }
+}
