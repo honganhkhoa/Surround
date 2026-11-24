@@ -717,8 +717,20 @@ struct IPadTabContainer: UIViewControllerRepresentable {
                     tabBarChangeInProgress = true
                     controller.setTabBarHidden(hidden, animated: controller.view.window != nil)
                     tabBarChangeInProgress = false
-                    setSidebarHidden(true)
-                    restoreSidebarChoice()
+                    // UIKit animates a sidebar change as a morph with the
+                    // floating tab bar. In a turn or a resize that bar can
+                    // still be outside the window just after the tab bar comes
+                    // back, and a morph from a view outside a window stops the
+                    // app, so there the sidebar changes without animation.
+                    let closeSidebar = {
+                        self.setSidebarHidden(true)
+                        self.restoreSidebarChoice()
+                    }
+                    if controller.isTransitioningSize {
+                        UIView.performWithoutAnimation(closeSidebar)
+                    } else {
+                        closeSidebar()
+                    }
                 }
             }
             if tabBarRequestWaits {

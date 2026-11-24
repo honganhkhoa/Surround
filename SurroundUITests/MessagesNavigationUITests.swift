@@ -1615,6 +1615,39 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
                      "Back must restore the wide root without a conversation pushed over it.")
     }
 
+    /// A conversation pushed in a compact iPad window's one column, then the
+    /// window grown back to full size: Messages turns to two columns with
+    /// that conversation in the pane, and the app keeps running. iPadOS 26
+    /// resizes app windows; earlier systems keep them full size.
+    func testWideningACompactWindowKeepsThePushedConversationInThePane() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This journey resizes an iPad window.")
+        #else
+        guard UIDevice.current.userInterfaceIdiom == .pad, #available(iOS 26.0, *) else {
+            throw XCTSkip("This journey resizes an iPad window, which iPadOS 26 allows.")
+        }
+        let app = launchMessages()
+        restoreFullSizeWindow(in: app)
+        // iPadOS keeps a window's size across launches: give it back, after a
+        // relaunch should the app have stopped.
+        addTeardownBlock { [weak self] in
+            if app.state != .runningForeground { app.launch() }
+            self?.restoreFullSizeWindow(in: app)
+        }
+        let window = resizeWindow(to: CGSize(width: 420, height: 760), in: app)
+        XCTAssertLessThan(window.width, 500, "The window reaches a compact width.")
+        XCTAssertFalse(usesColumns(in: app), "A compact window shows Messages in one column.")
+        // One column pushes the conversation the pane showed; where it shows
+        // the inbox instead, open the conversation from there.
+        if !query("messages.conversation", in: app).exists { openInboxConversation(firstPeerID, in: app) }
+        assertConversation("hakhoa", peerID: firstPeerID, presentation: .nativePush, in: app)
+        restoreFullSizeWindow(in: app)
+        XCTAssertEqual(app.state, .runningForeground, "Growing the window keeps the app running.")
+        assertWideRoot(in: app)
+        assertConversation("hakhoa", peerID: firstPeerID, presentation: .wideRoot, in: app)
+        #endif
+    }
+
     func testWideProfileMessageNativeBackRestoresProfileThenRootSelection() throws {
         let app = launchMessages(additionalLaunchArguments: [SurroundUITestContract.messagesOverflowLaunchArgument])
         try requireColumns(in: app)
