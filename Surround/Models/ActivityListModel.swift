@@ -90,6 +90,26 @@ struct ActivityRequest: Identifiable, Equatable {
                   list.contains(where: { $0.id == itemID }) else { return nil }
             return itemID
         }
+
+        /// What the list does as it first appears with this focus.
+        enum Opening: Equatable {
+            case none
+            /// Scrolls to Messages, and opens the conversation with this
+            /// peer at once where it is the one unread.
+            case messages(conversation: Int?)
+            /// Pushes this item's full card (`StackRoute.activityItem`), as
+            /// View in the bar or a Now row asks.
+            case card(String)
+        }
+
+        /// What the list does as it first appears, from what it lists then.
+        func opening(in list: [ActivityModel.Item]) -> Opening {
+            switch self {
+            case .top: .none
+            case .messages: .messages(conversation: conversationToOpen(in: list))
+            case .item: cardToOpen(in: list).map(Opening.card) ?? .none
+            }
+        }
     }
 
     /// The list's session, which its rows' results belong to (ActivityResults).

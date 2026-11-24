@@ -449,20 +449,31 @@ private struct ActivityListContent: View {
 
     /// Opened at Messages, the list scrolls there on its first appearance.
     /// With exactly one unread conversation it also opens that one at once,
-    /// so Back shows the list at Messages.
+    /// so Back shows the list at Messages. Opened at an item, as View in the
+    /// bar or a Now row opens it, the list pushes that item's card at once,
+    /// so Back shows the list.
     private func applyFocus(_ proxy: ScrollViewProxy, _ snapshot: ActivityListSource.Snapshot) {
-        guard focus == .messages, !hasFocused else { return }
+        guard focus != .top, !hasFocused else { return }
         hasFocused = true
-        let conversation = focus.conversationToOpen(in: snapshot.model.list).flatMap { peer($0) }
+        let opening = focus.opening(in: snapshot.model.list)
         // After the first layout, so the section has its place and the
         // stack has appeared.
         DispatchQueue.main.async {
-            proxy.scrollTo(ActivitySection.messages, anchor: .top)
-            guard let conversation else { return }
             var transaction = Transaction()
             transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                navigation.openConversation(conversation)
+            switch opening {
+            case .none:
+                break
+            case .messages(let peerID):
+                proxy.scrollTo(ActivitySection.messages, anchor: .top)
+                guard let conversation = peerID.flatMap({ peer($0) }) else { return }
+                withTransaction(transaction) {
+                    navigation.openConversation(conversation)
+                }
+            case .card(let itemID):
+                withTransaction(transaction) {
+                    push(itemID)
+                }
             }
         }
     }

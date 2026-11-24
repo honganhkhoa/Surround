@@ -103,13 +103,9 @@ enum GameControlItemRole: Equatable, CaseIterable {
         switch self {
         case .activeGames: SurroundUITestContract.AccessibilityID.gameActiveGamesButton
         case .zen: SurroundUITestContract.AccessibilityID.gameZenControl
-        case .conversation: Self.conversationIdentifier
+        case .conversation: SurroundUITestContract.AccessibilityID.messagesConversationGameControl
         }
     }
-
-    /// A conversation's own, never a game's, so a journey that finds Game
-    /// Detail's control can't pass against a conversation's.
-    static let conversationIdentifier = "messages.conversation.gameControl"
 }
 
 // MARK: - The window

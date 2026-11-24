@@ -297,6 +297,22 @@ final class ActivityListModelTests: XCTestCase {
         XCTAssertNotEqual(ActivityRequest.Focus.item("challenge-7"), .item("challenge-8"))
     }
 
+    /// What the list does as it first appears: View's focus pushes the
+    /// item's card, as the list itself pushes it from the row; the Messages
+    /// button's scrolls to Messages; the top does nothing.
+    func testTheListOpensAsItsFocusAsks() {
+        typealias Focus = ActivityRequest.Focus
+        let list = [game(1), challenge(7), waiting("open-4"), conversation(31)]
+        XCTAssertEqual(Focus.item("challenge-7").opening(in: list), .card("challenge-7"),
+                       "View in the bar or a Now row opens the challenge's card.")
+        XCTAssertEqual(Focus.item("waiting-open-4").opening(in: list), .card("waiting-open-4"))
+        XCTAssertEqual(Focus.item("challenge-8").opening(in: list), .none, "An item that has gone opens the list.")
+        XCTAssertEqual(Focus.item("game-1").opening(in: list), .none, "A live game has no card.")
+        XCTAssertEqual(Focus.messages.opening(in: list), .messages(conversation: 31))
+        XCTAssertEqual(Focus.messages.opening(in: [game(1)]), .messages(conversation: nil))
+        XCTAssertEqual(Focus.top.opening(in: list), .none)
+    }
+
     // MARK: Row controls
 
     func testInlineAcceptOnlyForAUsualChallengeOutsideAGame() {

@@ -4795,6 +4795,23 @@
         }
       }
     },
+    "%@ left" : {
+      "comment" : "Activity bar and Now section, VoiceOver: the time left on the user's clock in a live game, such as 42 seconds; said after the game",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sisa %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ lagi"
+          }
+        }
+      }
+    },
     "%@ per move" : {
       "comment" : "Homeview - simple time control, e.g. 1 day per move",
       "localizations" : {
@@ -6440,6 +6457,147 @@
         }
       }
     },
+    "%lld challenges" : {
+      "comment" : "Activity bar, VoiceOver: one part of what waits for the user, how many challenges were sent to them",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld challenge"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld challenges"
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tantangan"
+                }
+              }
+            }
+          }
+        },
+        "ms" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cabaran"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld conversations" : {
+      "comment" : "Activity bar: under N waiting, how many conversations are unread",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld conversation"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld conversations"
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld percakapan"
+                }
+              }
+            }
+          }
+        },
+        "ms" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld perbualan"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld correspondence challenges" : {
+      "comment" : "Activity bar: under N waiting, how many correspondence challenges were sent to the user",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "A correspondence challenge"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld correspondence challenges"
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tantangan korespondensi"
+                }
+              }
+            }
+          }
+        },
+        "ms" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cabaran surat-menyurat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld Dan" : {
       "comment" : "formattedRank - dan - long format",
       "localizations" : {
@@ -7580,6 +7738,53 @@
         }
       }
     },
+    "%lld live games on your move" : {
+      "comment" : "Activity bar, VoiceOver: one part of what waits for the user, such as 2 live games on your move",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld live game on your move"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld live games on your move"
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "giliran Anda dalam %lld permainan langsung"
+                }
+              }
+            }
+          }
+        },
+        "ms" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "giliran anda dalam %lld permainan langsung"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld minutes" : {
       "comment" : "Duration - minutes part, long format",
       "localizations" : {
@@ -8200,6 +8405,53 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "另有 %lld 項待處理"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld more waiting for you: %@" : {
+      "comment" : "Activity bar and Now section, VoiceOver: how many more games, challenges and messages wait beyond what is shown. The second value lists them, such as a challenge from CedarWave and 2 unread conversations",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more waiting for you: %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more waiting for you: %@"
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lagi menunggu Anda: %@"
+                }
+              }
+            }
+          }
+        },
+        "ms" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lagi menunggu anda: %@"
                 }
               }
             }
@@ -10305,6 +10557,53 @@
         }
       }
     },
+    "%lld unread conversations" : {
+      "comment" : "Activity bar, VoiceOver: one part of what waits for the user, how many conversations are unread",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unread conversation"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unread conversations"
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld percakapan belum dibaca"
+                }
+              }
+            }
+          }
+        },
+        "ms" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld perbualan belum dibaca"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld waiting" : {
       "comment" : "In-game control, VoiceOver: how many games, challenges and messages wait in Activity",
       "localizations" : {
@@ -10507,6 +10806,53 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld 項待處理"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld waiting for you: %@" : {
+      "comment" : "Activity bar, VoiceOver: nothing live leads, and this many challenges and messages wait. The second value lists them, such as a correspondence challenge from CedarWave and 2 unread conversations",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld waiting for you: %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld waiting for you: %@"
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld menunggu Anda: %@"
+                }
+              }
+            }
+          }
+        },
+        "ms" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld menunggu anda: %@"
                 }
               }
             }
@@ -13271,6 +13617,40 @@
         }
       }
     },
+    "a challenge from %@" : {
+      "comment" : "Activity bar, VoiceOver: one part of what waits for the user, a live challenge from this player",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tantangan dari %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cabaran daripada %@"
+          }
+        }
+      }
+    },
+    "a correspondence challenge from %@" : {
+      "comment" : "Activity bar, VoiceOver: one part of what waits for the user, a correspondence challenge from this player",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tantangan korespondensi dari %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cabaran surat-menyurat daripada %@"
+          }
+        }
+      }
+    },
     "A game ends" : {
       "comment" : "Correspondence games notification setting",
       "localizations" : {
@@ -15436,6 +15816,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AGA"
+          }
+        }
+      }
+    },
+    "All activity" : {
+      "comment" : "iPad and Mac sidebar: the Now section's last row; opens the whole Activity list",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Semua aktivitas"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Semua aktiviti"
           }
         }
       }
@@ -21435,6 +21832,23 @@
         }
       }
     },
+    "Challenge from %@: %@" : {
+      "comment" : "Activity bar and Now section, VoiceOver: a live challenge sent to the user. The first value is the challenger's name and rank, the second the board size, rankedness and speed",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tantangan dari %@: %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cabaran daripada %@: %@"
+          }
+        }
+      }
+    },
     "Challenge received!" : {
       "localizations" : {
         "de" : {
@@ -21596,6 +22010,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "向 %@ 發起的挑戰"
+          }
+        }
+      }
+    },
+    "Challenge to %@: %@" : {
+      "comment" : "Activity bar and Now section, VoiceOver: a challenge the user sent to this player. The first value is the player's name, the second the speed and board size",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tantangan untuk %@: %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cabaran kepada %@: %@"
           }
         }
       }
@@ -37425,6 +37856,57 @@
         }
       }
     },
+    "Live game with %@. Their move" : {
+      "comment" : "Activity bar and Now section, VoiceOver: a live game on the opponent's move. The value is the opponent's name and rank",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permainan langsung melawan %@. Giliran lawan"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permainan langsung dengan %@. Giliran lawan"
+          }
+        }
+      }
+    },
+    "Live game with %@. Your move" : {
+      "comment" : "Activity bar and Now section, VoiceOver: a live game on the user's move. The value is the opponent's name and rank; the time left follows as the element's value",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permainan langsung melawan %@. Giliran Anda"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permainan langsung dengan %@. Giliran anda"
+          }
+        }
+      }
+    },
+    "Live game with %@. Your move, sudden death" : {
+      "comment" : "Activity bar and Now section, VoiceOver: a live game on the user's move, in its last byo-yomi period. The value is the opponent's name and rank; the time left follows as the element's value",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permainan langsung melawan %@. Giliran Anda, periode terakhir"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permainan langsung dengan %@. Giliran anda, tempoh terakhir"
+          }
+        }
+      }
+    },
     "Live games" : {
       "comment" : "Homeview",
       "localizations" : {
@@ -44385,6 +44867,23 @@
         }
       }
     },
+    "Now" : {
+      "comment" : "iPad and Mac sidebar: the header of the section that lists what needs the user now, above All activity",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sekarang"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sekarang"
+          }
+        }
+      }
+    },
     "Numbers" : {
       "comment" : "Analyze-board tool that places sequential number labels.",
       "localizations" : {
@@ -45790,6 +46289,23 @@
         }
       }
     },
+    "Open challenge: %@" : {
+      "comment" : "Activity bar and Now section, VoiceOver: an open challenge the user posted, which anyone can accept. The value is its speed and board size; the time it has waited follows as the element's value",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tantangan terbuka: %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cabaran terbuka: %@"
+          }
+        }
+      }
+    },
     "Open game" : {
       "comment" : "Activity: opens the correspondence game an accepted challenge started",
       "localizations" : {
@@ -46033,6 +46549,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開啟 OGS 帳號設定"
+          }
+        }
+      }
+    },
+    "Open the game with %@" : {
+      "comment" : "Activity bar, VoiceOver: the Open game button of a live game that started elsewhere. The value is the opponent's name",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buka permainan melawan %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buka permainan dengan %@"
           }
         }
       }
@@ -52945,6 +53478,23 @@
         }
       }
     },
+    "Rengo · %@: %@" : {
+      "comment" : "Activity bar and Now section, VoiceOver: a Rengo challenge the user hosts or joined. The first value is its name, the second its speed, board size and players",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rengo · %@: %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rengo · %@: %@"
+          }
+        }
+      }
+    },
     "Rengo (%lld vs. %lld)" : {
       "comment" : "HistoryGameCell Rengo team sizes, black versus white",
       "extractionState" : "stale",
@@ -54680,6 +55230,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新載入棋盤預覽"
+          }
+        }
+      }
+    },
+    "Retry connecting to OGS" : {
+      "comment" : "Activity bar and Now section, VoiceOver: the Retry button beside Can’t reach OGS",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coba hubungkan kembali ke OGS"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuba sambung semula ke OGS"
           }
         }
       }
@@ -56858,6 +57425,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在搜尋對局"
+          }
+        }
+      }
+    },
+    "Searching for a game: %@" : {
+      "comment" : "Activity bar and Now section, VoiceOver: the user's Quick Match search. The value is its kind, speed and board sizes; the time searched follows as the element's value",
+      "localizations" : {
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mencari permainan: %@"
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mencari permainan: %@"
           }
         }
       }

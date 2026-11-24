@@ -955,6 +955,29 @@ enum SurroundUITestContract {
         /// The Activity bar, the same on every host. Journeys measure it
         /// with the tab bar as the screen's bottom chrome.
         static let activityBar = "activity.bar"
+        /// The bar's lead, its trailing action (View, Open game, Withdraw,
+        /// or a failed result's Retry) and its +N.
+        static let activityBarLead = "activity.bar.lead"
+        static let activityBarAction = "activity.bar.action"
+        static let activityBarMore = "activity.bar.more"
+        #if DEBUG
+        /// Hidden: what the window's host applied, such as "live
+        /// game-26268404 uiKitAccessory expanded", or "none".
+        static let activityBarState = "activity.bar.state"
+        #endif
+        /// The iPad's and the Mac's Now section, its rows and their
+        /// actions by item id, and All activity. On the Mac the section's
+        /// own identifier never reaches XCTest; its rows do.
+        static let activityNow = "activity.now"
+        static func activityNowRow(_ itemID: String) -> String { "activity.now.row.\(itemID)" }
+        static func activityNowRowAction(_ itemID: String) -> String { "activity.now.row.\(itemID).action" }
+        static let activityNowAll = "activity.now.all"
+        /// The window's connection status on root screens: the bar's status
+        /// kinds and the Now section's status row, on every host, and its
+        /// Retry wherever it sits. The line under root titles is the
+        /// navigation item's subtitle text, which takes none.
+        static let rootConnectionStatus = "root.connectionStatus"
+        static let rootConnectionStatusRetry = "root.connectionStatus.retry"
 
         static let profileRengoMenuPrefix = "profile.menu.rengo."
         static let profileActiveGames = "profile.active-games"
@@ -1317,6 +1340,10 @@ enum SurroundUITestContract {
         /// Zen's control beside Exit: the circle, or the bar item before
         /// a native Exit, for another live game on your move.
         static let gameZenControl = "game.zenControl"
+        /// A conversation's control while a live game needs you: its own,
+        /// never a game's, so a journey that finds Game Detail's control
+        /// can't pass against a conversation's.
+        static let messagesConversationGameControl = "messages.conversation.gameControl"
         /// The window's connection status in a game's title slot, and its
         /// Retry where it offers one.
         static let gameConnectionStatus = "game.connectionStatus"

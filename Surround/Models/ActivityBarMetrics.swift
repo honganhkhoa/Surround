@@ -1,0 +1,414 @@
+//
+//  ActivityBarMetrics.swift
+//  Surround
+//
+//  The Activity bar's fonts, and its parts' widths at a text size, measured
+//  with UIKit as the in-game control's chip measures its own
+//  (`GameControlChipMetrics`). The fonts are fixed at the size they scale to,
+//  and the bar draws its text, symbols and fixed parts at these sizes, so
+//  what fits here fits on screen. Text stops growing at XXL in every host.
+//  The Now section's rows draw the same parts at the third row density.
+//  The drawing and its drop order are the model's (`ActivityBarDrawing`);
+//  SurroundTests' fit test proves that every kind's parts that never drop
+//  fit each host's narrowest bar in every language.
+//
+
+import UIKit
+
+/// The text a bar's measured parts draw.
+struct ActivityBarPartText {
+    /// Line one at its narrowest: a letter and the ellipsis, or the ellipsis
+    /// alone where line one may truncate to nothing, as "Can’t reach OGS"
+    /// may where the title says it; or all of it, where it must read whole,
+    /// as the status words do where nothing else on screen says them.
+    var lineOneMinimum = ActivityBarPartText.letterAndEllipsis
+    /// Beside the name in the two-line form and in compact height; it never
+    /// truncates.
+    var rank: String?
+    /// Line two's grey status badge, where it shows on a lead in a host that
+    /// says all status: it reads whole, so the lines' column is at least as
+    /// wide as the badge.
+    var statusBadge: String?
+    var actionLabel: (ActivityBarAction) -> String = ActivityBarWords.action
+    /// The clock's time; nil for a game without a countdown, whose chip
+    /// shows its hourglass alone.
+    var clock: GameControlClock?
+    /// In sudden death, the mark the chip draws in the hourglass's place.
+    var suddenDeathMark: GameControlSuddenDeathMark?
+    var plusN = 0
+    /// The language's direction. The parts mirror, and keep their widths.
+    var direction = NSWritingDirection.leftToRight
+
+    static let letterAndEllipsis = "W…"
+    static let ellipsis = "…"
+}
+
+struct ActivityBarMetrics {
+    /// The largest text size the bar draws, in every host.
+    static let cap = UIContentSizeCategory.extraExtraLarge
+    /// Every hit area is at least this big.
+    static let targetSize: CGFloat = 44
+
+    let form: ActivityBarForm
+    /// The text size the bar draws at: the one asked for, up to the cap.
+    let sizeCategory: UIContentSizeCategory
+    /// Line one: 15 pt semibold, scaled as subheadline.
+    let lineOneFont: UIFont
+    /// The rank beside the name, and line two: 13 pt, scaled as footnote.
+    let detailFont: UIFont
+    /// The clock's digits and the sudden-death mark's text: 15 pt semibold
+    /// with monospaced digits.
+    let clockFont: UIFont
+    /// View, Open game, Retry and Withdraw: 15 pt semibold.
+    let actionFont: UIFont
+    /// +N: 15 pt semibold with monospaced digits, 14 pt in one-line forms.
+    let countFont: UIFont
+    /// Line two's grey "Reconnecting…" badge: 12 pt semibold, scaled as
+    /// caption.
+    let badgeFont: UIFont
+
+    var spacing: ActivityBarSpacing {
+        form.isOneLine
+            ? ActivityBarSpacing(leading: 8, trailing: 8, between: 6)
+            : ActivityBarSpacing(leading: 8, trailing: 6, between: 8)
+    }
+
+    /// The opponent's, the challenger's, or a glyph's tile.
+    var tileSize: CGFloat {
+        switch form {
+        case .expanded: 36
+        case .compactHeight: 32
+        case .inline, .closed: 30
+        }
+    }
+
+    var clockHeight: CGFloat { form == .expanded ? 32 : 30 }
+    /// The pills' and +N's drawn height, inside a 44 pt target.
+    var capsuleHeight: CGFloat { form.isOneLine ? 30 : 36 }
+    var clockPadding: CGFloat { form.isOneLine ? 8 : 9 }
+    /// Between the hourglass or the mark and the digits, which read as one.
+    var clockInnerGap: CGFloat { 4 }
+    var pillPadding: CGFloat { form.isOneLine ? 10 : 12 }
+    var withdrawPadding: CGFloat { 10 }
+    var countPadding: CGFloat { form.isOneLine ? 8 : 10 }
+    var countMinimumWidth: CGFloat { form.isOneLine ? 36 : 44 }
+    var badgeHeight: CGFloat { ceil(badgeFont.lineHeight) + 4 }
+    /// Between the name and its rank.
+    static let rankGap: CGFloat = 4
+    /// Between line one and line two.
+    static let lineGap: CGFloat = 1
+
+    init(form: ActivityBarForm, sizeCategory: UIContentSizeCategory) {
+        self.form = form
+        let requested = sizeCategory == .unspecified ? .large : sizeCategory
+        let capped = min(requested, Self.cap)
+        self.sizeCategory = capped
+        let traits = UITraitCollection(preferredContentSizeCategory: capped)
+        func scaled(_ size: CGFloat, as style: UIFont.TextStyle) -> CGFloat {
+            UIFontMetrics(forTextStyle: style).scaledFont(for: .systemFont(ofSize: size), compatibleWith: traits).pointSize
+        }
+        lineOneFont = .systemFont(ofSize: scaled(15, as: .subheadline), weight: .semibold)
+        detailFont = .systemFont(ofSize: scaled(13, as: .footnote))
+        clockFont = .monospacedDigitSystemFont(ofSize: scaled(15, as: .subheadline), weight: .semibold)
+        actionFont = .systemFont(ofSize: scaled(15, as: .subheadline), weight: .semibold)
+        countFont = .monospacedDigitSystemFont(ofSize: scaled(form.isOneLine ? 14 : 15, as: .subheadline),
+                                               weight: .semibold)
+        badgeFont = .systemFont(ofSize: scaled(12, as: .caption1), weight: .semibold)
+    }
+
+    /// The iPad's floating bar from iPadOS 26: its host fixes UIKit's
+    /// accessory at 48 pt (`ActivityAccessoryHost.idealSize`).
+    static let iPadAccessoryHeight: CGFloat = 48
+
+    /// The bar's height in its host: the system's in a phone's accessory,
+    /// about 44 pt, and the iPad host's 48 pt; the custom bar's 56 pt, and
+    /// 48 pt in compact height.
+    static func height(of bar: ActivityHostPolicy.Bar, form: ActivityBarForm,
+                       container: ActivityHostPolicy.Container = .swiftUITabView) -> CGFloat {
+        switch bar {
+        case .customBar: form == .compactHeight ? 48 : 56
+        case .uiKitAccessory where container == .iPadTabContainer: iPadAccessoryHeight
+        case .swiftUIAccessory, .uiKitAccessory: 44
+        }
+    }
+
+    /// Line one's height, and line two's or its status badge's, whichever
+    /// is taller, with the gap between them: what two lines take.
+    var twoLinesHeight: CGFloat {
+        ceil(lineOneFont.lineHeight) + Self.lineGap + max(ceil(detailFont.lineHeight), badgeHeight)
+    }
+
+    /// The two-line form keeps line two where both lines fit the host's
+    /// height at this text size: everywhere at the default size, but not in
+    /// a phone's 44 pt accessories at the cap, where line two drops before
+    /// any action does. Fonts decide it, never the bar's frame.
+    func showsLineTwo(in bar: ActivityHostPolicy.Bar,
+                      container: ActivityHostPolicy.Container = .swiftUITabView) -> Bool {
+        form == .expanded && twoLinesHeight <= Self.height(of: bar, form: form, container: container)
+    }
+
+    // MARK: Widths
+
+    /// A part's width in points, its padding included. The hourglass's
+    /// width takes the clock's inner gap in place of the spacing before the
+    /// clock, so the two read as one chip; line two shares line one's column,
+    /// which is as wide as its status badge where one shows.
+    /// - Parameter lineOneLines: The lines line one may take.
+    func width(of part: ActivityBarPart, _ text: ActivityBarPartText, lineOneLines: Int = 1) -> CGFloat {
+        switch part {
+        case .tile: tileSize
+        case .lineOne: max(lineOneWidth(text, lines: lineOneLines), badgeWidth(text))
+        case .lineTwo: 0
+        case .hourglass: symbolWidth("hourglass") + clockInnerGap - spacing.between
+        case .clock: clockWidth(text)
+        case .action(let action): actionWidth(action, label: text.actionLabel(action), direction: text.direction)
+        case .plusN: max(Self.targetSize, countWidth(text.plusN, direction: text.direction))
+        }
+    }
+
+    /// Line one at its narrowest, on `lines` lines, with the rank beside the
+    /// name where the form draws it.
+    func lineOneWidth(_ text: ActivityBarPartText, lines: Int = 1) -> CGFloat {
+        var width = Self.columnWidth(text.lineOneMinimum, font: lineOneFont, lines: lines, direction: text.direction)
+        if let rank = text.rank, !rank.isEmpty, !form.isOneLine {
+            width += Self.rankGap + ceil(Self.textWidth(rank, font: detailFont, direction: text.direction))
+        }
+        return width
+    }
+
+    /// The status badge's capsule: its words and 8 pt on each side.
+    func badgeWidth(_ text: ActivityBarPartText) -> CGFloat {
+        text.statusBadge.map { ceil(Self.textWidth($0, font: badgeFont, direction: text.direction)) + 2 * 8 } ?? 0
+    }
+
+    /// The narrowest column that holds `text` on `lines` lines, broken
+    /// between words as the bar's lines break it: its one-line width for a
+    /// single line, and a point more than the measured column for more, which
+    /// SwiftUI's lines then break within.
+    static func columnWidth(_ text: String, font: UIFont, lines: Int,
+                            direction: NSWritingDirection = .leftToRight) -> CGFloat {
+        let oneLine = ceil(textWidth(text, font: font, direction: direction))
+        guard lines > 1, !text.isEmpty else { return oneLine }
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.baseWritingDirection = direction
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .paragraphStyle: paragraph]
+        let limit = lineHeight(text, font: font) * CGFloat(lines) + 0.5
+        var narrow: CGFloat = 1
+        var wide = oneLine
+        while wide - narrow > 0.5 {
+            let middle = (narrow + wide) / 2
+            let height = (text as NSString).boundingRect(
+                with: CGSize(width: middle, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes, context: nil).height
+            if ceil(height) <= limit { wide = middle } else { narrow = middle }
+        }
+        return min(oneLine, ceil(wide) + 1)
+    }
+
+    /// The clock's chip without a separate hourglass: its digits, or the
+    /// hourglass alone without a countdown, with the sudden-death mark
+    /// before the digits in sudden death.
+    func clockWidth(_ text: ActivityBarPartText) -> CGFloat {
+        guard let clock = text.clock else { return 2 * clockPadding + symbolWidth("hourglass") }
+        var width = 2 * clockPadding + ceil(Self.textWidth(clock.widestSample, font: clockFont, direction: text.direction))
+        if let mark = text.suddenDeathMark {
+            width += markWidth(mark, direction: text.direction) + clockInnerGap
+        }
+        return width
+    }
+
+    func markWidth(_ mark: GameControlSuddenDeathMark, direction: NSWritingDirection = .leftToRight) -> CGFloat {
+        switch mark {
+        case .text(let text): ceil(Self.textWidth(text, font: clockFont, direction: direction))
+        case .glyph: symbolWidth(GameControlSuddenDeathMark.glyphSystemName)
+        }
+    }
+
+    /// View, Open game and Retry are pills; Withdraw is accent text. Each is
+    /// at least 44 pt wide.
+    func actionWidth(_ action: ActivityBarAction, label: String,
+                     direction: NSWritingDirection = .leftToRight) -> CGFloat {
+        let padding = action == .withdraw ? withdrawPadding : pillPadding
+        return max(Self.targetSize, ceil(Self.textWidth(label, font: actionFont, direction: direction)) + 2 * padding)
+    }
+
+    /// +N's drawn capsule.
+    func countWidth(_ plusN: Int, direction: NSWritingDirection = .leftToRight) -> CGFloat {
+        max(countMinimumWidth,
+            ceil(Self.textWidth(Self.countText(plusN), font: countFont, direction: direction)) + 2 * countPadding)
+    }
+
+    static func countText(_ plusN: Int) -> String { "+\(plusN)" }
+
+    /// A symbol's width at the clock's text size, as the bar draws it.
+    func symbolWidth(_ systemName: String) -> CGFloat {
+        let configuration = UIImage.SymbolConfiguration(pointSize: symbolPointSize, weight: .semibold)
+        let image = UIImage(systemName: systemName, withConfiguration: configuration)
+        return ceil(image?.size.width ?? symbolPointSize)
+    }
+
+    /// The hourglass and the glyph beside the clock: three quarters of its
+    /// text, as the design draws an 11 pt hourglass beside 15 pt digits.
+    var symbolPointSize: CGFloat { (clockFont.pointSize * 0.75).rounded() }
+
+    static func textWidth(_ text: String, font: UIFont,
+                          direction: NSWritingDirection = .leftToRight) -> CGFloat {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.baseWritingDirection = direction
+        return (text as NSString).size(withAttributes: [.font: font, .paragraphStyle: paragraph]).width
+    }
+
+    /// One line's height as drawn, fallback fonts included.
+    static func lineHeight(_ text: String, font: UIFont) -> CGFloat {
+        let bounds = (text as NSString).boundingRect(
+            with: CGSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font], context: nil)
+        return ceil(max(bounds.height, font.lineHeight))
+    }
+
+    // MARK: Fitting
+
+    /// The parts `drawing` keeps in `width`, after its drop order. Line two
+    /// shares line one's column, and the chip draws its own mark in sudden
+    /// death, or its hourglass alone without a countdown, which then never
+    /// drops. Line one takes the lines the drawing gives it.
+    func fit(_ drawing: ActivityBarDrawing, in width: CGFloat, text: ActivityBarPartText) -> ActivityBarFit {
+        var horizontal = drawing
+        let chipDrawsItsSymbol = text.clock == nil || text.suddenDeathMark != nil
+        let left: (ActivityBarPart) -> Bool = { $0 == .lineTwo || ($0 == .hourglass && chipDrawsItsSymbol) }
+        horizontal.parts.removeAll(where: left)
+        horizontal.dropOrder.removeAll(where: left)
+        return horizontal.fit(in: width, spacing: spacing) {
+            self.width(of: $0, text, lineOneLines: drawing.lineOneLines)
+        }
+    }
+}
+
+// MARK: - The bar's own colours
+
+/// The bar's and the Now section's own colours, apart from Messages'
+/// indigo, which Activity's list shares. Their words read at 4.5:1 or
+/// better on what draws under them in every host: the custom bar's material
+/// and its tinted pills, the system's glass, and the sidebar.
+enum ActivityBarColors {
+    /// View, Open game, Retry and Withdraw, and All activity: the app's
+    /// indigo, deeper in light and lighter in dark, where the custom bar's
+    /// dark material and its pills would leave the system's indigo near
+    /// 2:1.
+    static let accent = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.69, green: 0.686, blue: 1, alpha: 1)
+            : UIColor(red: 0.282, green: 0.275, blue: 0.784, alpha: 1)
+    }
+
+    /// The status badge behind its white words: a darker grey than the
+    /// system's, which leaves white text near 3.3:1.
+    static let statusBadge = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.388, green: 0.388, blue: 0.4, alpha: 1)
+            : UIColor(red: 0.424, green: 0.424, blue: 0.439, alpha: 1)
+    }
+}
+
+extension ActivityBarDrawing {
+    /// Parts and a drop order of the caller's own, as the Now rows draw them.
+    init(parts: [ActivityBarPart], dropOrder: [ActivityBarPart]) {
+        self.parts = parts
+        self.dropOrder = dropOrder
+    }
+}
+
+// MARK: - The Now section's rows
+
+/// A Now row at the third row density (`ActivityRowDensity.now`): a 32 pt
+/// tile in a 60 pt row, the name in 15 pt semibold with the rank and line
+/// two in 13 pt, then one trailing part: a live game's 28 pt clock, View,
+/// Withdraw, Open game, or the status row's Retry. Its text stops growing
+/// at XXL, as the bar's does, so the section keeps its height. The lines
+/// truncate first; then, where the trailing part still doesn't fit, the
+/// hourglass drops, then the tile, as in the bar's one-line forms. The
+/// clock and Retry never drop.
+struct ActivityNowRowMetrics {
+    static let height: CGFloat = 60
+    static let tileSize: CGFloat = 32
+    static let clockHeight: CGFloat = 28
+    static let pillHeight: CGFloat = 32
+
+    let sizeCategory: UIContentSizeCategory
+    let lineOneFont: UIFont
+    let detailFont: UIFont
+    /// The clock's digits: 14 pt semibold with monospaced digits.
+    let clockFont: UIFont
+    /// View, Open game, Retry and Withdraw: 14 pt semibold.
+    let actionFont: UIFont
+
+    let spacing = ActivityBarSpacing(leading: 10, trailing: 8, between: 10)
+    let clockPadding: CGFloat = 8
+    let clockInnerGap: CGFloat = 4
+    let pillPadding: CGFloat = 12
+    let withdrawPadding: CGFloat = 8
+
+    init(sizeCategory: UIContentSizeCategory) {
+        let requested = sizeCategory == .unspecified ? .large : sizeCategory
+        let capped = min(requested, ActivityBarMetrics.cap)
+        self.sizeCategory = capped
+        let traits = UITraitCollection(preferredContentSizeCategory: capped)
+        func scaled(_ size: CGFloat, as style: UIFont.TextStyle) -> CGFloat {
+            UIFontMetrics(forTextStyle: style).scaledFont(for: .systemFont(ofSize: size), compatibleWith: traits).pointSize
+        }
+        lineOneFont = .systemFont(ofSize: scaled(15, as: .subheadline), weight: .semibold)
+        detailFont = .systemFont(ofSize: scaled(13, as: .footnote))
+        clockFont = .monospacedDigitSystemFont(ofSize: scaled(14, as: .subheadline), weight: .semibold)
+        actionFont = .systemFont(ofSize: scaled(14, as: .subheadline), weight: .semibold)
+    }
+
+    /// The row's parts: the bar's two-line drawing of its lead, or of the
+    /// status row, without +N, which All activity carries.
+    static func parts(_ lead: ActivityBarLead) -> [ActivityBarPart] {
+        ActivityBarDrawing(.lead(lead, counted: [], status: nil), form: .expanded).parts
+    }
+
+    static func parts(_ status: NowStatusRow) -> [ActivityBarPart] {
+        let content: ActivityBarContent = status.offersRetry ? .unreachable(counted: []) : .status(status.words)
+        return ActivityBarDrawing(content, form: .expanded).parts
+    }
+
+    func width(of part: ActivityBarPart, _ text: ActivityBarPartText) -> CGFloat {
+        switch part {
+        case .tile: Self.tileSize
+        case .lineOne:
+            measured(text.lineOneMinimum, lineOneFont, text)
+                + (text.rank.map { ActivityBarMetrics.rankGap + measured($0, detailFont, text) } ?? 0)
+        case .lineTwo, .plusN: 0
+        case .hourglass: symbolWidth("hourglass") + clockInnerGap - spacing.between
+        case .clock:
+            text.clock.map { 2 * clockPadding + measured($0.widestSample, clockFont, text) }
+                ?? 2 * clockPadding + symbolWidth("hourglass")
+        case .action(let action):
+            max(ActivityBarMetrics.targetSize,
+                measured(text.actionLabel(action), actionFont, text) + 2 * (action == .withdraw ? withdrawPadding : pillPadding))
+        }
+    }
+
+    private func measured(_ string: String, _ font: UIFont, _ text: ActivityBarPartText) -> CGFloat {
+        ceil(ActivityBarMetrics.textWidth(string, font: font, direction: text.direction))
+    }
+
+    func symbolWidth(_ systemName: String) -> CGFloat {
+        let pointSize = (clockFont.pointSize * 0.75).rounded()
+        let image = UIImage(systemName: systemName,
+                            withConfiguration: UIImage.SymbolConfiguration(pointSize: pointSize, weight: .semibold))
+        return ceil(image?.size.width ?? pointSize)
+    }
+
+    /// The parts that drop where the rest doesn't fit, the first first.
+    static let dropOrder: [ActivityBarPart] = [.hourglass, .tile]
+
+    /// The row's parts in `width`, with line one at its narrowest, after
+    /// the drop order.
+    func fit(_ parts: [ActivityBarPart], in width: CGFloat, text: ActivityBarPartText) -> ActivityBarFit {
+        let kept = parts.filter { $0 != .lineTwo && $0 != .plusN && !($0 == .hourglass && text.clock == nil) }
+        let drawing = ActivityBarDrawing(parts: kept, dropOrder: Self.dropOrder.filter(kept.contains))
+        return drawing.fit(in: width, spacing: spacing) { self.width(of: $0, text) }
+    }
+}

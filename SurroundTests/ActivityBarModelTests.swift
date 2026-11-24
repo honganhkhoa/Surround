@@ -997,4 +997,191 @@ final class ActivityBarModelTests: XCTestCase {
         }
         XCTAssertNil(leads.announcement(for: nil, isRootOnScreen: true, claimStartedGame: unclaimed))
     }
+
+    // MARK: What VoiceOver hears from the bar
+
+    private let english = Locale(identifier: "en")
+    private typealias Spoken = ActivityBarAccessibility
+
+    func testTheBarIsAnActivityContainer() {
+        XCTAssertEqual(Spoken.barLabel, "Activity")
+    }
+
+    func testAGamesLeadSaysTheGameWithItsTimeAsTheValue() {
+        let live = Spoken.liveGame(opponent: "HarborMist", rank: "1d", isYourMove: true, timeLeft: 42, ticks: true,
+                                   locale: english)
+        XCTAssertEqual(live.label, "Live game with HarborMist, 1d. Your move")
+        XCTAssertEqual(live.value, "42 seconds left")
+        XCTAssertEqual(live.hint, "Opens that game.")
+        XCTAssertTrue(live.updatesFrequently, "The time is the value, so the label holds still as it ticks.")
+
+        let suddenDeath = Spoken.liveGame(opponent: "HarborMist", rank: "1d", isYourMove: true, isSuddenDeath: true,
+                                          timeLeft: 8, ticks: true, locale: english)
+        XCTAssertEqual(suddenDeath.label, "Live game with HarborMist, 1d. Your move, sudden death")
+        XCTAssertEqual(suddenDeath.value, "8 seconds left")
+
+        let theirs = Spoken.liveGame(opponent: "HarborMist", rank: "1d", isYourMove: false, timeLeft: 190, ticks: true,
+                                     locale: english)
+        XCTAssertEqual(theirs.label, "Live game with HarborMist, 1d. Their move")
+        XCTAssertEqual(theirs.value, "", "Their move has no time.")
+        XCTAssertFalse(theirs.updatesFrequently)
+
+        let offline = Spoken.liveGame(opponent: "HarborMist", rank: "1d", isYourMove: true, timeLeft: 42, ticks: true,
+                                      isOffline: true, locale: english)
+        XCTAssertEqual(offline.value, "42 seconds left, Reconnecting to OGS")
+        XCTAssertEqual(Spoken.liveGame(opponent: "HarborMist", rank: "1d", isYourMove: false, isOffline: true,
+                                       locale: english).value, "Reconnecting to OGS")
+
+        XCTAssertEqual(Spoken.liveGame(opponent: "HarborMist", rank: nil, isYourMove: true, locale: english).label,
+                       "Live game with HarborMist. Your move", "No rank while ranks are hidden.")
+        let stopped = Spoken.liveGame(opponent: "HarborMist", rank: "1d", isYourMove: true, timeLeft: 42, ticks: false,
+                                      locale: english)
+        XCTAssertEqual(stopped.value, "42 seconds left")
+        XCTAssertFalse(stopped.updatesFrequently, "A clock that doesn't run doesn't tick.")
+    }
+
+    func testAStartedGameAChallengeAndYourOwnItems() {
+        let started = Spoken.gameStarted(opponent: "CedarWave")
+        XCTAssertEqual(started.label, "Game started with CedarWave")
+        XCTAssertEqual(started.hint, "Opens that game.")
+
+        let challenge = Spoken.challenge(challenger: "CedarWave", rank: "5k", details: ["19×19", "Ranked", "Live"])
+        XCTAssertEqual(challenge.label, "Challenge from CedarWave, 5k: 19×19, Ranked, Live")
+        XCTAssertEqual(challenge.hint, "Opens Activity.")
+
+        let search = Spoken.waiting(.search, details: ["Quick match", "Live", "19×19"], waited: 72, ticks: true,
+                                    locale: english)
+        XCTAssertEqual(search.label, "Searching for a game: Quick match, Live, 19×19")
+        XCTAssertEqual(search.value, "1 minute, 12 seconds", "The time searched is the value.")
+        XCTAssertTrue(search.updatesFrequently)
+        XCTAssertEqual(search.hint, "Opens Activity.")
+        XCTAssertFalse(Spoken.waiting(.search, details: ["Quick match"], waited: 72, ticks: false,
+                                      locale: english).updatesFrequently, "UI tests stop the time searched.")
+
+        let open = Spoken.waiting(.openChallenge, details: ["Live", "19×19"], waited: 45, ticks: true, locale: english)
+        XCTAssertEqual(open.label, "Open challenge: Live, 19×19")
+        XCTAssertEqual(open.value, "45 seconds")
+        let sent = Spoken.waiting(.sentChallenge(to: "QuietPine"), details: ["Live", "19×19"], locale: english)
+        XCTAssertEqual(sent.label, "Challenge to QuietPine: Live, 19×19")
+        XCTAssertEqual(sent.value, "")
+        XCTAssertEqual(Spoken.waiting(.rengo("Weekend 19×19"), details: ["Live", "19×19", "3 players"],
+                                      locale: english).label,
+                       "Rengo · Weekend 19×19: Live, 19×19, 3 players")
+    }
+
+    func testNothingLeadsPlusNAndAllActivitySayWhatWaits() {
+        let names: (Int) -> String? = { $0 == 5 ? "CedarWave" : nil }
+        let waiting = ActivityBarBreakdown([.challenge(Model.Challenge(id: 5, isLive: false)), .conversation(peerID: 1),
+                                            .conversation(peerID: 2)], challenger: names)
+        let nothingLeads = Spoken.nothingLeads(count: 3, waiting, locale: english)
+        XCTAssertEqual(nothingLeads.label,
+                       "3 waiting for you: a correspondence challenge from CedarWave and 2 unread conversations")
+        XCTAssertEqual(nothingLeads.hint, "Opens Activity.")
+
+        let beyond = ActivityBarBreakdown([.challenge(liveChallenge(5)), .conversation(peerID: 1),
+                                           .conversation(peerID: 2)], challenger: names)
+        let plusN = Spoken.plusN(3, beyond, locale: english)
+        XCTAssertEqual(plusN.label, "3 more waiting for you: a challenge from CedarWave and 2 unread conversations")
+        XCTAssertEqual(plusN.hint, "Opens Activity.")
+
+        let conversations = ActivityBarBreakdown([.conversation(peerID: 1), .conversation(peerID: 2)], challenger: names)
+        let all = Spoken.allActivity(plusN: 2, conversations, locale: english)
+        XCTAssertEqual(all.label, "All activity")
+        XCTAssertEqual(all.value, "2 more waiting for you: 2 unread conversations")
+        XCTAssertEqual(all.hint, "Opens Activity.")
+        XCTAssertEqual(Spoken.allActivity(plusN: 0, ActivityBarBreakdown(), locale: english).value, "")
+    }
+
+    /// Counts of two or more: the catalog's singular forms are
+    /// ActivityBarFitTests', which reads the app's own bundle.
+    func testTheBreakdownsPhrasesCountEachKind() {
+        let none: (Int) -> String? = { _ in nil }
+        XCTAssertEqual(ActivityBarBreakdown([.liveGame(gameID: 1), .liveGame(gameID: 2)], challenger: none)
+            .spoken(locale: english), "2 live games on your move")
+        XCTAssertEqual(ActivityBarBreakdown([.challenge(liveChallenge(1)), .challenge(liveChallenge(2))], challenger: none)
+            .spoken(locale: english), "2 challenges")
+        XCTAssertEqual(ActivityBarBreakdown([.challenge(liveChallenge(1)), .challenge(liveChallenge(2))],
+                                            challenger: { _ in "CedarWave" }).spoken(locale: english),
+                       "2 challenges", "Only a single challenge names its challenger.")
+        XCTAssertEqual(ActivityBarBreakdown([.conversation(peerID: 1), .conversation(peerID: 2)], challenger: none)
+            .spoken(locale: english), "2 unread conversations")
+        XCTAssertEqual(ActivityBarBreakdown([.liveGame(gameID: 1), .liveGame(gameID: 2), .challenge(liveChallenge(1)),
+                                             .challenge(liveChallenge(2)), .conversation(peerID: 1),
+                                             .conversation(peerID: 2)], challenger: none)
+            .spoken(locale: english), "2 live games on your move, 2 challenges, and 2 unread conversations")
+        XCTAssertEqual(ActivityBarBreakdown([.challenge(liveChallenge(1))], challenger: { _ in "CedarWave" })
+            .spoken(locale: english), "a challenge from CedarWave")
+        XCTAssertEqual(ActivityBarBreakdown([.challenge(Model.Challenge(id: 1, isLive: false))], challenger: { _ in "CedarWave" })
+            .spoken(locale: english), "a correspondence challenge from CedarWave")
+
+        XCTAssertEqual(ActivityBarBreakdown([.challenge(Model.Challenge(id: 5, isLive: false)),
+                                             .challenge(Model.Challenge(id: 6, isLive: false)), .conversation(peerID: 1),
+                                             .conversation(peerID: 2)], challenger: none).lineTwo,
+                       "2 correspondence challenges · 2 conversations")
+        XCTAssertEqual(ActivityBarBreakdown([.conversation(peerID: 1), .conversation(peerID: 2)], challenger: none).lineTwo,
+                       "2 conversations", "Line two names what waits, and only that.")
+        XCTAssertEqual(ActivityBarBreakdown([.challenge(liveChallenge(1))], challenger: none).lineTwo, "",
+                       "A live challenge leads, so it never waits under N waiting.")
+    }
+
+    func testTheButtonsSayWhatTheyActOn() {
+        XCTAssertEqual(Spoken.openGame(opponent: "CedarWave"), "Open the game with CedarWave")
+        XCTAssertEqual(Spoken.view(challenger: "CedarWave"), "View the challenge from CedarWave")
+        XCTAssertEqual(Spoken.withdraw(title: "Quick match", details: ["Live", "19×19"]), "Withdraw Quick match, Live, 19×19")
+        XCTAssertEqual(Spoken.retry, "Retry connecting to OGS")
+    }
+
+    func testTheStatusKindsAndTheResultsSayTheirWords() {
+        XCTAssertEqual(Spoken.status(.reconnecting).label, "Reconnecting to OGS")
+        XCTAssertEqual(Spoken.status(.connecting).label, "Connecting…")
+        XCTAssertEqual(Spoken.status(.unreachable).label, "Can’t reach OGS")
+        XCTAssertEqual(Spoken.status(.connected).label, "Connected")
+        for words in [Words.reconnecting, .connecting, .unreachable, .connected] {
+            XCTAssertEqual(Spoken.status(words).hint, "", "\(words) is status, not a button.")
+        }
+        let display = ActivityRowDisplay(title: "Quick match", detail: "Live · 19×19")
+        func result(_ state: ActivityActionState) -> Spoken {
+            Spoken.result(ActivityBarResult(itemID: "waiting-quick-match-1", action: .withdraw, state: state,
+                                            display: display))
+        }
+        XCTAssertEqual(result(.pending(since: 0)), Spoken(label: "Withdrawing…", value: "Quick match"))
+        XCTAssertEqual(result(.succeeded(.withdrawn)), Spoken(label: "Withdrawn", value: "Quick match"))
+        XCTAssertEqual(result(.failed), Spoken(label: "Couldn’t withdraw", value: "Quick match"))
+    }
+
+    func testTheNowSectionsWords() {
+        XCTAssertEqual(Spoken.nowHeader, "Now")
+        XCTAssertEqual(Spoken.allActivityTitle, "All activity")
+    }
+
+    func testTheBarsIdentifiersAreTheSameOnEveryHost() {
+        typealias ID = SurroundUITestContract.AccessibilityID
+        XCTAssertEqual([ID.activityBar, ID.activityBarLead, ID.activityBarAction, ID.activityBarMore],
+                       ["activity.bar", "activity.bar.lead", "activity.bar.action", "activity.bar.more"])
+        XCTAssertEqual([ID.activityNow, ID.activityNowRow("game-1"), ID.activityNowRowAction("game-1"), ID.activityNowAll],
+                       ["activity.now", "activity.now.row.game-1", "activity.now.row.game-1.action", "activity.now.all"])
+        XCTAssertEqual([ID.rootConnectionStatus, ID.rootConnectionStatusRetry],
+                       ["root.connectionStatus", "root.connectionStatus.retry"])
+        XCTAssertEqual(ID.activityBarState, "activity.bar.state")
+        XCTAssertEqual(GameControlItemRole.conversation.accessibilityIdentifier, ID.messagesConversationGameControl)
+    }
+
+    func testTheDebugStateNamesTheKindTheLeadTheHostAndTheForm() {
+        XCTAssertEqual(ActivityBarAppliedState.text(.lead(.liveGame(gameID: 26268404), counted: [], status: nil),
+                                                    host: .uiKitAccessory, form: .expanded),
+                       "live game-26268404 uiKitAccessory expanded")
+        XCTAssertEqual(ActivityBarAppliedState.text(.lead(.waiting(search, withdrawsInPlace: true), counted: [],
+                                                          status: .reconnecting), host: .customBar, form: .compactHeight),
+                       "search waiting-\(search.id) customBar compactHeight")
+        XCTAssertEqual(ActivityBarAppliedState.text(.lead(.nothingLeads(count: 3), counted: [], status: nil),
+                                                    host: .swiftUIAccessory, form: .expanded),
+                       "nothingLeads none swiftUIAccessory expanded")
+        XCTAssertEqual(ActivityBarAppliedState.text(.unreachable(counted: []), host: .uiKitAccessory, form: .closed),
+                       "unreachable none uiKitAccessory closed")
+        XCTAssertEqual(ActivityBarAppliedState.text(.status(.reconnecting), host: .customBar, form: .expanded),
+                       "reconnecting none customBar expanded")
+        XCTAssertEqual(ActivityBarAppliedState.text(nil, host: .uiKitAccessory, form: .expanded), "none")
+        XCTAssertEqual(ActivityBarAppliedState.text(.status(.connected), host: nil, form: .expanded), "none",
+                       "A host that applied nothing says so, whatever MainView asked for.")
+    }
 }

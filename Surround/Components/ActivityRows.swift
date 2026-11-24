@@ -123,15 +123,46 @@ extension View {
 
 // MARK: - Density
 
-/// The rows of the sheet and of a popover on a root screen, or the denser
-/// rows of a game's popover.
+/// The rows of the sheet and of a popover on a root screen, the denser rows
+/// of a game's popover, or the iPad's and the Mac's Now section, whose rows
+/// fit a sidebar.
 enum ActivityRowDensity {
     case regular, dense
+    /// The Now section's: a 32 pt tile in a 60 pt row, the name in 15 pt
+    /// semibold with the rank in 13 pt, as `ActivityNowRowMetrics` measures.
+    case now
 
-    var tile: CGFloat { self == .regular ? 40 : 36 }
-    var rowHeight: CGFloat { self == .regular ? 60 : 56 }
-    var liveGameHeight: CGFloat { self == .regular ? 72 : 56 }
-    var horizontalPadding: CGFloat { self == .regular ? 12 : 16 }
+    var tile: CGFloat {
+        switch self {
+        case .regular: 40
+        case .dense: 36
+        case .now: ActivityNowRowMetrics.tileSize
+        }
+    }
+
+    var rowHeight: CGFloat {
+        switch self {
+        case .regular, .now: 60
+        case .dense: 56
+        }
+    }
+
+    var liveGameHeight: CGFloat {
+        switch self {
+        case .regular: 72
+        case .dense: 56
+        case .now: ActivityNowRowMetrics.height
+        }
+    }
+
+    var horizontalPadding: CGFloat {
+        switch self {
+        case .regular: 12
+        case .dense: 16
+        case .now: 10
+        }
+    }
+
     var titleFont: Font { self == .regular ? .callout.weight(.semibold) : .subheadline.weight(.semibold) }
     var rankFont: Font { self == .regular ? .subheadline : .footnote }
     /// Separators start past the tile.
@@ -438,7 +469,7 @@ private struct ActivityTrailingButtonStyle: ViewModifier {
                 .font(.callout.weight(.semibold))
                 .tint(MessagesStyle.accent)
                 .frame(minHeight: 44)
-        case .dense:
+        case .dense, .now:
             content
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.capsule)
