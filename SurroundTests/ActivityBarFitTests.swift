@@ -461,3 +461,162 @@ final class ActivityBarFitTests: XCTestCase {
         }, "Unable to locate the hosted app bundle with every translation")
     }
 }
+
+extension ActivityBarFitTests {
+    /// Two Now rows where the window is tall enough for them below the
+    /// sidebar's tab rows, one in a shorter window, and none where even one
+    /// row would reach the last tab row: from the window's height, the text
+    /// size and the language the sidebar is drawn in alone. A larger size,
+    /// lines iOS sets taller, and an accessibility size, where the titles
+    /// wrap, need a taller window; from AX4 there is none. Each threshold is
+    /// at least 9 pt above the height at which the section's top was
+    /// measured to meet the last tab row on iPadOS 26.5, but two rows at XXL
+    /// and in Thai at the default size, from 834 pt, 1 pt above it.
+    func testAShortWindowGivesTheNowSectionOneRowAndAShorterOneNone() {
+        typealias Rows = ActivityNowSectionRows
+        func count(_ height: CGFloat, _ size: UIContentSizeCategory, _ strings: String,
+                   lines: String? = nil) -> Int {
+            Rows.count(windowHeight: height, sizeCategory: size,
+                       language: Rows.Language(strings: strings, lines: lines ?? strings))
+        }
+        // English at the default size and at XXL.
+        XCTAssertEqual(count(834, .large, "en"), 2)
+        XCTAssertEqual(count(770, .large, "en"), 2)
+        XCTAssertEqual(count(769, .large, "en"), 1)
+        XCTAssertEqual(count(708, .large, "en"), 1)
+        XCTAssertEqual(count(707, .large, "en"), 0)
+        XCTAssertEqual(count(597, .large, "en"), 0)
+        XCTAssertEqual(count(486, .small, "en"), 0)
+        XCTAssertEqual(count(770, .unspecified, "en"), 2)
+        XCTAssertEqual(count(707, .unspecified, "en"), 0)
+        XCTAssertEqual(count(834, .extraExtraLarge, "en"), 2)
+        XCTAssertEqual(count(833, .extraExtraLarge, "en"), 1)
+        XCTAssertEqual(count(780, .extraExtraLarge, "en"), 1)
+        XCTAssertEqual(count(779, .extraExtraLarge, "en"), 0)
+
+        // A full-size landscape window, 834 pt tall: two rows up to XXL, and
+        // in Thai and Vietnamese at the default size; one at XXXL, in
+        // Vietnamese at XL and XXL and in Thai at XL; none in Thai from XXL,
+        // in Vietnamese from XXXL, and at accessibility sizes but AX1 in
+        // Chinese and Korean, whose titles don't wrap there.
+        for language in Self.languages where !["th", "vi"].contains(language) {
+            XCTAssertEqual(count(834, .extraExtraLarge, language), 2, language)
+            XCTAssertEqual(count(834, .extraExtraExtraLarge, language), 1, language)
+            XCTAssertEqual(count(834, .accessibilityMedium, language),
+                           ["ko", "zh-Hans", "zh-Hant"].contains(language) ? 1 : 0, language)
+        }
+        XCTAssertEqual(count(834, .large, "th"), 2)
+        XCTAssertEqual(count(834, .extraLarge, "th"), 1)
+        XCTAssertEqual(count(834, .extraExtraLarge, "th"), 0, "In Thai at XXL even one row would reach Web version.")
+        XCTAssertEqual(count(834, .large, "vi"), 2)
+        XCTAssertEqual(count(834, .extraLarge, "vi"), 1)
+        XCTAssertEqual(count(834, .extraExtraLarge, "vi"), 1)
+        XCTAssertEqual(count(834, .extraExtraExtraLarge, "vi"), 0)
+        XCTAssertEqual(count(834, .accessibilityMedium, "th"), 0)
+        XCTAssertEqual(count(834, .accessibilityExtraExtraExtraLarge, "fr"), 0)
+        // A full-size portrait window, 1210 pt tall: one row at AX1 and AX2,
+        // at AX3 only where the titles leave room, and none from AX4.
+        for language in Self.languages {
+            XCTAssertEqual(count(1210, .accessibilityMedium, language), 1, language)
+            XCTAssertEqual(count(1210, .accessibilityLarge, language), 1, language)
+            XCTAssertEqual(count(1210, .accessibilityExtraLarge, language),
+                           ["es", "fr", "pt-PT", "th", "vi"].contains(language) ? 0 : 1, language)
+            XCTAssertEqual(count(1210, .accessibilityExtraExtraLarge, language), 0, language)
+            XCTAssertEqual(count(1376, .accessibilityExtraExtraExtraLarge, language), 0, language)
+        }
+
+        // iOS sets the lines for the first preferred language, whether the
+        // app ships it or not: around the app's English, Arabic's lines are as
+        // tall as Vietnamese's, Hindi's as Thai's, and Khmer's taller still.
+        let lineHeights: [(String, Rows.LineHeight)] = [
+            ("en", .standard), ("zh-Hant-TW", .standard), ("nl-NL", .standard), ("he", .standard),
+            ("vi-VN", .likeVietnamese), ("ar", .likeVietnamese), ("ta", .likeVietnamese),
+            ("th_TH", .likeThai), ("hi-IN", .likeThai), ("hy", .likeThai), ("km", .likeKhmer), ("my", .likeKhmer),
+        ]
+        for (lines, height) in lineHeights {
+            XCTAssertEqual(Rows.LineHeight(Rows.Language(strings: "en", lines: lines)), height, lines)
+        }
+        XCTAssertEqual(count(834, .extraExtraLarge, "en", lines: "hi-IN"), 0)
+        XCTAssertEqual(count(834, .extraExtraLarge, "en", lines: "ar"), 1)
+        XCTAssertEqual(count(834, .extraExtraLarge, "fr", lines: "nl-NL"), 2)
+        XCTAssertEqual(count(834, .large, "en", lines: "km"), 1)
+        XCTAssertEqual(count(1210, .accessibilityMedium, "en", lines: "hi-IN"), 1)
+        XCTAssertEqual(count(1210, .accessibilityMedium, "fr", lines: "hi-IN"), 0,
+                       "At accessibility sizes taller lines were measured around English titles and their own only.")
+
+        // Where the section's top met the last tab row on iPadOS 26.5, in
+        // the window that left the least room, for two rows and for one:
+        // every threshold is at least 9 pt above, but two rows from 834 pt,
+        // the full-size landscape window, where every measurement left room.
+        let needs: [(size: UIContentSizeCategory, lines: String, two: CGFloat?, one: CGFloat)] = [
+            (.large, "en", 761, 699), (.large, "vi", 797, 735), (.large, "th", 833, 771),
+            (.large, "km", 887, 825),
+            (.extraLarge, "en", 797, 735), (.extraLarge, "vi", 837.5, 775.5), (.extraLarge, "th", 873.5, 811.5),
+            (.extraLarge, "km", 936.5, 874.5),
+            (.extraExtraLarge, "en", 833, 771), (.extraExtraLarge, "vi", 873.5, 811.5),
+            (.extraExtraLarge, "th", 918.5, 856.5), (.extraExtraLarge, "km", 981.5, 919.5),
+            (.extraExtraExtraLarge, "en", 887, 825), (.extraExtraExtraLarge, "vi", 936.5, 874.5),
+            (.extraExtraExtraLarge, "th", 981.5, 919.5), (.extraExtraExtraLarge, "km", 1053.5, 991.5),
+            (.accessibilityMedium, "km", nil, 1073.5), (.accessibilityMedium, "hi", nil, 994.5),
+            (.accessibilityMedium, "ar", nil, 943.5), (.accessibilityLarge, "hi", nil, 1148),
+            (.accessibilityLarge, "ar", nil, 1084.5),
+        ]
+        for need in needs {
+            // Measured in every language the app ships for the standard
+            // height, and around their own titles or English's otherwise.
+            let measuredStrings = need.lines == "en" ? Self.languages.filter { !["th", "vi"].contains($0) }
+                : ["vi", "th"].contains(need.lines) ? [need.lines] : ["en"]
+            for strings in measuredStrings {
+                let heights = Rows.heights(sizeCategory: need.size,
+                                           language: Rows.Language(strings: strings, lines: need.lines))
+                let tag = "\(strings) set in \(need.lines) at \(need.size.rawValue)"
+                if let two = need.two, let threshold = heights.twoRows {
+                    XCTAssertGreaterThanOrEqual(threshold, two + (threshold == 834 ? 1 : 9), tag)
+                }
+                if let threshold = heights.oneRow {
+                    XCTAssertGreaterThanOrEqual(threshold, need.one + 9, tag)
+                }
+            }
+        }
+        let accessibilityNeeds: [(size: UIContentSizeCategory, one: [String: CGFloat])] = [
+            (.accessibilityMedium, ["de": 951, "en": 888, "es": 919.5, "fr": 888, "id": 888, "ja": 856.5, "ko": 825,
+                                    "ms": 888, "pt-BR": 919.5, "pt-PT": 919.5, "th": 994.5, "vi": 943.5,
+                                    "zh-Hans": 825, "zh-Hant": 825]),
+            (.accessibilityLarge, ["de": 1056.5, "en": 1016.5, "es": 1056.5, "fr": 1096.5, "id": 976.5,
+                                   "ja": 1016.5, "ko": 896.5, "ms": 936.5, "pt-BR": 1016.5, "pt-PT": 1056.5,
+                                   "th": 1054, "vi": 997.5, "zh-Hans": 856.5, "zh-Hant": 856.5]),
+            (.accessibilityExtraLarge, ["de": 1173, "en": 1125, "es": 1221, "fr": 1221, "id": 1173, "ja": 1125,
+                                        "ko": 1029, "ms": 1077, "pt-BR": 1125, "pt-PT": 1221, "th": 1387,
+                                        "vi": 1252, "zh-Hans": 1029, "zh-Hant": 1029]),
+        ]
+        for need in accessibilityNeeds {
+            for (language, one) in need.one {
+                let heights = Rows.heights(sizeCategory: need.size, language: Rows.Language(language))
+                XCTAssertNil(heights.twoRows, "\(language) \(need.size.rawValue)")
+                XCTAssertGreaterThanOrEqual(heights.oneRow ?? .infinity, one + 9, "\(language) \(need.size.rawValue)")
+            }
+        }
+
+        // In every language: never more rows in a shorter window, at a larger
+        // size or with taller lines, and at most one at accessibility sizes.
+        let sizes: [UIContentSizeCategory] = [.extraSmall, .small, .medium, .large, .extraLarge, .extraExtraLarge,
+                                              .extraExtraExtraLarge, .accessibilityMedium, .accessibilityLarge,
+                                              .accessibilityExtraLarge, .accessibilityExtraExtraLarge,
+                                              .accessibilityExtraExtraExtraLarge]
+        for language in Self.languages {
+            for height in stride(from: CGFloat(400), through: 1400, by: 2) {
+                var previous = Int.max
+                for size in sizes {
+                    let rows = count(height, size, language)
+                    let tag = "\(language) \(height) \(size.rawValue)"
+                    XCTAssertLessThanOrEqual(rows, previous, tag)
+                    XCTAssertLessThanOrEqual(rows, count(height + 2, size, language), tag)
+                    XCTAssertLessThanOrEqual(rows, size.isAccessibilityCategory ? 1 : 2, tag)
+                    let byLines = ["km", "hi", "ar", "nl"].map { count(height, size, language, lines: $0) }
+                    XCTAssertEqual(byLines, byLines.sorted(), "Taller lines never list more rows: \(tag)")
+                    previous = rows
+                }
+            }
+        }
+    }
+}

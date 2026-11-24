@@ -582,4 +582,61 @@ final class ActivityBarStateTests: XCTestCase {
                       "The in-game control can still say it.")
     }
 }
+extension ActivityBarStateTests {
+    /// The iPad container gives the Now section one row in a short window,
+    /// a main-queue turn later, as every input.
+    func testAShortWindowListsOneNowRow() throws {
+        try prepare(.challengeReceived)
+        attach()
+        XCTAssertEqual(bar.nowSection.rows, [usualChallenge, fixtureGame])
+        let publishes = countPublishes()
+        bar.setNowSectionRows(1)
+        XCTAssertEqual(barScheduler.pendingTurns, 1)
+        barScheduler.turn()
+        XCTAssertEqual(bar.nowSection.rows, [usualChallenge])
+        XCTAssertEqual(bar.nowSection.counted, [], "Their move never counts.")
+        XCTAssertEqual(publishes(), 1)
+        bar.setNowSectionRows(1)
+        XCTAssertEqual(barScheduler.pendingTurns, 0, "The same room asks for nothing.")
+    }
+
+    /// A window too short for even one row lists nothing, not even the
+    /// window's status, so the section shows nothing; one row of room comes
+    /// back with the status row in it.
+    func testAWindowTooShortForOneRowListsNothing() throws {
+        try prepare(.challengeReceived)
+        attach()
+        socket.send(false)
+        uptime.now += ConnectionStatusModel.revealDelay
+        sourceScheduler.advance()
+        barScheduler.turn()
+        XCTAssertEqual(bar.nowSection.statusRow, NowStatusRow(.reconnecting, place: .root(isMessagesTab: false)))
+        bar.setNowSectionRows(0)
+        barScheduler.turn()
+        XCTAssertEqual(bar.nowSection, ActivityBarNowSection(), "No row, no status row and no +N.")
+        bar.setNowSectionRows(1)
+        barScheduler.turn()
+        XCTAssertEqual(bar.nowSection.statusRow, NowStatusRow(.reconnecting, place: .root(isMessagesTab: false)))
+        XCTAssertEqual(bar.nowSection.rows, [], "One row of room is the status row's.")
+    }
+
+    /// While the window's bar says no status, the Now section's rows stay
+    /// Activity's during an outage.
+    func testTheNowSectionCanLeaveTheWindowsStatusOut() throws {
+        try prepare(.challengeReceived)
+        bar.nowSectionSaysStatus = false
+        attach()
+        socket.send(false)
+        uptime.now += ConnectionStatusModel.revealDelay
+        sourceScheduler.advance()
+        barScheduler.turn()
+        XCTAssertEqual(bar.connection.words, .reconnecting)
+        XCTAssertNil(bar.nowSection.statusRow)
+        XCTAssertEqual(bar.nowSection.rows, [usualChallenge, fixtureGame], "Both rows stay Activity's.")
+        bar.nowSectionSaysStatus = true
+        barScheduler.turn()
+        XCTAssertEqual(bar.nowSection.statusRow, NowStatusRow(.reconnecting, place: .root(isMessagesTab: false)))
+        XCTAssertEqual(bar.nowSection.rows, [usualChallenge])
+    }
+}
 #endif

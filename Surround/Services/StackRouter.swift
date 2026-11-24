@@ -97,8 +97,38 @@ final class StackRouter: ObservableObject {
     }
 
     @Published var path: [StackRoute] = [] {
-        didSet { discardInactiveState() }
+        didSet {
+            discardInactiveState()
+            reportTopRouteShowsGame()
+        }
     }
+
+    /// The top route shows Game Detail: a game's route, a linked game's
+    /// loading and error screens included.
+    var topRouteShowsGame: Bool { path.last?.showsGameDetail == true }
+
+    /// Told as the top route starts or stops showing Game Detail, from the
+    /// path's own change: as soon as a game is asked for, before the game's
+    /// first layout. A tab's stack in the iPad container installs it, so the
+    /// container takes the Activity bar away before a game lays out beside it.
+    private var topRouteShowsGameReport: ((Bool) -> Void)?
+    private var reportedTopRouteShowsGame = false
+
+    /// Installs `report` and tells it at once whether the top route shows a
+    /// game now; later, each time that changes. Nil stops the reports.
+    func reportTopRouteShowsGame(to report: ((Bool) -> Void)?) {
+        topRouteShowsGameReport = report
+        reportedTopRouteShowsGame = topRouteShowsGame
+        report?(reportedTopRouteShowsGame)
+    }
+
+    private func reportTopRouteShowsGame() {
+        let shows = topRouteShowsGame
+        guard shows != reportedTopRouteShowsGame else { return }
+        reportedTopRouteShowsGame = shows
+        topRouteShowsGameReport?(shows)
+    }
+
     private(set) var users: [Int: OGSUser] = [:]
     @Published private(set) var games: [Int: Game] = [:]
     private(set) var activeGamesByPlayer: [Int: ProfileActiveGames] = [:]
@@ -847,6 +877,7 @@ struct AppNavigationStack<Content: View>: View {
         .onAppear {
             isVisible = true
             updateActivity()
+            reportGameRoutes()
         }
         .onDisappear {
             isVisible = false
@@ -872,6 +903,18 @@ struct AppNavigationStack<Content: View>: View {
 
     private func updateActivity() {
         navigation.setActive(isVisible && (rootView == nil || rootView == nav.main.rootView))
+    }
+
+    /// A tab's own stack in the iPad container tells its tab's context
+    /// whether its top route shows a game, from the path itself, which every
+    /// way a game opens in a tab goes through. The container then takes its
+    /// bar away before the game's first layout. Presented stacks inherit
+    /// their presenter's context but never report for its tab.
+    private func reportGameRoutes() {
+        guard rootView != nil, let iPadTabContext else { return }
+        navigation.reportTopRouteShowsGame { [weak iPadTabContext] shows in
+            iPadTabContext?.setGameAskedFor(shows)
+        }
     }
 
     @ViewBuilder

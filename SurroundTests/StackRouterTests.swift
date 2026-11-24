@@ -861,3 +861,33 @@ final class StackRouterTests: XCTestCase {
                        "One column puts the conversation under Profile.")
     }
 }
+
+extension StackRouterTests {
+    /// The iPad's early clear: a tab's router reports as soon as its top
+    /// route starts or stops showing a game, from the path itself, once per
+    /// change, whatever opened it.
+    func testTheTopRouteReportsAsAGameIsAskedForAndGoes() {
+        let router = Router()
+        var reports = [Bool]()
+        router.reportTopRouteShowsGame { reports.append($0) }
+        XCTAssertEqual(reports, [false], "Installing tells the current value at once.")
+
+        router.present(.homeGame)
+        XCTAssertEqual(reports, [false, true], "Before the game's first layout: the path's own change.")
+        router.openProfile(firstPlayer)
+        XCTAssertEqual(reports, [false, true, false], "A profile pushed over the game shows none.")
+        router.openGame(gameID: 77, using: NavigationService(), service: OGSService.previewInstance())
+        XCTAssertEqual(reports, [false, true, false, true], "A linked game from a pushed profile.")
+        router.remove(.game(77))
+        XCTAssertEqual(reports, [false, true, false, true, false])
+        router.openProfile(secondPlayer)
+        XCTAssertEqual(reports.count, 5, "Routes that show no game on top report nothing new.")
+        router.path = []
+        XCTAssertEqual(reports.count, 5)
+
+        router.present(.publicGame)
+        router.reportTopRouteShowsGame(to: nil)
+        router.path = []
+        XCTAssertEqual(reports, [false, true, false, true, false, true], "Nil stops the reports.")
+    }
+}

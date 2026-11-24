@@ -129,6 +129,8 @@ struct MainView: View {
             isCovered: { [weak ogs] in ogs?.superchatCover != nil },
             gamesOnScreen: { [weak nav] in nav?.ownLiveGameIDsOnScreen ?? [] }
         )
+        // The Now section says the window's status where the bar does.
+        nav.activityBar.nowSectionSaysStatus = ActivityBarHosting.carriesConnectionStatus
         nav.activityBar.attach(ogs: ogs, nav: nav, connection: environment.connectionStatus)
     }
 
@@ -212,7 +214,8 @@ struct MainView: View {
             .environment(\.appReviewPresentationRelay, environment.appReviewPresentationRelay))
     }
 
-    /// The Activity bar in UIKit's accessory, with the window's environment.
+    /// The Activity bar in UIKit's accessory, and the iPad's Now section in
+    /// its sidebar's bottom bar, with the window's environment.
     private func hostedAccessoryContent(_ bar: AnyView) -> AnyView {
         AnyView(windowEnvironment(bar))
     }
@@ -230,11 +233,12 @@ struct MainView: View {
                 isLoggedIn: ogs.isLoggedIn,
                 messagesBadgeCount: messagesBadgeCount,
                 onAccountSheet: { nav.main.accountSheet = $0 },
-                content: hostedTabContent
+                content: hostedTabContent,
+                activityPlaces: nav.activityPlaces,
+                activityBar: nav.activityBar,
+                accessoryContent: hostedAccessoryContent,
+                closeNowSectionPopover: { nav.closeActivityPopover(openedFrom: .nowSection) }
             )
-            #if DEBUG
-            .withNoticesHostProbe(places: nav.activityPlaces)
-            #endif
             .ignoresSafeArea()
         } else {
             #if canImport(SwiftUI, _version: 8.0)

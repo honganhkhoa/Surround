@@ -412,3 +412,148 @@ struct ActivityNowRowMetrics {
         return drawing.fit(in: width, spacing: spacing) { self.width(of: $0, text) }
     }
 }
+
+/// How many Activity rows the iPad's Now section lists: two where they fit
+/// below the sidebar's last tab row, one where only one does, and none where
+/// even one would reach it, so the section shows nothing there: it has no
+/// background, and the tab rows would show through it. It comes from the
+/// window scene's height, the text size and the language the sidebar is
+/// drawn in, which change only with the window and the person's settings,
+/// never from the section's own geometry. The section's text stops growing
+/// at XXL, but the sidebar's rows grow with the text, are taller in
+/// languages whose lines iOS sets taller, and at accessibility sizes wrap
+/// their titles, each language's in its own places. The heights are
+/// measured: the last tab row ends at the same place in a window of any
+/// height while the list fits, and the section sits at the window's bottom,
+/// so each threshold is the window height at which the section's top would
+/// meet the last tab row on iPadOS 26.5, where it sits highest (10 pt
+/// higher in a resized window, or once its rows have changed, than at a
+/// launch with two rows), plus 9 pt; 18.6 and 27.0 leave more room. Two
+/// rows at XXL, and in Thai at the default size, start at 834 pt instead,
+/// 1 pt above that height, so that a full-size landscape window keeps the
+/// two rows every measurement found room for.
+enum ActivityNowSectionRows {
+    /// The language the sidebar is drawn in. Its titles are the app's own
+    /// strings, and iOS sets their lines for the first of the person's
+    /// preferred languages, which decides their height. The two differ only
+    /// where that language is one the app doesn't ship: in Hindi, the
+    /// English titles' lines are as tall as Thai's.
+    struct Language: Equatable {
+        /// The app's strings' language, such as "pt-BR".
+        var strings: String
+        /// The language iOS sets the lines in, such as "hi-IN".
+        var lines: String
+
+        init(strings: String, lines: String) {
+            self.strings = strings
+            self.lines = lines
+        }
+
+        /// One language for both, as where the app ships it.
+        init(_ language: String) {
+            self.init(strings: language, lines: language)
+        }
+
+        /// The app's own: its strings' language, and the first of the
+        /// person's preferred languages.
+        static var app: Language {
+            Language(strings: Bundle.main.preferredLocalizations.first ?? "en",
+                     lines: Locale.preferredLanguages.first ?? "en")
+        }
+
+        /// The lines' language without its script or region, such as "hi".
+        var linesCode: String { lines.prefix { $0 != "-" && $0 != "_" }.lowercased() }
+    }
+
+    /// How tall iOS sets a line in a language, as the sidebar's rows show it
+    /// at every text size, measured in 49 languages: most at the standard
+    /// height, then, each taller, as Vietnamese, as Thai and as Khmer.
+    /// Armenian and Sinhala, a little shorter than Thai, count as Thai.
+    enum LineHeight: CaseIterable {
+        case standard, likeVietnamese, likeThai, likeKhmer
+
+        init(_ language: Language) {
+            let code = language.linesCode
+            self = Self.allCases.first { Self.codes[$0]?.contains(code) == true } ?? .standard
+        }
+
+        private static let codes: [LineHeight: Set<String>] = [
+            .likeVietnamese: ["vi", "ar", "fa", "ml", "or", "ta"],
+            .likeThai: ["th", "as", "bn", "gu", "hi", "hy", "lo", "mr", "ne", "pa", "si"],
+            .likeKhmer: ["km", "bo", "kn", "my", "te", "ur"],
+        ]
+    }
+
+    /// The shortest window that lists two rows, and the shortest that lists
+    /// one; nil where none does.
+    struct Heights: Equatable {
+        var twoRows: CGFloat?
+        var oneRow: CGFloat?
+
+        init(twoRows: CGFloat?, oneRow: CGFloat?) {
+            self.twoRows = twoRows
+            self.oneRow = oneRow
+        }
+
+        static func onlyOneRow(from height: CGFloat) -> Heights { Heights(twoRows: nil, oneRow: height) }
+        static let noRows = Heights(twoRows: nil, oneRow: nil)
+    }
+
+    /// The thresholds by text size, the default size and smaller taking
+    /// Large's, for each line height. At accessibility sizes the titles
+    /// wrap: one row at most, from the height the language that wraps most
+    /// needs, never lower for taller lines, and from AX4 none, since even an
+    /// 11-inch iPad's 1210 pt portrait window has no room left.
+    private static let thresholds: [(upTo: UIContentSizeCategory, standard: Heights, likeVietnamese: Heights,
+                                     likeThai: Heights, likeKhmer: Heights)] = [
+        (.large, Heights(twoRows: 770, oneRow: 708), Heights(twoRows: 806, oneRow: 744),
+         Heights(twoRows: 834, oneRow: 780), Heights(twoRows: 896, oneRow: 834)),
+        (.extraLarge, Heights(twoRows: 806, oneRow: 744), Heights(twoRows: 847, oneRow: 785),
+         Heights(twoRows: 883, oneRow: 821), Heights(twoRows: 946, oneRow: 884)),
+        (.extraExtraLarge, Heights(twoRows: 834, oneRow: 780), Heights(twoRows: 883, oneRow: 821),
+         Heights(twoRows: 928, oneRow: 866), Heights(twoRows: 991, oneRow: 929)),
+        (.extraExtraExtraLarge, Heights(twoRows: 896, oneRow: 834), Heights(twoRows: 946, oneRow: 884),
+         Heights(twoRows: 991, oneRow: 929), Heights(twoRows: 1063, oneRow: 1001)),
+        (.accessibilityMedium, .onlyOneRow(from: 960), .onlyOneRow(from: 960), .onlyOneRow(from: 1004),
+         .onlyOneRow(from: 1083)),
+        (.accessibilityLarge, .onlyOneRow(from: 1106), .onlyOneRow(from: 1106), .onlyOneRow(from: 1157),
+         .noRows),
+        (.accessibilityExtraLarge, .onlyOneRow(from: 1182), .noRows, .noRows, .noRows),
+        (.accessibilityExtraExtraExtraLarge, .noRows, .noRows, .noRows, .noRows),
+    ]
+
+    /// At AX1 the Chinese and Korean titles don't wrap, so one row clears
+    /// them in a full-size landscape window.
+    private static let unwrappedAtAX1: Set<String> = ["ko", "zh-Hans", "zh-Hant"]
+    /// At AX3 the Spanish, French and European Portuguese titles wrap once
+    /// more than the others', and leave no room even in a portrait window.
+    private static let wrappedMoreAtAX3: Set<String> = ["es", "fr", "pt-PT"]
+
+    static func heights(sizeCategory: UIContentSizeCategory, language: Language) -> Heights {
+        let category = sizeCategory == .unspecified ? .large : sizeCategory
+        let lines = LineHeight(language)
+        guard let entry = thresholds.first(where: { category <= $0.upTo }) else { return .noRows }
+        if category.isAccessibilityCategory {
+            // Taller lines were measured around English titles and their own
+            // language's only.
+            if lines != .standard, language.strings != "en", language.strings != language.linesCode { return .noRows }
+            if category == .accessibilityMedium, lines == .standard, unwrappedAtAX1.contains(language.strings) {
+                return .onlyOneRow(from: 834)
+            }
+            if category == .accessibilityExtraLarge, wrappedMoreAtAX3.contains(language.strings) { return .noRows }
+        }
+        switch lines {
+        case .standard: return entry.standard
+        case .likeVietnamese: return entry.likeVietnamese
+        case .likeThai: return entry.likeThai
+        case .likeKhmer: return entry.likeKhmer
+        }
+    }
+
+    static func count(windowHeight: CGFloat, sizeCategory: UIContentSizeCategory, language: Language) -> Int {
+        let heights = heights(sizeCategory: sizeCategory, language: language)
+        if let two = heights.twoRows, windowHeight >= two { return ActivityModel.nowSectionRows }
+        if let one = heights.oneRow, windowHeight >= one { return 1 }
+        return 0
+    }
+}

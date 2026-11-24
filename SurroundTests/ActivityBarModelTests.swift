@@ -1185,3 +1185,59 @@ final class ActivityBarModelTests: XCTestCase {
                        "A host that applied nothing says so, whatever MainView asked for.")
     }
 }
+
+extension ActivityBarModelTests {
+    /// The iPad's keyboard rule: a docked keyboard takes the bar away where
+    /// its end frame meets the window, and a small window above it keeps it.
+    func testADockedKeyboardCoversTheWindowOnlyWhereItsEndFrameMeetsIt() {
+        let window = CGRect(x: 0, y: 0, width: 834, height: 1210)
+        let docked = CGRect(x: 0, y: 870, width: 834, height: 340)
+        XCTAssertTrue(ActivityBarHostState.keyboardIsOverWindow(docked: true, keyboardEnd: docked, window: window))
+        // A 375 × 549 window at 230,274 on the screen, the keyboard docked
+        // from the screen's y 925: in the window's coordinates, below it.
+        let small = CGRect(x: 0, y: 0, width: 375, height: 549)
+        let below = CGRect(x: -230, y: 651, width: 834, height: 285)
+        XCTAssertFalse(ActivityBarHostState.keyboardIsOverWindow(docked: true, keyboardEnd: below, window: small),
+                       "Below a small window it covers nothing, so its bar stays, as its tab bar does.")
+        XCTAssertFalse(ActivityBarHostState.keyboardIsOverWindow(docked: false, keyboardEnd: docked, window: window),
+                       "A floating or split keyboard isn't docked.")
+        XCTAssertFalse(ActivityBarHostState.keyboardIsOverWindow(docked: true, keyboardEnd: .null, window: window))
+        XCTAssertFalse(ActivityBarHostState.keyboardIsOverWindow(
+            docked: true, keyboardEnd: CGRect(x: 0, y: 1210, width: 834, height: 340), window: window),
+                       "Touching the window's edge covers nothing.")
+    }
+
+    /// The Now section's rows: the bar state's, with the chrome's result in
+    /// its row's place, kept there once OGS confirms the item gone; never
+    /// more than the room; nothing when nothing waits.
+    func testANowRowsResultTakesItsPlaceAndKeepsItOnceTheItemGoes() {
+        typealias Entry = ActivityNowEntry
+        let search = Model.Waiting(id: Model.WaitingID.quickMatch("q"), kind: .quickMatch, isLive: true, since: 0)
+        let waiting = Lead.waiting(search, withdrawsInPlace: true)
+        let game = Lead.liveGame(gameID: 7)
+        let challenge = Lead.challenge(Model.Challenge(id: 9, isLive: true))
+        let display = ActivityRowDisplay(title: "Quick match", detail: "Live · 19×19", kindSymbol: "hourglass")
+        let itemID = Model.Item.waiting(search).id
+        let pending = ActivityBarResult(itemID: itemID, action: .withdraw, state: .pending(since: 0), display: display)
+        let withdrawn = ActivityBarResult(itemID: itemID, action: .withdraw, state: .succeeded(.withdrawn),
+                                          display: display)
+        let drawn = ["game-7", itemID]
+
+        XCTAssertEqual(Entry.entries(rows: [game, waiting], results: [], room: 2, previous: []),
+                       [.lead(game), .lead(waiting)])
+        XCTAssertEqual(Entry.entries(rows: [game, waiting], results: [pending], room: 2, previous: drawn),
+                       [.lead(game), .result(pending)], "Withdrawing… in the row's place.")
+        XCTAssertEqual(Entry.entries(rows: [game, challenge], results: [withdrawn], room: 2, previous: drawn),
+                       [.lead(game), .result(withdrawn)],
+                       "Withdrawn keeps the row's place for its 4 s, and the section keeps its height.")
+        XCTAssertEqual(Entry.entries(rows: [game, challenge], results: [withdrawn], room: 2,
+                                     previous: ["game-7", "challenge-9"]),
+                       [.lead(game), .lead(challenge)], "A result the section never drew is the bar's alone.")
+        XCTAssertEqual(Entry.entries(rows: [game, challenge], results: [], room: 1, previous: []), [.lead(game)],
+                       "A short window's one row.")
+        XCTAssertEqual(Entry.entries(rows: [.nothingLeads(count: 3)], results: [], room: 2, previous: []).map(\.id),
+                       [Entry.waitingID])
+        XCTAssertEqual(Entry.entries(rows: [], results: [withdrawn], room: 2, previous: []), [],
+                       "Nothing waits: no section.")
+    }
+}

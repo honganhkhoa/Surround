@@ -1145,3 +1145,27 @@ final class AppRouteTests: XCTestCase {
         XCTAssertEqual(resets.value, 2)
     }
 }
+
+extension AppRouteTests {
+    /// The iPad's Now section is in its sidebar: as the sidebar goes, a
+    /// popover it opened would point at nothing, so it closes. A sheet, or a
+    /// list another opener opened, stays.
+    @MainActor
+    func testTheNowSectionsPopoverClosesAsItsSidebarGoes() {
+        let navigation = NavigationService()
+        let row = CGRect(x: 10, y: 600, width: 250, height: 60)
+        navigation.openActivity(source: .nowSection, anchor: row, horizontalSizeClass: .regular)
+        navigation.closeActivityPopover(openedFrom: .activityBar)
+        XCTAssertNotNil(navigation.main.activity, "Another opener's close leaves it.")
+        navigation.closeActivityPopover(openedFrom: .nowSection)
+        XCTAssertNil(navigation.main.activity)
+
+        navigation.openActivity(source: .activityBar, anchor: row, horizontalSizeClass: .regular)
+        navigation.closeActivityPopover(openedFrom: .nowSection)
+        XCTAssertEqual(navigation.main.activity?.source, .activityBar, "The bar's popover stays.")
+
+        navigation.openActivity(source: .nowSection, anchor: row, horizontalSizeClass: .compact)
+        navigation.closeActivityPopover(openedFrom: .nowSection)
+        XCTAssertEqual(navigation.main.activity?.style, .sheet, "A sheet has no opener to lose.")
+    }
+}

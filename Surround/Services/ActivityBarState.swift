@@ -43,11 +43,20 @@ struct ActivityBarNowSection: Equatable {
 
     /// The section for the window's input (`ActivityModel.nowSection(_:rows:)`),
     /// beside `statusRow`.
-    /// - Parameter searchWithdrawsInPlace: Whether a Quick Match search's row
-    ///   withdraws in place (`ActivityBarLead`).
-    init(_ input: ActivityModel.Input, statusRow: NowStatusRow?,
+    /// - Parameters:
+    ///   - room: How many rows the section has room for, the status row's
+    ///     included: two, one in a short window, or none in a shorter one,
+    ///     which lists nothing, the status row included
+    ///     (`ActivityNowSectionRows`).
+    ///   - searchWithdrawsInPlace: Whether a Quick Match search's row
+    ///     withdraws in place (`ActivityBarLead`).
+    init(_ input: ActivityModel.Input, statusRow: NowStatusRow?, room: Int = ActivityModel.nowSectionRows,
          searchWithdrawsInPlace: (ActivityModel.Waiting) -> Bool = { _ in false }) {
-        let section = ActivityModel.nowSection(input, rows: NowStatusRow.activityRows(beside: statusRow))
+        guard room > 0 else {
+            self = ActivityBarNowSection()
+            return
+        }
+        let section = ActivityModel.nowSection(input, rows: NowStatusRow.activityRows(beside: statusRow, of: room))
         self.statusRow = statusRow
         rows = section.rows.compactMap { ActivityBarLead($0, searchWithdrawsInPlace: searchWithdrawsInPlace) }
         plusN = section.plusN
@@ -92,6 +101,26 @@ final class ActivityBarState: ObservableObject {
     /// claims nothing either, so the in-game control still says a started
     /// game.
     var postsFirstLeads = false
+
+    /// Whether the Now section's first row says the window's status during
+    /// an outage, taking one of its rows. MainView turns it off while the
+    /// window's bar carries no status (`ActivityBarHosting`), so the section
+    /// lists Activity alone, with all its rows.
+    var nowSectionSaysStatus = true {
+        didSet { if nowSectionSaysStatus != oldValue { scheduleRecompute() } }
+    }
+
+    /// How many rows the Now section has room for: two, one in a short iPad
+    /// window, or none in a shorter one (`ActivityNowSectionRows`), which
+    /// the iPad's container sets as its window appears and after each resize
+    /// or turn.
+    private(set) var nowSectionRows = ActivityModel.nowSectionRows
+
+    func setNowSectionRows(_ rows: Int) {
+        guard rows != nowSectionRows else { return }
+        nowSectionRows = rows
+        scheduleRecompute()
+    }
 
     private let scheduler: OGSWebsocketScheduling
     private let now: () -> TimeInterval
@@ -179,7 +208,8 @@ final class ActivityBarState: ObservableObject {
         } ?? ActivityBarConnection()
         let nextActivity = ActivityBarActivity(ActivityModel.snapshot(input), result: results.chromeResults.last,
                                                searchWithdrawsInPlace: withdrawsInPlace)
-        let nextNowSection = ActivityBarNowSection(input, statusRow: NowStatusRow(nextConnection.words, place: place),
+        let statusRow = nowSectionSaysStatus ? NowStatusRow(nextConnection.words, place: place) : nil
+        let nextNowSection = ActivityBarNowSection(input, statusRow: statusRow, room: nowSectionRows,
                                                    searchWithdrawsInPlace: withdrawsInPlace)
         if connection != nextConnection {
             connection = nextConnection

@@ -98,6 +98,7 @@
 		5C5E00272026112000000027 /* ActivityBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00262026112000000026 /* ActivityBarView.swift */; };
 		5C5E00292026112000000029 /* ActivityBarFitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00282026112000000028 /* ActivityBarFitTests.swift */; };
 		5C5E00312026112100000031 /* ActivityAccessoryHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00302026112100000030 /* ActivityAccessoryHost.swift */; };
+		5C5E00412026112100000041 /* ActivityNowSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00402026112100000040 /* ActivityNowSection.swift */; };
 		5C5E00812026112000000081 /* ActivityBarHosts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00802026112000000080 /* ActivityBarHosts.swift */; };
 		5FEB00012026111700000001 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
 		5FEB00032026111700000003 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
@@ -690,6 +691,7 @@
 		5C5E00262026112000000026 /* ActivityBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarView.swift; sourceTree = "<group>"; };
 		5C5E00282026112000000028 /* ActivityBarFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarFitTests.swift; sourceTree = "<group>"; };
 		5C5E00302026112100000030 /* ActivityAccessoryHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityAccessoryHost.swift; sourceTree = "<group>"; };
+		5C5E00402026112100000040 /* ActivityNowSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityNowSection.swift; sourceTree = "<group>"; };
 		5C5E00802026112000000080 /* ActivityBarHosts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarHosts.swift; sourceTree = "<group>"; };
 		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
 		5FEB00022026111700000002 /* MoveCommitHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveCommitHaptics.swift; sourceTree = "<group>"; };
@@ -1257,6 +1259,7 @@
 				5C3E00182026111200000018 /* ActivityListView.swift */,
 				5C5E00262026112000000026 /* ActivityBarView.swift */,
 				5C5E00802026112000000080 /* ActivityBarHosts.swift */,
+				5C5E00402026112100000040 /* ActivityNowSection.swift */,
 				BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */,
 				9932FB46E36E47B6A222B4A8 /* MessagesFriendsView.swift */,
 				07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */,
@@ -2034,6 +2037,7 @@
 				5C3E00192026111200000019 /* ActivityListView.swift in Sources */,
 				5C5E00272026112000000027 /* ActivityBarView.swift in Sources */,
 				5C5E00812026112000000081 /* ActivityBarHosts.swift in Sources */,
+				5C5E00412026112100000041 /* ActivityNowSection.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -336,6 +336,52 @@ struct NowStatusRow: Equatable {
     }
 }
 
+// MARK: - The Now section's rows
+
+/// One Activity row of the Now section: what the window's bar state lists,
+/// or the result of an action the bar or the section took on its item,
+/// pending and then for 4 s after it settles. A withdrawn item leaves the
+/// list as OGS confirms it, and its result keeps the row's place meanwhile.
+enum ActivityNowEntry: Equatable {
+    case lead(ActivityBarLead)
+    case result(ActivityBarResult)
+
+    /// The "N waiting" row's id, which stands for no one item.
+    static let waitingID = "waiting"
+
+    /// The row's item (`ActivityModel.Item.id`), or `waitingID`.
+    var id: String {
+        switch self {
+        case .lead(let lead): lead.itemID ?? Self.waitingID
+        case .result(let result): result.itemID
+        }
+    }
+
+    /// The rows to draw, at most `room`: each of `rows`, with the result in
+    /// its place where the chrome acted on its item, and a result whose item
+    /// has left `rows` where its row was drawn before. A result for an item
+    /// the section never drew is the bar's alone.
+    /// - Parameters:
+    ///   - results: The chrome's results, in the order they were sent
+    ///     (`ActivityResults.chromeResults`).
+    ///   - previous: The ids of the rows drawn last, in order.
+    static func entries(rows: [ActivityBarLead], results: [ActivityBarResult], room: Int,
+                        previous: [String]) -> [ActivityNowEntry] {
+        var byItem = [String: ActivityBarResult]()
+        for result in results { byItem[result.itemID] = result }
+        var entries: [ActivityNowEntry] = rows.map { lead in
+            if let id = lead.itemID, let result = byItem[id] { .result(result) } else { .lead(lead) }
+        }
+        var shown = Set(entries.map(\.id))
+        for result in results where !shown.contains(result.itemID) {
+            guard let index = previous.firstIndex(of: result.itemID) else { continue }
+            entries.insert(.result(byItem[result.itemID] ?? result), at: min(index, entries.count))
+            shown.insert(result.itemID)
+        }
+        return Array(entries.prefix(max(0, room)))
+    }
+}
+
 // MARK: - Forms
 
 /// What a bar's form comes from: its host, the accessory's placement trait
@@ -611,6 +657,23 @@ struct ActivityBarHostState: Equatable {
             if isKeyboardOverWindow, !hasBottomTabBar { return nil }
             return bar
         }
+    }
+
+    /// Whether a docked software keyboard shows over the window, from the
+    /// keyboard's notification: its end frame, in the window's coordinates,
+    /// overlaps the window's bounds. A small iPad window can sit above a
+    /// keyboard docked at the screen's bottom, and keeps its bar then, as it
+    /// keeps its tab bar.
+    /// - Parameters:
+    ///   - docked: The notification shows a docked software keyboard
+    ///     (`isAttachedSoftwareKeyboardVisible(from:)`).
+    ///   - keyboardEnd: The notification's end frame, in the window's
+    ///     coordinates.
+    ///   - window: The window's bounds.
+    static func keyboardIsOverWindow(docked: Bool, keyboardEnd: CGRect, window: CGRect) -> Bool {
+        guard docked, !keyboardEnd.isNull, !keyboardEnd.isEmpty else { return false }
+        let overlap = keyboardEnd.intersection(window)
+        return !overlap.isNull && overlap.width > 0 && overlap.height > 0
     }
 }
 

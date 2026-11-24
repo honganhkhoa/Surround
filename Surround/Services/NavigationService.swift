@@ -809,6 +809,15 @@ extension NavigationService {
         main.activity = request
     }
 
+    /// Closes this window's Activity popover where `source` opened it, as
+    /// its opener leaves: the iPad sidebar's Now section, as the sidebar
+    /// hides or the window's size class changes, would otherwise leave it
+    /// pointing at nothing. A sheet, or a list another opener opened, stays.
+    func closeActivityPopover(openedFrom source: ActivityRequest.Source) {
+        guard let request = main.activity, request.style == .popover, request.source == source else { return }
+        main.activity = nil
+    }
+
     /// Opens a game from Activity on Home's route: a live Accept, the
     /// correspondence row, Open game, and a game opened from a profile the
     /// list pushed. The account sheet closes, as a game in the iPad Profile

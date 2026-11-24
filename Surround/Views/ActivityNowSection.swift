@@ -1,0 +1,701 @@
+//
+//  ActivityNowSection.swift
+//  Surround
+//
+//  The sidebar's Now section: what needs the user now, below the sidebar's
+//  tab rows. "Now", the rows the window's bar state lists, two or one in a
+//  short window, and All activity with what else waits, at the third row
+//  density (`ActivityNowRowMetrics`). It draws nothing when nothing waits,
+//  and over a game it leaves that game out. A row opens its game, or
+//  Activity anchored at it; View opens a challenge's card; Withdraw acts in
+//  place, and its result keeps the row's place for 4 s, as in the bar. Its
+//  text stops growing at XXL, so it keeps its height, and its rows, their
+//  actions and All activity take keyboard focus. The iPad's container hosts
+//  it in UIKit's sidebar bottom bar, which follows its size; it holds no
+//  state that matters.
+//
+
+import SwiftUI
+import UIKit
+
+private typealias ID = SurroundUITestContract.AccessibilityID
+
+struct ActivityNowSection: View {
+    @ObservedObject var bar: ActivityBarState
+    @EnvironmentObject private var nav: NavigationService
+
+    var body: some View {
+        ActivityNowSectionBody(bar: bar, results: nav.activityResults)
+            .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+    }
+}
+
+/// The rows and All activity, from the bar state's section and the chrome's
+/// results.
+private struct ActivityNowSectionBody: View {
+    @ObservedObject var bar: ActivityBarState
+    @ObservedObject var results: ActivityResults
+    @EnvironmentObject private var ogs: OGSService
+    @EnvironmentObject private var nav: NavigationService
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.displayScale) private var displayScale
+    /// Where each opener is in its window, and which one opened the list.
+    /// Held by reference, so a new frame redraws nothing.
+    @State private var openers = ActivityNowOpeners()
+    /// The rows last drawn, so a withdrawn row's result keeps its place.
+    @State private var lastDrawn = ActivityNowLastDrawn()
+
+    var body: some View {
+        let section = bar.nowSection
+        // The window's status takes no row here while the bar state lists
+        // none (`ActivityBarState.nowSectionSaysStatus`).
+        let room = NowStatusRow.activityRows(beside: section.statusRow, of: bar.nowSectionRows)
+        let entries = lastDrawn.keep(ActivityNowEntry.entries(rows: section.rows, results: results.chromeResults,
+                                                              room: room, previous: lastDrawn.ids))
+        if !entries.isEmpty {
+            let context = ActivityNowContext(
+                metrics: ActivityNowRowMetrics(sizeCategory: UIContentSizeCategory(dynamicTypeSize)),
+                isOffline: ActivityBarHosting.isOffline(bar), counted: section.counted, openers: openers,
+                open: open
+            )
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: ActivityBarAccessibility.nowHeader)
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .frame(height: 40)
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                    ActivityNowRow(entry: entry, isLead: index == 0, context: context)
+                }
+                allActivity(section)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 10)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(Color(uiColor: .separator))
+                    .frame(height: 1 / max(1, displayScale))
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 10)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(ID.activityNow)
+        }
+    }
+
+    private func allActivity(_ section: ActivityBarNowSection) -> some View {
+        let breakdown = ActivityBarBreakdown(section.counted) { id in
+            ogs.challengesReceived.first { $0.id == id }?.challenger?.username
+        }
+        let accessibility = ActivityBarAccessibility.allActivity(plusN: section.plusN, breakdown)
+        let opener = ActivityNowOpeners.allActivity
+        return Button { open(.top, from: opener) } label: {
+            HStack(spacing: 6) {
+                Text(verbatim: ActivityBarAccessibility.allActivityTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(MessagesStyle.accent)
+                    .lineLimit(1)
+                if section.plusN > 0 {
+                    Text(verbatim: ActivityBarMetrics.countText(section.plusN))
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.forward")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: ActivityBarMetrics.targetSize)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ActivityBarPressStyle())
+        .focusable()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: accessibility.label))
+        .accessibilityValue(Text(verbatim: accessibility.value))
+        .accessibilityHint(Text(verbatim: accessibility.hint))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityShowsLargeContentViewer {
+            Text(verbatim: ActivityBarAccessibility.allActivityTitle)
+        }
+        .accessibilityIdentifier(ID.activityNowAll)
+        .modifier(ActivityNowOpenerFrame(openers: openers, opener: opener))
+    }
+
+    /// Opens Activity from an opener: a popover anchored at it in regular
+    /// width, over a game the game's own.
+    private func open(_ focus: ActivityRequest.Focus, from opener: String) {
+        openers.opened = opener
+        nav.openActivity(source: .nowSection, focus: focus, anchor: openers.frames[opener] ?? .zero,
+                         horizontalSizeClass: horizontalSizeClass)
+    }
+}
+
+/// The openers' frames in their window. Inside the sidebar's bottom bar
+/// SwiftUI's global space is the window's, once laid out.
+final class ActivityNowOpeners {
+    static let allActivity = "all"
+    var frames: [String: CGRect] = [:]
+    /// The opener the window's list last opened from.
+    var opened: String?
+}
+
+/// What the section last drew, by its rows' ids in order.
+final class ActivityNowLastDrawn {
+    private(set) var ids: [String] = []
+
+    func keep(_ entries: [ActivityNowEntry]) -> [ActivityNowEntry] {
+        ids = entries.map(\.id)
+        return entries
+    }
+}
+
+/// Records an opener's frame, and moves the popover it opened as it moves,
+/// a main-queue turn later: only while that popover is open
+/// (`moveActivityAnchor`). Nothing it reads decides what the section shows.
+private struct ActivityNowOpenerFrame: ViewModifier {
+    let openers: ActivityNowOpeners
+    let opener: String
+    @EnvironmentObject private var nav: NavigationService
+
+    func body(content: Content) -> some View {
+        content.onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+            openers.frames[opener] = frame
+            guard openers.opened == opener else { return }
+            let nav = nav
+            DispatchQueue.main.async { nav.moveActivityAnchor(to: frame, from: .nowSection) }
+        }
+    }
+}
+
+/// What every row needs beside its own content.
+private struct ActivityNowContext {
+    let metrics: ActivityNowRowMetrics
+    /// The window's connection is down or not yet up: Withdraw and a failed
+    /// result's Retry dim and say "Reconnecting…"; View and Open game work.
+    let isOffline: Bool
+    /// What the "N waiting" row counts.
+    let counted: [ActivityBarCountedItem]
+    let openers: ActivityNowOpeners
+    let open: (ActivityRequest.Focus, String) -> Void
+}
+
+// MARK: - The rows
+
+/// One row: a lead's kind, or the chrome's result on its item.
+private struct ActivityNowRow: View {
+    let entry: ActivityNowEntry
+    /// The first row, which is tinted.
+    let isLead: Bool
+    let context: ActivityNowContext
+
+    @EnvironmentObject private var ogs: OGSService
+
+    var body: some View {
+        switch entry {
+        case .result(let result):
+            ActivityNowResultRow(result: result, isLead: isLead, context: context)
+        case .lead(let lead):
+            switch lead {
+            case .liveGame(let gameID), .gameStarted(let gameID):
+                if let game = ogs.liveGames.first(where: { $0.ogsID == gameID }) {
+                    ActivityNowGameRow(game: game, itemID: entry.id, isStarted: lead != .liveGame(gameID: gameID),
+                                       isLead: isLead, context: context)
+                }
+            case .challenge(let challenge):
+                if let received = ogs.challengesReceived.first(where: { $0.id == challenge.id }) {
+                    ActivityNowChallengeRow(challenge: received, model: challenge, isLead: isLead, context: context)
+                }
+            case .waiting(let waiting, let withdrawsInPlace):
+                ActivityNowWaitingRow(waiting: waiting, withdrawsInPlace: withdrawsInPlace, isLead: isLead,
+                                      context: context)
+            case .nothingLeads(let count):
+                ActivityNowNothingLeadsRow(count: count, isLead: isLead, context: context)
+            }
+        }
+    }
+}
+
+/// A live game, on your move or theirs, or one that started elsewhere, with
+/// Open game. Observing the game redraws its clock each second.
+private struct ActivityNowGameRow: View {
+    @ObservedObject var game: Game
+    /// The game's item (`ActivityModel.Item.id`).
+    let itemID: String
+    let isStarted: Bool
+    let isLead: Bool
+    let context: ActivityNowContext
+
+    @EnvironmentObject private var ogs: OGSService
+    @EnvironmentObject private var nav: NavigationService
+    /// The two settings Home reads, so the clock wears Home's colors.
+    @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
+    private var gameThemeID = SurroundTheme.standard.rawValue
+    @AppStorage(SettingKey<Bool>.themeAppliesToWholeApp.name, store: userDefaults)
+    private var themeAppliesToWholeApp = true
+
+    var body: some View {
+        ActivityNowRowFace(model: model, isLead: isLead, context: context)
+            .environment(\.surroundTheme, SurroundTheme.current(storedID: gameThemeID,
+                                                                appliesToWholeApp: themeAppliesToWholeApp))
+    }
+
+    private var model: ActivityNowRowModel {
+        let facts = HomeGameFacts(game: game, user: ogs.user)
+        let name = facts.opponent?.username ?? ""
+        let nav = nav
+        let game = game
+        let open = { nav.goToActiveGame(game: game) }
+        if isStarted {
+            let details = [name, ActivityRowContents.board(width: game.width, height: game.height),
+                           game.gameData?.timeControl.system.shortDescription ?? ""].filter { !$0.isEmpty }
+            return ActivityNowRowModel(
+                itemID: itemID, tile: .user(facts.opponent), lineOne: ActivityBarWords.gameStarted,
+                lineTwo: details.joined(separator: " · "),
+                accessibility: .gameStarted(opponent: name), largeContent: name, tap: open,
+                action: ActivityNowActionModel(
+                    action: .openGame, label: ActivityBarWords.action(.openGame),
+                    accessibilityLabel: ActivityBarAccessibility.openGame(opponent: name), tap: open
+                )
+            )
+        }
+        let live = ogs.user.flatMap { ActivityModel.LiveGame(game: game, userID: $0.id) }
+        let isYourMove = live?.isYourMove ?? false
+        // Your clock on your move; theirs, in their stone's color, on theirs.
+        let color = isYourMove ? facts.bottomColor : facts.topColor
+        let clockState = facts.clock(color)
+        let timeLeft = facts.chipTimeLeft(color)
+        let isSuddenDeath = isYourMove && clockState.running && clockState.suddenDeath
+        let rank = ActivityRowContents.rank(facts.opponent)
+        let clock = ActivityBarClockFace(
+            time: timeLeft.map(GameControlClock.init(timeLeft:)), color: color,
+            mark: isSuddenDeath ? ActivityBarMarks.suddenDeath : nil,
+            warns: (live.map(ActivityModel.isLowOnTime) ?? false) || isSuddenDeath,
+            glows: clockState.running
+        )
+        return ActivityNowRowModel(
+            itemID: itemID, tile: .user(facts.opponent), lineOne: name, rank: rank,
+            lineTwo: ActivityRowContents.liveGame(facts).detail, clock: clock,
+            accessibility: .liveGame(opponent: name, rank: rank, isYourMove: isYourMove, isSuddenDeath: isSuddenDeath,
+                                     timeLeft: clockState.running ? timeLeft : nil, ticks: clockState.running),
+            largeContent: name, tap: open
+        )
+    }
+}
+
+/// A live challenge sent to you: View opens its full card in Activity, and
+/// the rest of the row opens Activity.
+private struct ActivityNowChallengeRow: View {
+    let challenge: OGSDirectChallenge
+    let model: ActivityModel.Challenge
+    let isLead: Bool
+    let context: ActivityNowContext
+
+    var body: some View {
+        let content = ActivityRowContents.challenge(challenge, isLive: model.isLive)
+        let itemID = ActivityModel.Item.challenge(model).id
+        let name = content.title
+        let context = context
+        ActivityNowRowFace(
+            model: ActivityNowRowModel(
+                itemID: itemID, tile: .user(challenge.challenger), lineOne: name, rank: content.rank,
+                lineTwo: ([ActivityBarWords.challenge] + content.details).joined(separator: " · "),
+                accessibility: .challenge(challenger: name, rank: content.rank, details: content.details),
+                largeContent: name, tap: { context.open(.top, itemID) },
+                action: ActivityNowActionModel(
+                    action: .view, label: ActivityBarWords.action(.view),
+                    accessibilityLabel: ActivityBarAccessibility.view(challenger: name),
+                    tap: { context.open(.item(itemID), ActivityNowRowFace.actionOpener(itemID)) }
+                )
+            ),
+            isLead: isLead, context: context
+        )
+    }
+}
+
+/// One of your own searches or challenges: a still hourglass, the time
+/// searched, which moves each second unless UI tests stop it
+/// (`ActivityElapsed.stopsAt`), and Withdraw where the list's row withdraws
+/// in place.
+private struct ActivityNowWaitingRow: View {
+    let waiting: ActivityModel.Waiting
+    let withdrawsInPlace: Bool
+    let isLead: Bool
+    let context: ActivityNowContext
+
+    var body: some View {
+        if ActivityElapsed.stopsAt == nil {
+            TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                ActivityNowWaitingFace(waiting: waiting, withdrawsInPlace: withdrawsInPlace, isLead: isLead,
+                                       context: context, now: timeline.date.timeIntervalSince1970, ticks: true)
+            }
+        } else {
+            ActivityNowWaitingFace(waiting: waiting, withdrawsInPlace: withdrawsInPlace, isLead: isLead,
+                                   context: context, now: Date().timeIntervalSince1970, ticks: false)
+        }
+    }
+}
+
+private struct ActivityNowWaitingFace: View {
+    let waiting: ActivityModel.Waiting
+    let withdrawsInPlace: Bool
+    let isLead: Bool
+    let context: ActivityNowContext
+    let now: TimeInterval
+    let ticks: Bool
+
+    @EnvironmentObject private var ogs: OGSService
+    @EnvironmentObject private var nav: NavigationService
+
+    var body: some View {
+        let source = ActivityListSource(ogs: ogs, nav: nav, placement: .sheet)
+        if let target = source.waitingTarget(ActivityWaitingRef.parse(waiting.id), in: source.openChallenges) {
+            ActivityNowRowFace(model: model(target, content: source.content(of: target, waiting: waiting, now: now)),
+                               isLead: isLead, context: context)
+        }
+    }
+
+    private func model(_ target: ActivityListSource.WaitingTarget, content: ActivityRowContent) -> ActivityNowRowModel {
+        let itemID = ActivityModel.Item.waiting(waiting).id
+        let hasElapsedTime = waiting.kind == .quickMatch || waiting.kind == .openChallenge
+        let steady = hasElapsedTime ? Array(content.details.dropLast()) : content.details
+        let lineOne: String
+        let lineTwo: [String]
+        let subject: ActivityBarAccessibility.WaitingSubject
+        var isSearch = false
+        switch target {
+        case .search:
+            lineOne = ActivityBarWords.searching
+            lineTwo = [content.title] + content.details
+            subject = .search
+            isSearch = true
+        case .openChallenge:
+            lineOne = content.title
+            lineTwo = content.details
+            subject = .openChallenge
+        case .sentChallenge(let challenge):
+            lineOne = content.title
+            lineTwo = content.details
+            subject = .sentChallenge(to: challenge.challenged?.username ?? "")
+        case .rengo(let challenge):
+            lineOne = content.title
+            lineTwo = content.details
+            let gameName = challenge.game.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            subject = .rengo(gameName.isEmpty ? (challenge.challenger?.username ?? "") : gameName)
+        }
+        let spokenDetails = isSearch ? [content.title] + steady : steady
+        let waited = hasElapsedTime ? ActivityElapsed.waited(since: waiting.since, now: now) : nil
+        let results = nav.activityResults
+        let display = content.display
+        let context = context
+        return ActivityNowRowModel(
+            itemID: itemID,
+            tile: .glyph(content.symbol ?? "hourglass", tint: MessagesStyle.accent, background: MessagesStyle.paleAccent),
+            lineOne: lineOne, lineTwo: lineTwo.joined(separator: " · "),
+            accessibility: .waiting(subject, details: spokenDetails, waited: waited, ticks: ticks),
+            largeContent: lineOne, tap: { context.open(.top, itemID) },
+            action: withdrawsInPlace ? ActivityNowActionModel(
+                action: .withdraw, label: ActivityBarWords.action(.withdraw),
+                accessibilityLabel: ActivityBarAccessibility.withdraw(title: content.title, details: steady),
+                isEnabled: !context.isOffline,
+                tap: {
+                    switch target {
+                    case .search(let entry):
+                        results.withdraw(automatch: entry, session: results.chromeSession, itemID: itemID,
+                                         display: display, section: .waiting, after: nil)
+                    default:
+                        guard let challenge = target.challenge else { return }
+                        results.withdraw(challenge: challenge, session: results.chromeSession, itemID: itemID,
+                                         display: display, section: .waiting, after: nil)
+                    }
+                }
+            ) : nil
+        )
+    }
+}
+
+/// Nothing live leads: the inbox glyph, "3 waiting" and what waits; a tap
+/// opens Activity.
+private struct ActivityNowNothingLeadsRow: View {
+    let count: Int
+    let isLead: Bool
+    let context: ActivityNowContext
+
+    @EnvironmentObject private var ogs: OGSService
+
+    var body: some View {
+        let breakdown = ActivityBarBreakdown(context.counted) { id in
+            ogs.challengesReceived.first { $0.id == id }?.challenger?.username
+        }
+        let lineOne = ActivityBarWords.waiting(count)
+        let context = context
+        ActivityNowRowFace(
+            model: ActivityNowRowModel(
+                itemID: ActivityNowEntry.waitingID,
+                tile: .glyph("tray", tint: .primary, background: Color(uiColor: .tertiarySystemFill)),
+                lineOne: lineOne, lineTwo: breakdown.lineTwo,
+                accessibility: .nothingLeads(count: count, breakdown), largeContent: lineOne,
+                tap: { context.open(.top, ActivityNowEntry.waitingID) }
+            ),
+            isLead: isLead, context: context
+        )
+    }
+}
+
+/// An action taken from the bar or the section: "Withdrawing…" with a grey
+/// hourglass and no action, then "Withdrawn", or "Couldn’t withdraw" with
+/// Retry, for 4 s after it settles.
+private struct ActivityNowResultRow: View {
+    let result: ActivityBarResult
+    let isLead: Bool
+    let context: ActivityNowContext
+    @EnvironmentObject private var nav: NavigationService
+
+    var body: some View {
+        let accessibility = ActivityBarAccessibility.result(result)
+        let display = result.display
+        let results = nav.activityResults
+        let itemID = result.itemID
+        ActivityNowRowFace(
+            model: ActivityNowRowModel(
+                itemID: itemID,
+                tile: result.state.isPending
+                    ? .glyph(display.kindSymbol ?? "hourglass", tint: .secondary,
+                             background: Color(uiColor: .tertiarySystemFill))
+                    : .display(display),
+                lineOne: accessibility.label,
+                lineTwo: [display.title, display.detail].filter { !$0.isEmpty }.joined(separator: " · "),
+                accessibility: accessibility, largeContent: accessibility.label, tap: nil,
+                action: result.state == .failed ? ActivityNowActionModel(
+                    action: .retry, label: ActivityBarWords.action(.retry),
+                    accessibilityLabel: ActivityBarWords.action(.retry), isEnabled: !context.isOffline,
+                    tap: { results.retry(itemID: itemID, session: results.chromeSession) }
+                ) : nil
+            ),
+            isLead: isLead, context: context
+        )
+    }
+}
+
+// MARK: - One row's face
+
+private struct ActivityNowRowModel {
+    enum Tile {
+        case user(OGSUser?)
+        case glyph(String, tint: Color, background: Color)
+        /// A resolved item's frozen picture.
+        case display(ActivityRowDisplay)
+    }
+
+    /// The row's item (`ActivityModel.Item.id`), which names its identifiers.
+    var itemID: String
+    var tile: Tile
+    var lineOne: String
+    var rank: String?
+    var lineTwo: String
+    var clock: ActivityBarClockFace?
+    var accessibility: ActivityBarAccessibility
+    /// What the Large Content Viewer shows for the row.
+    var largeContent: String
+    /// Nil for a result, which isn't a button.
+    var tap: (() -> Void)?
+    var action: ActivityNowActionModel?
+}
+
+private struct ActivityNowActionModel {
+    var action: ActivityBarAction
+    var label: String
+    var accessibilityLabel: String
+    var isEnabled = true
+    var tap: () -> Void
+}
+
+/// A 60 pt row: the tile, the name with its rank and line two, then one
+/// trailing part, a live game's clock or the row's action. Where the
+/// trailing part doesn't fit beside the narrowest line one, the hourglass
+/// drops, then the tile; the clock and Retry never drop. The lead's row is
+/// tinted.
+private struct ActivityNowRowFace: View {
+    let model: ActivityNowRowModel
+    let isLead: Bool
+    let context: ActivityNowContext
+
+    private var metrics: ActivityNowRowMetrics { context.metrics }
+
+    /// The opener name of a row's action, apart from the row's own.
+    static func actionOpener(_ itemID: String) -> String { "\(itemID).action" }
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            row(showsHourglass: true, showsTile: true)
+            row(showsHourglass: false, showsTile: true)
+            row(showsHourglass: false, showsTile: false)
+        }
+        .frame(height: ActivityNowRowMetrics.height)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            if isLead {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(MessagesStyle.accent.opacity(0.08))
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    private var text: ActivityBarPartText {
+        ActivityBarPartText(rank: model.rank, clock: model.clock?.time, suddenDeathMark: model.clock?.mark)
+    }
+
+    private func row(showsHourglass: Bool, showsTile: Bool) -> some View {
+        HStack(spacing: 0) {
+            lead(showsHourglass: showsHourglass, showsTile: showsTile)
+            if let action = model.action {
+                actionButton(action)
+                    .padding(.leading, metrics.spacing.between)
+            }
+        }
+        .padding(.leading, metrics.spacing.leading)
+        .padding(.trailing, metrics.spacing.trailing)
+    }
+
+    @ViewBuilder
+    private func lead(showsHourglass: Bool, showsTile: Bool) -> some View {
+        let accessibility = model.accessibility
+        let face = HStack(spacing: metrics.spacing.between) {
+            if showsTile {
+                tile
+            }
+            // Ideal at its narrowest, so the variant that fits is the one
+            // the fit test proves; the lines then take the rest.
+            lines
+                .frame(minWidth: metrics.width(of: .lineOne, text), idealWidth: metrics.width(of: .lineOne, text),
+                       maxWidth: .infinity, alignment: .leading)
+            if let clock = model.clock {
+                ActivityBarClockChip(clock: clock, sizes: metrics.clockChip, showsHourglass: showsHourglass)
+                    .fixedSize()
+            }
+        }
+        .frame(maxHeight: .infinity)
+        .contentShape(Rectangle())
+        Group {
+            if let tap = model.tap {
+                Button {
+                    tap()
+                } label: {
+                    face
+                }
+                .buttonStyle(ActivityBarPressStyle())
+                .focusable()
+                .accessibilityHint(Text(verbatim: accessibility.hint))
+                .accessibilityShowsLargeContentViewer {
+                    Text(verbatim: model.largeContent)
+                }
+            } else {
+                face
+                    .accessibilityElement(children: .ignore)
+            }
+        }
+        .accessibilityLabel(Text(verbatim: accessibility.label))
+        .accessibilityValue(Text(verbatim: accessibility.value))
+        .accessibilityAddTraits(accessibility.updatesFrequently ? .updatesFrequently : [])
+        .accessibilityIdentifier(ID.activityNowRow(model.itemID))
+        .modifier(ActivityNowOpenerFrame(openers: context.openers, opener: model.itemID))
+    }
+
+    private var tile: some View {
+        Group {
+            switch model.tile {
+            case .user(let user):
+                ActivityRowTile(user: user, symbol: user == nil ? "person.fill" : nil,
+                                size: ActivityNowRowMetrics.tileSize)
+            case .glyph(let name, let tint, let background):
+                Image(systemName: name)
+                    .font(.system(size: ActivityNowRowMetrics.tileSize * 0.45, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: ActivityNowRowMetrics.tileSize, height: ActivityNowRowMetrics.tileSize)
+                    .background(background, in: Circle())
+            case .display(let display):
+                ActivityRowTile(user: nil, symbol: display.kindSymbol, display: display,
+                                size: ActivityNowRowMetrics.tileSize)
+            }
+        }
+        .frame(width: ActivityNowRowMetrics.tileSize, height: ActivityNowRowMetrics.tileSize)
+        .accessibilityHidden(true)
+    }
+
+    private var lines: some View {
+        VStack(alignment: .leading, spacing: ActivityBarMetrics.lineGap) {
+            HStack(alignment: .firstTextBaseline, spacing: ActivityBarMetrics.rankGap) {
+                Text(verbatim: model.lineOne)
+                    .font(Font(metrics.lineOneFont as CTFont))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if let rank = model.rank, !rank.isEmpty {
+                    Text(verbatim: rank)
+                        .font(Font(metrics.detailFont as CTFont))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+            }
+            if !model.lineTwo.isEmpty {
+                Text(verbatim: model.lineTwo)
+                    .font(Font(metrics.detailFont as CTFont).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    /// View, Open game and Retry as indigo-tinted pills; Withdraw as accent
+    /// text; each in a 44 pt target.
+    private func actionButton(_ action: ActivityNowActionModel) -> some View {
+        let isPill = action.action != .withdraw
+        let width = metrics.width(of: .action(action.action), ActivityBarPartText(actionLabel: { _ in action.label }))
+        let opener = Self.actionOpener(model.itemID)
+        return Button(action: action.tap) {
+            Text(verbatim: action.label)
+                .font(Font(metrics.actionFont as CTFont))
+                .foregroundStyle(MessagesStyle.accent)
+                .lineLimit(1)
+                .fixedSize()
+                .frame(width: width, height: isPill ? ActivityNowRowMetrics.pillHeight : ActivityBarMetrics.targetSize)
+                .background {
+                    if isPill {
+                        Capsule().fill(MessagesStyle.accent.opacity(0.12))
+                    }
+                }
+                .frame(height: ActivityBarMetrics.targetSize)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(ActivityBarPressStyle())
+        .frame(width: width)
+        .disabled(!action.isEnabled)
+        .focusable()
+        .accessibilityLabel(Text(verbatim: action.accessibilityLabel))
+        .accessibilityValue(Text(verbatim: action.isEnabled ? "" : ActivityBarWords.reconnecting))
+        .accessibilityShowsLargeContentViewer {
+            Text(verbatim: action.label)
+        }
+        .accessibilityIdentifier(ID.activityNowRowAction(model.itemID))
+        .modifier(ActivityNowOpenerFrame(openers: context.openers, opener: opener))
+    }
+}
+
+extension ActivityNowRowMetrics {
+    /// The 28 pt clock chip.
+    var clockChip: ActivityClockChipSizes {
+        ActivityClockChipSizes(height: Self.clockHeight, padding: clockPadding, innerGap: clockInnerGap,
+                               cornerRadius: 8, font: clockFont,
+                               symbolPointSize: (clockFont.pointSize * 0.75).rounded())
+    }
+}

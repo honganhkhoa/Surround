@@ -35,12 +35,13 @@ final class ActivityAccessoryHost {
     private var placementReadScheduled = false
 
     /// The bar's size where no tab bar holds the accessory, as on a Max
-    /// iPhone in landscape and in the Duo's open and tall poses: UIKit makes
-    /// such an accessory as wide as its content's ideal width and as tall as
-    /// its content needs, within its space. Left to the bar, the width would
-    /// be its narrowest drawing, which truncates the lead, and a challenge's
-    /// View would make it taller. So it is an iPhone's bar above its tab
-    /// bar: 360 pt wide, and fixed at the accessory view's 48 pt. Above a tab
+    /// iPhone in landscape, in the Duo's open and tall poses and on an iPad
+    /// whose sidebar is hidden: UIKit makes such an accessory as wide as its
+    /// content's ideal width and as tall as its content needs, within its
+    /// space. Left to the bar, the width would be its narrowest drawing,
+    /// which truncates the lead, and a challenge's View would make it
+    /// taller. So it is an iPhone's bar above its tab bar: 360 pt wide, and
+    /// fixed at the accessory view's 48 pt, centred on an iPad. Above a tab
     /// bar, and beside a minimized one, UIKit sets the size itself.
     nonisolated static let idealSize = CGSize(width: 360, height: 48)
 
@@ -202,16 +203,29 @@ final class ActivityAccessoryHost {
         let has = controller.hasActivityAccessory
         let action = has == had ? "kept" : has ? "set" : "cleared"
         let flag = NoticesHostProbeLog.flag
+        var fields: [(String, String)] = [("container", container.rawValue), ("action", action)]
         // A change logs with what asked for it; a recompute that changes
         // nothing logs only when the records it read change.
-        let asked = action == "kept" ? [] : [("reason", reason), ("animated", flag(animated))]
-        NoticesHostProbeLog.event("bar.accessory", [("container", container.rawValue), ("action", action)] + asked + [
+        if action != "kept" {
+            fields.append(("reason", reason))
+            fields.append(("animated", flag(animated)))
+        }
+        let records: [(String, String)] = [
             ("requested", "\(state.requestedTabBar)"), ("controllerHidden", flag(controller.isTabBarHidden)),
             ("window", flag(state.isInWindow)), ("drawer", flag(state.isDrawerShown)),
             ("keyboard", flag(state.isKeyboardOverWindow)), ("bottomTabBar", flag(state.hasBottomTabBar)),
             ("compactHeight", flag(state.isCompactHeight)), ("hides", flag(state.placeHidesBar)),
-            ("content", flag(state.hasContent)), ("applied", drawn.applied),
-        ], key: action == "kept" ? "bar.accessory.kept.\(container.rawValue)" : nil)
+            ("content", flag(state.hasContent)),
+        ]
+        fields.append(contentsOf: records)
+        // The iPad's own records: its sidebar's and a game asked for.
+        if container == .iPadTabContainer {
+            fields.append(("sidebar", state.facts.sidebar.rawValue))
+            fields.append(("gameAskedFor", flag(state.isGameAskedFor)))
+        }
+        fields.append(("applied", drawn.applied))
+        let key: String? = action == "kept" ? "bar.accessory.kept.\(container.rawValue)" : nil
+        NoticesHostProbeLog.event("bar.accessory", fields, key: key)
     }
 
     /// The accessory's frame in its window, from the container's layout and

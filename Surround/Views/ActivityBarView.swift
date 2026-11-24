@@ -493,8 +493,9 @@ private enum ActivityBarStatusGlyph {
 }
 
 /// The sudden-death mark in the app's language, measured once: the app's
-/// language can't change while it runs. The bar keeps the in-game chip's rule.
-private enum ActivityBarMarks {
+/// language can't change while it runs. The bar and the Now rows keep the
+/// in-game chip's rule.
+enum ActivityBarMarks {
     static let suddenDeath = GameControlSuddenDeathMark.drawn(in: .bottomBar)
 }
 
@@ -555,8 +556,9 @@ private struct ActivityBarMoreModel {
 
 /// A game's clock as the chip draws it: digits only, in its side's stone
 /// colors; the running one glows, low time is red with the sudden-death
-/// mark, and offline the digits stay while the glow goes.
-private struct ActivityBarClockFace {
+/// mark, and offline the digits stay while the glow goes. The Now rows draw
+/// the same chip at their own size.
+struct ActivityBarClockFace {
     /// Nil without a countdown: the hourglass alone.
     var time: GameControlClock?
     var color: StoneColor
@@ -696,7 +698,7 @@ private struct ActivityBarLeadView: View {
                 .frame(minWidth: lines, idealWidth: lines, maxWidth: .infinity, alignment: .leading)
             if let clock = model.clock, kept.contains(.clock) {
                 let showsHourglass = kept.contains(.hourglass)
-                ActivityBarClockChip(clock: clock, metrics: metrics, showsHourglass: showsHourglass)
+                ActivityBarClockChip(clock: clock, sizes: metrics.clockChip, showsHourglass: showsHourglass)
                     .frame(width: (showsHourglass ? metrics.width(of: .hourglass, text) + metrics.spacing.between : 0)
                            + metrics.width(of: .clock, text))
             }
@@ -792,11 +794,29 @@ private struct ActivityBarLines: View {
     }
 }
 
+/// A clock chip's sizes: the bar's in its form, or a Now row's.
+struct ActivityClockChipSizes {
+    var height: CGFloat
+    var padding: CGFloat
+    /// Between the hourglass or the mark and the digits.
+    var innerGap: CGFloat
+    var cornerRadius: CGFloat
+    var font: UIFont
+    var symbolPointSize: CGFloat
+}
+
+extension ActivityBarMetrics {
+    var clockChip: ActivityClockChipSizes {
+        ActivityClockChipSizes(height: clockHeight, padding: clockPadding, innerGap: clockInnerGap,
+                               cornerRadius: form.isOneLine ? 8 : 9, font: clockFont, symbolPointSize: symbolPointSize)
+    }
+}
+
 /// The clock in its side's stone colors, as Home's chips wear them: the
 /// hourglass, or the sudden-death mark in its place, beside the digits.
-private struct ActivityBarClockChip: View {
+struct ActivityBarClockChip: View {
     let clock: ActivityBarClockFace
-    let metrics: ActivityBarMetrics
+    let sizes: ActivityClockChipSizes
     let showsHourglass: Bool
 
     @Environment(\.surroundTheme) private var theme
@@ -805,17 +825,17 @@ private struct ActivityBarClockChip: View {
 
     private var warningColor: Color { theme.clockSuddenDeathAccent(clock.color, scheme: colorScheme) }
     private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: metrics.form.isOneLine ? 8 : 9, style: .continuous)
+        RoundedRectangle(cornerRadius: sizes.cornerRadius, style: .continuous)
     }
-    private var symbolFont: Font { .system(size: metrics.symbolPointSize, weight: .semibold) }
+    private var symbolFont: Font { .system(size: sizes.symbolPointSize, weight: .semibold) }
 
     var body: some View {
-        HStack(spacing: metrics.clockInnerGap) {
+        HStack(spacing: sizes.innerGap) {
             if let mark = clock.mark {
                 switch mark {
                 case .text(let text):
                     Text(verbatim: text)
-                        .font(Font(metrics.clockFont as CTFont))
+                        .font(Font(sizes.font as CTFont))
                         .foregroundStyle(warningColor)
                         .fixedSize()
                 case .glyph:
@@ -831,14 +851,14 @@ private struct ActivityBarClockChip: View {
             }
             if let time = clock.time {
                 Text(verbatim: time.text)
-                    .font(Font(metrics.clockFont as CTFont))
+                    .font(Font(sizes.font as CTFont))
                     .foregroundStyle(clock.warns ? warningColor : theme.identityForeground(clock.color))
                     .fixedSize()
             }
         }
-        .padding(.horizontal, metrics.clockPadding)
+        .padding(.horizontal, sizes.padding)
         .frame(maxWidth: .infinity)
-        .frame(height: metrics.clockHeight)
+        .frame(height: sizes.height)
         .background { surface }
         .overlay { ring }
         .accessibilityHidden(true)
@@ -955,7 +975,7 @@ enum ActivityBarStyle {
 }
 
 /// Dims a part while it is pressed, as the in-game control's do.
-private struct ActivityBarPressStyle: ButtonStyle {
+struct ActivityBarPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.opacity(configuration.isPressed ? 0.6 : 1)
     }

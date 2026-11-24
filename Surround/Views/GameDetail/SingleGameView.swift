@@ -375,6 +375,10 @@ struct SingleGameView: View {
                     .accessibilityValue(
                         Text(verbatim: boardUITestAccessibilityValue)
                     )
+                    // The board's window frame at each size, in the hosts' log.
+                    .background {
+                        if NoticesProbeBoardMarker.logs { NoticesProbeBoardMarker() }
+                    }
             }
             #endif
         }

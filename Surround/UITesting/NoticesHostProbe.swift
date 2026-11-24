@@ -2,15 +2,16 @@
 //  NoticesHostProbe.swift
 //  Surround
 //
-//  Debug-only placeholders for the in-app notices host probes. Each one is
-//  dashed magenta, says PLACEHOLDER and logs what its host does with it, so a
-//  device run can answer where Activity's bar, its Now section and connection
-//  status can live before the real views exist. Every placeholder stays off
-//  unless its --surround-notices-* launch flag is present (TESTING.md).
+//  Debug-only placeholders for the in-app notices host probes, and the hosts'
+//  log. The one placeholder left, connection status under root titles, says
+//  PLACEHOLDER and logs what its host does with it, so a device run can
+//  answer where connection status can live before the real line exists; it
+//  stays off unless its --surround-notices-* launch flag is present
+//  (TESTING.md). Activity's bar and the iPad's Now section are the real ones
+//  in every container, and log here.
 //
 
 #if DEBUG && MAIN_APP
-import Combine
 import OSLog
 import SwiftUI
 import UIKit
@@ -140,173 +141,25 @@ struct NoticesProbeMarker: UIViewRepresentable {
     }
 }
 
-private struct NoticesPlaceholderOutline: ViewModifier {
-    func body(content: Content) -> some View {
-        content.overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color(red: 1, green: 0, blue: 1), style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
-                .allowsHitTesting(false)
-        }
-    }
-}
+/// Game Detail's board, one key per screen instance, so each open logs the
+/// board's first size and every later change: how a game opened beside the
+/// Activity bar lays out. Only with `--surround-activity-hidden-log`.
+struct NoticesProbeBoardMarker: UIViewRepresentable {
+    static let logs = ProcessInfo.processInfo.arguments.contains(ActivityPlaceRegistry.logLaunchArgument)
+    private static var instances = 0
 
-// MARK: - Bar
-
-/// Activity's bar, in whichever host shows it: SwiftUI's accessory, UIKit's
-/// accessory or the custom bar.
-struct NoticesPlaceholderBar: View {
-    private enum Presentation: String { case sheet, popover }
-
-    let host: ActivityHostPolicy.Bar
-    let root: RootView?
-    var connection: ActivityHostPolicy.ConnectionStatus? = nil
-
-    @State private var placement = ActivityHostPolicy.AccessoryPlacement.unavailable
-    @State private var showsSheet = false
-    @State private var showsPopover = false
-
-    private var rootName: String { root?.rawValue ?? "window" }
-
-    private var secondLine: String {
-        (connection == .floatingBar ? "Reconnecting… · " : "") + "placement \(placement.rawValue)"
+    func makeUIView(context: Context) -> NoticesProbeMarker.MarkerView {
+        Self.instances += 1
+        return NoticesProbeMarker.MarkerView(event: "board", key: "board.\(Self.instances)")
     }
 
-    var body: some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: "PLACEHOLDER · \(host.rawValue)")
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
-                    .accessibilityIdentifier(NoticesProbeID.barLine1)
-                Text(verbatim: secondLine)
-                    .font(.caption2)
-                    .lineLimit(1)
-                    .accessibilityIdentifier(NoticesProbeID.barLine2)
-            }
-            Spacer(minLength: 4)
-            Button { open(.sheet) } label: { Text(verbatim: "Sheet") }
-                .accessibilityIdentifier(NoticesProbeID.barSheet)
-            Button { open(.popover) } label: { Text(verbatim: "Popover") }
-                .accessibilityIdentifier(NoticesProbeID.barPopover)
-                .popover(isPresented: $showsPopover) { presented(.popover) }
-        }
-        .buttonStyle(.borderless)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
-        .frame(maxWidth: .infinity, minHeight: 44)
-        .modifier(NoticesPlaceholderOutline())
-        .background(NoticesProbeMarker(event: "bar", key: "bar.\(host.rawValue).\(rootName)"))
-        .sheet(isPresented: $showsSheet) { presented(.sheet) }
-        .onActivityAccessoryPlacementChange { placement = $0 }
-        .onChange(of: placement, initial: true) { _, placement in
-            NoticesHostProbeLog.event("bar.placement", [
-                ("host", host.rawValue), ("root", rootName), ("swiftui", placement.rawValue),
-            ], key: "bar.placement.\(host.rawValue).\(rootName)")
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(NoticesProbeID.bar)
-        .accessibilityValue(Text(verbatim: "host=\(host.rawValue);root=\(rootName);swiftui=\(placement.rawValue)"))
-    }
-
-    private func open(_ presentation: Presentation) {
-        NoticesHostProbeLog.event("bar.tap", [
-            ("host", host.rawValue), ("root", rootName), ("kind", presentation.rawValue),
-        ])
-        switch presentation {
-        case .sheet: showsSheet = true
-        case .popover: showsPopover = true
-        }
-    }
-
-    private func presented(_ presentation: Presentation) -> some View {
-        Text(verbatim: "PLACEHOLDER · \(presentation.rawValue) from \(host.rawValue)")
-            .padding(24)
-            .accessibilityIdentifier(NoticesProbeID.barPresented)
-            .onAppear {
-                NoticesHostProbeLog.event("bar.presented", [
-                    ("host", host.rawValue), ("kind", presentation.rawValue),
-                ])
-            }
-    }
-}
-
-// MARK: - Now
-
-/// The iPad or Mac sidebar's Now section: a status row with Retry, rows that
-/// grow and shrink, and an All activity popover.
-struct NoticesPlaceholderNow: View {
-    let host: ActivityHostPolicy.NowSection
-    var onReassign: (() -> Void)? = nil
-
-    @State private var rows = 2
-    @State private var showsAll = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text(verbatim: "PLACEHOLDER · Can’t reach OGS")
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
-                Spacer(minLength: 4)
-                Button { tap("retry") } label: { Text(verbatim: "Retry") }
-                    .accessibilityIdentifier(NoticesProbeID.nowRetry)
-            }
-            ForEach(Array(stride(from: 1, through: rows, by: 1)), id: \.self) { row in
-                Button { tap("row.\(row)") } label: {
-                    Text(verbatim: "Now row \(row)").frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .accessibilityIdentifier(NoticesProbeID.nowRow(row))
-            }
-            HStack(spacing: 12) {
-                Button {
-                    rows += 1
-                    tap("add")
-                } label: { Text(verbatim: "Add") }
-                    .accessibilityIdentifier(NoticesProbeID.nowAdd)
-                Button {
-                    rows = max(0, rows - 1)
-                    tap("remove")
-                } label: { Text(verbatim: "Remove") }
-                    .accessibilityIdentifier(NoticesProbeID.nowRemove)
-                if let onReassign {
-                    Button {
-                        tap("reassign")
-                        onReassign()
-                    } label: { Text(verbatim: "Reassign") }
-                        .accessibilityIdentifier(NoticesProbeID.nowReassign)
-                }
-            }
-            Button {
-                tap("all")
-                showsAll = true
-            } label: { Text(verbatim: "All activity") }
-                .accessibilityIdentifier(NoticesProbeID.nowAll)
-                .popover(isPresented: $showsAll) {
-                    Text(verbatim: "PLACEHOLDER · All activity from \(host.rawValue)")
-                        .padding(24)
-                        .accessibilityIdentifier(NoticesProbeID.nowAllContent)
-                        .onAppear { NoticesHostProbeLog.event("now.presented", [("host", host.rawValue)]) }
-                }
-        }
-        .buttonStyle(.borderless)
-        .font(.callout)
-        .padding(10)
-        .modifier(NoticesPlaceholderOutline())
-        .background(NoticesProbeMarker(event: "now", key: "now.\(host.rawValue).\(rows)"))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(NoticesProbeID.now)
-    }
-
-    private func tap(_ target: String) {
-        NoticesHostProbeLog.event("now.tap", [("host", host.rawValue), ("target", target), ("rows", "\(rows)")])
-    }
+    func updateUIView(_ view: NoticesProbeMarker.MarkerView, context: Context) {}
 }
 
 // MARK: - Root screens
 
-/// AppNavigationStack's root content: the placeholder custom bar in the iPad
-/// container, whose real bars aren't built yet, and the root subtitle. The
-/// iPhone's SwiftUI TabView and the iOS 27 container have their real bars
+/// AppNavigationStack's root content: the root subtitle, and what the policy
+/// decides for the root. Every container has its real bar
 /// (ActivityBarHosts.swift, ActivityAccessoryHost.swift), which the force
 /// flag reaches too. Plain content without a probe, in presented stacks and
 /// in roots without tabs.
@@ -324,20 +177,18 @@ struct NoticesHostProbeRoot: ViewModifier {
     private struct Probed: ViewModifier {
         let probe: SurroundUITestContract.NoticesHostProbe
         let root: RootView
-        @EnvironmentObject private var nav: NavigationService
         @Environment(\.iPadTabContext) private var iPadTabContext
         @Environment(\.duoTabContext) private var duoTabContext
 
         func body(content: Content) -> some View {
-            content.modifier(Hosted(probe: probe, root: root, places: nav.activityPlaces, facts: facts))
+            content.modifier(Hosted(probe: probe, root: root, facts: facts))
         }
 
-        /// The container's state, which it delivers after layout; never geometry.
+        /// The container's state: on iPad the sidebar's observable copy, as
+        /// the real chrome reads it; never geometry.
         private var facts: ActivityHostPolicy.Facts {
             if let iPadTabContext {
-                let sidebar: ActivityHostPolicy.Sidebar = !iPadTabContext.sidebarAvailable ? .unavailable
-                    : iPadTabContext.sidebarVisible ? .shown : .hidden
-                return .current(.iPadTabContainer, sidebar: sidebar)
+                return .current(.iPadTabContainer, sidebar: iPadTabContext.activitySidebar)
             }
             return .current(duoTabContext == nil ? .swiftUITabView : .duoTabContainer)
         }
@@ -346,16 +197,10 @@ struct NoticesHostProbeRoot: ViewModifier {
     private struct Hosted: ViewModifier {
         let probe: SurroundUITestContract.NoticesHostProbe
         let root: RootView
-        @ObservedObject var places: ActivityPlaceRegistry
         let facts: ActivityHostPolicy.Facts
-        @State private var keyboardShows = false
-
-        private static let keyboardChanges = SystemPlatformServices.shared.keyboardWillChangeFramePublisher
 
         func body(content: Content) -> some View {
             let hosts = ActivityHostPolicy.hosts(for: facts, overrides: .init(probe, afterLaunch: true))
-            let shows = probe.showsBar && hosts.bar == .customBar && facts.container == .iPadTabContainer
-                && !places.hidesActivity(in: root) && !(probe.barKeyboard == .hide && keyboardShows)
             let subtitled = probe.subtitle != nil && facts.showsPlaceholderSubtitle
             content
                 .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { insets in
@@ -364,48 +209,13 @@ struct NoticesHostProbeRoot: ViewModifier {
                         ("bottom", NoticesHostProbeLog.number(insets.bottom)),
                     ], key: "root.layout.\(root.rawValue)")
                 }
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if shows {
-                        NoticesPlaceholderBar(host: .customBar, root: root,
-                                              connection: facts.showsPlaceholderSubtitle ? nil : hosts.connectionStatus)
-                    }
-                }
                 .modifier(NoticesProbeSubtitle(variant: subtitled ? probe.subtitle : nil, root: root.rawValue,
                                                neverMinimizes: probe.navigationBarMinimize == .never))
-                .modifier(IgnoresKeyboard(ignores: probe.showsBar && probe.barKeyboard == .ignore))
-                .onReceive(Self.keyboardChanges) { notification in
-                    guard probe.showsBar else { return }
-                    let visible = SystemPlatformServices.shared.isAttachedSoftwareKeyboardVisible(from: notification)
-                    guard visible != keyboardShows else { return }
-                    keyboardShows = visible
-                    NoticesHostProbeLog.event("bar.keyboard", [
-                        ("root", root.rawValue), ("visible", NoticesHostProbeLog.flag(visible)),
-                        ("variant", probe.barKeyboard.rawValue),
-                    ])
-                }
-                .onChange(of: shows, initial: true) { _, shows in
-                    NoticesHostProbeLog.event("bar.custom", [
-                        ("root", root.rawValue), ("shown", NoticesHostProbeLog.flag(shows)),
-                    ])
-                }
                 .onChange(of: hosts, initial: true) { _, hosts in
                     NoticesHostProbeLog.event("host.decision",
                                               NoticesHostProbeLog.fields(facts, hosts) + [("root", root.rawValue)],
                                               key: "decision.root.\(root.rawValue)")
                 }
-        }
-    }
-
-    /// A launch constant, so the root keeps its identity.
-    private struct IgnoresKeyboard: ViewModifier {
-        let ignores: Bool
-
-        func body(content: Content) -> some View {
-            if ignores {
-                content.ignoresSafeArea(.keyboard, edges: .bottom)
-            } else {
-                content
-            }
         }
     }
 }
@@ -485,156 +295,4 @@ private struct NoticesProbeSubtitle: ViewModifier {
     }
 }
 
-// MARK: - UIKit containers
-
-#if !targetEnvironment(macCatalyst)
-/// UIKit's bottom accessory content: a hosted placeholder bar. Deliberately
-/// not a child controller, so a device run shows whether content hosted this
-/// way still presents and still receives its placement.
-final class NoticesPlaceholderAccessoryView: UIView {
-    private let host = UIHostingController(rootView: NoticesPlaceholderBar(host: .uiKitAccessory, root: nil))
-
-    init() {
-        super.init(frame: .zero)
-        host.view.backgroundColor = .clear
-        host.view.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(host.view)
-        NSLayoutConstraint.activate([
-            host.view.leadingAnchor.constraint(equalTo: leadingAnchor),
-            host.view.trailingAnchor.constraint(equalTo: trailingAnchor),
-            host.view.topAnchor.constraint(equalTo: topAnchor),
-            host.view.bottomAnchor.constraint(equalTo: bottomAnchor),
-        ])
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-}
-
-/// Owned by IPadTabContainer's coordinator: sets and clears the UIKit
-/// accessory and puts the Now section in the sidebar's bottom bar. It
-/// decides from state (the tab bar request, the registry's settled state, a
-/// settled sidebar transition), never from geometry. The iOS 27 container
-/// hosts the real bar (ActivityAccessoryHost.swift).
-@MainActor
-final class NoticesHostProbeUIKit {
-    struct State {
-        var root: RootView
-        var tabBarHidden: Bool
-        var sidebar: ActivityHostPolicy.Sidebar
-    }
-
-    /// Nil unless a notices host flag is present.
-    static func make(container: ActivityHostPolicy.Container,
-                     places: ActivityPlaceRegistry?) -> NoticesHostProbeUIKit? {
-        guard let probe = SurroundUITestContract.noticesHostProbe else { return nil }
-        return NoticesHostProbeUIKit(probe: probe, container: container, places: places)
-    }
-
-    /// A deferred accessory change waits for the next main turn. Until then
-    /// IPadTabContainer samples no closed baselines.
-    private(set) var changePending = false
-
-    private let probe: SurroundUITestContract.NoticesHostProbe
-    private let container: ActivityHostPolicy.Container
-    private let places: ActivityPlaceRegistry?
-    private weak var controller: UITabBarController?
-    private var state: (() -> State?)?
-    private var subscription: AnyCancellable?
-    private var nowHost: UIHostingController<NoticesPlaceholderNow>?
-    private lazy var accessory = NoticesPlaceholderAccessoryView()
-
-    private init(probe: SurroundUITestContract.NoticesHostProbe, container: ActivityHostPolicy.Container,
-                 places: ActivityPlaceRegistry?) {
-        self.probe = probe
-        self.container = container
-        self.places = places
-    }
-
-    func install(on controller: UITabBarController, state: @escaping () -> State?) {
-        self.controller = controller
-        self.state = state
-        if container == .iPadTabContainer, probe.showsNow {
-            let host = UIHostingController(rootView: NoticesPlaceholderNow(host: .iPadSidebar) { [weak self] in
-                self?.reassignNow()
-            })
-            host.sizingOptions = .intrinsicContentSize
-            host.view.backgroundColor = .clear
-            controller.sidebar.bottomBarView = host.view
-            nowHost = host
-        }
-        subscription = places?.stateDidChange.sink { [weak self] _ in self?.refresh(reason: "registry") }
-        refresh(reason: "install")
-    }
-
-    /// Right before setTabBarHidden: the `before` order changes the accessory here.
-    func tabBarWillChange(hidden: Bool) {
-        guard probe.barOrder == .before else { return }
-        apply(tabBarHidden: hidden, reason: "tabBarWillChange")
-    }
-
-    /// Right after setTabBarHidden: `after` changes the accessory here;
-    /// `deferred` waits for the next main turn.
-    func tabBarDidChange(hidden: Bool) {
-        switch probe.barOrder {
-        case .before:
-            break
-        case .after:
-            apply(tabBarHidden: hidden, reason: "tabBarDidChange")
-        case .deferred:
-            changePending = true
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                self.changePending = false
-                self.refresh(reason: "deferred")
-            }
-        }
-    }
-
-    func refresh(reason: String) {
-        guard !changePending, let state = state?() else { return }
-        apply(tabBarHidden: state.tabBarHidden, reason: reason)
-    }
-
-    /// IPadTabContainer's closed-baseline sampling, logged from measureLayout.
-    /// It only logs.
-    func baselineSample(root: RootView, insets: UIEdgeInsets, recorded: Bool, revealing: Bool,
-                        tabBarHidden: Bool) {
-        let number = NoticesHostProbeLog.number
-        let flag = NoticesHostProbeLog.flag
-        NoticesHostProbeLog.event("ipad.baseline", [
-            ("root", root.rawValue),
-            ("insets", [insets.top, insets.left, insets.bottom, insets.right].map(number).joined(separator: ",")),
-            ("recorded", flag(recorded)), ("revealing", flag(revealing)), ("tabBarHidden", flag(tabBarHidden)),
-            ("accessory", flag(controller?.hasActivityAccessory == true)), ("pending", flag(changePending)),
-        ], key: "ipad.baseline.\(root.rawValue)")
-    }
-
-    private func apply(tabBarHidden: Bool, reason: String) {
-        guard let controller, let state = state?() else { return }
-        let facts = ActivityHostPolicy.Facts.current(container, sidebar: state.sidebar)
-        // The iPad's tab bar never minimizes, so the launch doesn't matter.
-        let hosts = ActivityHostPolicy.hosts(for: facts, overrides: .init(probe, afterLaunch: true))
-        let hides = places?.hidesActivity(in: state.root) ?? false
-        let wanted = probe.showsBar && hosts.bar == .uiKitAccessory && !tabBarHidden && !hides
-        let had = controller.hasActivityAccessory
-        controller.setActivityAccessory(wanted ? accessory : nil, animated: controller.view.window != nil)
-        let action = wanted == had ? "kept" : wanted ? "set" : "cleared"
-        let flag = NoticesHostProbeLog.flag
-        NoticesHostProbeLog.event("bar.accessory", [
-            ("container", container.rawValue), ("action", action), ("reason", reason),
-            ("order", probe.barOrder.rawValue), ("tabBarHidden", flag(tabBarHidden)), ("hides", flag(hides)),
-            ("root", state.root.rawValue), ("sidebar", state.sidebar.rawValue),
-        ], key: action == "kept" ? "bar.accessory.kept.\(container.rawValue)" : nil)
-        NoticesHostProbeLog.event("host.decision", NoticesHostProbeLog.fields(facts, hosts),
-                                  key: "decision.\(container.rawValue)")
-    }
-
-    /// Reassigns the sidebar's bottom bar, for its resizing check.
-    private func reassignNow() {
-        guard let controller, let view = nowHost?.view else { return }
-        controller.sidebar.bottomBarView = nil
-        controller.sidebar.bottomBarView = view
-    }
-}
-#endif
 #endif
