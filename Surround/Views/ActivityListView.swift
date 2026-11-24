@@ -88,10 +88,11 @@ struct ActivityListView: View {
 
 // MARK: - What the list shows
 
-/// What one window's Activity list shows now, from the service, the window's
-/// last-known seek graph rows and its results; in Debug runs with an
-/// Activity state, from the fixture and its clock. The pushed cards read the
-/// same, so their actions keep the row's place.
+/// What one window's Activity list shows now, from the window's input
+/// (`ActivityModel.Input.window`), which the window's bar and Game Detail's
+/// control read too, its last-known seek graph rows and its results; in
+/// Debug runs with an Activity state, from the fixture and its clock. The
+/// pushed cards read the same, so their actions keep the row's place.
 @MainActor
 struct ActivityListSource {
     let ogs: OGSService
@@ -109,8 +110,8 @@ struct ActivityListSource {
         var sections: [ActivityListSections.Section]
         /// The user's open and Rengo challenges, as the rows read them.
         var openChallenges: ActivityLastKnown.OpenChallenges
-        /// Ids the store hides that the model no longer lists, so they need
-        /// no hiding.
+        /// Ids the store hides that the service no longer lists
+        /// (`ActivityModel.Input.hiddenListedIDs`), so they need no hiding.
         var settledHiddenIDs: Set<String>
 
         /// No card and no section: the list reads "Nothing waiting".
@@ -172,10 +173,12 @@ struct ActivityListSource {
     func snapshot(now: TimeInterval, card: ActivityGameOverCard = ActivityGameOverCard(),
                   showing cardChallengeID: Int? = nil) -> Snapshot {
         let openChallenges = openChallenges
-        let input = input(now: now, openChallenges: openChallenges)
+        let input = ActivityModel.Input.window(ogs: ogs, nav: nav, place: place, now: now)
         let model = ActivityModel.snapshot(input)
         let results = nav.activityResults
         let hidden = results.hiddenIDs
+        // The input already leaves out what OGS confirmed gone; the list
+        // keeps its own filter for the resolved rows it shows.
         let listed = model.list.filter { !hidden.contains($0.id) }
         let resolved = results.resolvedRows
         let cardRow = card.row(showing: cardChallengeID, listed: listed, resolved: resolved)
@@ -184,21 +187,7 @@ struct ActivityListSource {
             sections: ActivityListSections.sections(list: listed, resolved: resolved,
                                                     excluding: Set(cardRow.map { [$0.id] } ?? [])),
             openChallenges: openChallenges,
-            settledHiddenIDs: hidden.subtracting(model.list.map(\.id))
-        )
-    }
-
-    private func input(now: TimeInterval, openChallenges: ActivityLastKnown.OpenChallenges) -> ActivityModel.Input {
-        #if DEBUG && MAIN_APP
-        if let input = ActivityFixtures.selectedInput(ogs, place: place) {
-            return input
-        }
-        #endif
-        // Recent read conversations are the saved peers Messages lists, so
-        // the session starts at the distant past.
-        return ActivityModel.Input(
-            ogs: ogs, place: place, firstSeen: ActivitySession.firstSeen, sessionStart: 0, now: now,
-            openChallenges: openChallenges
+            settledHiddenIDs: hidden.subtracting(input.hiddenListedIDs)
         )
     }
 

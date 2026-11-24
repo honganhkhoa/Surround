@@ -1209,6 +1209,7 @@ struct GameDetailView: View {
                 game: currentGame,
                 gameControlState: gameControlState,
                 connection: connection,
+                activityResults: nav.activityResults,
                 selectedConditionalVariation: $selectedConditionalVariation,
                 interaction: $interaction,
                 showsCompactChatBoard: $showsCompactChatBoard,
@@ -1478,6 +1479,9 @@ private struct GameToolbarLayout: ViewModifier {
     /// The window's connection status, for the title slot's capsule and
     /// the header clocks' mark.
     @ObservedObject var connection: ConnectionStatusSource
+    /// The window's Activity results, so the in-game control drops what OGS
+    /// confirmed gone as soon as the store hides it.
+    @ObservedObject var activityResults: ActivityResults
     /// Redraws the in-game control where time alone changes its state.
     @StateObject private var gameControlDeadlines = GameControlDeadlines()
     /// The control's last state, which it keeps while its popover is open
@@ -1930,15 +1934,13 @@ private struct GameToolbarLayout: ViewModifier {
         #endif
     }
 
-    /// One read of the window's state for the game on screen, as Activity
-    /// reads it: in Debug runs with an Activity state, the state's own on its
-    /// clock.
+    /// One read of the window's state for the game on screen, the input the
+    /// window's bar and Activity read (`ActivityModel.Input.window`): less
+    /// what OGS confirmed gone, so a challenge rejected in the popover leaves
+    /// the control at once, and in Debug runs with an Activity state, the
+    /// state's own on its clock.
     private func gameControlInput() -> ActivityModel.Input {
-        let place = ActivityModel.Place(showing: game)
-        #if DEBUG && MAIN_APP
-        if let input = ActivityFixtures.selectedInput(ogs, place: place) { return input }
-        #endif
-        return ActivityModel.Input(ogs: ogs, place: place, startedGames: nav.startedGamesRecorder.startedGames)
+        ActivityModel.Input.window(ogs: ogs, nav: nav, place: ActivityModel.Place(showing: game))
     }
 
     private func opponentName(in game: Game?) -> String? {

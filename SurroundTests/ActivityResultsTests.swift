@@ -651,6 +651,171 @@ final class ActivityResultsTests: XCTestCase {
         XCTAssertTrue(store.entries.isEmpty)
     }
 
+    // MARK: The chrome's session
+
+    /// Withdraws the user's open challenge from the Activity bar or a Now
+    /// row, which share the chrome's session.
+    private func withdrawFromTheChrome(_ id: Int) {
+        store.withdraw(challenge: openChallenge(id), session: store.chromeSession, itemID: "waiting-open-\(id)",
+                       display: display("Open challenge"), section: .waiting, after: nil)
+    }
+
+    private func chromeResult(_ id: Int, _ state: ActivityActionState) -> ActivityBarResult {
+        ActivityBarResult(itemID: "waiting-open-\(id)", action: .withdraw, state: state,
+                          display: display("Open challenge"))
+    }
+
+    func testAWithdrawFromTheBarIsPendingThenShowsItsResultForFourSeconds() {
+        withdrawFromTheChrome(40)
+        XCTAssertEqual(client.withdrawnOrDeclined, [40])
+        XCTAssertEqual(store.chromeResults, [chromeResult(40, .pending(since: 1_000))])
+        XCTAssertTrue(store.entries.isEmpty, "The list's rows show only the list's own actions.")
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "Nothing times a withdraw while its reply is on its way.")
+
+        clock.now = 1_001
+        succeed(client.withdrawReplies.last, with: ())
+        XCTAssertEqual(store.chromeResults, [chromeResult(40, .succeeded(.withdrawn))])
+        XCTAssertEqual(store.hiddenIDs, ["waiting-open-40"], "OGS confirmed it gone, so it never comes back.")
+        XCTAssertEqual(scheduler.pendingDelays, [4])
+        scheduler.turn()
+        XCTAssertEqual(navigator.announcements, [result("waiting-open-40", .withdraw, "Withdrawn")],
+                       "Spoken once, through the store's key.")
+
+        clock.now = 1_004.5
+        scheduler.advance()
+        XCTAssertEqual(store.chromeResults, [chromeResult(40, .succeeded(.withdrawn))],
+                       "A wake-up before the 4 s are up waits on.")
+        XCTAssertEqual(scheduler.pendingDelays, [0.5])
+        clock.now = 1_005
+        scheduler.advance()
+        XCTAssertEqual(store.chromeResults, [], "The store publishes the result's end.")
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty)
+    }
+
+    func testAFailedWithdrawFromTheBarOffersRetryWhileItsResultShows() {
+        withdrawFromTheChrome(41)
+        fail(client.withdrawReplies.last)
+        XCTAssertEqual(store.chromeResults, [chromeResult(41, .failed)])
+        XCTAssertEqual(scheduler.pendingDelays, [4], "Couldn’t withdraw shows for 4 s too.")
+        scheduler.turn()
+        XCTAssertEqual(navigator.spoken, ["Couldn’t withdraw"])
+
+        clock.now = 1_002
+        store.retry(itemID: "waiting-open-41")
+        XCTAssertEqual(client.withdrawnOrDeclined, [41], "The list's Retry never repeats the bar's action.")
+        store.retry(itemID: "waiting-open-41", session: store.chromeSession)
+        XCTAssertEqual(client.withdrawnOrDeclined, [41, 41])
+        XCTAssertEqual(store.chromeResults, [chromeResult(41, .pending(since: 1_002))])
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty, "Pending again, it waits for its reply.")
+
+        succeed(client.withdrawReplies.last, with: ())
+        XCTAssertEqual(store.chromeResults, [chromeResult(41, .succeeded(.withdrawn))])
+        XCTAssertEqual(scheduler.pendingDelays, [4], "Its 4 s start again as it settles.")
+        clock.now = 1_006
+        scheduler.advance()
+        XCTAssertEqual(store.chromeResults, [])
+        store.retry(itemID: "waiting-open-41", session: store.chromeSession)
+        XCTAssertEqual(client.withdrawnOrDeclined, [41, 41], "Once its result has gone there is nothing to retry.")
+    }
+
+    func testTheBarsResultsAndAnOpenListsRowsNeverHideEachOther() {
+        withdraw(42)
+        withdrawFromTheChrome(43)
+        XCTAssertEqual(Set(store.entries.keys), ["waiting-open-42"])
+        XCTAssertEqual(store.chromeResults.map(\.itemID), ["waiting-open-43"])
+        XCTAssertEqual(store.liveSession, session)
+
+        let popover = UUID()
+        store.begin(session: popover)
+        XCTAssertTrue(store.entries.isEmpty)
+        XCTAssertEqual(store.chromeResults.map(\.itemID), ["waiting-open-43"], "A list that begins hides nothing of the bar's.")
+        store.begin(session: store.chromeSession)
+        store.end(session: store.chromeSession)
+        XCTAssertEqual(store.liveSession, popover, "No list begins or ends the chrome's session.")
+        XCTAssertEqual(store.chromeResults.map(\.itemID), ["waiting-open-43"])
+        store.end(session: popover)
+        XCTAssertEqual(Set(store.entries.keys), ["waiting-open-42"], "The earlier list is live again, with its own row.")
+        store.end(session: session)
+        XCTAssertNil(store.liveSession)
+        XCTAssertEqual(store.chromeResults.map(\.itemID), ["waiting-open-43"], "Nor does a list that ends.")
+
+        succeed(client.withdrawReplies.first, with: ())
+        XCTAssertEqual(store.chromeResults, [chromeResult(43, .pending(since: 1_000))],
+                       "The list's reply lands in no session of the bar's.")
+        succeed(client.withdrawReplies.last, with: ())
+        XCTAssertEqual(store.chromeResults, [chromeResult(43, .succeeded(.withdrawn))])
+        XCTAssertTrue(store.entries.isEmpty)
+        XCTAssertEqual(store.hiddenIDs, ["waiting-open-42", "waiting-open-43"])
+    }
+
+    func testTheNowSectionSharesTheBarsSession() {
+        withdrawFromTheChrome(44)
+        withdrawFromTheChrome(45)
+        XCTAssertEqual(store.chromeResults.map(\.itemID), ["waiting-open-44", "waiting-open-45"],
+                       "In the order they were sent, so the bar shows the latest.")
+        fail(client.withdrawReplies[0])
+        store.retry(itemID: "waiting-open-44", session: store.chromeSession)
+        XCTAssertEqual(store.chromeResults.map(\.itemID), ["waiting-open-45", "waiting-open-44"],
+                       "A Retry is the latest action.")
+        succeed(client.withdrawReplies[1], with: ())
+        succeed(client.withdrawReplies[2], with: ())
+        XCTAssertEqual(store.chromeResults.map(\.state), [.succeeded(.withdrawn), .succeeded(.withdrawn)])
+        clock.now = 1_004
+        scheduler.advance()
+        XCTAssertEqual(store.chromeResults, [], "Each result ends 4 s after it settled.")
+    }
+
+    func testAQuickMatchWithdrawFromTheBarIsForgottenWithItsResult() {
+        store.withdraw(automatch: OGSAutomatchEntry(sizeSpeedOptions: [], uuid: "k"), session: store.chromeSession,
+                       itemID: "waiting-quick-match-k", display: display("Quick match"), section: .waiting,
+                       after: nil)
+        XCTAssertEqual(scheduler.pendingDelays, [8])
+        clock.now = 1_008
+        scheduler.advance()
+        XCTAssertEqual(store.chromeResults.map(\.state), [.failed])
+        XCTAssertEqual(scheduler.pendingDelays, [4])
+        lifecycle(.cancelled(uuid: "k", removedCount: 1))
+        XCTAssertEqual(store.chromeResults.map(\.state), [.succeeded(.withdrawn)],
+                       "A late cancel still confirms it while its result shows.")
+
+        store.withdraw(automatch: OGSAutomatchEntry(sizeSpeedOptions: [], uuid: "l"), session: store.chromeSession,
+                       itemID: "waiting-quick-match-l", display: display("Quick match"), section: .waiting,
+                       after: nil)
+        clock.now = 1_016
+        scheduler.advance()
+        scheduler.turn()
+        XCTAssertEqual(navigator.spoken, ["Couldn’t withdraw", "Withdrawn", "Couldn’t withdraw"])
+        clock.now = 1_020
+        scheduler.advance()
+        XCTAssertEqual(store.chromeResults, [])
+        lifecycle(.cancelled(uuid: "l", removedCount: 1))
+        scheduler.turn()
+        XCTAssertEqual(store.chromeResults, [])
+        XCTAssertEqual(navigator.spoken, ["Couldn’t withdraw", "Withdrawn", "Couldn’t withdraw"],
+                       "Once its result has gone, no row is left to correct.")
+    }
+
+    func testResetForgetsTheBarsResults() {
+        withdrawFromTheChrome(46)
+        succeed(client.withdrawReplies.last, with: ())
+        XCTAssertEqual(scheduler.pendingDelays, [4])
+        store.reset()
+        XCTAssertEqual(store.chromeResults, [])
+        XCTAssertTrue(scheduler.pendingDelays.isEmpty)
+        withdrawFromTheChrome(47)
+        XCTAssertEqual(store.chromeResults.map(\.itemID), ["waiting-open-47"], "The session stands after a reset.")
+    }
+
+    func testTheWindowsClockComesWithItsQueue() {
+        let window = ActivityResults()
+        let later = Clock()
+        later.now = 5_000
+        window.attach(client: client.client, navigator: navigator, scheduler: scheduler, now: { later.now })
+        window.withdraw(challenge: openChallenge(48), session: window.chromeSession, itemID: "waiting-open-48",
+                        display: display("Open challenge"), section: .waiting, after: nil)
+        XCTAssertEqual(window.chromeResults.map(\.state), [.pending(since: 5_000)])
+    }
+
     // MARK: Who speaks
 
     func testARowThatClaimsItsResultSilencesTheAnnouncement() {

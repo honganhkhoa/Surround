@@ -258,6 +258,10 @@ class NavigationService: ObservableObject {
     /// changes never publish through this service. Only Activity's hosts
     /// observe the registry, which settles a main-queue turn later.
     let activityPlaces = ActivityPlaceRegistry()
+    /// What this window's Activity bar, Now section and root lines show for
+    /// the selected tab. A constant, so its changes never publish through
+    /// this service; MainView attaches it.
+    let activityBar = ActivityBarState()
     /// What this window's Activity lists started, and what came of it. It
     /// outlives each list, so a request still finishes after its list closes.
     let activityResults = ActivityResults()

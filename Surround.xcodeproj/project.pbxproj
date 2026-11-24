@@ -88,6 +88,9 @@
 		5C5E00022026112000000002 /* ActivityBarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00012026112000000001 /* ActivityBarModel.swift */; };
 		5C5E00032026112000000003 /* ActivityBarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00012026112000000001 /* ActivityBarModel.swift */; };
 		5C5E00052026112000000005 /* ActivityBarModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00042026112000000004 /* ActivityBarModelTests.swift */; };
+		5C5E00112026112000000011 /* ActivityBarState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00102026112000000010 /* ActivityBarState.swift */; };
+		5C5E00122026112000000012 /* ActivityBarState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00102026112000000010 /* ActivityBarState.swift */; };
+		5C5E00142026112000000014 /* ActivityBarStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00132026112000000013 /* ActivityBarStateTests.swift */; };
 		5FEB00012026111700000001 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
 		5FEB00032026111700000003 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
 		5FEB00042026111700000004 /* VoiceCountdownAnnouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00052026111700000005 /* VoiceCountdownAnnouncer.swift */; };
@@ -672,6 +675,8 @@
 		5C4E00522026111400000052 /* GameControlDriverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlDriverTests.swift; sourceTree = "<group>"; };
 		5C5E00012026112000000001 /* ActivityBarModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarModel.swift; sourceTree = "<group>"; };
 		5C5E00042026112000000004 /* ActivityBarModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarModelTests.swift; sourceTree = "<group>"; };
+		5C5E00102026112000000010 /* ActivityBarState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarState.swift; sourceTree = "<group>"; };
+		5C5E00132026112000000013 /* ActivityBarStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarStateTests.swift; sourceTree = "<group>"; };
 		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
 		5FEB00022026111700000002 /* MoveCommitHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveCommitHaptics.swift; sourceTree = "<group>"; };
 		5FEB00052026111700000005 /* VoiceCountdownAnnouncer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCountdownAnnouncer.swift; sourceTree = "<group>"; };
@@ -1123,6 +1128,7 @@
 				5C2E00022026111100000002 /* SceneCoverPolicyTests.swift */,
 				5C2E00082026111100000008 /* SuperchatStoreTests.swift */,
 				5C3E000F202611120000000F /* ActivityResultsTests.swift */,
+				5C5E00132026112000000013 /* ActivityBarStateTests.swift */,
 				5C3E00112026111200000011 /* ActivityLastKnownTests.swift */,
 				5C4E00162026111400000016 /* StartedGamesRecorderTests.swift */,
 				5C4E00182026111400000018 /* LowTimeHapticWatcherTests.swift */,
@@ -1378,6 +1384,7 @@
 				5C2E00032026111100000003 /* SuperchatStore.swift */,
 				5C3E00012026111200000001 /* ActivitySession.swift */,
 				5C3E00072026111200000007 /* ActivityResults.swift */,
+				5C5E00102026112000000010 /* ActivityBarState.swift */,
 				5C3E000A202611120000000A /* ActivityLastKnown.swift */,
 				5C4E00102026111400000010 /* StartedGamesRecorder.swift */,
 				5C4E00132026111400000013 /* LowTimeHapticWatcher.swift */,
@@ -1885,6 +1892,7 @@
 				5C2E00042026111100000004 /* SuperchatStore.swift in Sources */,
 				5C3E00022026111200000002 /* ActivitySession.swift in Sources */,
 				5C3E00082026111200000008 /* ActivityResults.swift in Sources */,
+				5C5E00112026112000000011 /* ActivityBarState.swift in Sources */,
 				5C3E000B202611120000000B /* ActivityLastKnown.swift in Sources */,
 				5C4E00112026111400000011 /* StartedGamesRecorder.swift in Sources */,
 				5C4E00142026111400000014 /* LowTimeHapticWatcher.swift in Sources */,
@@ -2050,12 +2058,14 @@
 				5C2E00052026111100000005 /* SuperchatStore.swift in Sources */,
 				5C3E00032026111200000003 /* ActivitySession.swift in Sources */,
 				5C3E00092026111200000009 /* ActivityResults.swift in Sources */,
+				5C5E00122026112000000012 /* ActivityBarState.swift in Sources */,
 				5C3E000C202611120000000C /* ActivityLastKnown.swift in Sources */,
 				5C4E00122026111400000012 /* StartedGamesRecorder.swift in Sources */,
 				5C4E00152026111400000015 /* LowTimeHapticWatcher.swift in Sources */,
 				5C3E00152026111200000015 /* ConversationDraftStore.swift in Sources */,
 				5C2E00092026111100000009 /* SuperchatStoreTests.swift in Sources */,
 				5C3E00102026111200000010 /* ActivityResultsTests.swift in Sources */,
+				5C5E00142026112000000014 /* ActivityBarStateTests.swift in Sources */,
 				5C3E00122026111200000012 /* ActivityLastKnownTests.swift in Sources */,
 				5C4E00172026111400000017 /* StartedGamesRecorderTests.swift in Sources */,
 				5C4E00192026111400000019 /* LowTimeHapticWatcherTests.swift in Sources */,

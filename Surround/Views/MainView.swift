@@ -110,7 +110,10 @@ struct MainView: View {
     }
 
     /// Connects the window's Activity stores and producers to its service,
-    /// and its list to this presenter, once.
+    /// and its list to this presenter, once. The window's bar state comes
+    /// last, so its first value, computed here before the first layout,
+    /// reads the stores attached before it. Roots built without MainView
+    /// never attach it, so it publishes nothing there.
     private func attachActivity() {
         guard activityFirstSeen == nil else { return }
         nav.activityResults.attach(client: .live(ogs), navigator: nav,
@@ -126,6 +129,7 @@ struct MainView: View {
             isCovered: { [weak ogs] in ogs?.superchatCover != nil },
             gamesOnScreen: { [weak nav] in nav?.ownLiveGameIDsOnScreen ?? [] }
         )
+        nav.activityBar.attach(ogs: ogs, nav: nav, connection: environment.connectionStatus)
     }
 
     /// Another account's list, results, drafts and last-known rows don't

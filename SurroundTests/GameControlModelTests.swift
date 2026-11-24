@@ -10,6 +10,7 @@
 //  with the press timing; and what VoiceOver says.
 //
 
+import Combine
 import XCTest
 import SwiftUI
 import UIKit
@@ -1195,6 +1196,59 @@ final class GameControlModelTests: XCTestCase {
         window.game.gamePhase = .finished
         XCTAssertTrue(window.ogs.liveGames.contains { $0 === window.game }, "The service still lists it as live.")
         XCTAssertEqual(slot(), .base(plusN: 1), "Game over releases what waited, read from the game itself.")
+    }
+
+    /// Answers every reject at once, as OGS's 2xx does.
+    private static let confirmingClient = ActivityResults.Client(
+        accept: { _ in Empty(completeImmediately: false).eraseToAnyPublisher() },
+        withdrawOrDecline: { _ in Just(()).setFailureType(to: Error.self).eraseToAnyPublisher() },
+        cancelAutomatch: { _ in true },
+        leaveRengo: { _ in Empty(completeImmediately: false).eraseToAnyPublisher() },
+        startRengo: { _ in Empty(completeImmediately: false).eraseToAnyPublisher() },
+        hasActiveGame: { _ in false },
+        automatchLifecycleEvents: Empty(completeImmediately: false).eraseToAnyPublisher()
+    )
+
+    private final class SilentNavigator: ActivityNavigating {
+        func openGame(_ gameID: Int, closesNewGame: Bool) {}
+        func announce(_ announcement: AppAnnouncement) {}
+    }
+
+    /// Holds every block, so nothing the store schedules runs.
+    private final class HeldScheduler: OGSWebsocketScheduling {
+        func async(_ block: @escaping () -> Void) {}
+        func schedule(after delay: TimeInterval, _ block: @escaping () -> Void) -> Cancellable { AnyCancellable {} }
+        func scheduleRepeating(every interval: TimeInterval, _ block: @escaping () -> Void) -> Cancellable {
+            AnyCancellable {}
+        }
+    }
+
+    /// Game Detail's control reads the window's input, so a challenge
+    /// rejected in its popover leaves +N, and the game-over card, as soon as
+    /// OGS confirms it, though the service lists it until OGS's next update.
+    func testAChallengeRejectedInThePopoverLeavesTheControlAtOnce() throws {
+        let window = try openWindow(.challengeReceived)
+        window.game.gamePhase = .finished
+        let navigator = SilentNavigator()
+        let nav = NavigationService()
+        nav.activityResults.attach(client: Self.confirmingClient, navigator: navigator, scheduler: HeldScheduler())
+        func slot(_ context: Context) -> GameControlSlot? {
+            let input = Model.Input.window(ogs: window.ogs, nav: nav, place: Model.Place(showing: window.game),
+                                           now: clock.now, fixture: nil)
+            return GameControlSlot(input, context: context)
+        }
+        let card = Context(cardChallengeID: ID.usualChallengeID)
+        XCTAssertEqual(slot(.home), .base(plusN: 1))
+        XCTAssertEqual(slot(card), .gameOverCard(challengeID: ID.usualChallengeID, plusN: 0))
+
+        let challenge = try XCTUnwrap(window.ogs.challengesReceived.first { $0.id == ID.usualChallengeID })
+        nav.activityResults.reject(challenge: challenge, session: UUID(), itemID: "challenge-\(challenge.id)",
+                                   display: ActivityRowDisplay(title: "CedarWave", detail: "19×19"),
+                                   section: .challengesReceived, after: nil)
+        XCTAssertTrue(window.ogs.challengesReceived.contains { $0.id == ID.usualChallengeID },
+                      "The service lists it until OGS's next update.")
+        XCTAssertEqual(slot(.home), .base(plusN: 0), "It leaves +N at once.")
+        XCTAssertEqual(slot(card), .base(plusN: 0), "And the card, whose popover keeps its result.")
     }
 
     /// Signed out there is no slot, and no item keeps its place, not even
