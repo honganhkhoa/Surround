@@ -20,7 +20,8 @@ final class GameDetailLayoutTests: XCTestCase {
                       narrowChipWidth: CGFloat = 0,
                       identityTwoLineRowHeight: CGFloat? = nil,
                       chromeBandTop: CGFloat? = nil,
-                      boardDepth: BoardDepthPlacement? = nil) -> GameDetailLayoutPlan {
+                      boardDepth: BoardDepthPlacement? = nil,
+                      alignsPlayerChipsToGrid: Bool = false) -> GameDetailLayoutPlan {
         GameDetailLayoutPlan(size: size, compact: compact, zen: zen, analyze: analyze,
                              chat: chat, hidesBoard: hidesBoard, keyboard: keyboard,
                              accessibility: false, foldsClock: false,
@@ -34,7 +35,7 @@ final class GameDetailLayoutTests: XCTestCase {
                              compactClockLineWidth: compactClockLineWidth,
                              narrowChipWidth: narrowChipWidth,
                              chromeBandTop: chromeBandTop,
-                             boardDepth: boardDepth)
+                             boardDepth: boardDepth, alignsPlayerChipsToGrid: alignsPlayerChipsToGrid)
     }
 
     func testZenChipsGrowToTheirLongestCountdownWithinTheRow() {
@@ -1905,6 +1906,125 @@ final class GameDetailLayoutTests: XCTestCase {
                            file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertEqual(row.minX, drawn.minX, accuracy: 0.01, message, file: file, line: line)
         XCTAssertEqual(row.maxX, drawn.maxX, accuracy: 0.01, message, file: file, line: line)
+    }
+
+    func testGridIntersectionsUseTheDrawnCellPitchAndCoordinateGutters() {
+        let frame = CGRect(x: 11, y: 23, width: 390, height: 390)
+        let midpoint = CGPoint(x: 206, y: 218)
+        // Goban centers its pixel-floored cells in a square. A coordinate gutter
+        // occupies 1/10 or 1/20 of the face on each labeled axis.
+        let cases: [(Int, Int, Bool, CGFloat, CGFloat, CGPoint)] = [
+            (19, 19, false, 2, 20.5, midpoint),
+            (19, 19, false, 3, 61 / 3, midpoint),
+            (9, 9, false, 3, 130 / 3, midpoint),
+            (9, 9, true, 3, 39, CGPoint(x: 225.5, y: 237.5)),
+            (19, 19, true, 2, 19.5, CGPoint(x: 215.75, y: 227.75)),
+            (19, 9, false, 3, 61 / 3, midpoint),
+            (9, 19, true, 3, 55 / 3, CGPoint(x: 225.5, y: 218)),
+            (19, 9, true, 3, 55 / 3, CGPoint(x: 206, y: 237.5))
+        ]
+        for (width, height, labels, scale, pitch, center) in cases {
+            let board = BoardDepthPlacement(boardWidth: width, boardHeight: height, showsCoordinates: labels,
+                                            displayScale: scale, depth: nil)
+            let grid = board.gridIntersections(in: frame)
+            let message = "\(width)×\(height), coordinates \(labels), \(scale)×"
+            XCTAssertEqual(grid.midX, center.x, accuracy: 0.001, message)
+            XCTAssertEqual(grid.midY, center.y, accuracy: 0.001, message)
+            XCTAssertEqual(grid.width, pitch * CGFloat(width - 1), accuracy: 0.001, message)
+            XCTAssertEqual(grid.height, pitch * CGFloat(height - 1), accuracy: 0.001, message)
+        }
+    }
+
+    func testPlayerChipsAboveAndBelowTheBoardFollowItsFirstAndLastColumns() {
+        let board = BoardDepthPlacement(boardWidth: 19, boardHeight: 19, showsCoordinates: true,
+                                        displayScale: 3, depth: nil)
+        for (size, compact) in [(CGSize(width: 390, height: 740), true),
+                                (CGSize(width: 375, height: 540), true),
+                                (CGSize(width: 820, height: 1074), false),
+                                (CGSize(width: 1180, height: 820), false)] {
+            let standard = plan(size, compact: compact)
+            let aligned = plan(size, compact: compact, boardDepth: board, alignsPlayerChipsToGrid: true)
+            let grid = board.gridIntersections(in: aligned[.board])
+            if standard[.opponent].isEmpty {
+                XCTAssertTrue(aligned[.opponent].isEmpty, "A folded opponent stays in the header")
+            } else {
+                XCTAssertEqual(aligned[.opponent].minX, grid.minX, accuracy: 0.01, "\(size)")
+                XCTAssertEqual(aligned[.opponent].minY, standard[.opponent].minY, "\(size)")
+                XCTAssertEqual(aligned[.opponent].maxX, standard[.opponent].maxX, accuracy: 0.01, "\(size)")
+            }
+            XCTAssertFalse(aligned.hidesActionIdentity)
+            XCTAssertEqual(aligned[.actions].maxX, grid.maxX, accuracy: 0.01, "\(size)")
+            XCTAssertEqual(aligned[.actions].minX, standard[.actions].minX, "\(size)")
+            XCTAssertEqual(aligned[.actions].minY, standard[.actions].minY, "\(size)")
+            for slot in GameDetailLayoutPlan.Slot.allCases where slot != .opponent && slot != .actions {
+                XCTAssertEqual(aligned[slot], standard[slot], "\(size): \(slot)")
+            }
+        }
+    }
+
+    func testNarrowPortraitKeepsRoomForActionsBesideThePlayerChip() {
+        let board = BoardDepthPlacement(boardWidth: 9, boardHeight: 19, showsCoordinates: false,
+                                        displayScale: 2, depth: nil)
+        let size = CGSize(width: 320, height: 548)
+        let aligned = plan(size, compact: true, boardDepth: board, alignsPlayerChipsToGrid: true)
+        let grid = board.gridIntersections(in: aligned[.board])
+        XCTAssertFalse(aligned.hidesActionIdentity)
+        XCTAssertGreaterThan(aligned[.actions].maxX, grid.maxX)
+        // A 180 pt action group, its normal gap, and the 64 pt minimum identity.
+        XCTAssertEqual(aligned[.actions].width, 180 + 10 + 64)
+        XCTAssertEqual(aligned[.board], plan(size, compact: true)[.board])
+    }
+
+    func testPlayerChipsBesideTheBoardFollowItsFirstAndLastRows() {
+        let board = BoardDepthPlacement(boardWidth: 9, boardHeight: 9, showsCoordinates: true,
+                                        displayScale: 2, depth: nil)
+        let size = CGSize(width: 669, height: 893)
+        let fold = CGRect(x: 0, y: 436, width: 669, height: 40)
+        let standard = plan(size, division: fold)
+        let aligned = plan(size, division: fold, boardDepth: board, alignsPlayerChipsToGrid: true)
+        let grid = board.gridIntersections(in: aligned[.board])
+        XCTAssertEqual(aligned[.opponent].minY, grid.minY, accuracy: 0.01)
+        XCTAssertEqual(aligned[.actions].maxY, grid.maxY, accuracy: 0.01)
+        for slot in [GameDetailLayoutPlan.Slot.opponent, .actions] {
+            XCTAssertEqual(aligned[slot].minX, standard[slot].minX)
+            XCTAssertEqual(aligned[slot].size, standard[slot].size)
+        }
+        XCTAssertEqual(aligned[.board], standard[.board])
+        XCTAssertEqual(aligned[.clocks], standard[.clocks])
+    }
+
+    func testPhoneLandscapeMovesClocksOnlyFarEnoughToAlignBothPlayerChips() {
+        let board = BoardDepthPlacement(boardWidth: 19, boardHeight: 19, showsCoordinates: true,
+                                        displayScale: 3, depth: nil)
+        let size = CGSize(width: 750, height: 312)
+        let standard = plan(size, compact: true, boardDepth: board)
+        let aligned = plan(size, compact: true, boardDepth: board, alignsPlayerChipsToGrid: true)
+        let grid = board.gridIntersections(in: standard[.board])
+        XCTAssertEqual(aligned[.board], standard[.board])
+        XCTAssertEqual(aligned[.opponent].minY, grid.minY, accuracy: 0.01)
+        XCTAssertEqual(aligned[.actions].maxY, grid.maxY, accuracy: 0.01)
+        let firstAvailableY = grid.minY + standard[.opponent].height + 4
+        XCTAssertGreaterThan(firstAvailableY, standard[.clocks].minY)
+        XCTAssertEqual(aligned[.clocks].minY, firstAvailableY, accuracy: 0.01)
+        XCTAssertEqual(aligned[.clocks].minX, standard[.clocks].minX)
+        XCTAssertEqual(aligned[.clocks].size, standard[.clocks].size)
+        XCTAssertLessThanOrEqual(aligned[.clocks].maxY, aligned[.board].maxY)
+    }
+
+    func testConstrainedChipColumnPreservesSpaceForClocksAndActions() {
+        let board = BoardDepthPlacement(boardWidth: 9, boardHeight: 9, showsCoordinates: true,
+                                        displayScale: 3, depth: nil)
+        let size = CGSize(width: 594, height: 466)
+        let standard = plan(size, compact: true, usesVerticalToolbar: true)
+        let aligned = plan(size, compact: true, usesVerticalToolbar: true,
+                           boardDepth: board, alignsPlayerChipsToGrid: true)
+        XCTAssertEqual(aligned[.board], standard[.board])
+        XCTAssertEqual(aligned[.clocks], standard[.clocks])
+        XCTAssertEqual(aligned[.opponent].size, standard[.opponent].size)
+        XCTAssertEqual(aligned[.actions].size, standard[.actions].size)
+        XCTAssertEqual(aligned[.clocks].minY - aligned[.opponent].maxY, 4, accuracy: 0.01)
+        XCTAssertEqual(aligned[.actions].minY - aligned[.clocks].maxY, 4, accuracy: 0.01)
+        assertOccupiedSlotsFit(aligned, in: size)
     }
 
     /// Flat themes keep the frames they had before boards had depth, also

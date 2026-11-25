@@ -1063,6 +1063,7 @@ struct GameDetailView: View {
         .environment(\.christmasKeepsakesLightContext,
                      ChristmasKeepsakesLightContext(size: geometry.size, safeAreaInsets: geometry.safeAreaInsets))
         .environment(\.excludesBoardsFromSceneShadows, theme == .frostPine || theme == .sakuraStream)
+        .environment(\.keepsCompactBoardsUnlit, theme == .reefLight)
         .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
         .coordinateSpace(name: ChristmasKeepsakesLightContext.coordinateSpace)
         .accessibilityElement(children: .contain)
@@ -1071,9 +1072,9 @@ struct GameDetailView: View {
         )
         .backgroundPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
             Group {
-                if theme == .sakuraStream {
+                if theme == .sakuraStream || theme == .reefLight {
                     GeometryReader { scene in
-                        GameDetailBackdrop(sakuraBoards: scene.boardShadowRegions(anchors))
+                        GameDetailBackdrop(sceneBoards: scene.boardShadowRegions(anchors))
                     }
                 } else {
                     GameDetailBackdrop(usesPhoneLandscapeFraming: usesPhoneLandscapeRoomFraming(in: geometry))
@@ -1086,10 +1087,14 @@ struct GameDetailView: View {
                 ThemeStatusBarContrast(hidden: hidesZenChrome && hidesStatusBarInZen)
             }
             .ignoresSafeArea(.container)
+            .preference(key: GameDetailForegroundAnchorsKey.self, value: GameDetailForegroundAnchors(boards: anchors))
         }
-        .overlayPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
+        .overlayPreferenceValue(GameDetailForegroundAnchorsKey.self) { anchors in
             GeometryReader { scene in
-                GameDetailSceneForeground(shadowExclusions: scene.boardShadowRegions(anchors))
+                GameDetailSceneForeground(shadowExclusions: scene.boardShadowRegions(anchors.boards),
+                                          shellFaces: anchors.shells.map {
+                                              RoundedRectangle(cornerRadius: $0.cornerRadius).path(in: scene[$0.bounds])
+                                          })
             }
             .ignoresSafeArea(.container)
         }

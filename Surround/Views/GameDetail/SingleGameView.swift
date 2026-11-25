@@ -311,6 +311,7 @@ struct SingleGameView: View {
                     boardPosition: selectedChatPosition,
                     variation: selectedChatPreview?.variation,
                     showsCoordinate: showsBoardCoordinates,
+                    surfaceIsInScene: theme == .reefLight,
                     highlightCoordinates: selectedChatPreview?.coordinates ?? [],
                     markups: .constant(
                         selectedChatPreview?.variation?.markups ?? [:]
@@ -325,6 +326,7 @@ struct SingleGameView: View {
                     newMove: $analyticsPendingMove,
                     newPosition: $analyticsPendingPosition,
                     allowsSelfCapture: game.gameData?.allowSelfCapture ?? false,
+                    surfaceIsInScene: theme == .reefLight,
                     boardTool: analysisToolSelection,
                     markups: analyzeMarkupsBinding(for: analyticsPosition)
                 )
@@ -352,6 +354,7 @@ struct SingleGameView: View {
                     newPosition: $pendingPosition,
                     allowsSelfCapture: game.gameData?.allowSelfCapture ?? false,
                     stoneRemovalSelectedPoints: stoneRemovalSelection,
+                    surfaceIsInScene: theme == .reefLight,
                     highlightCoordinates: selectedChatPreview?.coordinates ?? [],
                     undoRequestCoordinates: game.undoRequestCoordinates
                 )
@@ -1006,7 +1009,8 @@ struct SingleGameView: View {
             compactColumnIdentityShortHeight: GameDetailPlayerIdentity.compactColumnHeight(
                 dynamicTypeSize: dynamicTypeSize, secondLine: false),
             columnDetail: columnDetail(fullCards: true), compactColumnDetail: columnDetail(fullCards: false),
-            chromeBandTop: chromeBandTop, boardDepth: boardDepthPlacement)
+            chromeBandTop: chromeBandTop, boardDepth: boardDepthPlacement,
+            alignsPlayerChipsToGrid: theme == .reefLight)
     }
 
     /// How the board draws inside its slot. Every board this screen shows has the game's size.

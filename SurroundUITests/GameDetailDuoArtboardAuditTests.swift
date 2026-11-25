@@ -572,6 +572,10 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         auditThemeStates(theme: "feltMeadow", suffix: "-felt-meadow-night", appearance: "dark")
     }
 
+    func testReefLightThemeStates() {
+        auditThemeStates(theme: "reefLight", suffix: "-reef-light", appearance: "light")
+    }
+
     func testWhittledWoodlandThemeStates() {
         auditThemeStates(theme: "whittledWoodland", suffix: "-whittled-woodland", appearance: "light")
     }

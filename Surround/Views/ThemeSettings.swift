@@ -45,10 +45,10 @@ struct ThemeLivePreview: View {
                     // Anchor the lower tree to the tile, not the oversized
                     // board whose corner fills this preview.
                     GameDetailBackdrop().frame(width: side, height: side)
-                } else if theme != .sakuraStream {
+                } else if theme != .sakuraStream && theme != .reefLight {
                     GameDetailBackdrop()
                 }
-                BoardView(boardPosition: Self.position)
+                BoardView(boardPosition: Self.position, surfaceIsInScene: theme == .reefLight)
                     .environment(\.excludesBoardsFromSceneShadows,
                                  theme == .frostPine || theme == .sakuraStream)
                     .frame(width: boardSide, height: boardSide)
@@ -56,16 +56,16 @@ struct ThemeLivePreview: View {
             }
             .frame(width: side, height: side, alignment: .topLeading)
             .backgroundPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
-                if theme == .sakuraStream {
+                if theme == .sakuraStream || theme == .reefLight {
                     GeometryReader { scene in
-                        GameDetailBackdrop(sakuraBoards: scene.boardShadowRegions(anchors))
+                        GameDetailBackdrop(sceneBoards: scene.boardShadowRegions(anchors))
                     }
                 }
             }
             .overlayPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
-                if theme == .frostPine || theme == .sakuraStream {
+                if theme == .frostPine || theme == .sakuraStream || theme == .reefLight {
                     GeometryReader { scene in
-                        GameDetailSceneForeground(shadowExclusions: scene.boardShadowRegions(anchors))
+                        GameDetailSceneForeground(shadowExclusions: scene.boardShadowRegions(anchors), animatesWater: false)
                     }
                 }
             }

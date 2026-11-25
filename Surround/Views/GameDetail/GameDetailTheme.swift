@@ -19,6 +19,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     case flowingInkPlain
     case sakuraStream
     case whittledWoodland
+    case reefLight
 
     var id: Self { self }
 
@@ -102,6 +103,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         case .rakedGarden: String(localized: "Raked Garden", comment: "Theme name: a Japanese dry landscape garden with raked sand, basalt and jade stones. Use a short, natural garden title; the sand pattern is visible in the preview.")
         case .surroundStudio: "Surround Studio"
         case .whittledWoodland: String(localized: "Whittled Woodland", comment: "Theme name: a miniature woodland carved by hand, with a maple board and walnut and birch stones.")
+        case .reefLight: String(localized: "Reef Light", comment: "Sunlight filters onto a sandy reef where the players use dark abalone and pale mother-of-pearl stones.")
         case .sakuraStream: String(localized: "Sakura Stream", comment: "Theme name: a clear stream beside cherry blossoms, with ivory ceramic and pale pink porcelain. Use a short, natural title preserving the cherry-blossom and stream imagery.")
         case .frostPine: String(localized: "Frost & Pine", comment: "Theme name: frost crystals and pine branches. Preserve the winter frost and pine imagery in a short title.")
         case .feltMeadow: String(localized: "Felt Meadow", comment: "Theme name: a meadow crafted from soft wool felt. Felt is the textile material, not the past tense of feel. Use a short, natural title.")
@@ -121,7 +123,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
             nil
-        case .standard, .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland: nil
+        case .standard, .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight: nil
         case .nebulaPearl: .dark
         }
     }
@@ -129,6 +131,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     /// Resolve image grading alongside the board palette. The image references
     /// stay cached, so an appearance change does not decode or regenerate art.
     func board(for scheme: ColorScheme) -> BoardAppearance {
+        if self == .reefLight { return ReefLight.board(for: scheme) }
         if self == .whittledWoodland { return WhittledWoodland.board(for: scheme) }
         if self == .sakuraStream, scheme == .dark {
             var night = board
@@ -386,6 +389,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     var board: BoardAppearance {
         switch self {
         case .whittledWoodland: return WhittledWoodland.board(for: .light)
+        case .reefLight: return ReefLight.board(for: .light)
         case .sakuraStream:
             return BoardAppearance(
                 boardColor: Color(themeHex: 0xF2E7D7),
@@ -1562,6 +1566,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.page
         case .paperBlossoms: PaperBlossomsColors.page
         case .whittledWoodland: WhittledWoodland.page
+        case .reefLight: ReefLight.page
         }
     }
 
@@ -1580,6 +1585,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.panel
         case .paperBlossoms: PaperBlossomsColors.panel
         case .whittledWoodland: WhittledWoodland.panel
+        case .reefLight: ReefLight.panel
         }
     }
 
@@ -1597,6 +1603,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.foreground
         case .paperBlossoms: PaperBlossomsColors.foreground
         case .whittledWoodland: WhittledWoodland.foreground
+        case .reefLight: ReefLight.foreground
         }
     }
 
@@ -1612,6 +1619,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.detailSecondary
         case .paperBlossoms: PaperBlossomsColors.detailSecondary
         case .whittledWoodland: WhittledWoodland.detailSecondary
+        case .reefLight: ReefLight.detailSecondary
         default: .secondary
         }
     }
@@ -1636,6 +1644,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.panelBorder.opacity(0.28)
         case .paperBlossoms: PaperBlossomsColors.panelBorder.opacity(0.28)
         case .whittledWoodland: WhittledWoodland.panelBorder.opacity(0.28)
+        case .reefLight: ReefLight.panelBorder.opacity(0.28)
         }
     }
 
@@ -1652,6 +1661,15 @@ extension SurroundTheme {
     /// keep glass.
     var usesGlassControls: Bool { self != .standard && self != .feltMeadow && self != .paperBlossoms && self != .whittledWoodland && !isFlowingInk }
 
+    /// The standard clock uses clear glass. These scene themes can also tint
+    /// the native glass on clocks and player identities.
+    var allowsGlassOnPlayerSurfaces: Bool {
+        switch self {
+        case .standard, .nebulaPearl, .rakedGarden, .surroundStudio, .sakuraStream: true
+        default: false
+        }
+    }
+
     /// The same hue has different strengths on the dark and pale clock faces.
     fileprivate var clockShoulderPigments: (black: UInt32, white: UInt32)? {
         switch self {
@@ -1667,7 +1685,7 @@ extension SurroundTheme {
 
     /// The natural scenes use their own foregrounds, translucent pigment
     /// on older systems, and opaque controls under Increase Contrast.
-    var usesLightSceneSurfaces: Bool { isFlowingInk || self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream || self == .whittledWoodland }
+    var usesLightSceneSurfaces: Bool { isFlowingInk || self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream || self == .whittledWoodland || self == .reefLight }
 
     /// Tinted Liquid Glass for a player's clock, in the stone's color.
     /// Light stones use a strong tint to preserve their material color over
@@ -1695,6 +1713,8 @@ extension SurroundTheme {
             color == .black ? ChristmasKeepsakesColors.blackGlass.opacity(0.82) : ChristmasKeepsakesColors.whiteGlass.opacity(0.84)
         case .paperBlossoms:
             color == .black ? PaperBlossomsColors.blackGlass.opacity(0.82) : PaperBlossomsColors.whiteGlass.opacity(0.84)
+        case .reefLight:
+            clockSolidSurface(color).opacity(color == .black ? 0.92 : 0.95)
         case .whittledWoodland:
             clockSolidSurface(color)
         }
@@ -1725,6 +1745,8 @@ extension SurroundTheme {
             color == .black ? ChristmasKeepsakesColors.blackGlass.opacity(0.86) : ChristmasKeepsakesColors.whiteIdentityGlass.opacity(0.90)
         case .paperBlossoms:
             color == .black ? PaperBlossomsColors.blackGlass.opacity(0.86) : PaperBlossomsColors.whiteIdentityGlass.opacity(0.90)
+        case .reefLight:
+            clockSolidSurface(color).opacity(color == .black ? 0.92 : 0.95)
         case .whittledWoodland:
             clockSolidSurface(color)
         }
@@ -1747,6 +1769,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.action
         case .paperBlossoms: PaperBlossomsColors.action
         case .whittledWoodland: WhittledWoodland.action
+        case .reefLight: ReefLight.action
         }
     }
 
@@ -1759,7 +1782,7 @@ extension SurroundTheme {
         case .nightGarden: actionTint?.opacity(0.86)
         case .sakuraStream: actionTint?.opacity(0.86)
         case .christmasKeepsakes: actionTint?.opacity(0.86)
-        case .paperBlossoms, .whittledWoodland: actionTint?.opacity(0.86)
+        case .paperBlossoms, .whittledWoodland, .reefLight: actionTint?.opacity(0.86)
         case .rakedGarden: actionTint?.opacity(0.88)
         default: actionTint
         }
@@ -1777,6 +1800,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.selection
         case .paperBlossoms: PaperBlossomsColors.selection
         case .whittledWoodland: WhittledWoodland.selection
+        case .reefLight: ReefLight.selection
         default: Color(uiColor: .systemIndigo)
         }
     }
@@ -1797,6 +1821,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.chatBubble
         case .paperBlossoms: PaperBlossomsColors.chatBubble
         case .whittledWoodland: WhittledWoodland.chatBubble
+        case .reefLight: ReefLight.chatBubble
         }
     }
 }
@@ -1821,6 +1846,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.selection
         case .paperBlossoms: PaperBlossomsColors.selection
         case .whittledWoodland: WhittledWoodland.selection
+        case .reefLight: ReefLight.selection
         }
     }
 
@@ -1841,6 +1867,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.conditional
         case .paperBlossoms: PaperBlossomsColors.conditional
         case .whittledWoodland: WhittledWoodland.conditional
+        case .reefLight: ReefLight.conditional
         }
     }
 
@@ -1861,6 +1888,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.keyline
         case .paperBlossoms: PaperBlossomsColors.keyline
         case .whittledWoodland: WhittledWoodland.keyline
+        case .reefLight: ReefLight.keyline
         }
     }
 
@@ -1880,6 +1908,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.treeGuide.opacity(0.24)
         case .paperBlossoms: PaperBlossomsColors.treeGuide.opacity(0.24)
         case .whittledWoodland: WhittledWoodland.panelBorder.opacity(0.24)
+        case .reefLight: ReefLight.panelBorder.opacity(0.24)
         }
     }
 
@@ -1899,6 +1928,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.selection
         case .paperBlossoms: PaperBlossomsColors.selection
         case .whittledWoodland: WhittledWoodland.selection
+        case .reefLight: ReefLight.selection
         }
     }
 
@@ -1910,7 +1940,7 @@ extension SurroundTheme {
             nil
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xB7A4FF).opacity(0.85)
-        case .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland: nil
+        case .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight: nil
         }
     }
 
@@ -1930,6 +1960,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.conditional
         case .paperBlossoms: PaperBlossomsColors.conditional
         case .whittledWoodland: WhittledWoodland.conditional
+        case .reefLight: ReefLight.conditional
         }
     }
 
@@ -1949,6 +1980,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.idle
         case .paperBlossoms: PaperBlossomsColors.idle
         case .whittledWoodland: WhittledWoodland.idle
+        case .reefLight: ReefLight.idle
         }
     }
 }
@@ -2044,7 +2076,7 @@ extension SurroundTheme {
             }
             return [.init(color: PaperBlossomsColors.whiteSurfaceTop, location: 0),
                     .init(color: PaperBlossomsColors.whiteSurfaceBottom, location: 1)]
-        case .whittledWoodland:
+        case .whittledWoodland, .reefLight:
             let surfaces = identityChipColors(color)
             return [.init(color: surfaces[0], location: 0), .init(color: surfaces[1], location: 1)]
         }
@@ -2066,6 +2098,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.blackSolid : ChristmasKeepsakesColors.whiteGlass
         case .paperBlossoms: color == .black ? PaperBlossomsColors.blackSolid : PaperBlossomsColors.whiteGlass
         case .whittledWoodland: color == .black ? WhittledWoodland.walnut : WhittledWoodland.birch
+        case .reefLight: color == .black ? ReefLight.deepGlass : ReefLight.paleGlass
         }
     }
 
@@ -2084,6 +2117,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.cream : ChristmasKeepsakesColors.whiteForeground
         case .paperBlossoms: color == .black ? PaperBlossomsColors.cream : PaperBlossomsColors.whiteForeground
         case .whittledWoodland: color == .black ? WhittledWoodland.cream : WhittledWoodland.whiteForeground
+        case .reefLight: color == .black ? ReefLight.blackForeground : ReefLight.whiteForeground
         }
     }
 
@@ -2105,12 +2139,13 @@ extension SurroundTheme {
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.blackAccent : ChristmasKeepsakesColors.whiteAccent
         case .paperBlossoms: color == .black ? PaperBlossomsColors.blackAccent : PaperBlossomsColors.whiteAccent
         case .whittledWoodland: color == .black ? WhittledWoodland.blackAccent : WhittledWoodland.whiteAccent
+        case .reefLight: color == .black ? ReefLight.blackAccent : ReefLight.whiteAccent
         }
     }
 
     private var usesWarmClockStatusColors: Bool {
         switch self {
-        case .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland: true
+        case .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight: true
         default: false
         }
     }
@@ -2231,6 +2266,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.turnOutline
         case .paperBlossoms: PaperBlossomsColors.turnOutline
         case .whittledWoodland: WhittledWoodland.turnOutline
+        case .reefLight: ReefLight.turnOutline
         }
     }
 
@@ -2250,6 +2286,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.turnGlow
         case .paperBlossoms: PaperBlossomsColors.turnGlow
         case .whittledWoodland: WhittledWoodland.turnGlow
+        case .reefLight: ReefLight.turnGlow
         }
     }
 
@@ -2271,6 +2308,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.action
         case .paperBlossoms: PaperBlossomsColors.action
         case .whittledWoodland: WhittledWoodland.action
+        case .reefLight: ReefLight.action
         }
     }
 
@@ -2318,6 +2356,10 @@ extension SurroundTheme {
             color == .black
                 ? [PaperBlossomsColors.blackSurfaceTop, PaperBlossomsColors.blackSurfaceBottom]
                 : [PaperBlossomsColors.whiteSurfaceTop, PaperBlossomsColors.whiteSurfaceBottom]
+        case .reefLight:
+            color == .black
+                ? [ReefLight.blackSurfaceTop, ReefLight.blackSurfaceBottom]
+                : [ReefLight.whiteSurfaceTop, ReefLight.whiteSurfaceBottom]
         case .whittledWoodland:
             color == .black
                 ? [WhittledWoodland.blackSurfaceTop, WhittledWoodland.blackSurfaceBottom]
@@ -2363,6 +2405,8 @@ extension SurroundTheme {
             color == .black
                 ? PaperBlossomsColors.blackBorder.opacity(0.3)
                 : PaperBlossomsColors.whiteBorder.opacity(0.35)
+        case .reefLight:
+            identityForeground(color).opacity(0.28)
         case .whittledWoodland:
             color == .black
                 ? WhittledWoodland.blackBorder.opacity(0.3)
@@ -2385,6 +2429,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: color == .black ? ChristmasKeepsakesColors.cream : ChristmasKeepsakesColors.whiteForeground
         case .paperBlossoms: color == .black ? PaperBlossomsColors.cream : PaperBlossomsColors.whiteForeground
         case .whittledWoodland: color == .black ? WhittledWoodland.cream : WhittledWoodland.whiteForeground
+        case .reefLight: color == .black ? ReefLight.blackForeground : ReefLight.whiteForeground
         }
     }
 
@@ -2412,6 +2457,8 @@ extension SurroundTheme {
             color == .black ? ChristmasKeepsakesColors.blackSecondary : ChristmasKeepsakesColors.whiteSecondary
         case .paperBlossoms:
             color == .black ? PaperBlossomsColors.blackSecondary : PaperBlossomsColors.whiteSecondary
+        case .reefLight:
+            color == .black ? ReefLight.blackSecondary : ReefLight.whiteSecondary
         case .whittledWoodland:
             color == .black ? WhittledWoodland.blackSecondary : WhittledWoodland.whiteSecondary
         }
@@ -2573,6 +2620,7 @@ extension SurroundTheme {
         case .christmasKeepsakes: ChristmasKeepsakesColors.conditional
         case .paperBlossoms: PaperBlossomsColors.selection
         case .whittledWoodland: WhittledWoodland.selection
+        case .reefLight: ReefLight.selection
         default: actionTint ?? .accentColor
         }
     }
@@ -3346,7 +3394,7 @@ extension SurroundTheme {
     /// Themes with their own readable ink for unselected toolbar symbols and detail text.
     var usesCustomDetailTint: Bool {
         switch self {
-        case .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland: true
+        case .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight: true
         default: false
         }
     }
@@ -4094,7 +4142,7 @@ struct ThemeStatusBarContrast: View {
         return switch theme {
         case .nightGarden: 0.8
         case .flowingInk, .flowingInkJade: 0.85
-        case .rakedGarden, .frostPine, .surroundStudio, .paperBlossoms, .sakuraStream, .whittledWoodland: 0.55
+        case .rakedGarden, .frostPine, .surroundStudio, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight: 0.55
         default: 0
         }
     }
@@ -4199,7 +4247,7 @@ struct GameDetailBackdrop: View {
     @Environment(\.surroundTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     var usesPhoneLandscapeFraming = false
-    var sakuraBoards: [BoardSceneShadowRegion] = []
+    var sceneBoards: [BoardSceneShadowRegion] = []
 
     var body: some View {
         switch theme {
@@ -4214,6 +4262,8 @@ struct GameDetailBackdrop: View {
             RakedGardenScene(scheme: colorScheme)
         case .surroundStudio:
             SurroundStudioScene(scheme: colorScheme)
+        case .reefLight:
+            ReefLightScene(scheme: colorScheme, boards: sceneBoards)
         case .whittledWoodland:
             WhittledWoodlandScene(scheme: colorScheme)
         case .feltMeadow:
@@ -4227,7 +4277,7 @@ struct GameDetailBackdrop: View {
         case .frostPine:
             FrostPineScene(scheme: colorScheme)
         case .sakuraStream:
-            SakuraStreamScene(scheme: colorScheme, boards: sakuraBoards)
+            SakuraStreamScene(scheme: colorScheme, boards: sceneBoards)
         }
     }
 }
@@ -5706,11 +5756,34 @@ struct GameDetailSceneFoliage: View {
     }
 }
 
+/// Resolve all surfaces in the foreground's coordinate space as the game resizes.
+struct GameDetailForegroundAnchors {
+    struct Shell {
+        let bounds: Anchor<CGRect>
+        let cornerRadius: CGFloat
+    }
+
+    var boards: [BoardSceneShadowAnchor] = []
+    var shells: [Shell] = []
+}
+
+struct GameDetailForegroundAnchorsKey: PreferenceKey {
+    static let defaultValue = GameDetailForegroundAnchors()
+
+    static func reduce(value: inout GameDetailForegroundAnchors, nextValue: () -> GameDetailForegroundAnchors) {
+        let next = nextValue()
+        value.boards.append(contentsOf: next.boards)
+        value.shells.append(contentsOf: next.shells)
+    }
+}
+
 /// Cast shadows retain their projection across the game, above the backdrop.
 struct GameDetailSceneForeground: View {
     @Environment(\.surroundTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     var shadowExclusions: [BoardSceneShadowRegion] = []
+    var shellFaces: [Path] = []
+    var animatesWater = true
 
     var body: some View {
         Group {
@@ -5718,6 +5791,9 @@ struct GameDetailSceneForeground: View {
                 GeometryReader { geometry in
                     RakedGardenMapleShadow(size: geometry.size, scheme: colorScheme).equatable()
                 }
+            } else if theme == .reefLight {
+                ReefLightWater(scheme: colorScheme, boards: shadowExclusions, animates: animatesWater,
+                               shells: shellFaces)
             } else if theme == .sakuraStream {
                 GeometryReader { geometry in
                     SakuraStreamCanopyForeground(size: geometry.size, scheme: colorScheme, boards: shadowExclusions)

@@ -637,6 +637,18 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                                appearance: .dark)
     }
 
+    func testReefLightThemeOrientations() {
+        auditThemeOrientations(theme: "reefLight", title: "Reef Light", suffix: "-reef-light", appearance: .light)
+    }
+
+    func testReefLightThemePanels() {
+        auditThemePanels(theme: "reefLight", title: "Reef Light", suffix: "-reef-light-night", appearance: .dark)
+    }
+
+    func testReefLightThemeNarrowWindow() {
+        auditNarrowNativeWindowArtboard(theme: "reefLight", suffix: "-reef-light", appearance: .light)
+    }
+
     func testWhittledWoodlandThemeOrientations() {
         auditThemeOrientations(theme: "whittledWoodland", title: "Whittled Woodland",
                                suffix: "-whittled-woodland", appearance: .light)
@@ -1639,7 +1651,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                                                  requestedSize: CGSize = CGSize(width: 375, height: 548)) {
         let app = launchGame(artboard: 84, portrait: true, theme: theme, appearance: appearance)
         defer {
-            if theme?.hasPrefix("flowingInk") == true || theme == "paperBlossoms" || theme == "sakuraStream" {
+            if theme?.hasPrefix("flowingInk") == true || theme == "paperBlossoms" || theme == "sakuraStream" || theme == "reefLight" {
                 restoreFullWindow(in: app)
                 app.terminate()
             }

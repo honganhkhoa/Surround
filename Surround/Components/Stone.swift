@@ -44,6 +44,8 @@ private struct ExcludesBoardsFromSceneShadowsKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
+    @Entry var keepsCompactBoardsUnlit = false
+
     var excludesBoardsFromSceneShadows: Bool {
         get { self[ExcludesBoardsFromSceneShadowsKey.self] }
         set { self[ExcludesBoardsFromSceneShadowsKey.self] = newValue }
@@ -52,6 +54,7 @@ extension EnvironmentValues {
 
 struct BoardSceneShadowExclusion: ViewModifier {
     @Environment(\.excludesBoardsFromSceneShadows) private var enabled
+    @Environment(\.keepsCompactBoardsUnlit) private var keepsCompactBoardsUnlit
     var cornerRadius: CGFloat = 0
     var isDetailed = true
     var cellSize: CGFloat = 0
@@ -59,7 +62,7 @@ struct BoardSceneShadowExclusion: ViewModifier {
 
     func body(content: Content) -> some View {
         content.anchorPreference(key: BoardSceneShadowExclusionKey.self, value: .bounds) {
-            enabled ? [BoardSceneShadowAnchor(bounds: $0, cornerRadius: cornerRadius,
+            enabled || (keepsCompactBoardsUnlit && !isDetailed) ? [BoardSceneShadowAnchor(bounds: $0, cornerRadius: cornerRadius,
                                              isDetailed: isDetailed, cellSize: cellSize, frontDepth: frontDepth)] : []
         }
     }
@@ -182,7 +185,7 @@ enum ImageStoneShadowStyle: Equatable {
     case ice
     /// A firmer contact edge gives polished glass depth on dark enamel.
     case raisedGlass
-    /// Cream glass needs a stronger white contact without a broader cast.
+    /// Grounds cream glass and nacre with a firmer contact shadow beneath White.
     case raisedIvoryGlass
 
     var usesRaisedGlassProfile: Bool { self == .raisedGlass || self == .raisedIvoryGlass }
@@ -526,6 +529,25 @@ struct BoardDepthPlacement: Equatable {
         return BoardDepthGeometry(containerSize: frame.size, boardWidth: boardWidth, boardHeight: boardHeight,
                                   showsCoordinates: showsCoordinates, displayScale: displayScale, depth: depth)
             .visibleRect.offsetBy(dx: frame.minX, dy: frame.minY)
+    }
+
+    /// Bounds from the first playable intersection to the last, in layout coordinates.
+    func gridIntersections(in frame: CGRect) -> CGRect {
+        guard !frame.isEmpty, boardWidth > 0, boardHeight > 0 else { return .zero }
+        let layout = BoardDepthGeometry(containerSize: frame.size, boardWidth: boardWidth, boardHeight: boardHeight,
+                                       showsCoordinates: showsCoordinates, displayScale: displayScale, depth: depth)
+        let face = layout.faceRect.offsetBy(dx: frame.minX, dy: frame.minY)
+        let grid = boardGridSize(containerSize: face.size, boardWidth: boardWidth, boardHeight: boardHeight,
+                                 showsCoordinates: showsCoordinates)
+        let side = min(grid.width, grid.height)
+        let width = CGFloat(boardWidth), height = CGFloat(boardHeight)
+        // BoardView centers the coordinate frame, then shifts it half a gutter
+        // down and right for the labels. Its square content starts at that origin.
+        let x = face.midX - grid.width / 2 + (showsCoordinates ? face.width / (width + 1) / 2 : 0)
+        let y = face.midY - grid.height / 2 + (showsCoordinates ? face.height / (height + 1) / 2 : 0)
+        let linesWidth = (width - 1) * layout.cellSize, linesHeight = (height - 1) * layout.cellSize
+        return CGRect(x: x + (side - linesWidth) / 2, y: y + (side - linesHeight) / 2,
+                      width: linesWidth, height: linesHeight)
     }
 }
 
@@ -1076,6 +1098,10 @@ struct BoardAppearance: Equatable {
         restoreMark: Color(red: 0.157, green: 0.408, blue: 0.302),
         removalMarkCasing: .white
     )
+
+    func stonePadding(at cellSize: CGFloat) -> CGFloat {
+        cellSize < 10 ? 0 : 1
+    }
 
     func stones(_ color: StoneColor) -> StonePalette {
         color == .black ? black : white

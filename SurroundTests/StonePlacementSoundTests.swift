@@ -3,8 +3,8 @@ import UIKit
 import XCTest
 
 final class StonePlacementSoundTests: XCTestCase {
-    func testSakuraPaperAndWoodlandUseTheirOwnPlacementAndCaptureBanks() {
-        for theme: SurroundTheme in [.sakuraStream, .paperBlossoms, .whittledWoodland] {
+    func testSelectedMaterialThemesUseTheirOwnPlacementAndCaptureBanks() {
+        for theme: SurroundTheme in [.sakuraStream, .paperBlossoms, .whittledWoodland, .reefLight] {
             XCTAssertEqual(StonePlacementSoundPlayer.assetName(theme: theme, color: .black, variation: 1),
                            "StoneSound-\(theme.rawValue)-black-1")
             XCTAssertEqual(StonePlacementSoundPlayer.captureAssetName(theme: theme, color: .white,

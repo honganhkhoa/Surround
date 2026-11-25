@@ -108,7 +108,7 @@ struct GameDetailLayoutPlan {
          columnDetail: GameDetailColumnDetailLayouts = .init(),
          compactColumnDetail: GameDetailColumnDetailLayouts = .init(),
          chromeBandTop: CGFloat? = nil,
-         boardDepth: BoardDepthPlacement? = nil) {
+         boardDepth: BoardDepthPlacement? = nil, alignsPlayerChipsToGrid: Bool = false) {
         // One panel on every arrangement, independent of the window size.
         let analyze = analyze && !zen
         let chat = chat && !zen && !analyze
@@ -940,6 +940,10 @@ struct GameDetailLayoutPlan {
             frames[.analysis] = .zero
             frames[.chat] = .zero
         }
+        if alignsPlayerChipsToGrid, !hidesIdentity, let boardDepth {
+            alignPlayerChips(to: boardDepth.gridIntersections(in: self[.board]),
+                             minimumActionRowWidth: (showsActions ? actionSize.width + 10 : 0) + 64)
+        }
         if recoveryHeight > 0 {
             // Recovery is exceptional and never participates in the ordinary
             // board budget. Use empty space above a width-bound board first;
@@ -973,6 +977,60 @@ struct GameDetailLayoutPlan {
         // do not expose those obsolete positions as occupied layout geometry.
         for slot in Slot.allCases where self[slot].isEmpty {
             frames[slot] = .zero
+        }
+    }
+
+    /// On sand the engraved grid is the board's visible edge. Rows align to its
+    /// outer columns and side stacks to its outer rows, within the space free
+    /// around the clock and controls. Hidden identities retain their normal layout.
+    private mutating func alignPlayerChips(to grid: CGRect, minimumActionRowWidth: CGFloat) {
+        guard !grid.isEmpty else { return }
+        let board = self[.board]
+        var clocks = self[.clocks]
+        let clearance: CGFloat = 4
+        func sharesColumn(_ lhs: CGRect, _ rhs: CGRect) -> Bool {
+            !lhs.isEmpty && !rhs.isEmpty && lhs.maxX > rhs.minX && lhs.minX < rhs.maxX
+        }
+        var opponent = self[.opponent]
+        let actions = self[.actions]
+        if !opponent.isEmpty {
+            if sharesColumn(opponent, board) {
+                // The shared preview, when present, keeps its other edge.
+                let x = min(grid.minX, opponent.maxX - min(64, opponent.width))
+                opponent = CGRect(x: x, y: opponent.minY, width: opponent.maxX - x, height: opponent.height)
+            } else {
+                var y = min(grid.minY, max(opponent.minY, board.maxY - opponent.height))
+                // A separate clock column can use the space beneath its pair.
+                // Move only enough to clear the chip, stopping at the board's
+                // bottom or the next occupied slot. Packed Duo stacks stay put.
+                let needed = y + opponent.height + clearance - clocks.minY
+                if needed > 0, clocks.minY >= opponent.maxY, sharesColumn(opponent, clocks),
+                   !sharesColumn(clocks, actions) {
+                    var limit = board.maxY
+                    for lower in frames.values where lower.minY >= clocks.maxY && sharesColumn(clocks, lower) {
+                        limit = min(limit, lower.minY - clearance)
+                    }
+                    clocks = clocks.offsetBy(dx: 0, dy: min(needed, max(0, limit - clocks.maxY)))
+                    frames[.clocks] = clocks
+                }
+                for next in [clocks, actions] where sharesColumn(opponent, next) && next.minY > opponent.minY {
+                    y = min(y, max(opponent.minY, next.minY - clearance - opponent.height))
+                }
+                opponent = opponent.offsetBy(dx: 0, dy: y - opponent.minY)
+            }
+            frames[.opponent] = opponent
+        }
+        guard !hidesActionIdentity, !actions.isEmpty else { return }
+        if sharesColumn(actions, board) {
+            let right = max(grid.maxX, actions.minX + min(actions.width, minimumActionRowWidth))
+            frames[.actions] = CGRect(x: actions.minX, y: actions.minY, width: right - actions.minX,
+                                      height: actions.height)
+        } else {
+            var y = max(grid.maxY - actions.height, min(board.minY, actions.minY))
+            for previous in [clocks, opponent] where sharesColumn(actions, previous) && previous.minY < actions.minY {
+                y = max(y, min(actions.minY, previous.maxY + clearance))
+            }
+            frames[.actions] = actions.offsetBy(dx: 0, dy: y - actions.minY)
         }
     }
 }

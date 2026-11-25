@@ -434,7 +434,9 @@ private struct GameDetailClockCard: View {
         if state.passed || (state.notStarted && !state.firstMoveDeadline) {
             return Color(uiColor: .systemGray)
         }
-        return state.suddenDeath ? theme.clockSuddenDeathBadge(scheme: colorScheme) : theme.statusBadge
+        if state.suddenDeath { return theme.clockSuddenDeathBadge(scheme: colorScheme) }
+        if theme == .reefLight, state.running { return ReefLight.turnBadge(on: color) }
+        return theme.statusBadge
     }
     private var agreementColor: Color {
         theme.clockAgreementAccent(color, scheme: colorScheme)
@@ -494,9 +496,7 @@ private struct GameDetailClockCard: View {
                     }
                 }
                 .modifier(GameDetailClearGlass(shape: shape,
-                                               enabled: !theme.isFlowingInk && theme != .feltMeadow
-                                                   && theme != .paperBlossoms && theme != .christmasKeepsakes && theme != .frostPine
-                                                   && theme != .nightGarden && theme != .whittledWoodland
+                                               enabled: theme.allowsGlassOnPlayerSurfaces
                                                    && (theme != .sakuraStream || style != .inline)
                                                    && !reduceTransparency
                                                    && (!theme.usesLightSceneSurfaces || contrast != .increased),
@@ -632,8 +632,7 @@ private struct GameDetailClockCard: View {
     /// Scene clocks in a glass theme; header chips already sit on the bar's
     /// glass, and accessibility settings keep the solid surfaces.
     private var showsThemeGlass: Bool {
-        guard !theme.isFlowingInk, theme != .christmasKeepsakes, theme != .frostPine, theme != .nightGarden,
-              theme.usesGlassControls, style != .inline,
+        guard theme.allowsGlassOnPlayerSurfaces, theme.usesGlassControls, style != .inline,
               !reduceTransparency, contrast != .increased else {
             return false
         }
@@ -642,7 +641,10 @@ private struct GameDetailClockCard: View {
     }
 
     @ViewBuilder private var surface: some View {
-        if theme == .whittledWoodland {
+        if theme == .reefLight {
+            ReefLightShellSurface(color: color, cornerRadius: clockCornerRadius, role: .clock,
+                                  compact: style != .full || narrowFullCard || columnCard)
+        } else if theme == .whittledWoodland {
             WhittledWoodlandControlSurface(color: color, cornerRadius: clockCornerRadius,
                                            runningInk: state.running ? accent : nil)
         } else if theme == .frostPine {
@@ -694,7 +696,10 @@ private struct GameDetailClockCard: View {
 
     private var clockOutline: some View {
         ZStack {
-            if theme.isFlowingInk || theme == .christmasKeepsakes {
+            if theme == .reefLight {
+                ReefLightClockHighlight(color: color, cornerRadius: clockCornerRadius, isRunning: state.running,
+                                        isWarning: state.suddenDeath, plain: reduceTransparency || contrast == .increased)
+            } else if theme.isFlowingInk || theme == .christmasKeepsakes {
                 GameDetailMatteClockOutline(color: color, isRunning: state.running,
                                            isWarning: state.suddenDeath, cornerRadius: clockCornerRadius)
             } else {
@@ -1319,7 +1324,11 @@ struct GameDetailPlayerIdentity: View {
             }
         }
         .background {
-            if theme == .whittledWoodland {
+            if theme == .reefLight {
+                ReefLightShellSurface(color: color, cornerRadius: chipCornerRadius, role: .player,
+                                      compact: navigationHeader || compactHeader || compactColumn || avatarOnly,
+                                      shellOnLeading: shellOnLeading, hairlineOnly: avatarOnly)
+            } else if theme == .whittledWoodland {
                 WhittledWoodlandControlSurface(color: color, cornerRadius: chipCornerRadius, isIdentity: true)
             } else if theme == .frostPine {
                 FrostPineWoodPlateSurface(color: color, cornerRadius: chipCornerRadius, role: .player,
@@ -1415,6 +1424,11 @@ struct GameDetailPlayerIdentity: View {
     }
 
     private var chipCornerRadius: CGFloat { compactColumn ? 9 : (vertical ? 12 : 10) }
+    /// Put the shell detail opposite the avatar. Navigation headers always
+    /// lead with it, and stacked layouts align it with the identity text.
+    private var shellOnLeading: Bool {
+        !navigationHeader && (vertical ? identityAlignment == .trailing : !avatarLeads)
+    }
     private var compactPaperCorner: Bool { !vertical || compactColumn || navigationHeader || compactHeader || avatarOnly }
     private var chipPadding: CGFloat {
         vertical ? (compactColumn ? 5 : columnPadding) : (compactHeader ? 0 : (accessibleRow ? 6 : 4))
@@ -1423,8 +1437,7 @@ struct GameDetailPlayerIdentity: View {
     /// Scene chips in a glass theme; the navigation header sits on the bar's
     /// glass, and accessibility settings keep the solid chip.
     private var showsThemeGlass: Bool {
-        guard !theme.isFlowingInk, theme != .christmasKeepsakes, theme != .frostPine, theme != .nightGarden,
-              theme.usesGlassControls, !navigationHeader,
+        guard theme.allowsGlassOnPlayerSurfaces, theme.usesGlassControls, !navigationHeader,
               !reduceTransparency, contrast != .increased else {
             return false
         }

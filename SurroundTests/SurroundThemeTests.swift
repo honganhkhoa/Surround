@@ -428,6 +428,7 @@ final class SurroundThemeTests: XCTestCase {
         let names = families.flatMap { family in (0..<4).map { "\(family)\($0)" } }
             + ["FeltMeadowBlackStone", "FeltMeadowWhiteStone",
                "NightGardenBlackStone", "NightGardenWhiteStone",
+               "ReefLightBlackStone", "ReefLightWhiteStone",
                "ChristmasKeepsakesRubyStone", "ChristmasKeepsakesIvoryStone"]
         let side = 128
         for name in names {
@@ -1752,6 +1753,479 @@ final class SurroundThemeTests: XCTestCase {
                           "The painting includes opaque white paper: \(name)")
             XCTAssertTrue(stride(from: 0, to: pixels.count, by: 4).contains { pixels[$0] < 180 },
                           "The exported artwork must contain visible ink: \(name)")
+        }
+    }
+
+    func testReefLightKeepsTheGridInTheSeabedAndFlatStonesReadable() throws {
+        let theme = SurroundTheme.reefLight
+        XCTAssertTrue(theme.isDebugOnly)
+        XCTAssertNil(theme.colorScheme)
+        for scheme: ColorScheme in [.light, .dark] {
+            let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+            let board = theme.board(for: scheme)
+            XCTAssertEqual(board.gridStyle, .ragged)
+            XCTAssertNil(board.boardDepth)
+            XCTAssertFalse(board.boardBevel)
+            XCTAssertGreaterThanOrEqual(contrast(board.black.flat, board.white.flat, style: style), 7)
+            XCTAssertGreaterThanOrEqual(contrast(theme.detailSecondaryForeground, theme.panel, style: style), 4.5)
+            try assertNightControlFallbacksKeepReadableTextAndRoles(theme, scheme: scheme)
+        }
+    }
+
+    @MainActor
+    func testReefLightShellFacesKeepNamesAndClockStatesReadable() throws {
+        let theme = SurroundTheme.reefLight
+        for name in ["ReefLightAbaloneCorner", "ReefLightAbaloneFoot", "ReefLightPearlCorner", "ReefLightPearlFoot"] {
+            XCTAssertNotNil(UIImage(named: name, in: ReefLight.bundle, compatibleWith: nil)?.cgImage, name)
+        }
+        let cases: [(role: ReefLightShellSurface.Role, size: CGSize)] = [
+            (.clock, CGSize(width: 190, height: 96)), (.clock, CGSize(width: 90, height: 34)),
+            (.player, CGSize(width: 134, height: 52)), (.player, CGSize(width: 56, height: 44))
+        ]
+        let players = [OGSUser(username: "supporter", id: 1, supporter: true),
+                       OGSUser(username: "moderator", id: 2, isModerator: true)]
+        for scheme: ColorScheme in [.light, .dark] {
+            let style: UIUserInterfaceStyle = scheme == .light ? .light : .dark
+            for color: StoneColor in [.black, .white] {
+                XCTAssertGreaterThanOrEqual(contrast(.white, ReefLight.turnBadge(on: color), style: style), 4.5,
+                                            "The turn label stays readable on the \(color) player's shell badge")
+                for (role, size) in cases {
+                    let compact = size.width < 100
+                    let image = try nativeMaterialPixels(ReefLightShellSurface(
+                        color: color, cornerRadius: 12, role: role, compact: compact)
+                        .frame(width: size.width, height: size.height)
+                        .environment(\.colorScheme, scheme), scale: 2)
+                    let inks = role == .player
+                        ? [theme.identityForeground(color), theme.identitySecondary(color)]
+                            + players.map { theme.roleColor(for: $0, on: color) }
+                        : [theme.clockForeground(color, scheme: scheme), theme.clockAccent(color),
+                           theme.clockSuddenDeathAccent(color, scheme: scheme),
+                           theme.clockDisconnectedAccent(color, scheme: scheme),
+                           theme.clockUndoAccent(color, scheme: scheme), theme.clockAgreementAccent(color, scheme: scheme)]
+                    for y in [image.height / 3, image.height / 2, 2 * image.height / 3] {
+                        for x in [image.width / 4, image.width / 2, 3 * image.width / 4] {
+                            let i = (y * image.width + x) * 4
+                            XCTAssertEqual(image.pixels[i + 3], 255, "The face behind the type is opaque")
+                            let face = Color(red: Double(image.pixels[i]) / 255,
+                                             green: Double(image.pixels[i + 1]) / 255,
+                                             blue: Double(image.pixels[i + 2]) / 255)
+                            for ink in inks {
+                                XCTAssertGreaterThanOrEqual(contrast(ink, face, style: style), 4.5,
+                                                            "\(scheme) \(color) \(role) at \(size)")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testReefLightRunningAndWarningLightFollowTheUpperRightOfTheClock() throws {
+        let scale: CGFloat = 2
+        for size in [CGSize(width: 190, height: 96), CGSize(width: 88, height: 28)] {
+            let width = Int(size.width * scale), height = Int(size.height * scale)
+            let corner: CGFloat = size.height < 32 ? 7 : 12
+            for scheme: ColorScheme in [.light, .dark] {
+                for color: StoneColor in [.black, .white] {
+                    let surface = ReefLightShellSurface(color: color, cornerRadius: corner,
+                                                        role: .clock, compact: size.height < 32)
+                    func render(running: Bool, warning: Bool, plain: Bool) throws -> [UInt8] {
+                        try nativeMaterialPixels(surface.overlay {
+                            ReefLightClockHighlight(color: color, cornerRadius: corner,
+                                                    isRunning: running, isWarning: warning, plain: plain)
+                        }
+                        .frame(width: size.width, height: size.height)
+                        .environment(\.colorScheme, scheme), scale: scale).pixels
+                    }
+                    let idle = try render(running: false, warning: false, plain: false)
+                    XCTAssertTrue(try render(running: false, warning: true, plain: false) == idle,
+                                  "An idle clock with little time does not take the active cue")
+                    for plain in [false, true] {
+                        let running = try render(running: true, warning: false, plain: plain)
+                        let warning = try render(running: true, warning: true, plain: plain)
+                        let sample = "\(scheme), \(color), \(size), plain=\(plain)"
+                        func differs(_ a: [UInt8], _ b: [UInt8], at i: Int) -> Bool {
+                            (0..<3).contains { abs(Int(a[i + $0]) - Int(b[i + $0])) > 16 }
+                        }
+                        let differences = stride(from: 0, to: running.count, by: 4).filter {
+                            differs(running, warning, at: $0)
+                        }
+                        XCTAssertGreaterThan(differences.count, width / 4, "Warning has its own visible ink: \(sample)")
+                        for active in [running, warning] {
+                            var lit = 0, opposite = 0, content = 0
+                            for i in stride(from: 0, to: active.count, by: 4) where differs(active, idle, at: i) {
+                                let x = i / 4 % width, y = i / 4 / width
+                                if x > width / 2 && y < height / 2 { lit += 1 }
+                                if x < width / 2 && y > height / 2 { opposite += 1 }
+                                if (width / 5 ..< 4 * width / 5).contains(x)
+                                    && (height / 4 ..< 3 * height / 4).contains(y) { content += 1 }
+                            }
+                            XCTAssertGreaterThan(lit, width / 4, "The active clock catches light at upper right: \(sample)")
+                            XCTAssertEqual(content, 0, "The clock digits retain their plate contrast: \(sample)")
+                            if plain {
+                                XCTAssertGreaterThan(opposite, width / 4, "The solid accessibility outline continues around the clock: \(sample)")
+                            } else {
+                                XCTAssertGreaterThan(lit, 2 * opposite, "The reflection follows the stone's light: \(sample)")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testReefLightChipInlayMirrorsAndBecomesAHairlineForAvatarOnly() throws {
+        for color: StoneColor in [.black, .white] {
+            func render(leading: Bool, hairline: Bool, direction: LayoutDirection) throws
+                -> (pixels: [UInt8], width: Int, height: Int) {
+                try nativeMaterialPixels(ReefLightShellSurface(
+                    color: color, cornerRadius: 12, role: .player, compact: false,
+                    shellOnLeading: leading, hairlineOnly: hairline)
+                    .frame(width: 146, height: 54).environment(\.layoutDirection, direction), scale: 2)
+            }
+            for direction: LayoutDirection in [.leftToRight, .rightToLeft] {
+                // The shell fragment changes ends with the player. The light on the
+                // underlying nacre or abalone still comes from the board's upper right.
+                let rim = try render(leading: false, hairline: true, direction: direction)
+                func plateBrightness(xPercent: Int, yPercent: Int) -> Double {
+                    var sum = 0.0
+                    let cx = xPercent * rim.width / 100, cy = yPercent * rim.height / 100
+                    for y in (cy - 3)...(cy + 3) {
+                        for x in (cx - 3)...(cx + 3) {
+                            let i = 4 * (y * rim.width + x)
+                            sum += 0.2126 * Double(rim.pixels[i]) + 0.7152 * Double(rim.pixels[i + 1])
+                                + 0.0722 * Double(rim.pixels[i + 2])
+                        }
+                    }
+                    return sum / 49
+                }
+                XCTAssertGreaterThan(plateBrightness(xPercent: 82, yPercent: 20),
+                                     plateBrightness(xPercent: 18, yPercent: 80) + 4,
+                                     "The physical upper right of the \(color) chip is lit in \(direction)")
+                for leading in [true, false] {
+                    let chip = try render(leading: leading, hairline: false, direction: direction)
+                    let onLeft = leading == (direction == .leftToRight)
+                    var changesAtInlay = 0, changesAtAvatar = 0
+                    // Skip the outside 2 pt where both ends carry the polished rim.
+                    for y in 4..<(chip.height - 4) {
+                        for x in 4..<(chip.width - 4) {
+                            let i = (y * chip.width + x) * 4
+                            guard (i..<(i + 3)).contains(where: {
+                                abs(Int(chip.pixels[$0]) - Int(rim.pixels[$0])) > 12
+                            }) else { continue }
+                            if (x < chip.width / 2) == onLeft { changesAtInlay += 1 }
+                            else { changesAtAvatar += 1 }
+                        }
+                    }
+                    XCTAssertGreaterThan(changesAtInlay, 25)
+                    XCTAssertGreaterThan(changesAtInlay, 2 * changesAtAvatar,
+                                         "The shell should widen at the end away from the avatar: \(color) \(direction)")
+                }
+            }
+        }
+    }
+
+    func testReefLightWhiteNacreDarkensAtItsLowerContactEdge() throws {
+        let stones = try XCTUnwrap(SurroundTheme.reefLight.board(for: .light).stoneImages)
+        let side = 64
+        func patchLuma(_ pixels: [UInt8], x: Range<Int>, y: Range<Int>) -> Double {
+            var total = 0.0
+            var lowestAlpha = UInt8.max
+            for row in y {
+                for column in x {
+                    let offset = (row * side + column) * 4
+                    total += 0.2126 * Double(pixels[offset]) + 0.7152 * Double(pixels[offset + 1])
+                        + 0.0722 * Double(pixels[offset + 2])
+                    lowestAlpha = min(lowestAlpha, pixels[offset + 3])
+                }
+            }
+            XCTAssertGreaterThanOrEqual(lowestAlpha, 250, "Measure the shell inside its silhouette")
+            return total / Double(x.count * y.count)
+        }
+        let blackFaces = try stones.black.map { image in
+            let pixels = try rgbaPixels(for: XCTUnwrap(image.cgImage), side: side)
+            return patchLuma(pixels, x: 23..<41, y: 24..<40)
+        }
+        let brightestBlack = try XCTUnwrap(blackFaces.max())
+        XCTAssertFalse(stones.white.isEmpty)
+        for image in stones.white {
+            let pixels = try rgbaPixels(for: XCTUnwrap(image.cgImage), side: side)
+            let face = patchLuma(pixels, x: 23..<41, y: 24..<40)
+            let lowerEdge = patchLuma(pixels, x: 25..<39, y: 57..<60)
+            XCTAssertGreaterThan(face - lowerEdge, 10, "White nacre shades into its contact with the sand")
+            XCTAssertGreaterThan(face - brightestBlack, 70, "White nacre stays lighter than every dark abalone face")
+        }
+    }
+
+    @MainActor
+    func testReefLightRenderedStoneFacesStayDistinctInDaylightAndMoonlight() throws {
+        let linear = (0...255).map { byte -> Double in
+            let value = Double(byte) / 255
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        for scheme: ColorScheme in [.light, .dark] {
+            let board = SurroundTheme.reefLight.board(for: scheme)
+            for size: CGFloat in [13, 20] {
+                func faceLuminance(_ color: StoneColor) throws -> Double {
+                    let image = try nativeMaterialPixels(Stone(color: color, shadowRadius: 1)
+                        .frame(width: size, height: size)
+                        .background(board.surfaceColor(detailed: size >= 14))
+                        .environment(\.boardAppearance, board)
+                        .environment(\.colorScheme, scheme)
+                        .environment(\.displayScale, 3))
+                    let flat = size < 14 ? try nativeMaterialPixels(board.stones(color).flat
+                        .frame(width: 1, height: 1), scale: 1).pixels : nil
+                    // A broad opaque patch includes the stone's texture without
+                    // averaging the contact shadow or sand into either player's face.
+                    let xs = image.width / 4 ..< 3 * image.width / 4
+                    let ys = image.height / 4 ..< 3 * image.height / 4
+                    var luminance = 0.0, matchesFlat = true
+                    for y in ys {
+                        for x in xs {
+                            let i = (y * image.width + x) * 4
+                            luminance += 0.2126 * linear[Int(image.pixels[i])]
+                                + 0.7152 * linear[Int(image.pixels[i + 1])] + 0.0722 * linear[Int(image.pixels[i + 2])]
+                            if let flat { matchesFlat = matchesFlat && image.pixels[i..<i + 4].elementsEqual(flat) }
+                        }
+                    }
+                    XCTAssertTrue(matchesFlat, "Compact \(color) must render its solid \(scheme) pigment")
+                    return luminance / Double(xs.count * ys.count)
+                }
+                let black = try faceLuminance(.black), white = try faceLuminance(.white)
+                XCTAssertGreaterThanOrEqual((white + 0.05) / (black + 0.05), size < 14 ? 7 : 5.5,
+                                            "Black and White faces at \(size) pt in \(scheme)")
+            }
+        }
+    }
+
+    @MainActor
+    func testReefLightNacreHasAnOpenSunlitEdgeAndARoundedShadedShoulder() throws {
+        let scale: CGFloat = 3
+        for scheme: ColorScheme in [.light, .dark] {
+            let board = SurroundTheme.reefLight.board(for: scheme)
+            let sand = try XCTUnwrap(board.boardTexture)
+            for cell: CGFloat in [20, 32] {
+                let diameter = cell - 2 * board.stonePadding(at: cell)
+                let image = try nativeMaterialPixels(
+                    Image(uiImage: sand.image).resizable().colorMultiply(sand.tint)
+                        .frame(width: cell * 19, height: cell * 19)
+                        .frame(width: cell * 2, height: cell * 2).clipped()
+                        .overlay {
+                            Stone(color: .white, shadowRadius: 1)
+                                .frame(width: diameter, height: diameter)
+                        }
+                        .environment(\.boardAppearance, board)
+                        .environment(\.colorScheme, scheme)
+                        .environment(\.displayScale, scale), scale: scale)
+                let radius = diameter * scale / 2
+                // Average a sector wide enough to include several shell layers.
+                // Fractional radii keep these patches on the same part of the shell at both sizes.
+                func patch(heading: Int, radii: [CGFloat]) -> Double {
+                    var sum = 0.0
+                    let offsets = [-20, -10, 0, 10, 20]
+                    for offset in offsets {
+                        let angle = CGFloat(heading + offset) * .pi / 180
+                        for fraction in radii {
+                            let x = Int(CGFloat(image.width) / 2 + cos(angle) * radius * fraction)
+                            let y = Int(CGFloat(image.height) / 2 + sin(angle) * radius * fraction)
+                            let i = 4 * (y * image.width + x)
+                            sum += luminance(Color(.sRGB, red: Double(image.pixels[i]) / 255,
+                                                   green: Double(image.pixels[i + 1]) / 255,
+                                                   blue: Double(image.pixels[i + 2]) / 255))
+                        }
+                    }
+                    return sum / Double(offsets.count * radii.count)
+                }
+                let face: [CGFloat] = [0.60, 0.66, 0.72]
+                let edge: [CGFloat] = [0.93, 0.95, 0.97]
+                let sunlitFace = patch(heading: -45, radii: face)
+                let sunlitEdge = patch(heading: -45, radii: edge)
+                let shadedFace = patch(heading: 135, radii: face)
+                let shoulder = patch(heading: 135, radii: [0.80, 0.84, 0.88])
+                let shadedEdge = patch(heading: 135, radii: edge)
+                let sandBeyondShadow = patch(heading: 135, radii: [1.26, 1.32])
+                let sample = "\(scheme), \(cell) pt"
+                XCTAssertGreaterThan((sunlitEdge + 0.05) / (sunlitFace + 0.05), 0.50,
+                                     "Sunlight reaches the upper-right edge: \(sample)")
+                XCTAssertGreaterThan((shadedFace + 0.05) / (shoulder + 0.05), 1.5,
+                                     "The lower-left flank starts rounding well inside the edge: \(sample)")
+                XCTAssertGreaterThan((sandBeyondShadow + 0.05) / (shadedEdge + 0.05), scheme == .light ? 3 : 1.45,
+                                     "The shaded shell edge separates from the nearby sand: \(sample)")
+            }
+        }
+    }
+
+    func testReefLightUsesTheFullBoardStoneDiameter() throws {
+        let cells: [CGFloat] = [7, 9.99, 10, 13.99, 14, 16, 20, 23, 32, 48, 64]
+        for scheme: ColorScheme in [.light, .dark] {
+            let board = SurroundTheme.reefLight.board(for: scheme)
+            let images = try XCTUnwrap(board.stoneImages)
+            for cell in cells {
+                let padding = board.stonePadding(at: cell)
+                let slot = CGRect(x: cell * 3, y: cell * 4, width: cell, height: cell)
+                let face = images.displayRect(in: slot.insetBy(dx: padding, dy: padding), cellSize: cell)
+                XCTAssertEqual(face.midX, slot.midX, accuracy: 0.000001)
+                XCTAssertEqual(face.midY, slot.midY, accuracy: 0.000001)
+                XCTAssertEqual(face.width, cell < 10 ? cell : cell - 2, accuracy: 0.000001,
+                               "Adjacent stones use the original two-point gap from 10 pt upward")
+                XCTAssertEqual(images.displayRect(in: slot, cellSize: cell), slot,
+                               "Standalone stone artwork still fills its requested diameter")
+            }
+        }
+    }
+
+    @MainActor
+    func testReefLightSandBlendsOutsideThePlayableBoardSlot() throws {
+        let size = CGSize(width: 330, height: 330)
+        var board = BoardSceneShadowRegion(bounds: CGRect(x: 70, y: 70, width: 190, height: 190),
+                                          cellSize: 19)
+        func render(_ boards: [BoardSceneShadowRegion]) throws -> [UInt8] {
+            try nativeMaterialPixels(ReefLightScene(scheme: .light, boards: boards)
+                .frame(width: size.width, height: size.height), scale: 1).pixels
+        }
+        let reef = try render([])
+        let detailed = try render([board])
+        func changedPixels(at x: Int) -> Int {
+            (110..<220).filter { y in
+                let index = (y * Int(size.width) + x) * 4
+                return (0..<3).contains { abs(Int(reef[index + $0]) - Int(detailed[index + $0])) > 2 }
+            }.count
+        }
+        XCTAssertGreaterThan(changedPixels(at: 65), 50, "Sand must extend past the clipped board slot")
+        XCTAssertEqual(changedPixels(at: 10), 0, "Leave the distant reef visible")
+        board.isDetailed = false
+        XCTAssertTrue(try render([board]) == reef, "Compact boards supply their own solid surface")
+    }
+
+    @MainActor
+    func testReefLightDaylightKeepsExposedSandBrightAndWarm() throws {
+        let sand = SurroundTheme.reefLight.board(for: .light).boardColor.frame(width: 300, height: 360)
+        let unlit = try nativeMaterialPixels(sand, scale: 1)
+        let linear = (0...255).map { byte -> Double in
+            let value = Double(byte) / 255
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        // Sample the deeper lower-left water, where the tint is strongest.
+        // Average a patch so the result covers sand between moving ribbons.
+        func sample(_ pixels: [UInt8]) -> (light: Double, warmth: Int) {
+            var light = 0.0, warmth = 0
+            for y in stride(from: 250, to: 310, by: 2) {
+                for x in stride(from: 45, to: 105, by: 2) {
+                    let i = (y * unlit.width + x) * 4
+                    let red = Int(pixels[i]), green = Int(pixels[i + 1]), blue = Int(pixels[i + 2])
+                    light += 0.2126 * linear[red] + 0.7152 * linear[green] + 0.0722 * linear[blue]
+                    warmth += red - blue
+                }
+            }
+            return (light, warmth)
+        }
+        let base = sample(unlit.pixels)
+        for phase in [0.0, 0.35] {
+            let wet = try nativeMaterialPixels(sand.overlay {
+                ReefLightWaterSurface(scheme: .light, phase: phase)
+            }, scale: 1)
+            let water = sample(wet.pixels)
+            XCTAssertGreaterThanOrEqual(water.light, base.light * 0.92, "Daylight preserves the sand's luminance")
+            XCTAssertGreaterThan(water.warmth, base.warmth / 2, "The sand retains its warm red-to-blue balance")
+        }
+    }
+
+    @MainActor
+    func testReefLightWaterSoftensAcrossTheShellFaceOnly() throws {
+        let backdrop = Color(themeHex: 0x0A2A38).frame(width: 220, height: 112)
+        let plate = RoundedRectangle(cornerRadius: 12).path(in: CGRect(x: 20, y: 16, width: 100, height: 80))
+        let base = try nativeMaterialPixels(backdrop, scale: 1)
+        func render(_ shells: [Path]) throws -> [UInt8] {
+            try nativeMaterialPixels(backdrop.overlay {
+                ReefLightWater(scheme: .light, boards: [], animates: false, shells: shells)
+            }, scale: 1).pixels
+        }
+        let openWater = try render([])
+        let shell = try render([plate])
+        var openChange = 0, shellChange = 0
+        var outsideDifference = 0, outsideChannels = 0, largestDifference = 0
+        for y in 28..<84 {
+            for x in 30..<110 {
+                let i = (y * base.width + x) * 4
+                for channel in i..<(i + 3) {
+                    openChange += abs(Int(openWater[channel]) - Int(base.pixels[channel]))
+                    shellChange += abs(Int(shell[channel]) - Int(base.pixels[channel]))
+                }
+            }
+            let start = (y * base.width + 136) * 4
+            let end = (y * base.width + 204) * 4
+            for pixel in stride(from: start, to: end, by: 4) {
+                for channel in pixel..<(pixel + 3) {
+                    let difference = abs(Int(shell[channel]) - Int(openWater[channel]))
+                    outsideDifference += difference
+                    outsideChannels += 1
+                    largestDifference = max(largestDifference, difference)
+                }
+            }
+        }
+        // Rasterizing the mask introduces an extra 8-bit compositing pass.
+        XCTAssertLessThan(Double(outsideDifference) / Double(outsideChannels), 0.75,
+                          "Open water keeps its light outside the clock")
+        XCTAssertLessThanOrEqual(largestDifference, 3)
+        XCTAssertGreaterThan(shellChange, openChange / 20, "Some of the shared light reaches the clock")
+        XCTAssertLessThan(shellChange, openChange / 3, "The matte face diffuses the light behind the time")
+    }
+
+    @MainActor
+    func testReefLightWaterMovesAcrossTheFieldWithoutObscuringTheSand() throws {
+        let size = CGSize(width: 300, height: 360)
+        let sand = Color(themeHex: 0xA69B87).frame(width: size.width, height: size.height)
+        let background = try nativeMaterialPixels(sand, scale: 1)
+        let regions = [
+            ("center", 100..<200, 120..<240),
+            ("outer edge", 0..<300, 0..<60),
+        ]
+        let board = BoardSceneShadowRegion(bounds: CGRect(x: 90, y: 100, width: 120, height: 160),
+                                           cellSize: 18)
+        for scheme: ColorScheme in [.light, .dark] {
+            func render(_ phase: Double, board: BoardSceneShadowRegion) throws -> [UInt8] {
+                try nativeMaterialPixels(sand.overlay {
+                    ReefLightWaterSurface(scheme: scheme, phase: phase, boards: [board])
+                }.environment(\.colorScheme, scheme), scale: 1).pixels
+            }
+            let first = try render(0, board: board), second = try render(0.35, board: board)
+            let beforeWrap = try render(0.99999, board: board)
+            XCTAssertTrue(zip(beforeWrap, first).allSatisfy { abs(Int($0.0) - Int($0.1)) <= 2 },
+                          "The drifting light must meet its starting position without a visible jump")
+            for (name, xs, ys) in regions {
+                var lit = 0, moved = 0, totalChange = 0
+                for y in ys {
+                    for x in xs {
+                        let offset = (y * background.width + x) * 4
+                        var pigmentChange = 0, phaseChange = 0
+                        for c in offset..<(offset + 3) {
+                            pigmentChange = max(pigmentChange, abs(Int(first[c]) - Int(background.pixels[c])))
+                            phaseChange = max(phaseChange, abs(Int(first[c]) - Int(second[c])))
+                        }
+                        if pigmentChange >= 3 { lit += 1 }
+                        if phaseChange >= 2 { moved += 1 }
+                        totalChange += pigmentChange
+                    }
+                }
+                let count = xs.count * ys.count
+                let sample = "\(scheme) \(name)"
+                XCTAssertGreaterThan(lit, count / 100, "Water must register on the sand in the \(sample)")
+                XCTAssertGreaterThan(moved, count / 100, "The water pattern must move in the \(sample)")
+                XCTAssertLessThan(Double(totalChange) / Double(count), 30,
+                                  "The mean color shift must preserve the underlying sand in the \(sample)")
+            }
+            var compactBoard = board
+            compactBoard.isDetailed = false
+            compactBoard.cellSize = 13
+            let compact = try render(0.35, board: compactBoard)
+            let compactStaysSolid = (120..<240).allSatisfy { y in
+                let start = (y * background.width + 100) * 4
+                let end = (y * background.width + 200) * 4
+                return compact[start..<end].elementsEqual(background.pixels[start..<end])
+            }
+            XCTAssertTrue(compactStaysSolid, "Compact boards keep solid pigment even while surrounding water moves")
         }
     }
 
@@ -3394,6 +3868,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "paperBlossoms"), .paperBlossoms)
         XCTAssertEqual(SurroundTheme.current(storedID: "sakuraStream"), .sakuraStream)
         XCTAssertEqual(SurroundTheme.current(storedID: "whittledWoodland"), .whittledWoodland)
+        XCTAssertEqual(SurroundTheme.current(storedID: "reefLight"), .reefLight)
         #else
         XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl"), .nebulaPearl)
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .rakedGarden)
@@ -3405,6 +3880,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "paperBlossoms"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "sakuraStream"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "whittledWoodland"), .standard)
+        XCTAssertEqual(SurroundTheme.current(storedID: "reefLight"), .standard)
         #endif
     }
 
@@ -3413,7 +3889,7 @@ final class SurroundThemeTests: XCTestCase {
     func testPickersOfferTheReleasedThemesFirst() {
         XCTAssertEqual(SurroundTheme.released, [.standard, .surroundStudio, .rakedGarden, .nebulaPearl])
         let unreleased: [SurroundTheme] = [.frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes,
-                                          .paperBlossoms, .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain, .sakuraStream, .whittledWoodland]
+                                          .paperBlossoms, .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain, .sakuraStream, .whittledWoodland, .reefLight]
         XCTAssertEqual(SurroundTheme.allCases.filter(\.isDebugOnly), unreleased)
         #if DEBUG
         XCTAssertEqual(SurroundTheme.available, SurroundTheme.released + unreleased)
@@ -3787,15 +4263,16 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
-    func testChristmasKeepsakesIvoryContactPreservesOtherStoneShadows() {
+    func testIvoryContactPreservesOtherStoneShadows() {
         let ivory = ImageStoneShadowStyle.raisedIvoryGlass
         let glass = ImageStoneShadowStyle.raisedGlass
         let originalStyles: [ImageStoneShadowStyle] = [.contact, .raised, .ice, .raisedGlass]
         XCTAssertEqual(BoardAppearance.standard.imageStoneShadow, .contact)
         for scheme: ColorScheme in [.light, .dark] {
             for theme in SurroundTheme.allCases {
-                XCTAssertEqual(theme.board(for: scheme).imageStoneShadow == ivory, theme == .christmasKeepsakes,
-                               "Stronger white contact must be an explicit Christmas material choice")
+                XCTAssertEqual(theme.board(for: scheme).imageStoneShadow == ivory,
+                               theme == .christmasKeepsakes || theme == .reefLight,
+                               "The stronger contact grounds cream glass and nacre on their boards")
             }
         }
         XCTAssertTrue(ivory.usesRaisedGlassProfile)
@@ -3804,7 +4281,7 @@ final class SurroundThemeTests: XCTestCase {
             let black = ivory.contactOpacity(for: .black, cellSize: cell)
             let white = ivory.contactOpacity(for: .white, cellSize: cell)
             XCTAssertEqual(black, glass.contactOpacity(for: .black, cellSize: cell),
-                           "Cranberry retains the original contact at every detailed size")
+                           "Dark stones retain their original contact at every detailed size")
             XCTAssertGreaterThan(white, black, "Ivory gains contact separation without changing the cast")
             XCTAssertLessThan(white, 1, "The contact must remain translucent")
             for style in originalStyles {
@@ -4622,7 +5099,7 @@ final class SurroundThemeTests: XCTestCase {
                 XCTAssertGreaterThan(contrast(theme.clockAccent(color), surface, style: style), 4.5)
                 XCTAssertGreaterThanOrEqual(
                     contrast(theme.clockSuddenDeathAccent(color, scheme: scheme), surface, style: style), 4.5)
-                if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland {
+                if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland || theme == .reefLight {
                     for (state, accent) in [
                         ("Accepted", theme.clockAgreementAccent(color, scheme: scheme)),
                         ("Disconnected", theme.clockDisconnectedAccent(color, scheme: scheme)),
@@ -4645,7 +5122,7 @@ final class SurroundThemeTests: XCTestCase {
         }
         XCTAssertGreaterThan(contrast(.white, try XCTUnwrap(theme.actionTint), style: style), 4.5)
         XCTAssertGreaterThan(contrast(.white, theme.statusBadge, style: style), 4.5)
-        if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland {
+        if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland || theme == .reefLight {
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockUndoBadge(scheme: scheme), style: style), 4.5,
                                        "The Undo badge keeps its white text readable")
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockSuddenDeathBadge(scheme: scheme), style: style), 4.5,
@@ -5706,9 +6183,12 @@ final class SurroundThemeTests: XCTestCase {
         let white = try XCTUnwrap(UIImage(named: "SurroundStudioClamshell0", in: bundle, compatibleWith: nil))
         for scheme: ColorScheme in [.light, .dark] {
             for theme in SurroundTheme.allCases {
-                XCTAssertEqual(theme.board(for: scheme).imageStoneShading,
-                               (theme == .surroundStudio || theme == .paperBlossoms) ? .clamshellShoulder
-                                   : (theme == .frostPine ? .iceEdge : .artwork))
+                let expected: ImageStoneShading = switch theme {
+                case .surroundStudio, .paperBlossoms: .clamshellShoulder
+                case .frostPine: .iceEdge
+                default: .artwork
+                }
+                XCTAssertEqual(theme.board(for: scheme).imageStoneShading, expected)
             }
             var board = SurroundTheme.surroundStudio.board(for: scheme)
             let tint = board.stoneImages?.tint ?? .white
@@ -6517,15 +6997,16 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
-    func testRaggedGridIsGardenOnlyAndFallsBackOnSmallBoards() {
-        for theme in SurroundTheme.allCases where theme != .rakedGarden {
-            XCTAssertFalse(theme.board.gridStyle.usesRaggedEdges(at: 48))
+    func testRaggedGridAppearsOnDetailedGardenAndReefBoards() {
+        for theme in SurroundTheme.allCases {
+            let usesRaggedGrid = theme == .rakedGarden || theme == .reefLight
+            for scheme: ColorScheme in [.light, .dark] {
+                let style = theme.board(for: scheme).gridStyle
+                XCTAssertFalse(style.usesRaggedEdges(at: 13.99))
+                XCTAssertEqual(style.usesRaggedEdges(at: 14), usesRaggedGrid)
+                XCTAssertEqual(style.usesRaggedEdges(at: 48), usesRaggedGrid)
+            }
         }
-        // Small boards are solid: the scratched grid starts at the detail threshold.
-        let style = SurroundTheme.rakedGarden.board.gridStyle
-        XCTAssertFalse(style.usesRaggedEdges(at: 13.99))
-        XCTAssertTrue(style.usesRaggedEdges(at: 14))
-        XCTAssertTrue(style.usesRaggedEdges(at: 48))
         XCTAssertTrue(RaggedGridGeometry(width: 19, height: 19, cellSize: 9.99, lineScale: 1.6).path.isEmpty)
     }
 

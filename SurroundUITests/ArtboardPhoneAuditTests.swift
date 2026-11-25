@@ -980,6 +980,22 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         }
     }
 
+    func testReefLightThemeStates() throws {
+        try auditThemeStates(theme: "reefLight", title: "Reef Light", suffix: "-reef-light", appearance: .light)
+    }
+
+    func testReefLightShellControlInteractions() throws {
+        try auditThemeControlInteractions(theme: "reefLight", title: "Reef Light", suffix: "reef-light")
+    }
+
+    func testReefLightThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "reefLight", title: "Reef Light", suffix: "-reef-light", appearance: .light)
+    }
+
+    func testReefLightThemeScoring() throws {
+        try auditThemeScoring(theme: "reefLight", title: "Reef Light", suffix: "-reef-light-night", appearance: .dark)
+    }
+
     func testWhittledWoodlandThemeStates() throws {
         try auditThemeStates(theme: "whittledWoodland", title: "Whittled Woodland",
                              suffix: "-whittled-woodland", appearance: .light)

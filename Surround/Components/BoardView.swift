@@ -1119,6 +1119,7 @@ struct Stones: View {
         let shadowScale = min(1, max(0.35, (size - 10) / 30))
         let shadowOffset = min(2, max(1, size / 30)) * shadowScale
         let stoneImages = drawsShadow ? appearance.stoneImages : nil
+        let padding = appearance.stonePadding(at: size)
         var imageStones = [ImageStone]()
         
         let whitePaths = [CGMutablePath(), CGMutablePath(), CGMutablePath(), CGMutablePath()]
@@ -1129,7 +1130,6 @@ struct Stones: View {
         for row in 0..<height {
             for column in 0..<width {
                 if case .hasStone(let stoneColor) = boardPosition[row, column] {
-                    let padding = size < 10 ? CGFloat(0.0) : CGFloat(1.0)
                     let nominalRect = CGRect(x: CGFloat(column) * size + padding, y: CGFloat(row) * size + padding, width: size - padding * 2, height: size - padding * 2)
                     let stoneRect = stoneImages?.displayRect(in: nominalRect, cellSize: size) ?? nominalRect
                     let isRemoved = boardPosition.removedStones?.contains([row, column]) ?? false
@@ -1755,6 +1755,8 @@ struct BoardView: View {
     @State var highlightedRow = -1
     @State var highlightedColumn = -1
     var stoneRemovalSelectedPoints: Binding<Set<[Int]>> = .constant(Set<[Int]>())
+    /// Some detailed game surfaces are painted in the scene behind this board.
+    var surfaceIsInScene = false
     var cornerRadius: CGFloat = 0.0
     var highlightCoordinates: [[Int]] = []
     var undoRequestCoordinates: [[Int]] = []
@@ -1996,6 +1998,8 @@ struct BoardView: View {
                                     .opacity(detailed ? 1 : 0)
                             }
                         }
+                        .opacity(surfaceIsInScene && detailed ? 0 : 1)
+                        .animation(nil, value: detailed)
                         .animation(nil, value: padded)
                 } else {
                     Color.white.cornerRadius(cornerRadius).opacity(0.5)
@@ -2015,6 +2019,7 @@ struct BoardView: View {
                     .modifier(BoardSceneShadowExclusion(cornerRadius: faceRadius,
                                                         isDetailed: detailed, cellSize: cellSize,
                                                         frontDepth: depthGeometry.thickness))
+                    .transformEnvironment(\.excludesBoardsFromSceneShadows) { $0 = $0 || surfaceIsInScene }
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
