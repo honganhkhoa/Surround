@@ -125,6 +125,22 @@ final class ActivityBarFitTests: XCTestCase {
         "pt-PT XXL started",
     ]
 
+    /// Where a failed action's words can't keep their floor beside Retry's
+    /// symbol, so they truncate below it: Japanese and Korean, whose whole
+    /// words are the floor.
+    private static let nowFailedResultShortRows: Set<String> = [
+        "ja L Mac Now row Couldn’t accept", "ja L Mac Now row Couldn’t leave", "ja L Mac Now row Couldn’t start",
+        "ja L Mac Now row Couldn’t withdraw",
+        "ja XXL Mac Now row Couldn’t accept", "ja XXL Mac Now row Couldn’t leave", "ja XXL Mac Now row Couldn’t reject",
+        "ja XXL Mac Now row Couldn’t start", "ja XXL Mac Now row Couldn’t withdraw",
+        "ja XXL iPad Now row 26.5 Couldn’t accept", "ja XXL iPad Now row 26.5 Couldn’t leave",
+        "ja XXL iPad Now row 26.5 Couldn’t start", "ja XXL iPad Now row 26.5 Couldn’t withdraw",
+        "ja XXL iPad Now row 27.0 Couldn’t accept", "ja XXL iPad Now row 27.0 Couldn’t leave",
+        "ja XXL iPad Now row 27.0 Couldn’t start", "ja XXL iPad Now row 27.0 Couldn’t withdraw",
+        "ko XXL Mac Now row Couldn’t accept", "ko XXL Mac Now row Couldn’t leave", "ko XXL Mac Now row Couldn’t reject",
+        "ko XXL Mac Now row Couldn’t start", "ko XXL Mac Now row Couldn’t withdraw",
+    ]
+
     /// Where the Mac's status row needs a third line and grows past 60 pt:
     /// the longest "Can’t reach OGS" beside Retry's symbol at XXL.
     private static let macTallStatusRows: Set<String> = [
@@ -156,6 +172,8 @@ final class ActivityBarFitTests: XCTestCase {
 
     private static let ninetyNine = (1...99).map { ActivityBarCountedItem.conversation(peerID: $0) }
     private static let clock = GameControlClock(timeLeft: 5400)
+    /// The last byo-yomi period's 30 s, beside the sudden-death mark.
+    private static let suddenDeathClock = GameControlClock(timeLeft: 30)
     private static let search = ActivityModel.Waiting(id: ActivityModel.WaitingID.quickMatch("q"), kind: .quickMatch,
                                                      isLive: true, since: 0)
     private static let openChallenge = ActivityModel.Waiting(id: ActivityModel.WaitingID.openChallenge(1),
@@ -447,6 +465,64 @@ final class ActivityBarFitTests: XCTestCase {
         attach("Now rows that drop the rank", ranksDropped.joined(separator: "\n"))
         XCTAssertEqual(symbols["Mac"] ?? [], Self.macRowSymbols, "The Mac's 200 pt Now rows whose action is its symbol")
         XCTAssertEqual(symbols["iPad"] ?? [], Self.iPadRowSymbols, "The iPad's Now rows whose action is its symbol")
+    }
+
+    /// A Now row's chip in sudden death draws its mark before the digits, in
+    /// the hourglass's place, as the bar's does: the mark counts in the
+    /// clock's width, and the hourglass is no part that drops. Only the
+    /// Mac's 200 pt row at the cap, in every language, can't keep the name's
+    /// ten characters beside it, and there the name truncates below them.
+    func testANowRowsSuddenDeathClockCountsItsMark() throws {
+        let parts = ActivityNowRowMetrics.parts(.liveGame(gameID: 1))
+        var short = Set<String>()
+        for language in Self.languages {
+            let words = try Words(language: language, bundle: try appBundle())
+            for size in Self.sizes {
+                let metrics = ActivityNowRowMetrics(sizeCategory: size)
+                var text = words.text(lineOneMinimum: ActivityNowRowMetrics.floor(of: "HarborMist"), hasRank: true,
+                                      clock: Self.suddenDeathClock)
+                let plain = metrics.width(of: .clock, text)
+                text.suddenDeathMark = words.suddenDeath
+                let label = "\(language) \(size == .large ? "L" : "XXL")"
+                XCTAssertGreaterThan(metrics.width(of: .clock, text), plain, "\(label): the mark counts")
+                XCTAssertFalse(metrics.fit(parts, in: 1_000, text: text).parts.contains(.hourglass),
+                               "\(label): the mark takes the hourglass's place")
+                for row in Self.nowRows {
+                    let fit = metrics.fit(parts, in: row.width, text: text)
+                    XCTAssertTrue(fit.parts.contains(.clock), "\(label) \(row.name) lost the clock")
+                    if !fit.fits { short.insert("\(label) \(row.name)") }
+                }
+            }
+        }
+        XCTAssertEqual(short, Set(Self.languages.map { "\($0) XXL Mac Now row" }),
+                       "Where a sudden-death row's name truncates below its floor")
+    }
+
+    /// A failed action's Now row: its words, then Retry, drawn as its symbol
+    /// where the words need the room. Retry never leaves the row; where the
+    /// words still can't keep their floor, they truncate below it.
+    func testANowRowsFailedResultKeepsRetryInEveryLanguage() throws {
+        let failures = ["Couldn’t accept", "Couldn’t reject", "Couldn’t withdraw", "Couldn’t leave", "Couldn’t start"]
+        let parts: [ActivityBarPart] = [.tile, .lineOne, .action(.retry)]
+        var short = Set<String>()
+        for language in Self.languages {
+            let words = try Words(language: language, bundle: try appBundle())
+            for size in Self.sizes {
+                let metrics = ActivityNowRowMetrics(sizeCategory: size)
+                for key in failures {
+                    let text = words.text(lineOneMinimum: ActivityNowRowMetrics.floor(of: words.word(key)),
+                                          hasRank: false, clock: nil)
+                    for row in Self.nowRows {
+                        let symbol = metrics.actionDrawsSymbol(parts, in: row.decidesAt, text: text)
+                        let fit = metrics.fit(parts, in: row.width, text: text, actionAsSymbol: symbol)
+                        let label = "\(language) \(size == .large ? "L" : "XXL") \(row.name) \(key)"
+                        XCTAssertTrue(fit.parts.contains(.action(.retry)), "\(label): Retry stays")
+                        if !fit.fits { short.insert(label) }
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(short, Self.nowFailedResultShortRows, "Where a failed result's words truncate below their floor")
     }
 
     /// The status row says the window's status where nothing else on screen

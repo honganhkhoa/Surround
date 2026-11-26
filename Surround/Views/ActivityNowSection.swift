@@ -307,7 +307,8 @@ private struct ActivityNowGameRow: View {
             time: timeLeft.map(GameControlClock.init(timeLeft:)), color: color,
             mark: isSuddenDeath ? ActivityBarMarks.suddenDeath : nil,
             warns: (live.map(ActivityModel.isLowOnTime) ?? false) || isSuddenDeath,
-            glows: clockState.running
+            // Offline the digits stay while the glow goes, as in the bar.
+            glows: clockState.running && !context.isOffline
         )
         return ActivityNowRowModel(
             itemID: itemID, tile: .user(facts.opponent), lineOne: name, rank: rank,
@@ -679,9 +680,11 @@ private struct ActivityNowRowFace: View {
                 tile
             }
             // Ideal at its floor, so the variant that fits is the one the
-            // fit test proves; the lines then take the rest.
+            // fit test proves; the lines then take the rest. Where no
+            // variant fits, the last one's lines truncate below their floor,
+            // so the clock and the action stay in the row.
             lines(showsRank: showsRank, lineOneLines: face.lines)
-                .frame(minWidth: floor, idealWidth: floor, maxWidth: .infinity, alignment: .leading)
+                .frame(minWidth: 0, idealWidth: floor, maxWidth: .infinity, alignment: .leading)
             if let clock = model.clock {
                 ActivityBarClockChip(clock: clock, sizes: metrics.clockChip, showsHourglass: showsHourglass)
                     .fixedSize()

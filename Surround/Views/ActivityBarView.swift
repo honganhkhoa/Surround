@@ -697,8 +697,9 @@ private struct ActivityBarLeadView: View {
                 ActivityBarTile(tile: model.tile, size: metrics.tileSize)
             }
             let lines = metrics.width(of: .lineOne, text, lineOneLines: lineOneLines)
+            // Below its floor it truncates rather than push the clock out.
             ActivityBarLines(model: model, metrics: metrics, showsLineTwo: showsLineTwo, lineOneLines: lineOneLines)
-                .frame(minWidth: lines, idealWidth: lines, maxWidth: .infinity, alignment: .leading)
+                .frame(minWidth: 0, idealWidth: lines, maxWidth: .infinity, alignment: .leading)
             if let clock = model.clock, kept.contains(.clock) {
                 let showsHourglass = kept.contains(.hourglass)
                 ActivityBarClockChip(clock: clock, sizes: metrics.clockChip, showsHourglass: showsHourglass)

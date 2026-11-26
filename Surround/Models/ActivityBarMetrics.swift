@@ -428,8 +428,12 @@ struct ActivityNowRowMetrics {
         case .lineTwo, .plusN: 0
         case .hourglass: symbolWidth("hourglass") + clockInnerGap - spacing.between
         case .clock:
-            text.clock.map { 2 * clockPadding + measured($0.widestSample, clockFont, text) }
-                ?? 2 * clockPadding + symbolWidth("hourglass")
+            // In sudden death the chip draws its mark before the digits, in
+            // the hourglass's place, as the bar's does.
+            text.clock.map { clock in
+                2 * clockPadding + measured(clock.widestSample, clockFont, text)
+                    + (text.suddenDeathMark.map { markWidth($0, text) + clockInnerGap } ?? 0)
+            } ?? 2 * clockPadding + symbolWidth("hourglass")
         case .action(let action) where actionAsSymbol:
             symbolActionWidth(action)
         case .action(let action):
@@ -440,6 +444,14 @@ struct ActivityNowRowMetrics {
 
     private func measured(_ string: String, _ font: UIFont, _ text: ActivityBarPartText) -> CGFloat {
         ceil(ActivityBarMetrics.textWidth(string, font: font, direction: text.direction))
+    }
+
+    /// The sudden-death mark the chip draws before its digits.
+    private func markWidth(_ mark: GameControlSuddenDeathMark, _ text: ActivityBarPartText) -> CGFloat {
+        switch mark {
+        case .text(let string): measured(string, clockFont, text)
+        case .glyph: symbolWidth(GameControlSuddenDeathMark.glyphSystemName)
+        }
     }
 
     func symbolWidth(_ systemName: String) -> CGFloat {
@@ -460,7 +472,10 @@ struct ActivityNowRowMetrics {
     ///   - lineOneLines: The lines line one may take.
     func fit(_ parts: [ActivityBarPart], in width: CGFloat, text: ActivityBarPartText,
              actionAsSymbol: Bool = false, lineOneLines: Int = 1) -> ActivityBarFit {
-        let kept = parts.filter { $0 != .lineTwo && $0 != .plusN && !($0 == .hourglass && text.clock == nil) }
+        // The chip draws its hourglass alone without a countdown, and its
+        // mark in the hourglass's place in sudden death: neither drops.
+        let chipDrawsItsSymbol = text.clock == nil || text.suddenDeathMark != nil
+        let kept = parts.filter { $0 != .lineTwo && $0 != .plusN && !($0 == .hourglass && chipDrawsItsSymbol) }
         let drawing = ActivityBarDrawing(parts: kept, dropOrder: Self.dropOrder.filter(kept.contains))
         let fit = drawing.fit(in: width, spacing: spacing) {
             self.width(of: $0, text, actionAsSymbol: actionAsSymbol, lineOneLines: lineOneLines)
