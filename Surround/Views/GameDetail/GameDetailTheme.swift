@@ -21,6 +21,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     case whittledWoodland
     case reefLight
     case koiPond
+    case goldenCrumb
 
     var id: Self { self }
 
@@ -104,6 +105,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         case .rakedGarden: String(localized: "Raked Garden", comment: "Theme name: a Japanese dry landscape garden with raked sand, basalt and jade stones. Use a short, natural garden title; the sand pattern is visible in the preview.")
         case .surroundStudio: "Surround Studio"
         case .whittledWoodland: String(localized: "Whittled Woodland", comment: "Theme name: a miniature woodland carved by hand, with a maple board and walnut and birch stones.")
+        case .goldenCrumb: String(localized: "Golden Crumb", comment: "Theme name for a golden shortbread board with cocoa and vanilla cookie stones on a flour-dusted walnut workbench.")
         case .koiPond: String(localized: "Koi Pond", comment: "Theme name: a Japanese koi pond with a clear glass board and charcoal and cream pebble stones.")
         case .reefLight: String(localized: "Reef Light", comment: "Sunlight filters onto a sandy reef where the players use dark abalone and pale mother-of-pearl stones.")
         case .sakuraStream: String(localized: "Sakura Stream", comment: "Theme name: a clear stream beside cherry blossoms, with ivory ceramic and pale pink porcelain. Use a short, natural title preserving the cherry-blossom and stream imagery.")
@@ -125,7 +127,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         switch self {
         case .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain:
             nil
-        case .standard, .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight, .koiPond: nil
+        case .standard, .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight, .koiPond, .goldenCrumb: nil
         case .nebulaPearl: .dark
         }
     }
@@ -133,6 +135,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     /// Resolve image grading alongside the board palette. The image references
     /// stay cached, so an appearance change does not decode or regenerate art.
     func board(for scheme: ColorScheme) -> BoardAppearance {
+        if self == .goldenCrumb { return GoldenCrumb.board(for: scheme) }
         if self == .koiPond { return KoiPondBoard.appearance(for: scheme) }
         if self == .reefLight { return ReefLight.board(for: scheme) }
         if self == .whittledWoodland { return WhittledWoodland.board(for: scheme) }
@@ -393,6 +396,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         switch self {
         case .whittledWoodland: return WhittledWoodland.board(for: .light)
         case .koiPond: return KoiPondBoard.appearance(for: .light)
+        case .goldenCrumb: return GoldenCrumb.board(for: .light)
         case .reefLight: return ReefLight.board(for: .light)
         case .sakuraStream:
             return BoardAppearance(
@@ -879,7 +883,7 @@ private final class SakuraStreamAssets {
     }()
 
     static let board = UIImage(named: "SakuraStreamBoard", in: bundle, compatibleWith: nil).map {
-        BoardTexture(image: $0, frontGlaze: frontGlaze(from: $0), mapping: .framed)
+        BoardTexture(image: $0, frontSurface: frontGlaze(from: $0), mapping: .framed)
     }
 
     /// Unroll the visible front contour into a single cached row. At the
@@ -1551,6 +1555,95 @@ private final class WhittledWoodland {
     static let whiteSecondary = adaptive(0x513B29, 0x493425)
 }
 
+/// The baked rim belongs to the shortbread photograph. The scored lines and
+/// intersections stay live so they follow the dimensions of each game.
+final class GoldenCrumb {
+    private init() {}
+    static let bundle = Bundle(for: GoldenCrumb.self)
+    private static let shortbread = UIImage(named: "GoldenCrumbBoard", in: bundle, compatibleWith: nil)
+        .map {
+            BoardTexture(image: $0, frontSurface: UIImage(named: "GoldenCrumbBoardCrust", in: bundle,
+                                                          compatibleWith: nil), mapping: .framed)
+        }
+    private static let cookies: StoneImages? = {
+        guard let dark = UIImage(named: "GoldenCrumbBlackStone", in: bundle, compatibleWith: nil),
+              let pale = UIImage(named: "GoldenCrumbWhiteStone", in: bundle, compatibleWith: nil) else { return nil }
+        return StoneImages(black: [dark], white: [pale])
+    }()
+
+    static func board(for scheme: ColorScheme) -> BoardAppearance {
+        let night = scheme == .dark
+        let biscuit = Color(themeHex: night ? 0xC79D70 : 0xE8B881)
+        let crust = Color(themeHex: 0x53321F)
+        let ink = Color(themeHex: 0x342017)
+        let sugar = Color(themeHex: 0xFFF4DA)
+        let blue = Color(themeHex: 0x143447)
+        let green = Color(themeHex: 0x24432D)
+        let red = Color(themeHex: 0x6C232B)
+        var face = shortbread
+        var stones = cookies
+        if night {
+            face?.tint = Color(themeHex: 0xD8CBB6)
+            stones?.tint = Color(themeHex: 0xEEE1CA)
+        }
+        return BoardAppearance(
+            boardColor: biscuit, compactBoardColor: biscuit, boardEdge: crust,
+            boardTexture: face,
+            boardDepth: BoardDepth(
+                upperFace: Color(themeHex: night ? 0x803B1C : 0x974826),
+                lowerFace: Color(themeHex: night ? 0x402111 : 0x4A2414),
+                highlight: Color(themeHex: night ? 0xDFC19C : 0xF6D4A2),
+                shade: crust, shadow: Color(themeHex: 0x24140C),
+                thicknessRatio: 0.009, maximumThickness: 6, edgeStyle: .shortbread),
+            gridStyle: .shortbreadScore, stoneImages: stones, imageStoneShadow: .raised,
+            gridColor: crust, coordinateColor: ink,
+            black: StonePalette(
+                highlight: Color(themeHex: 0x674331), shade: Color(themeHex: 0x2F1912),
+                flat: Color(themeHex: night ? 0x40291D : 0x503123), outline: ink,
+                lastMove: sugar, label: sugar, detailedMarkerCasing: ink),
+            white: StonePalette(
+                highlight: sugar, shade: Color(themeHex: 0xD7B283),
+                flat: Color(themeHex: night ? 0xE5CFAB : 0xF7E6C8), outline: crust,
+                lastMove: ink, label: ink, detailedMarkerCasing: sugar),
+            emptyPointMarker: ink, markOutline: ink, dameColor: crust,
+            highlightColor: blue, highlightCasing: sugar,
+            crosshair: .init(valid: green, invalid: red, removal: blue), crosshairWidth: 1.5,
+            removeMark: red, restoreMark: green, removalMarkCasing: sugar, removedStoneOutline: ink)
+    }
+
+    private static func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {
+        Color(uiColor: UIColor { traits in
+            UIColor(Color(themeHex: traits.userInterfaceStyle == .dark ? dark : light))
+        })
+    }
+
+    static let page = adaptive(0xCDB295, 0x36271F)
+    static let panel = adaptive(0xFAF1E1, 0x313C42)
+    static let foreground = adaptive(0x2F2520, 0xFFF1DB)
+    static let detailSecondary = adaptive(0x58524B, 0xE2CEB5)
+    static let panelBorder = adaptive(0x816850, 0xD6BC9F)
+    static let cocoa = adaptive(0x472A1E, 0x39241B)
+    static let vanilla = adaptive(0xF7E9CF, 0xE1CEAF)
+    static let blackSurfaceTop = adaptive(0x593B2D, 0x493327)
+    static let blackSurfaceBottom = adaptive(0x3C241B, 0x302018)
+    static let whiteSurfaceTop = adaptive(0xEFDCB9, 0xDAC5A4)
+    static let whiteSurfaceBottom = adaptive(0xFFF2DD, 0xEBDBBF)
+    static let blackForeground = adaptive(0xFFF5DF, 0xFFF2DA)
+    static let whiteForeground = adaptive(0x3E2A20, 0x34251B)
+    static let blackAccent = adaptive(0xFFDB9E, 0xF4CF98)
+    static let whiteAccent = adaptive(0x59402A, 0x493321)
+    static let blackSecondary = adaptive(0xF5DEC3, 0xE8D5BC)
+    static let whiteSecondary = adaptive(0x5D4535, 0x49372D)
+    static let action = adaptive(0x345669, 0x3C5969)
+    static let selection = adaptive(0x234B60, 0xBBDDEB)
+    static let conditional = adaptive(0x794526, 0xF4C69F)
+    static let chatBubble = adaptive(0xE8DFCF, 0x425059)
+    static let keyline = adaptive(0xFFF4E1, 0x17232B)
+    static let idle = adaptive(0xC7C9C1, 0x56626A)
+    static let turnOutline = adaptive(0x80512D, 0xE8B887)
+    static let turnGlow = adaptive(0xCA854D, 0xBA8A66)
+}
+
 /// Open Water takes its dark and pale player surfaces from the two pebble
 /// stones. The golden koi supplies the running-clock accent against the teal.
 final class KoiPond {
@@ -1611,6 +1704,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.page
         case .reefLight: ReefLight.page
         case .koiPond: KoiPond.page
+        case .goldenCrumb: GoldenCrumb.page
         }
     }
 
@@ -1631,6 +1725,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.panel
         case .reefLight: ReefLight.panel
         case .koiPond: KoiPond.panel
+        case .goldenCrumb: GoldenCrumb.panel
         }
     }
 
@@ -1650,6 +1745,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.foreground
         case .reefLight: ReefLight.foreground
         case .koiPond: KoiPond.foreground
+        case .goldenCrumb: GoldenCrumb.foreground
         }
     }
 
@@ -1667,6 +1763,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.detailSecondary
         case .reefLight: ReefLight.detailSecondary
         case .koiPond: KoiPond.detailSecondary
+        case .goldenCrumb: GoldenCrumb.detailSecondary
         default: .secondary
         }
     }
@@ -1693,6 +1790,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.panelBorder.opacity(0.28)
         case .reefLight: ReefLight.panelBorder.opacity(0.28)
         case .koiPond: KoiPond.panelBorder.opacity(0.28)
+        case .goldenCrumb: GoldenCrumb.panelBorder.opacity(0.28)
         }
     }
 
@@ -1739,7 +1837,7 @@ extension SurroundTheme {
 
     /// The natural scenes use their own foregrounds, translucent pigment
     /// on older systems, and opaque controls under Increase Contrast.
-    var usesLightSceneSurfaces: Bool { isFlowingInk || self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream || self == .whittledWoodland || self == .reefLight || self == .koiPond }
+    var usesLightSceneSurfaces: Bool { isFlowingInk || self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream || self == .whittledWoodland || self == .reefLight || self == .koiPond || self == .goldenCrumb }
 
     /// Tinted Liquid Glass for a player's clock, in the stone's color.
     /// Light stones use a strong tint to preserve their material color over
@@ -1767,7 +1865,7 @@ extension SurroundTheme {
             color == .black ? ChristmasKeepsakesColors.blackGlass.opacity(0.82) : ChristmasKeepsakesColors.whiteGlass.opacity(0.84)
         case .paperBlossoms:
             color == .black ? PaperBlossomsColors.blackGlass.opacity(0.82) : PaperBlossomsColors.whiteGlass.opacity(0.84)
-        case .reefLight, .koiPond:
+        case .reefLight, .koiPond, .goldenCrumb:
             clockSolidSurface(color).opacity(color == .black ? 0.92 : 0.95)
         case .whittledWoodland:
             clockSolidSurface(color)
@@ -1799,7 +1897,7 @@ extension SurroundTheme {
             color == .black ? ChristmasKeepsakesColors.blackGlass.opacity(0.86) : ChristmasKeepsakesColors.whiteIdentityGlass.opacity(0.90)
         case .paperBlossoms:
             color == .black ? PaperBlossomsColors.blackGlass.opacity(0.86) : PaperBlossomsColors.whiteIdentityGlass.opacity(0.90)
-        case .reefLight, .koiPond:
+        case .reefLight, .koiPond, .goldenCrumb:
             clockSolidSurface(color).opacity(color == .black ? 0.92 : 0.95)
         case .whittledWoodland:
             clockSolidSurface(color)
@@ -1825,6 +1923,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.action
         case .reefLight: ReefLight.action
         case .koiPond: KoiPond.action
+        case .goldenCrumb: GoldenCrumb.action
         }
     }
 
@@ -1837,7 +1936,7 @@ extension SurroundTheme {
         case .nightGarden: actionTint?.opacity(0.86)
         case .sakuraStream: actionTint?.opacity(0.86)
         case .christmasKeepsakes: actionTint?.opacity(0.86)
-        case .paperBlossoms, .whittledWoodland, .reefLight, .koiPond: actionTint?.opacity(0.86)
+        case .paperBlossoms, .whittledWoodland, .reefLight, .koiPond, .goldenCrumb: actionTint?.opacity(0.86)
         case .rakedGarden: actionTint?.opacity(0.88)
         default: actionTint
         }
@@ -1857,6 +1956,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.selection
         case .reefLight: ReefLight.selection
         case .koiPond: KoiPond.selection
+        case .goldenCrumb: GoldenCrumb.selection
         default: Color(uiColor: .systemIndigo)
         }
     }
@@ -1879,6 +1979,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.chatBubble
         case .reefLight: ReefLight.chatBubble
         case .koiPond: KoiPond.chatBubble
+        case .goldenCrumb: GoldenCrumb.chatBubble
         }
     }
 }
@@ -1905,6 +2006,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.selection
         case .reefLight: ReefLight.selection
         case .koiPond: KoiPond.selection
+        case .goldenCrumb: GoldenCrumb.selection
         }
     }
 
@@ -1927,6 +2029,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.conditional
         case .reefLight: ReefLight.conditional
         case .koiPond: KoiPond.conditional
+        case .goldenCrumb: GoldenCrumb.conditional
         }
     }
 
@@ -1949,6 +2052,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.keyline
         case .reefLight: ReefLight.keyline
         case .koiPond: KoiPond.keyline
+        case .goldenCrumb: GoldenCrumb.keyline
         }
     }
 
@@ -1970,6 +2074,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.panelBorder.opacity(0.24)
         case .reefLight: ReefLight.panelBorder.opacity(0.24)
         case .koiPond: KoiPond.panelBorder.opacity(0.24)
+        case .goldenCrumb: GoldenCrumb.panelBorder.opacity(0.24)
         }
     }
 
@@ -1991,6 +2096,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.selection
         case .reefLight: ReefLight.selection
         case .koiPond: KoiPond.selection
+        case .goldenCrumb: GoldenCrumb.selection
         }
     }
 
@@ -2002,7 +2108,7 @@ extension SurroundTheme {
             nil
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xB7A4FF).opacity(0.85)
-        case .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight, .koiPond: nil
+        case .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight, .koiPond, .goldenCrumb: nil
         }
     }
 
@@ -2024,6 +2130,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.conditional
         case .reefLight: ReefLight.conditional
         case .koiPond: KoiPond.conditional
+        case .goldenCrumb: GoldenCrumb.conditional
         }
     }
 
@@ -2045,6 +2152,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.idle
         case .reefLight: ReefLight.idle
         case .koiPond: KoiPond.idle
+        case .goldenCrumb: GoldenCrumb.idle
         }
     }
 }
@@ -2140,7 +2248,7 @@ extension SurroundTheme {
             }
             return [.init(color: PaperBlossomsColors.whiteSurfaceTop, location: 0),
                     .init(color: PaperBlossomsColors.whiteSurfaceBottom, location: 1)]
-        case .whittledWoodland, .reefLight, .koiPond:
+        case .whittledWoodland, .reefLight, .koiPond, .goldenCrumb:
             let surfaces = identityChipColors(color)
             return [.init(color: surfaces[0], location: 0), .init(color: surfaces[1], location: 1)]
         }
@@ -2164,6 +2272,7 @@ extension SurroundTheme {
         case .whittledWoodland: color == .black ? WhittledWoodland.walnut : WhittledWoodland.birch
         case .reefLight: color == .black ? ReefLight.deepGlass : ReefLight.paleGlass
         case .koiPond: color == .black ? KoiPond.deepGlass : KoiPond.paleGlass
+        case .goldenCrumb: color == .black ? GoldenCrumb.cocoa : GoldenCrumb.vanilla
         }
     }
 
@@ -2184,6 +2293,7 @@ extension SurroundTheme {
         case .whittledWoodland: color == .black ? WhittledWoodland.cream : WhittledWoodland.whiteForeground
         case .reefLight: color == .black ? ReefLight.blackForeground : ReefLight.whiteForeground
         case .koiPond: color == .black ? KoiPond.blackForeground : KoiPond.whiteForeground
+        case .goldenCrumb: color == .black ? GoldenCrumb.blackForeground : GoldenCrumb.whiteForeground
         }
     }
 
@@ -2207,12 +2317,13 @@ extension SurroundTheme {
         case .whittledWoodland: color == .black ? WhittledWoodland.blackAccent : WhittledWoodland.whiteAccent
         case .reefLight: color == .black ? ReefLight.blackAccent : ReefLight.whiteAccent
         case .koiPond: color == .black ? KoiPond.blackAccent : KoiPond.whiteAccent
+        case .goldenCrumb: color == .black ? GoldenCrumb.blackAccent : GoldenCrumb.whiteAccent
         }
     }
 
     private var usesWarmClockStatusColors: Bool {
         switch self {
-        case .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight, .koiPond: true
+        case .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight, .koiPond, .goldenCrumb: true
         default: false
         }
     }
@@ -2335,6 +2446,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.turnOutline
         case .reefLight: ReefLight.turnOutline
         case .koiPond: KoiPond.turnOutline
+        case .goldenCrumb: GoldenCrumb.turnOutline
         }
     }
 
@@ -2356,6 +2468,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.turnGlow
         case .reefLight: ReefLight.turnGlow
         case .koiPond: KoiPond.turnGlow
+        case .goldenCrumb: GoldenCrumb.turnGlow
         }
     }
 
@@ -2379,6 +2492,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.action
         case .reefLight: ReefLight.action
         case .koiPond: KoiPond.action
+        case .goldenCrumb: GoldenCrumb.action
         }
     }
 
@@ -2426,6 +2540,10 @@ extension SurroundTheme {
             color == .black
                 ? [PaperBlossomsColors.blackSurfaceTop, PaperBlossomsColors.blackSurfaceBottom]
                 : [PaperBlossomsColors.whiteSurfaceTop, PaperBlossomsColors.whiteSurfaceBottom]
+        case .goldenCrumb:
+            color == .black
+                ? [GoldenCrumb.blackSurfaceTop, GoldenCrumb.blackSurfaceBottom]
+                : [GoldenCrumb.whiteSurfaceTop, GoldenCrumb.whiteSurfaceBottom]
         case .koiPond:
             color == .black
                 ? [KoiPond.blackSurfaceTop, KoiPond.blackSurfaceBottom]
@@ -2479,7 +2597,7 @@ extension SurroundTheme {
             color == .black
                 ? PaperBlossomsColors.blackBorder.opacity(0.3)
                 : PaperBlossomsColors.whiteBorder.opacity(0.35)
-        case .reefLight, .koiPond:
+        case .reefLight, .koiPond, .goldenCrumb:
             identityForeground(color).opacity(0.28)
         case .whittledWoodland:
             color == .black
@@ -2505,6 +2623,7 @@ extension SurroundTheme {
         case .whittledWoodland: color == .black ? WhittledWoodland.cream : WhittledWoodland.whiteForeground
         case .reefLight: color == .black ? ReefLight.blackForeground : ReefLight.whiteForeground
         case .koiPond: color == .black ? KoiPond.blackForeground : KoiPond.whiteForeground
+        case .goldenCrumb: color == .black ? GoldenCrumb.blackForeground : GoldenCrumb.whiteForeground
         }
     }
 
@@ -2532,6 +2651,8 @@ extension SurroundTheme {
             color == .black ? ChristmasKeepsakesColors.blackSecondary : ChristmasKeepsakesColors.whiteSecondary
         case .paperBlossoms:
             color == .black ? PaperBlossomsColors.blackSecondary : PaperBlossomsColors.whiteSecondary
+        case .goldenCrumb:
+            color == .black ? GoldenCrumb.blackSecondary : GoldenCrumb.whiteSecondary
         case .koiPond:
             color == .black ? KoiPond.blackSecondary : KoiPond.whiteSecondary
         case .reefLight:
@@ -2699,6 +2820,7 @@ extension SurroundTheme {
         case .whittledWoodland: WhittledWoodland.selection
         case .reefLight: ReefLight.selection
         case .koiPond: KoiPond.selection
+        case .goldenCrumb: GoldenCrumb.selection
         default: actionTint ?? .accentColor
         }
     }
@@ -3472,7 +3594,7 @@ extension SurroundTheme {
     /// Themes with their own readable ink for unselected toolbar symbols and detail text.
     var usesCustomDetailTint: Bool {
         switch self {
-        case .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight, .koiPond: true
+        case .feltMeadow, .nightGarden, .christmasKeepsakes, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight, .koiPond, .goldenCrumb: true
         default: false
         }
     }
@@ -4205,8 +4327,8 @@ extension View {
 
 /// Scene art behind bare system status text sometimes needs a narrow
 /// contrast margin. Read the owning window's actual status frame: there is no
-/// full-width band behind Duo’s corner status tray. Koi Pond lifts the water
-/// beneath that tray so daylight’s black glyphs remain legible.
+/// full-width band behind Duo’s corner status tray. A local wash beneath
+/// the tray keeps daylight's black glyphs legible over water and walnut.
 struct ThemeStatusBarContrast: View {
     @Environment(\.surroundTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
@@ -4220,6 +4342,9 @@ struct ThemeStatusBarContrast: View {
         return switch theme {
         case .nightGarden: 0.8
         case .flowingInk, .flowingInkJade: 0.85
+        // The phone time sits on flour and the indicators on golden pastry.
+        // A longer iPad status line also reaches the bare walnut between them.
+        case .goldenCrumb: UIDevice.current.userInterfaceIdiom == .phone ? 0.22 : 0.55
         case .rakedGarden, .frostPine, .surroundStudio, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight, .koiPond: 0.55
         default: 0
         }
@@ -4231,7 +4356,7 @@ struct ThemeStatusBarContrast: View {
         #else
         if !hidden, theme.showsSceneArt, opacity > 0 {
             StatusBarContrastSurface(color: UIColor(theme.pageBackground),
-                                     opacity: opacity, gradesCornerTray: theme == .koiPond)
+                                     opacity: opacity, gradesCornerTray: theme == .koiPond || theme == .goldenCrumb)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         }
@@ -4365,6 +4490,8 @@ struct GameDetailBackdrop: View {
             RakedGardenScene(scheme: colorScheme)
         case .surroundStudio:
             SurroundStudioScene(scheme: colorScheme)
+        case .goldenCrumb:
+            GoldenCrumbScene(scheme: colorScheme)
         case .koiPond:
             KoiPondScene(scheme: colorScheme, boards: sceneBoards)
         case .reefLight:

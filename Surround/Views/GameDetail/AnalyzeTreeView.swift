@@ -109,7 +109,8 @@ struct AnalyzeTreeSlice: View {
                                 .overlay {
                                     // Charcoal materials need a quiet edge on
                                     // their night panels, independently of marks.
-                                    if (theme == .feltMeadow || theme == .paperBlossoms || theme == .whittledWoodland),
+                                    if (theme == .feltMeadow || theme == .paperBlossoms
+                                        || theme == .whittledWoodland || theme == .goldenCrumb),
                                        colorScheme == .dark, lastMoveColor == .black {
                                         Circle().strokeBorder(appearance.white.flat.opacity(0.55), lineWidth: 0.75)
                                             .allowsHitTesting(false)

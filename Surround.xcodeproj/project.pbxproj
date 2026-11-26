@@ -547,10 +547,12 @@
 		E2E175CF0BB4463E8E450CBF /* MessagesFoldLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */; };
 		E7B75B1A24C841E8AD7DB50C /* SurroundUITestContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3100043A00000000000004 /* SurroundUITestContract.swift */; };
 		EF2611210000000000000002 /* ReefLight.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF2611210000000000000001 /* ReefLight.swift */; };
+		EC2611260000000000000002 /* GoldenCrumbScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC2611260000000000000001 /* GoldenCrumbScene.swift */; };
 		AC2611250000000000000002 /* KoiPondScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2611250000000000000001 /* KoiPondScene.swift */; };
 		AC2611250000000000000012 /* KoiPondSwimming.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2611250000000000000011 /* KoiPondSwimming.swift */; };
 		AC2611250000000000000022 /* KoiPondSwimmer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2611250000000000000021 /* KoiPondSwimmer.swift */; };
 		EF2611210000000000000003 /* ReefLight.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF2611210000000000000001 /* ReefLight.swift */; };
+		EC2611260000000000000003 /* GoldenCrumbScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC2611260000000000000001 /* GoldenCrumbScene.swift */; };
 		EF2611250000B00000000002 /* KoiPondBoard.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF2611250000B00000000001 /* KoiPondBoard.swift */; };
 		EF2611250000B00000000003 /* KoiPondBoard.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF2611250000B00000000001 /* KoiPondBoard.swift */; };
 		AC2611250000000000000003 /* KoiPondScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2611250000000000000001 /* KoiPondScene.swift */; };
@@ -953,6 +955,7 @@
 		E271DDB41A1044F0BB9E1A1A /* GameDetailInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailInteractionTests.swift; sourceTree = "<group>"; };
 		EEC58AEE01CB46809AB3EAD9 /* ChatSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSessionState.swift; sourceTree = "<group>"; };
 		EF2611210000000000000001 /* ReefLight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReefLight.swift; sourceTree = "<group>"; };
+		EC2611260000000000000001 /* GoldenCrumbScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoldenCrumbScene.swift; sourceTree = "<group>"; };
 		EF2611250000B00000000001 /* KoiPondBoard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KoiPondBoard.swift; sourceTree = "<group>"; };
 		AC2611250000000000000001 /* KoiPondScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KoiPondScene.swift; sourceTree = "<group>"; };
 		AC2611250000000000000011 /* KoiPondSwimming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KoiPondSwimming.swift; sourceTree = "<group>"; };
@@ -1453,6 +1456,7 @@
 				292944E5B1A442AC8C833A38 /* GameDetailPlayers.swift */,
 				4C16B1C83F38A637972CA7A3 /* GameDetailTheme.swift */,
 				EF2611210000000000000001 /* ReefLight.swift */,
+				EC2611260000000000000001 /* GoldenCrumbScene.swift */,
 				AC2611250000000000000001 /* KoiPondScene.swift */,
 				AC2611250000000000000011 /* KoiPondSwimming.swift */,
 				AC2611250000000000000021 /* KoiPondSwimmer.swift */,
@@ -1893,6 +1897,7 @@
 				88BE592C613B468E9DAD8659 /* GameDetailPlayers.swift in Sources */,
 				A0F800AD9C00B59EA66EFD40 /* GameDetailTheme.swift in Sources */,
 				EF2611210000000000000003 /* ReefLight.swift in Sources */,
+				EC2611260000000000000003 /* GoldenCrumbScene.swift in Sources */,
 				EF2611250000B00000000003 /* KoiPondBoard.swift in Sources */,
 				AC2611250000000000000003 /* KoiPondScene.swift in Sources */,
 				AC2611250000000000000013 /* KoiPondSwimming.swift in Sources */,
@@ -2138,6 +2143,7 @@
 				FC2510010000000000000003 /* FeltEdgeFibers.swift in Sources */,
 				33D3DFBAA384CA900DFCD5B9 /* GameDetailTheme.swift in Sources */,
 				EF2611210000000000000002 /* ReefLight.swift in Sources */,
+				EC2611260000000000000002 /* GoldenCrumbScene.swift in Sources */,
 				EF2611250000B00000000002 /* KoiPondBoard.swift in Sources */,
 				AC2611250000000000000002 /* KoiPondScene.swift in Sources */,
 				AC2611250000000000000012 /* KoiPondSwimming.swift in Sources */,

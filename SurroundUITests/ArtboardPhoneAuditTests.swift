@@ -1003,6 +1003,22 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         }
     }
 
+    func testGoldenCrumbThemeStates() throws {
+        try auditThemeStates(theme: "goldenCrumb", title: "Golden Crumb", suffix: "-golden-crumb", appearance: .light)
+    }
+
+    func testGoldenCrumbStampedClockAndPlayerInteractions() throws {
+        try auditThemeControlInteractions(theme: "goldenCrumb", title: "Golden Crumb", suffix: "golden-crumb")
+    }
+
+    func testGoldenCrumbThemeScoring() throws {
+        try auditThemeScoring(theme: "goldenCrumb", title: "Golden Crumb", suffix: "-golden-crumb-night", appearance: .dark)
+    }
+
+    func testGoldenCrumbThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "goldenCrumb", title: "Golden Crumb", suffix: "-golden-crumb", appearance: .light)
+    }
+
     func testReefLightThemeStates() throws {
         try auditThemeStates(theme: "reefLight", title: "Reef Light", suffix: "-reef-light", appearance: .light)
     }

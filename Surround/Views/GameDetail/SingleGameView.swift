@@ -281,7 +281,7 @@ struct SingleGameView: View {
     private var chatPreviewBar: some View {
         HStack(spacing: 12) {
             chatPreviewTitle
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme == .goldenCrumb ? AnyShapeStyle(theme.detailSecondaryForeground) : AnyShapeStyle(.secondary))
                 .lineLimit(1)
             Spacer(minLength: 0)
             Button {
@@ -292,7 +292,7 @@ struct SingleGameView: View {
                     .lineLimit(1)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.purple)
+            .foregroundStyle(theme == .goldenCrumb ? theme.selectionMark : .purple)
             // The title gives way first: the action stays readable.
             .layoutPriority(1)
             .accessibilityIdentifier("game.chat.preview.return")
@@ -300,7 +300,7 @@ struct SingleGameView: View {
         .font(.callout)
         .padding(.horizontal, 12)
         .frame(minHeight: 44)
-        .background(.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .background(theme == .goldenCrumb ? theme.panel : .purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 
     var boardView: some View {

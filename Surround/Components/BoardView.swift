@@ -172,7 +172,8 @@ struct Goban: View {
         let size = stoneSize(geometry: geometry, boardSize: max(width, height), displayScale: displayScale)
         let padded = appearance.gridStyle.usesPaddedCells(at: size)
         let engraved = appearance.gridStyle.usesEngraving(at: size)
-        let lineColor = appearance.gridColor.opacity(padded ? 0.6 : 1)
+        let coreOpacity = appearance.gridStyle.coreOpacity(at: size)
+        let lineColor = appearance.gridColor.opacity(coreOpacity)
         #if DEBUG
         let drawnRow = markerAuditState?.highlightedRow ?? highlightedRow
         let drawnColumn = markerAuditState?.highlightedColumn ?? highlightedColumn
@@ -239,6 +240,14 @@ struct Goban: View {
                         color: appearance.gridColor
                     ).equatable()
                 }
+                if appearance.gridStyle == .shortbreadScore {
+                    ShortbreadScoredGrid(
+                        geometry: EngravedGridGeometry(width: width, height: height,
+                                                      cellSize: size, lineScale: appearance.gridLineScale),
+                        shade: appearance.boardDepth?.shade ?? appearance.gridColor,
+                        highlight: appearance.boardDepth?.highlight ?? .white
+                    ).equatable()
+                }
                 if appearance.gridStyle == .incised {
                     // The far wall of a knife-cut groove catches the light.
                     // Its dark core and hoshi use the exact native paths below.
@@ -278,7 +287,7 @@ struct Goban: View {
                 .opacity(appearance.gridStyle.usesRaggedEdges(at: size) || engraved ? 0 : 1)
                 .animation(nil, value: appearance.gridStyle.usesRaggedEdges(at: size))
                 .animation(nil, value: engraved)
-                .animation(nil, value: padded)
+                .animation(nil, value: coreOpacity)
                 if appearance.gridStyle == .stitched {
                     StitchedGobanGrid(
                         geometry: StitchedGridGeometry(width: width, height: height, cellSize: size),
@@ -829,7 +838,7 @@ private struct PorcelainBoardWall: View {
             silhouette.fill(material.upperFace)
                 .overlay(alignment: .bottom) {
                     ZStack {
-                        if let texture, let glaze = texture.frontGlaze {
+                        if let texture, let glaze = texture.frontSurface {
                             texture.framedImage(glaze, in: strip, faceSize: geometry.size)
                                 .colorMultiply(texture.tint)
                         }
@@ -848,6 +857,77 @@ private struct PorcelainBoardWall: View {
                 }
                 .padding(.horizontal, tuck)
                 .frame(width: geometry.size.width, height: geometry.size.height + layout.thickness)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// The shortbread turns down around the same two arcs as the face. Project
+/// the small crumb photograph along that contour so the crust has the same
+/// thickness at the curved shoulders as it has across the straight front.
+private struct ShortbreadBoardWall: View {
+    let material: BoardDepth
+    let texture: BoardTexture?
+    let layout: BoardDepthGeometry
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        GeometryReader { geometry in
+            let depth = layout.thickness
+            let silhouette = RoundedRectangle(cornerRadius: cornerRadius, style: .circular)
+            silhouette.fill(material.upperFace)
+                .overlay(alignment: .bottom) {
+                    Canvas { context, size in
+                        guard depth > 0, let crumb = context.resolveSymbol(id: 0) else { return }
+                        // These windows meet at a shared texel and carry the same
+                        // image, including the face's nine-slice mapping on rectangles.
+                        func draw(from a: CGPoint, to b: CGPoint) {
+                            guard b.x > a.x else { return }
+                            var side = context
+                            let window = CGRect(x: a.x, y: 0, width: b.x - a.x, height: size.height)
+                            side.clip(to: Path(window), style: FillStyle(antialiased: false))
+                            let slope = (b.y - a.y) / (b.x - a.x)
+                            side.concatenate(CGAffineTransform(a: 1, b: slope, c: 0, d: 1,
+                                                               tx: 0, ty: a.y - slope * a.x))
+                            side.draw(crumb, at: .zero, anchor: .topLeading)
+                        }
+                        draw(from: CGPoint(x: cornerRadius, y: cornerRadius),
+                             to: CGPoint(x: size.width - cornerRadius, y: cornerRadius))
+                        var previous = CGPoint.zero
+                        for segment in 1...8 {
+                            let angle = CGFloat(segment) * .pi / 16
+                            let next = CGPoint(x: cornerRadius * (1 - cos(angle)), y: cornerRadius * sin(angle))
+                            draw(from: previous, to: next)
+                            draw(from: CGPoint(x: size.width - next.x, y: next.y),
+                                 to: CGPoint(x: size.width - previous.x, y: previous.y))
+                            previous = next
+                        }
+                    } symbols: {
+                        ZStack {
+                            LinearGradient(colors: [material.upperFace, material.lowerFace],
+                                           startPoint: .top, endPoint: .bottom)
+                            if let texture, let crust = texture.frontSurface {
+                                texture.framedImage(crust, in: CGSize(width: geometry.size.width, height: depth),
+                                                    faceSize: geometry.size)
+                                    .colorMultiply(texture.tint)
+                            }
+                        }
+                        .frame(width: geometry.size.width, height: depth)
+                        .tag(0)
+                    }
+                    .frame(height: cornerRadius + depth)
+                }
+                .clipShape(silhouette)
+                .background {
+                    // Both shadows touch the biscuit. Only the softer cast moves
+                    // down and right, within the fade already reserved by layout.
+                    silhouette.fill(material.lowerFace)
+                        .shadow(color: material.shadow.opacity(0.78), radius: depth * 0.10, y: depth * 0.08)
+                        .shadow(color: material.shadow.opacity(0.39), radius: layout.shadowRadius * 0.65,
+                                x: depth * 0.10, y: layout.shadowOffset * 0.55)
+                }
+                .frame(width: geometry.size.width, height: geometry.size.height + depth)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -1990,6 +2070,9 @@ struct BoardView: View {
                                         if depth.edgeStyle == .porcelain {
                                             PorcelainBoardWall(material: depth, texture: appearance.boardTexture,
                                                                layout: depthGeometry, cornerRadius: faceRadius)
+                                        } else if depth.edgeStyle == .shortbread {
+                                            ShortbreadBoardWall(material: depth, texture: appearance.boardTexture,
+                                                                layout: depthGeometry, cornerRadius: faceRadius)
                                         } else {
                                             BoardDepthView(material: depth, thickness: depthGeometry.thickness,
                                                            cornerRadius: faceRadius, shadowRadius: depthGeometry.shadowRadius,

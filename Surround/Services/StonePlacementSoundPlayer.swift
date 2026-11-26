@@ -137,8 +137,10 @@ final class StonePlacementSoundPlayer: ObservableObject {
         self.uptime = uptime
     }
 
-    /// Koi Pond shares Night Garden’s glass contact. Flowing Ink uses Classic.
+    /// Golden Crumb shares the dry paper pat, Koi Pond the glass contact,
+    /// and Flowing Ink the Classic stone sound.
     private static func soundTheme(for theme: SurroundTheme) -> SurroundTheme {
+        if theme == .goldenCrumb { return .paperBlossoms }
         if theme == .koiPond { return .nightGarden }
         return theme.isFlowingInk ? .standard : theme
     }

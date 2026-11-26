@@ -580,6 +580,10 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         auditThemeStates(theme: "koiPond", suffix: "-koi-pond", appearance: "light")
     }
 
+    func testGoldenCrumbThemeStates() {
+        auditThemeStates(theme: "goldenCrumb", suffix: "-golden-crumb", appearance: "light")
+    }
+
     func testWhittledWoodlandThemeStates() {
         auditThemeStates(theme: "whittledWoodland", suffix: "-whittled-woodland", appearance: "light")
     }

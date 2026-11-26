@@ -65,7 +65,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
     }
 
     /// The themes a Debug build offers, in the pickers' order.
-    private let debugThemes = ["standard", "surroundStudio", "rakedGarden", "nebulaPearl", "frostPine", "feltMeadow", "nightGarden", "christmasKeepsakes", "paperBlossoms", "flowingInk", "sakuraStream", "whittledWoodland", "reefLight", "koiPond"]
+    private let debugThemes = ["standard", "surroundStudio", "rakedGarden", "nebulaPearl", "frostPine", "feltMeadow", "nightGarden", "christmasKeepsakes", "paperBlossoms", "flowingInk", "sakuraStream", "whittledWoodland", "reefLight", "koiPond", "goldenCrumb"]
 
     /// Every tile's preview keeps the full width of its column, whatever
     /// height the picker's host can give: a host shorter than the picker
@@ -185,6 +185,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(themeOption("whittledWoodland", in: app).exists, "Debug builds offer Whittled Woodland.")
         XCTAssertTrue(themeOption("reefLight", in: app).exists, "Debug builds offer Reef Light.")
         XCTAssertTrue(themeOption("koiPond", in: app).exists, "Debug builds offer Koi Pond.")
+        XCTAssertTrue(themeOption("goldenCrumb", in: app).exists, "Debug builds offer Golden Crumb.")
         #endif
 
         // Settings has one picker; its screen identifier spans several elements.
@@ -246,6 +247,11 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         tap(pond, description: "Choose Koi Pond for this game", in: app)
         assertSelected(pond, true)
         assertSelected(reef, false)
+
+        let crumb = themeOption("goldenCrumb", in: app)
+        tap(crumb, description: "Choose Golden Crumb for this game", in: app)
+        assertSelected(crumb, true)
+        assertSelected(pond, false)
         #endif
     }
 

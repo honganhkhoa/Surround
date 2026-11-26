@@ -109,7 +109,8 @@ final class SurroundThemeTests: XCTestCase {
                                     SurroundTheme.frostPine.board(for: .light).boardDepth,
                                     SurroundTheme.frostPine.board(for: .dark).boardDepth,
                                     SurroundTheme.christmasKeepsakes.board(for: .light).boardDepth,
-                                    SurroundTheme.christmasKeepsakes.board(for: .dark).boardDepth]
+                                    SurroundTheme.christmasKeepsakes.board(for: .dark).boardDepth,
+                                    SurroundTheme.goldenCrumb.board(for: .light).boardDepth]
         for depth in depths {
             for boardSize in [9, 13, 19] {
                 for coordinates in [false, true] {
@@ -152,7 +153,8 @@ final class SurroundThemeTests: XCTestCase {
                           XCTUnwrap(SurroundTheme.frostPine.board(for: .light).boardDepth),
                           XCTUnwrap(SurroundTheme.frostPine.board(for: .dark).boardDepth),
                           XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .light).boardDepth),
-                          XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .dark).boardDepth)]
+                          XCTUnwrap(SurroundTheme.christmasKeepsakes.board(for: .dark).boardDepth),
+                          XCTUnwrap(SurroundTheme.goldenCrumb.board(for: .light).boardDepth)]
         for depth in depths {
             for boardSize in [9, 13, 19] {
                 for coordinates in [false, true] {
@@ -430,6 +432,7 @@ final class SurroundThemeTests: XCTestCase {
                "NightGardenBlackStone", "NightGardenWhiteStone",
                "ReefLightBlackStone", "ReefLightWhiteStone",
                "KoiPondBlackStone", "KoiPondWhiteStone",
+               "GoldenCrumbBlackStone", "GoldenCrumbWhiteStone",
                "ChristmasKeepsakesRubyStone", "ChristmasKeepsakesIvoryStone"]
         let side = 128
         for name in names {
@@ -4889,6 +4892,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "whittledWoodland"), .whittledWoodland)
         XCTAssertEqual(SurroundTheme.current(storedID: "reefLight"), .reefLight)
         XCTAssertEqual(SurroundTheme.current(storedID: "koiPond"), .koiPond)
+        XCTAssertEqual(SurroundTheme.current(storedID: "goldenCrumb"), .goldenCrumb)
         #else
         XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl"), .nebulaPearl)
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .rakedGarden)
@@ -4902,6 +4906,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "whittledWoodland"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "reefLight"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "koiPond"), .standard)
+        XCTAssertEqual(SurroundTheme.current(storedID: "goldenCrumb"), .standard)
         #endif
     }
 
@@ -4910,7 +4915,7 @@ final class SurroundThemeTests: XCTestCase {
     func testPickersOfferTheReleasedThemesFirst() {
         XCTAssertEqual(SurroundTheme.released, [.standard, .surroundStudio, .rakedGarden, .nebulaPearl])
         let unreleased: [SurroundTheme] = [.frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes,
-                                          .paperBlossoms, .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain, .sakuraStream, .whittledWoodland, .reefLight, .koiPond]
+                                          .paperBlossoms, .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain, .sakuraStream, .whittledWoodland, .reefLight, .koiPond, .goldenCrumb]
         XCTAssertEqual(SurroundTheme.allCases.filter(\.isDebugOnly), unreleased)
         #if DEBUG
         XCTAssertEqual(SurroundTheme.available, SurroundTheme.released + unreleased)
@@ -6169,6 +6174,267 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    func testGoldenCrumbUsesScoredShortbreadAndReadableCookieSurfaces() throws {
+        let theme = SurroundTheme.goldenCrumb
+        for scheme: ColorScheme in [.light, .dark] {
+            let board = theme.board(for: scheme)
+            XCTAssertEqual(board.gridStyle, .shortbreadScore)
+            let texture = try XCTUnwrap(board.boardTexture)
+            XCTAssertEqual(texture.mapping, .framed,
+                           "Rectangular games preserve all four sides of the toasted rim")
+            let slab = BoardDepthGeometry(containerSize: CGSize(width: 390, height: 390),
+                                         boardWidth: 19, boardHeight: 19, showsCoordinates: false,
+                                         displayScale: 3, depth: board.boardDepth)
+            XCTAssertGreaterThan(slab.cornerRadius, slab.thickness)
+            XCTAssertLessThanOrEqual(slab.cornerRadius, slab.cellSize / 2)
+            let cookies = try XCTUnwrap(board.stoneImages)
+            XCTAssertEqual(cookies.black.count, 1)
+            XCTAssertEqual(cookies.white.count, 1)
+            XCTAssertNil(board.boardReflection)
+            XCTAssertFalse(theme.allowsGlassOnPlayerSurfaces)
+            try assertNightControlFallbacksKeepReadableTextAndRoles(theme, scheme: scheme)
+            try assertNightAnalysisMarksRemainReadable(theme, scheme: scheme)
+        }
+    }
+
+    @MainActor
+    func testGoldenCrumbStampedSurfacesKeepClockAndPlayerTextReadable() throws {
+        let theme = SurroundTheme.goldenCrumb
+        let player = OGSUser(username: "player", id: 1)
+        for stone: StoneColor in [.black, .white] {
+            for scheme: ColorScheme in [.light, .dark] {
+                let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+                let inks = [theme.clockForeground(stone, scheme: scheme), theme.clockAccent(stone),
+                            theme.clockSuddenDeathAccent(stone, scheme: scheme),
+                            theme.identitySecondary(stone), theme.roleColor(for: player, on: stone)]
+                for size in [CGSize(width: 298, height: 96), CGSize(width: 140, height: 50),
+                             CGSize(width: 120, height: 34)] {
+                    let image = try nativeMaterialPixelsUsingDirectContext(
+                        GoldenCrumbCookieSurface(color: stone, cornerRadius: 12)
+                            .frame(width: size.width, height: size.height)
+                            .environment(\.colorScheme, scheme), scale: 1)
+                    XCTAssertEqual(image.width, Int(size.width))
+                    XCTAssertEqual(image.height, Int(size.height))
+                    // Sample where names, counters and footer labels sit, inside the stamped lip.
+                    var lowestContrast = Double.infinity
+                    var weakestPoint = CGPoint.zero
+                    var reds = [UInt8]()
+                    for y in stride(from: 8, to: image.height - 8, by: 3) {
+                        for x in stride(from: 12, to: image.width - 12, by: 7) {
+                            let i = 4 * (y * image.width + x)
+                            XCTAssertEqual(image.pixels[i + 3], 255)
+                            reds.append(image.pixels[i])
+                            let pigment = Color(red: Double(image.pixels[i]) / 255,
+                                                green: Double(image.pixels[i + 1]) / 255,
+                                                blue: Double(image.pixels[i + 2]) / 255)
+                            for ink in inks {
+                                let ratio = contrast(ink, pigment, style: style)
+                                if ratio < lowestContrast {
+                                    lowestContrast = ratio
+                                    weakestPoint = CGPoint(x: x, y: y)
+                                }
+                            }
+                        }
+                    }
+                    let sample = "\(stone), \(scheme), \(size)"
+                    XCTAssertGreaterThan(try XCTUnwrap(reds.max()) - XCTUnwrap(reds.min()), 2,
+                                         "The biscuit grain is present at \(sample)")
+                    XCTAssertGreaterThanOrEqual(lowestContrast, 4.5, "\(sample) at \(weakestPoint)")
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testGoldenCrumbRunningFlourMarksTheLowerEdgeAndWarningSurroundsTheClock() throws {
+        let padding: CGFloat = 8
+        let scale: CGFloat = 3
+        for size in [CGSize(width: 298, height: 96), CGSize(width: 120, height: 34)] {
+            let face = CGRect(origin: CGPoint(x: padding, y: padding), size: size)
+            for stone: StoneColor in [.black, .white] {
+                for scheme: ColorScheme in [.light, .dark] {
+                    func render(_ flour: GoldenCrumbCookieSurface.FlourPrint?) throws -> [UInt8] {
+                        try nativeMaterialPixelsUsingDirectContext(
+                            GoldenCrumbCookieSurface(color: stone, cornerRadius: 12,
+                                                    edgeClearance: size.height == 34 ? 4 : 6, flour: flour)
+                                .frame(width: size.width, height: size.height)
+                                .padding(padding)
+                                .environment(\.colorScheme, scheme), scale: scale).pixels
+                    }
+                    let idle = try render(nil), running = try render(.running), warning = try render(.warning)
+                    let width = Int((size.width + padding * 2) * scale)
+                    func changedPixels(_ printPixels: [UInt8], in region: CGRect, tolerance: Int = 8) -> Int {
+                        var count = 0
+                        for y in Int(ceil(region.minY * scale))..<Int(floor(region.maxY * scale)) {
+                            for x in Int(ceil(region.minX * scale))..<Int(floor(region.maxX * scale)) {
+                                let i = (y * width + x) * 4
+                                if (0..<4).contains(where: { abs(Int(printPixels[i + $0]) - Int(idle[i + $0])) > tolerance }) {
+                                    count += 1
+                                }
+                            }
+                        }
+                        return count
+                    }
+                    // Sample the flour on the bench outside the biscuit, clear
+                    // of the rounded corners. The warning can leave breaks in the print.
+                    let top = CGRect(x: face.minX + size.width * 0.15, y: 0,
+                                     width: size.width * 0.7, height: padding)
+                    let bottom = top.offsetBy(dx: 0, dy: face.maxY)
+                    let left = CGRect(x: 0, y: face.minY + size.height * 0.25,
+                                      width: padding, height: size.height * 0.5)
+                    let sample = "\(stone), \(scheme), \(size)"
+                    XCTAssertGreaterThan(changedPixels(running, in: bottom), 16, sample)
+                    XCTAssertEqual(changedPixels(running, in: top), 0, sample)
+                    for edge in [top, bottom, left, left.offsetBy(dx: face.maxX, dy: 0)] {
+                        XCTAssertGreaterThan(changedPixels(warning, in: edge), 4, "\(sample), edge \(edge)")
+                    }
+                    let text = face.insetBy(dx: 8, dy: 8)
+                    for printed in [running, warning] {
+                        XCTAssertEqual(changedPixels(printed, in: text, tolerance: 1), 0,
+                                       "Flour preserves every pixel beneath the live labels at \(sample)")
+                    }
+                }
+            }
+        }
+    }
+
+    func testGoldenCrumbCrustContinuesTheToastedRimAndDarkensAtItsFoot() throws {
+        let texture = try XCTUnwrap(SurroundTheme.goldenCrumb.board(for: .light).boardTexture)
+        let face = try XCTUnwrap(texture.image.cgImage)
+        let wall = try XCTUnwrap(texture.frontSurface?.cgImage)
+        XCTAssertEqual(wall.width, face.width)
+        func pigment(_ image: CGImage, x: Int, y: Int) throws -> [UInt8] {
+            let patch = try XCTUnwrap(image.cropping(to: CGRect(x: x, y: y, width: 8, height: 1)))
+            return try rgbaPixels(for: patch, side: 1)
+        }
+        for x in [face.width / 8, face.width / 2, face.width * 7 / 8] {
+            let rim = try pigment(face, x: x, y: face.height - 1)
+            let lip = try pigment(wall, x: x, y: 0)
+            let foot = try pigment(wall, x: x, y: wall.height - 1)
+            for channel in 0..<3 {
+                XCTAssertEqual(Double(lip[channel]), Double(rim[channel]), accuracy: 12,
+                               "The wall begins at the local rim color without a bright seam")
+                XCTAssertLessThan(foot[channel], lip[channel], "The wall shades toward the table")
+            }
+        }
+    }
+
+    @MainActor
+    func testGoldenCrumbWorkbenchKeepsCornerArtAndReadableLegacyChrome() throws {
+        let theme = SurroundTheme.goldenCrumb
+        let wood = try XCTUnwrap(UIImage(named: "GoldenCrumbWalnutBench", in: GoldenCrumb.bundle, compatibleWith: nil))
+        for size in [CGSize(width: 360, height: 700), CGSize(width: 840, height: 390)] {
+            let plain = try nativeMaterialPixelsUsingDirectContext(Image(uiImage: wood)
+                .resizable().scaledToFill().frame(width: size.width, height: size.height).clipped(), scale: 1)
+            for scheme: ColorScheme in [.light, .dark] {
+                let scene = try nativeMaterialPixelsUsingDirectContext(GameDetailBackdrop()
+                    .environment(\.surroundTheme, theme).environment(\.colorScheme, scheme)
+                    .frame(width: size.width, height: size.height), scale: 1)
+                // Both viewport shapes leave a patch of bare bench at the board center.
+                let centerX = scene.width / 2, centerY = scene.height / 2
+                var totalRed = 0, woodRed = 0, mismatched = 0
+                for y in (centerY - 12)..<(centerY + 12) {
+                    for x in (centerX - 12)..<(centerX + 12) {
+                        let i = (y * scene.width + x) * 4
+                        totalRed += Int(scene.pixels[i])
+                        woodRed += Int(plain.pixels[i])
+                        if (0..<3).contains(where: { abs(Int(scene.pixels[i + $0]) - Int(plain.pixels[i + $0])) > 4 }) {
+                            mismatched += 1
+                        }
+                    }
+                }
+                if scheme == .dark {
+                    XCTAssertLessThan(Double(totalRed), Double(woodRed) * 0.8, "Dim the walnut in Dark Mode")
+                    XCTAssertGreaterThan(Double(totalRed), Double(woodRed) * 0.25, "Retain the warm wood in Dark Mode")
+                } else {
+                    XCTAssertLessThan(mismatched, 24, "The middle of the playing area shows uninterrupted walnut")
+                }
+                if #available(iOS 26, macCatalyst 26, *) {
+                    guard scheme == .light else { continue }
+                    // Native glass leaves the sweep, pastry, cocoa and cutter visible.
+                    // Compare their own regions with the identical bare-wood crop.
+                    let edge = min(scene.width, scene.height) / 3
+                    for x0 in [0, scene.width - edge] {
+                        for y0 in [0, scene.height - edge] {
+                            var changed = 0
+                            for y in y0..<(y0 + edge) {
+                                for x in x0..<(x0 + edge) {
+                                    let i = (y * scene.width + x) * 4
+                                    if abs(Int(scene.pixels[i]) - Int(plain.pixels[i])) > 18 { changed += 1 }
+                                }
+                            }
+                            XCTAssertGreaterThan(changed, edge * edge / 50,
+                                                 "Visible corner artwork at (\(x0), \(y0)) in \(size)")
+                        }
+                    }
+                } else {
+                    // Older navigation and toolbar labels sit on the scene's edge gradients.
+                    let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+                    for y in [26, scene.height - 26] {
+                        for x in stride(from: centerX - 50, through: centerX + 50, by: 10) {
+                            let i = (y * scene.width + x) * 4
+                            let backing = Color(red: Double(scene.pixels[i]) / 255,
+                                                green: Double(scene.pixels[i + 1]) / 255,
+                                                blue: Double(scene.pixels[i + 2]) / 255)
+                            XCTAssertGreaterThanOrEqual(contrast(theme.foreground, backing, style: style), 4.5,
+                                                       "Unglazed toolbar text at (\(x), \(y)) in \(size), \(scheme)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testGoldenCrumbScoreHasTwoVisibleWallsOnRectangularBoards() throws {
+        let columns = 6, rows = 9
+        let scale: CGFloat = 3
+        for scheme: ColorScheme in [.light, .dark] {
+            let board = SurroundTheme.goldenCrumb.board(for: scheme)
+            let depth = try XCTUnwrap(board.boardDepth)
+            for cell: CGFloat in [7, 13, 20, 38] {
+                let grid = EngravedGridGeometry(width: columns, height: rows, cellSize: cell,
+                                                lineScale: board.gridLineScale)
+                let field = board.boardColor.frame(width: CGFloat(columns) * cell, height: CGFloat(rows) * cell)
+                let plain = try nativeMaterialPixelsUsingDirectContext(field, scale: scale)
+                let scored = try nativeMaterialPixelsUsingDirectContext(field.overlay {
+                    ShortbreadScoredGrid(geometry: grid, shade: depth.shade, highlight: depth.highlight)
+                }, scale: scale)
+                if cell < 14 {
+                    XCTAssertTrue(scored.pixels == plain.pixels, "The compact grid must add no relief at \(cell) pt")
+                    continue
+                }
+                func relief(at point: CGPoint) -> Int {
+                    let offset = 4 * (Int(point.y * scale) * scored.width + Int(point.x * scale))
+                    return (0..<3).reduce(0) { $0 + Int(scored.pixels[offset + $1]) - Int(plain.pixels[offset + $1]) } / 3
+                }
+                // Include the bottom and right borders: a square or transposed
+                // overlay would paint the wrong number of lanes on this board.
+                for horizontal in [true, false] {
+                    let count = horizontal ? rows : columns
+                    for line in [1, count - 2, count - 1] {
+                        let axis = (CGFloat(line) + 0.5) * cell
+                        for along in [2, 4] {
+                            func crossSection(_ direction: CGFloat) -> [Int] {
+                                (1...9).map { pixel in
+                                    let across = axis + direction * CGFloat(pixel) / scale
+                                    let betweenIntersections = CGFloat(along) * cell
+                                    return relief(at: CGPoint(x: horizontal ? betweenIntersections : across,
+                                                              y: horizontal ? across : betweenIntersections))
+                                }
+                            }
+                            let sample = "\(scheme), \(cell) pt, \(horizontal ? "row" : "column") \(line), span \(along)"
+                            XCTAssertLessThan(try XCTUnwrap(crossSection(-1).min()), -8, "The upper/left wall casts shade at \(sample)")
+                            XCTAssertGreaterThan(try XCTUnwrap(crossSection(1).max()), 7, "The lower/right wall catches light at \(sample)")
+                        }
+                    }
+                }
+                XCTAssertEqual(relief(at: CGPoint(x: 3 * cell, y: 7 * cell)), 0, "The middle of a cell stays clear")
+                XCTAssertEqual(relief(at: CGPoint(x: 5.9 * cell, y: 7.5 * cell)), 0, "Rows end at the right edge of the rectangular grid")
+            }
+        }
+    }
+
     func testKoiPondControlSurfacesAndAnalysisMarksInBothAppearances() throws {
         for scheme: ColorScheme in [.light, .dark] {
             try assertNightControlFallbacksKeepReadableTextAndRoles(.koiPond, scheme: scheme)
@@ -6209,7 +6475,7 @@ final class SurroundThemeTests: XCTestCase {
                 XCTAssertGreaterThan(contrast(theme.clockAccent(color), surface, style: style), 4.5)
                 XCTAssertGreaterThanOrEqual(
                     contrast(theme.clockSuddenDeathAccent(color, scheme: scheme), surface, style: style), 4.5)
-                if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland || theme == .reefLight || theme == .koiPond {
+                if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland || theme == .reefLight || theme == .koiPond || theme == .goldenCrumb {
                     for (state, accent) in [
                         ("Accepted", theme.clockAgreementAccent(color, scheme: scheme)),
                         ("Disconnected", theme.clockDisconnectedAccent(color, scheme: scheme)),
@@ -6232,7 +6498,7 @@ final class SurroundThemeTests: XCTestCase {
         }
         XCTAssertGreaterThan(contrast(.white, try XCTUnwrap(theme.actionTint), style: style), 4.5)
         XCTAssertGreaterThan(contrast(.white, theme.statusBadge, style: style), 4.5)
-        if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland || theme == .reefLight || theme == .koiPond {
+        if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland || theme == .reefLight || theme == .koiPond || theme == .goldenCrumb {
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockUndoBadge(scheme: scheme), style: style), 4.5,
                                        "The Undo badge keeps its white text readable")
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockSuddenDeathBadge(scheme: scheme), style: style), 4.5,

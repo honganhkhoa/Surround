@@ -637,6 +637,23 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                                appearance: .dark)
     }
 
+    func testGoldenCrumbThemeOrientations() {
+        auditThemeOrientations(theme: "goldenCrumb", title: "Golden Crumb", suffix: "-golden-crumb", appearance: .light)
+    }
+
+    func testGoldenCrumbThemePanels() {
+        auditThemePanels(theme: "goldenCrumb", title: "Golden Crumb", suffix: "-golden-crumb-night", appearance: .dark)
+    }
+
+    func testGoldenCrumbThemeNarrowWindow() {
+        auditNarrowNativeWindowArtboard(theme: "goldenCrumb", suffix: "-golden-crumb", appearance: .light)
+    }
+
+    func testGoldenCrumbThemeTallWindow() {
+        auditNarrowNativeWindowArtboard(theme: "goldenCrumb", suffix: "-golden-crumb-tall",
+                                        appearance: .light, requestedSize: CGSize(width: 375, height: 1000))
+    }
+
     func testReefLightThemeOrientations() {
         auditThemeOrientations(theme: "reefLight", title: "Reef Light", suffix: "-reef-light", appearance: .light)
     }
@@ -1663,7 +1680,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                                                  requestedSize: CGSize = CGSize(width: 375, height: 548)) {
         let app = launchGame(artboard: 84, portrait: true, theme: theme, appearance: appearance)
         defer {
-            if theme?.hasPrefix("flowingInk") == true || ["paperBlossoms", "sakuraStream", "reefLight", "koiPond"].contains(theme) {
+            if theme?.hasPrefix("flowingInk") == true || ["paperBlossoms", "sakuraStream", "reefLight", "koiPond", "goldenCrumb"].contains(theme) {
                 restoreFullWindow(in: app)
                 app.terminate()
             }

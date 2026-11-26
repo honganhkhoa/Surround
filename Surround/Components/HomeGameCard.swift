@@ -228,6 +228,8 @@ struct HomeClockChip<Leading: View>: View {
                 let ink = warning ? warningColor : theme.clockAccent(color)
                 WhittledWoodlandControlSurface(color: color, cornerRadius: size.radius, isIdentity: true,
                                                runningInk: state.running || lowOnTime ? ink : nil)
+            } else if theme == .goldenCrumb {
+                GoldenCrumbCookieSurface(color: color, cornerRadius: size.radius)
             } else if theme == .feltMeadow {
                 FeltControlSurface(color: color, shape: shape, runningClock: state.running || lowOnTime,
                                    isWarning: warning)

@@ -402,7 +402,7 @@ private struct GameDetailClockCard: View {
         style == .inline || (style == .compact && !spaciousCompact)
             || columnCard || narrowFullCard || narrowCompactCard
     }
-    private var compactSakuraControl: Bool {
+    private var compactClockArtwork: Bool {
         style != .full || columnCard || narrowFullCard || narrowCompactCard
     }
     private var hasSakuraEtchCorner: Bool {
@@ -486,7 +486,7 @@ private struct GameDetailClockCard: View {
                 .overlay {
                     if theme == .sakuraStream && showsThemeGlass {
                         SakuraStreamGlassEtching(color: color, cornerRadius: clockCornerRadius,
-                                                 role: .clock, compact: compactSakuraControl,
+                                                 role: .clock, compact: compactClockArtwork,
                                                  spareClockCorner: hasSakuraEtchCorner, mirrored: mirrored)
                     }
                 }
@@ -654,6 +654,10 @@ private struct GameDetailClockCard: View {
                     KoiPondBambooLedge(compact: style != .full, running: state.running)
                         .offset(y: KoiPondBambooLedge.height - KoiPondBambooLedge.overlap)
                 }
+        } else if theme == .goldenCrumb {
+            GoldenCrumbCookieSurface(color: color, cornerRadius: clockCornerRadius,
+                                     edgeClearance: compactClockArtwork || dynamicTypeSize.isAccessibilitySize ? 4 : 6,
+                                     flour: state.running ? (state.suddenDeath ? .warning : .running) : nil)
         } else if theme == .reefLight {
             ReefLightShellSurface(color: color, cornerRadius: clockCornerRadius, role: .clock,
                                   compact: style != .full || narrowFullCard || columnCard)
@@ -715,7 +719,7 @@ private struct GameDetailClockCard: View {
             } else if theme.isFlowingInk || theme == .christmasKeepsakes {
                 GameDetailMatteClockOutline(color: color, isRunning: state.running,
                                            isWarning: state.suddenDeath, cornerRadius: clockCornerRadius)
-            } else {
+            } else if theme != .goldenCrumb || reduceTransparency || contrast == .increased {
                 let highlightsOutline = state.running && theme != .feltMeadow && !theme.usesTintedClockShoulder
                 if highlightsOutline && contrast != .increased {
                     shape.strokeBorder(turnGlow.opacity(colorScheme == .dark ? 0.6 : 0.55), lineWidth: 6)
@@ -1409,6 +1413,9 @@ struct GameDetailPlayerIdentity: View {
         .background {
             if theme == .koiPond {
                 KoiPondPebbleChip(color: color, cornerRadius: chipCornerRadius)
+            } else if theme == .goldenCrumb {
+                GoldenCrumbCookieSurface(color: color, cornerRadius: chipCornerRadius,
+                                         edgeClearance: max(2, chipPadding))
             } else if theme == .reefLight {
                 ReefLightShellSurface(color: color, cornerRadius: chipCornerRadius, role: .player,
                                       compact: navigationHeader || compactHeader || compactColumn || avatarOnly,

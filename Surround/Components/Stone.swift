@@ -297,8 +297,8 @@ struct BoardTexture: Equatable {
     }
 
     var image: UIImage
-    /// Colors along the rounded front contour, continued down the porcelain wall.
-    var frontGlaze: UIImage? = nil
+    /// Unrolled front-wall material, with the same horizontal registration as the face.
+    var frontSurface: UIImage? = nil
     /// The tile's width in points; unused for a board-wide composition.
     var tileSize: CGFloat = 320
     var mapping: Mapping = .tiled
@@ -428,7 +428,7 @@ struct BoardDepth: Equatable {
     static let porcelainCornerFraction: CGFloat = 0.015
 
     enum EdgeStyle: Equatable {
-        case cut, frosted, rolledTin, porcelain, whittled
+        case cut, frosted, rolledTin, porcelain, whittled, shortbread
     }
 
     var upperFace: Color
@@ -499,6 +499,9 @@ struct BoardDepthGeometry: Equatable {
             self.cornerRadius = min(thickness * 2.8, self.cellSize * 0.45)
         case .whittled:
             self.cornerRadius = min(thickness * 1.6, self.cellSize * 0.42)
+        case .shortbread:
+            // The biscuit rounds over within the half-cell outside the grid.
+            self.cornerRadius = min(thickness * 3.5, self.cellSize * 0.5)
         default:
             self.cornerRadius = min(thickness * 0.65, self.cellSize / 4)
         }
@@ -704,7 +707,7 @@ struct StoneMarkerText: View, Equatable {
 }
 
 enum BoardGridStyle: Equatable {
-    case straight, ragged, stitched, engraved, incised
+    case straight, ragged, stitched, engraved, incised, shortbreadScore
 
     func usesEngraving(at cellSize: CGFloat) -> Bool {
         self == .engraved && usesDetailedStoneRendering(at: cellSize)
@@ -720,6 +723,15 @@ enum BoardGridStyle: Equatable {
 
     func usesPaddedCells(at cellSize: CGFloat) -> Bool {
         self == .stitched && usesDetailedStoneRendering(at: cellSize)
+    }
+
+    func coreOpacity(at cellSize: CGFloat) -> Double {
+        guard usesDetailedStoneRendering(at: cellSize) else { return 1 }
+        switch self {
+        case .stitched: return 0.6
+        case .shortbreadScore: return 0.72
+        default: return 1
+        }
     }
 }
 
@@ -789,6 +801,55 @@ struct EngravedGridGeometry: Equatable {
     var dimpleDiameter: CGFloat { min(5.5, max(4.5, cellSize * 0.26)) }
     /// A substantial opaque center stays distinct from a chipped crossing.
     var dimpleCoreDiameter: CGFloat { dimpleDiameter - 0.8 }
+}
+
+/// A pressed shortbread seam has a shaded near wall and a far wall that catches
+/// the light. The crumb breaks along its edges while the playing line stays true.
+struct ShortbreadScoredGrid: View, Equatable {
+    var geometry: EngravedGridGeometry
+    var shade: Color
+    var highlight: Color
+
+    var body: some View {
+        Canvas { context, _ in
+            let cell = geometry.cellSize
+            let bounds = geometry.gridRect
+            guard usesDetailedStoneRendering(at: cell), !bounds.isEmpty else { return }
+            let radius = min(3.3, cell * 0.075) * geometry.lineScale
+            let walls = Gradient(stops: [
+                .init(color: shade.opacity(0), location: 0),
+                .init(color: shade.opacity(0.20), location: 0.17),
+                .init(color: shade.opacity(0.78), location: 0.43),
+                .init(color: shade.opacity(0.85), location: 0.50),
+                .init(color: highlight.opacity(0.95), location: 0.63),
+                .init(color: highlight.opacity(0.72), location: 0.80),
+                .init(color: highlight.opacity(0), location: 1)
+            ])
+            for row in 0..<geometry.height {
+                let y = bounds.minY + CGFloat(row) * cell
+                let cut = CGRect(x: bounds.minX, y: y - radius,
+                                 width: bounds.width, height: 2 * radius)
+                context.fill(Path(roundedRect: cut, cornerRadius: radius), with: .linearGradient(
+                    walls, startPoint: CGPoint(x: cut.midX, y: cut.minY),
+                    endPoint: CGPoint(x: cut.midX, y: cut.maxY)))
+            }
+            for column in 0..<geometry.width {
+                let x = bounds.minX + CGFloat(column) * cell
+                let cut = CGRect(x: x - radius, y: bounds.minY,
+                                 width: 2 * radius, height: bounds.height)
+                context.fill(Path(roundedRect: cut, cornerRadius: radius), with: .linearGradient(
+                    walls, startPoint: CGPoint(x: cut.minX, y: cut.midY),
+                    endPoint: CGPoint(x: cut.maxX, y: cut.midY)))
+            }
+            let crumb = RaggedGridGeometry(width: geometry.width, height: geometry.height,
+                                           cellSize: cell, lineScale: geometry.lineScale,
+                                           edgeAmplitude: min(0.9, cell * 0.024),
+                                           edgeSamplesPerCell: 5, independentEdges: true)
+            context.fill(crumb.path, with: .color(shade.opacity(0.46)))
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
 }
 
 /// Rough ice-cut lips around a continuous pigment core. Relief stays in a

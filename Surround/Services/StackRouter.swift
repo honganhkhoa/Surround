@@ -849,7 +849,7 @@ struct AppNavigationStack<Content: View>: View {
     /// tint scope. Illustrated garden and keepsake scenes need matching ink.
     private var legacyGameDetailTint: Color? {
         let theme = SurroundTheme.current(storedID: gameThemeID)
-        guard theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland || theme == .reefLight || theme == .koiPond,
+        guard theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland || theme == .reefLight || theme == .koiPond || theme == .goldenCrumb,
               let route = navigation.path.last else { return nil }
         let hasLoadedGame: Bool = switch route {
         case .homeGame: nav.home.activeGame != nil
