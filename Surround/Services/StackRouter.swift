@@ -217,9 +217,21 @@ final class StackRouter: ObservableObject {
     /// does: a game opened from a profile there closes the list and opens
     /// in the window instead of being pushed.
     var gameOpenOverride: ((Int) -> Void)?
-    /// The connection status of the Activity list in this stack. The cards
-    /// the list pushes dim their actions by it, as its rows do.
-    weak var activityConnection: ConnectionStatusSource?
+    /// The connection status of the Activity list in this stack, while the
+    /// list is in it. The cards the list pushes dim their actions by it, as
+    /// its rows do, and a conversation pushed above it is Activity's.
+    private(set) weak var activityConnection: ConnectionStatusSource?
+    /// Where the Activity list is: nil at the stack's root, where it stays
+    /// for the stack's life, else the route it was pushed at.
+    private var activityListRoute: StackRoute?
+
+    /// The Activity list at `route`, or at the stack's root for nil, shows
+    /// with `connection`. A list whose route has left the path sets nothing.
+    func setActivityList(_ connection: ConnectionStatusSource, at route: StackRoute?) {
+        if let route, !path.contains(route) { return }
+        activityConnection = connection
+        activityListRoute = route
+    }
 
     /// Opening a game already below the profile returns to that same screen,
     /// retaining its analysis, chat draft and connection owner.
@@ -418,6 +430,12 @@ final class StackRouter: ObservableObject {
             if case .challenge(let id) = route { return id }; return nil
         }).union(selections.values.compactMap(\.draftID))
         drafts = drafts.filter { draftIDs.contains($0.key) }
+        // A list pushed at a route leaves with it, its connection too, though
+        // the window keeps the source: what is pushed later isn't Activity's.
+        if let route = activityListRoute, !path.contains(route) {
+            activityConnection = nil
+            activityListRoute = nil
+        }
     }
 }
 
@@ -784,7 +802,7 @@ private struct ActivityConnectionKey: EnvironmentKey {
 extension EnvironmentValues {
     /// In a stack with an Activity list, the list's connection status, so a
     /// conversation it pushes goes offline with it. Nil in every other
-    /// stack, Messages' own included.
+    /// stack, Messages' own included, and in New game's once its list closes.
     var activityConnection: ConnectionStatusSource? {
         get { self[ActivityConnectionKey.self] }
         set { self[ActivityConnectionKey.self] = newValue }

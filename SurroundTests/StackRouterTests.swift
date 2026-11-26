@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import XCTest
 
@@ -252,6 +253,32 @@ final class StackRouterTests: XCTestCase {
         router.remove(.activityItem("waiting-rengo-95301"))
         XCTAssertEqual(router.path, [.activityItem("challenge-95002")])
         XCTAssertFalse(StackRoute.activityItem("challenge-95002").showsGameDetail)
+    }
+
+    func testAnActivityListLendsItsConnectionWhileItIsInTheStack() {
+        let connection = ConnectionStatusSource(socketIsConnected: Just(true).eraseToAnyPublisher(),
+                                                path: ConstantNetworkPath.satisfied, reconnect: {})
+        // New game's Searching link pushes the list, and a conversation
+        // pushed above it is Activity's.
+        let newGame = Router()
+        newGame.present(.waitingGames)
+        newGame.setActivityList(connection, at: .waitingGames)
+        newGame.openConversation(firstPlayer)
+        XCTAssertIdentical(newGame.activityConnection, connection)
+        newGame.path = []
+        XCTAssertNil(newGame.activityConnection, "The list closed with its route, though the window keeps the source.")
+        newGame.openProfile(secondPlayer)
+        newGame.openConversation(secondPlayer)
+        XCTAssertNil(newGame.activityConnection, "A conversation from a challenger's profile later isn't Activity's.")
+        newGame.setActivityList(connection, at: .waitingGames)
+        XCTAssertNil(newGame.activityConnection, "A list whose route has left sets nothing.")
+
+        // A list at its stack's root, as in the window's sheet, stays.
+        let sheet = Router()
+        sheet.setActivityList(connection, at: nil)
+        sheet.present(.activityItem("challenge-95002"))
+        sheet.path = []
+        XCTAssertIdentical(sheet.activityConnection, connection)
     }
 
     func testOnlyGamesAndConversationsDrawNoActivityBar() {

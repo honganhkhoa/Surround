@@ -345,8 +345,9 @@ private struct ActivityListContent: View {
             results.begin(session: session)
             isPresented = true
             // The cards this list pushes dim by its status: the window's,
-            // in a game's popover.
-            navigation.activityConnection = connection
+            // in a game's popover. Pushed at a route, it lends it while its
+            // route is in the stack.
+            navigation.setActivityList(connection, at: owningStackRoute)
             if lifetime.release == nil {
                 let results = results
                 let session = session
