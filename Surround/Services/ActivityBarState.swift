@@ -113,16 +113,18 @@ final class ActivityBarState: ObservableObject {
     /// Whether the Now section's first row says the window's status during
     /// an outage, taking one of its rows. MainView turns it off where the
     /// window's bar carries no status (`ActivityBarHosting`), so the section
-    /// lists Activity alone, with all its rows.
-    var nowSectionSaysStatus = true {
+    /// lists Activity alone, with all its rows. Published as it changes, as
+    /// is the room below: a conversation beside the section reads both to
+    /// know whether the section says its status.
+    @Published var nowSectionSaysStatus = true {
         didSet { if nowSectionSaysStatus != oldValue { scheduleRecompute() } }
     }
 
     /// How many rows the Now section has room for: two, one in a short iPad
     /// window, or none in a shorter one (`ActivityNowSectionRows`), which
     /// the iPad's container sets as its window appears and after each resize
-    /// or turn.
-    private(set) var nowSectionRows = ActivityModel.nowSectionRows
+    /// or turn. The section's own rows follow a turn later.
+    @Published private(set) var nowSectionRows = ActivityModel.nowSectionRows
 
     func setNowSectionRows(_ rows: Int) {
         guard rows != nowSectionRows else { return }

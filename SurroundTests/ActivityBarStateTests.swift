@@ -676,13 +676,15 @@ extension ActivityBarStateTests {
         XCTAssertEqual(bar.nowSection.rows, [usualChallenge, fixtureGame])
         let publishes = countPublishes()
         bar.setNowSectionRows(1)
+        XCTAssertEqual(publishes(), 1, "The room at once, which a conversation beside the section reads.")
         XCTAssertEqual(barScheduler.pendingTurns, 1)
         barScheduler.turn()
         XCTAssertEqual(bar.nowSection.rows, [usualChallenge])
         XCTAssertEqual(bar.nowSection.counted, [], "Their move never counts.")
-        XCTAssertEqual(publishes(), 1)
+        XCTAssertEqual(publishes(), 2, "Then the rows, a turn later.")
         bar.setNowSectionRows(1)
         XCTAssertEqual(barScheduler.pendingTurns, 0, "The same room asks for nothing.")
+        XCTAssertEqual(publishes(), 2)
     }
 
     /// A window too short for even one row lists nothing, not even the
@@ -763,7 +765,9 @@ extension ActivityBarStateTests {
         XCTAssertEqual(bar.connection.words, .reconnecting)
         XCTAssertNil(bar.nowSection.statusRow)
         XCTAssertEqual(bar.nowSection.rows, [usualChallenge, fixtureGame], "Both rows stay Activity's.")
+        let publishes = countPublishes()
         bar.nowSectionSaysStatus = true
+        XCTAssertEqual(publishes(), 1, "At once, for a conversation beside the section.")
         barScheduler.turn()
         XCTAssertEqual(bar.nowSection.statusRow, NowStatusRow(.reconnecting, place: .root(isMessagesTab: false)))
         XCTAssertEqual(bar.nowSection.rows, [usualChallenge])

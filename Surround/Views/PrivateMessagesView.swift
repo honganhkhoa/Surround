@@ -724,6 +724,7 @@ struct MessagesConversationView: View {
             }
             MessagesConversationLog(drafts: nav.conversationDrafts,
                 connection: activityConnection ?? windowConnection ?? .neverOffline,
+                bar: nav.activityBar,
                 socket: ogs.socketStatus, statusLine: statusLinePlace, peer: peer,
                 accountID: ogs.user?.id,
                 marksThreadAsRead: navigation.path.last == owningStackRoute
@@ -740,7 +741,7 @@ struct MessagesConversationView: View {
     /// stack nothing of the root's shows beside it, so its line always does.
     private var statusLinePlace: MessagesConversationLog.StatusLinePlace {
         guard activityConnection == nil else { return .alone }
-        return .besideRoot(isPane: isPane, placement: connectionPlacement, nowRowSaysStatus: nowRowSaysStatus)
+        return .besideRoot(isPane: isPane, placement: connectionPlacement, showsNowSection: showsNowSection)
     }
 
     /// Where the window says its status, from its container's facts.
@@ -751,12 +752,11 @@ struct MessagesConversationView: View {
             .connectionStatus
     }
 
-    /// The window's Now section says the status beside the conversation: on
-    /// the Mac, whose sidebar always shows, or on iPad while the sidebar's
-    /// copy says it shows and the window has room for a row.
-    private var nowRowSaysStatus: Bool {
-        let bar = nav.activityBar
-        guard bar.nowSectionSaysStatus, bar.nowSectionRows > 0 else { return false }
+    /// The window's Now section is beside the conversation: on the Mac, whose
+    /// sidebar always shows, or on iPad while the sidebar's copy says it
+    /// shows. Whether it has room to say the status, the log reads from the
+    /// window's bar state, which publishes the room as it changes.
+    private var showsNowSection: Bool {
         #if targetEnvironment(macCatalyst)
         return true
         #else
@@ -847,12 +847,16 @@ private struct MessagesConversationLog: View {
     enum StatusLinePlace {
         /// Nothing of the root's: inside Activity's stack.
         case alone
-        /// The window's root carriers, as `ConversationStatusLine` reads them.
-        case besideRoot(isPane: Bool, placement: ActivityHostPolicy.ConnectionStatus, nowRowSaysStatus: Bool)
+        /// The window's root carriers, as `ConversationStatusLine` reads them,
+        /// with the window's Now section beside the conversation or not.
+        case besideRoot(isPane: Bool, placement: ActivityHostPolicy.ConnectionStatus, showsNowSection: Bool)
     }
 
     @ObservedObject var drafts: ConversationDraftStore
     @ObservedObject var connection: ConnectionStatusSource
+    /// The window's, whose Now section says the status while it has room for
+    /// a row: a resize or a text size can take that room away.
+    @ObservedObject var bar: ActivityBarState
     /// The window's socket, which tells a first attempt from a reconnect.
     let socket: OGSWebsocketStatus
     let statusLine: StatusLinePlace
@@ -891,9 +895,10 @@ private struct MessagesConversationLog: View {
         switch statusLine {
         case .alone:
             return true
-        case .besideRoot(let isPane, let placement, let nowRowSaysStatus):
+        case .besideRoot(let isPane, let placement, let showsNowSection):
             let words = RootConnectionLine.words(status: connection.status, hasConnected: connection.hasConnected,
                                                  socket: socket)
+            let nowRowSaysStatus = showsNowSection && bar.nowSectionSaysStatus && bar.nowSectionRows > 0
             return ConversationStatusLine.shows(words, isPane: isPane, placement: placement,
                                                 nowRowSaysStatus: nowRowSaysStatus)
         }
