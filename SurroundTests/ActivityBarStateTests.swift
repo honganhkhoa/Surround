@@ -118,6 +118,8 @@ final class ActivityBarStateTests: XCTestCase {
     private let socket = CurrentValueSubject<Bool, Never>(true)
 
     private var ogs: OGSService!
+    /// The service's socket, through which a test sends OGS's game events.
+    private var ogsSocket: OGSOfflineNoOpWebsocket!
     private var nav: NavigationService!
     private var source: ConnectionStatusSource!
     private var bar: ActivityBarState!
@@ -165,10 +167,12 @@ final class ActivityBarStateTests: XCTestCase {
     private func service(_ state: OGSService.BootstrapState) -> OGSService {
         let suite = "com.honganhkhoa.Surround.ActivityBarStateTests.\(UUID().uuidString)"
         suites.append(suite)
+        let ogsSocket = OGSOfflineNoOpWebsocket()
+        self.ogsSocket = ogsSocket
         return OGSService(
             environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
             httpClient: OGSOfflineRejectingHTTPClient(), preferences: UserDefaults(suiteName: suite)!,
-            ogsWebsocket: OGSOfflineNoOpWebsocket(), connectsAutomatically: false,
+            ogsWebsocket: ogsSocket, connectsAutomatically: false,
             usesSurroundOverviewService: false, enablesAppSideEffects: false, startsTimers: false,
             installsObservers: false, initialState: state)
     }
@@ -181,6 +185,24 @@ final class ActivityBarStateTests: XCTestCase {
         let ogs = service(state)
         Fixtures.finish(selected, service: ogs)
         prepareWindow(ogs)
+    }
+
+    /// `.stoneRemoval`, whose game awaits your acceptance, with
+    /// `.challengeReceived`'s live challenge behind it; that game connected,
+    /// so OGS's events for it reach it.
+    private func prepareScoringBeforeAChallenge() throws -> Game {
+        let clock = Fixtures.Clock(reference: Self.reference)
+        var state = try journeyState()
+        Fixtures.apply(.stoneRemoval, to: &state, clock: clock)
+        var received = try journeyState()
+        Fixtures.apply(.challengeReceived, to: &received, clock: clock)
+        state.challengesReceived = received.challengesReceived
+        let ogs = service(state)
+        Fixtures.finish(.stoneRemoval, service: ogs)
+        prepareWindow(ogs)
+        let game = try XCTUnwrap(ogs.activeGames[ID.stoneRemovalGameID])
+        ogs.connect(to: game, owner: .explicit(UUID()))
+        return game
     }
 
     /// A signed-in window whose service holds only what `build` gives it.
@@ -255,6 +277,18 @@ final class ActivityBarStateTests: XCTestCase {
                                    display: ActivityRowDisplay(title: "CedarWave", detail: "19×19"),
                                    section: .challengesReceived, after: nil)
         client.succeedLast()
+    }
+
+    /// Game 26268404's snapshot as OGS sends it, raw.
+    private func storedSnapshot() throws -> [String: Any] {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "game-26268404", withExtension: "json"))
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+    }
+
+    /// OGS's `event` for `game`, as the service's socket delivers it.
+    private func deliver(_ event: String, _ data: Any, to game: Game) throws {
+        let id = try XCTUnwrap(game.ogsID)
+        ogsSocket.serverEventCallback?("game/\(id)/\(event)", data)
     }
 
     private var usualChallenge: ActivityBarLead {
@@ -381,6 +415,57 @@ final class ActivityBarStateTests: XCTestCase {
         XCTAssertEqual(barScheduler.pendingTurns, 1, "The recorder publishes nothing; the window's open does.")
         barScheduler.turn()
         XCTAssertEqual(bar.activity.lead, fixtureGame)
+    }
+
+    func testALiveGamesScoringRecomputes() throws {
+        let game = try prepareScoringBeforeAChallenge()
+        attach()
+        let scoring = ActivityBarLead.liveGame(gameID: ID.stoneRemovalGameID)
+        XCTAssertEqual(bar.activity.lead, scoring, "It awaits your acceptance.")
+
+        // You accept on another device, and MapleRidge already has.
+        let user = try XCTUnwrap(ogs.user)
+        let stones = BoardPosition.positionString(fromPoints: game.currentPosition.removedStones ?? [])
+        try deliver("removed_stones_accepted", ["player_id": user.id, "stones": stones], to: game)
+        XCTAssertEqual(barScheduler.pendingTurns, 1, "No clock event comes with it.")
+        barScheduler.turn()
+        XCTAssertEqual(bar.activity.lead, usualChallenge, "Nothing awaits you there now.")
+
+        // A clock's tick changes the game but not who must act.
+        game.clock?.whiteTime.thinkingTimeLeft = 209
+        XCTAssertEqual(barScheduler.pendingTurns, 0)
+
+        // MapleRidge marks a stone dead, so your acceptance no longer stands.
+        try deliver("removed_stones", ["all_removed": "aa"], to: game)
+        XCTAssertEqual(barScheduler.pendingTurns, 1)
+        barScheduler.turn()
+        XCTAssertEqual(bar.activity.lead, scoring)
+
+        // A snapshot in which you have accepted that stone too, as after a
+        // reconnection.
+        var snapshot = try storedSnapshot()
+        snapshot["game_id"] = ID.stoneRemovalGameID
+        snapshot["phase"] = "stone removal"
+        snapshot["removed"] = "aa"
+        var players = try XCTUnwrap(snapshot["players"] as? [String: Any])
+        var white = try XCTUnwrap(players["white"] as? [String: Any])
+        XCTAssertEqual(white["id"] as? Int, user.id, "You play White in the snapshot as in the state.")
+        white["accepted_stones"] = "aa"
+        players["white"] = white
+        snapshot["players"] = players
+        try deliver("gamedata", snapshot, to: game)
+        XCTAssertEqual(barScheduler.pendingTurns, 1)
+        barScheduler.turn()
+        XCTAssertEqual(bar.activity.lead, usualChallenge)
+
+        // MapleRidge marks another, and then both accept and the game ends.
+        try deliver("removed_stones", ["all_removed": "aabb"], to: game)
+        barScheduler.turn()
+        XCTAssertEqual(bar.activity.lead, scoring)
+        try deliver("phase", "finished", to: game)
+        XCTAssertEqual(barScheduler.pendingTurns, 1)
+        barScheduler.turn()
+        XCTAssertEqual(bar.activity.lead, usualChallenge, "An ended game no longer leads.")
     }
 
     func testChangesWithinOneTurnRecomputeOnce() throws {

@@ -2100,6 +2100,16 @@ class OGSService: ObservableObject {
         }
     }
     
+    /// Publishes the active games again after an event that can change who
+    /// must act with no clock event after it: a game's snapshot; whether it
+    /// is played, scored or over; the stones each player accepted; and the
+    /// stones marked dead. As after a clock event, the lists sort again, and
+    /// what reads who must act, such as the Activity bar, reads the game anew.
+    private func republishActiveGame(_ game: Game, id: Int) {
+        guard activeGames[id] != nil else { return }
+        activeGames[id] = game
+    }
+
     private func onWebsocketServerGameEvent(ogsGameId: Int, eventName: String, data: Any?) {
         guard let connectedGame = self.connectedGames[ogsGameId] else {
             return
@@ -2137,6 +2147,7 @@ class OGSService: ObservableObject {
                 if self.activeGames[ogsGameId] != nil {
                     preferences[.latestOGSOverviewOutdated] = true
                 }
+                republishActiveGame(connectedGame, id: ogsGameId)
                 failConditionalMoveSubmissionIfStale(
                     gameID: ogsGameId,
                     game: connectedGame
@@ -2252,6 +2263,7 @@ class OGSService: ObservableObject {
             if let removedStoneData = data as? [String: Any] {
                 if let removedString = removedStoneData["all_removed"] as? String {
                     connectedGame.setRemovedStones(removedString: removedString)
+                    republishActiveGame(connectedGame, id: ogsGameId)
                 }
             }
         case "removed_stones_accepted":
@@ -2259,6 +2271,7 @@ class OGSService: ObservableObject {
                 if let playerId = removedStoneAcceptedData["player_id"] as? Int, let color = connectedGame.stoneColor(ofPlayerWithId: playerId),
                    let stones = removedStoneAcceptedData["stones"] as? String {
                     connectedGame.removedStonesAccepted[color] = BoardPosition.points(fromPositionString: stones)
+                    republishActiveGame(connectedGame, id: ogsGameId)
                 }
             }
         case "phase":
@@ -2271,6 +2284,7 @@ class OGSService: ObservableObject {
                 if let _ = self.activeGames[ogsGameId] {
                     preferences[.latestOGSOverviewOutdated] = true
                 }
+                republishActiveGame(connectedGame, id: ogsGameId)
                 authoritativeGamePhases.send((game: connectedGame, phase: phase))
             }
         case "conditional_moves":
