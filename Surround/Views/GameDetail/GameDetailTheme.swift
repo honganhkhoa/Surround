@@ -242,7 +242,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         }
         if self == .frostPine, scheme == .dark {
             var night = board
-            night.boardColor = Color(themeHex: 0xADB2B1)
+            night.boardColor = Color(themeHex: 0x818582)
             night.compactBoardColor = Color(themeHex: 0x9FA9A5)
             night.boardEdge = Color(themeHex: 0xBDD6E5).opacity(0.7)
             night.boardTexture?.tint = Color(themeHex: 0xE2DCD0)
@@ -250,14 +250,14 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             night.surfaceFrost?.tint = Color(themeHex: 0xA5B8C5)
             night.surfaceFrost?.opacity = 0.52
             night.stoneImages?.tint = Color(themeHex: 0xD5E2EE)
-            night.boardDepth = BoardDepth(
-                upperFace: Color(themeHex: 0xA6BCC9), lowerFace: Color(themeHex: 0x6C8596),
+            night.boardDepth = .frosted(
+                upperFace: Color(themeHex: 0x94CDDF).opacity(0.60), lowerFace: Color(themeHex: 0x5299B8).opacity(0.68),
                 highlight: Color(themeHex: 0xE3EFF6).opacity(0.74),
                 shade: Color(themeHex: 0x344F63).opacity(0.42),
-                shadow: Color(themeHex: 0x07121C).opacity(0.35),
-                thicknessRatio: 0.008, maximumThickness: 5, edgeStyle: .frosted)
+                shadow: Color(themeHex: 0x07121C).opacity(0.35))
             night.gridColor = Color(themeHex: 0x3A4947)
             night.coordinateColor = Color(themeHex: 0x263A3D)
+            night.engravedInk = .init(grid: Color(themeHex: 0x192925), coordinates: Color(themeHex: 0x101F20))
             night.black.flat = Color(themeHex: 0x102E43)
             // Bright enough to stand apart from the night board's slate.
             night.white.flat = Color(themeHex: 0xE4EFF6)
@@ -811,19 +811,17 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             )
         case .frostPine:
             return BoardAppearance(
-                // A quiet silver face separates the blue stones by hue as
-                // well as value; the rim retains the colder ice reflections.
-                boardColor: Color(themeHex: 0xCBCBC1),
+                // The silver face sits between pale and midnight ice in value.
+                boardColor: Color(themeHex: 0x9B9D93),
                 compactBoardColor: Color(themeHex: 0xBBC0B9),
                 boardEdge: Color(themeHex: 0xF6FCFF).opacity(0.85),
                 boardTexture: FrostPineAssets.board,
                 boardBevel: true,
-                boardDepth: BoardDepth(
-                    upperFace: Color(themeHex: 0xDDE5E5), lowerFace: Color(themeHex: 0xB5C4CA),
+                boardDepth: .frosted(
+                    upperFace: Color(themeHex: 0xB5DFEF).opacity(0.64), lowerFace: Color(themeHex: 0x72AEC9).opacity(0.72),
                     highlight: Color(themeHex: 0xFCFDFA).opacity(0.92),
                     shade: Color(themeHex: 0x738796).opacity(0.32),
-                    shadow: Color(themeHex: 0x253F51).opacity(0.24),
-                    thicknessRatio: 0.008, maximumThickness: 5, edgeStyle: .frosted),
+                    shadow: Color(themeHex: 0x253F51).opacity(0.24)),
                 surfaceFrost: FrostPineAssets.surfaceFrost,
                 // Keep the existing chipped cuts and recessed hoshi; graphite
                 // cores ground the engraving in the more neutral playing face.
@@ -835,6 +833,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 imageStoneShading: .iceEdge,
                 gridColor: Color(themeHex: 0x58615C),
                 coordinateColor: Color(themeHex: 0x344742),
+                engravedInk: .init(grid: Color(themeHex: 0x35403B), coordinates: Color(themeHex: 0x1E302B)),
                 black: StonePalette(
                     highlight: Color(themeHex: 0x4D799A), shade: Color(themeHex: 0x071C2E),
                     flat: Color(themeHex: 0x123449), outline: Color(themeHex: 0x081F31),
@@ -1160,43 +1159,56 @@ private final class FrostPineAssets {
         let black = (0..<4).compactMap { UIImage(named: "FrostPineMidnight\($0)", in: bundle, compatibleWith: nil) }
         let white = (0..<4).compactMap { UIImage(named: "FrostPinePale\($0)", in: bundle, compatibleWith: nil) }
         guard black.count == 4, white.count == 4 else { return nil }
-        return StoneImages(black: black, white: white, smallStoneInset: 0.35)
+        // Lift the blue middle tones while keeping a dark contact edge and
+        // room for bright reflections. The curve rises smoothly from 0 to 1.
+        let paleIce = CIVector(x: 0, y: 2.6, z: -2.3, w: 0.7)
+        let pale = grade(white) { image in
+            image.applyingFilter("CIColorPolynomial", parameters: [
+                "inputRedCoefficients": paleIce, "inputGreenCoefficients": paleIce,
+                "inputBlueCoefficients": paleIce
+            ])
+        }
+        return StoneImages(black: black, white: pale ?? white, smallStoneInset: 0.35)
     }()
 
-    /// Lift the ice's middle tones against the bright daytime board without
-    /// adding a veil over the dark depths or clipping the reflected glints.
-    /// Resolve once per process; night keeps the original artwork and tint.
+    /// Both appearances share the pale ice. Daylight also lifts the midnight stones.
     static let dayStones: StoneImages? = {
-        guard let stones else { return nil }
-        guard let sRGB = CGColorSpace(name: CGColorSpace.sRGB) else { return stones }
-        let context = CIContext(options: [.workingColorSpace: sRGB, .outputColorSpace: sRGB])
-        func grade(_ images: [UIImage], power: Float) -> [UIImage]? {
-            var result: [UIImage] = []
-            for image in images {
-                guard let source = image.cgImage else { return nil }
-                let input = CIImage(cgImage: source, options: [.colorSpace: sRGB])
-                let graded = input.applyingFilter("CIGammaAdjust", parameters: ["inputPower": power])
-                guard let output = context.createCGImage(graded, from: input.extent,
-                                                        format: .RGBA8, colorSpace: sRGB) else { return nil }
-                result.append(UIImage(cgImage: output, scale: image.scale, orientation: image.imageOrientation))
-            }
-            return result
-        }
-        guard let black = grade(stones.black, power: 0.82),
-              let white = grade(stones.white, power: 0.60) else { return stones }
-        var day = stones
-        day.black = black
-        day.white = white
+        guard var day = stones else { return nil }
+        day.black = grade(day.black) { image in
+            image.applyingFilter("CIGammaAdjust", parameters: ["inputPower": 0.82])
+        } ?? day.black
         return day
     }()
 
+    private static func grade(_ images: [UIImage], transform: (CIImage) -> CIImage) -> [UIImage]? {
+        guard let sRGB = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        let context = CIContext(options: [.workingColorSpace: sRGB, .outputColorSpace: sRGB])
+        var result: [UIImage] = []
+        for image in images {
+            guard let source = image.cgImage else { return nil }
+            let input = CIImage(cgImage: source, options: [.colorSpace: sRGB])
+            guard let output = context.createCGImage(transform(input), from: input.extent,
+                                                     format: .RGBA8, colorSpace: sRGB) else { return nil }
+            result.append(UIImage(cgImage: output, scale: image.scale, orientation: image.imageOrientation))
+        }
+        return result
+    }
+
     // Reuse the ice artwork at a quieter blend with a warm-neutral tint.
     // The colder crystalline perimeter remains a separate layer.
-    static let board = UIImage(named: "FrostPineBoard").map {
+    static let board = UIImage(named: "FrostPineBoard", in: bundle, compatibleWith: nil).map {
         BoardTexture(image: $0, mapping: .board, tint: Color(themeHex: 0xFFF5E7), opacity: 0.22)
     }
-    static let surfaceFrost = UIImage(named: "FrostPineBoardFrost").map {
-        BoardSurfaceOverlay(image: $0, opacity: 0.68, perimeterFadeFraction: 0.045)
+    static let surfaceFrost = UIImage(named: "FrostPineBoardFrost", in: bundle, compatibleWith: nil).map { image in
+        let corner = image.cgImage.flatMap { source in
+            let width = CGFloat(source.width), height = CGFloat(source.height)
+            // The connected lower-left crystal ridge sits above a transparent gutter.
+            let crop = CGRect(x: width * 0.020, y: height * 0.866,
+                              width: width * 0.400, height: height * 0.110).integral
+            return source.cropping(to: crop).map { UIImage(cgImage: $0, scale: image.scale, orientation: .up) }
+        }
+        return BoardSurfaceOverlay(image: image, opacity: 0.68, perimeterFadeFraction: 0.045,
+                                   lowerLeftDeposit: corner)
     }
     // Give the generated fibers a useful tonal range without letting a bright
     // splinter or dark check compromise text anywhere on a resized control.

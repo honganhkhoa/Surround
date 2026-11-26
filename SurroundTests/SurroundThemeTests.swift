@@ -38,7 +38,7 @@ final class SurroundThemeTests: XCTestCase {
     /// What lines up with a board follows what BoardView draws in its frame:
     /// the face and the sidewall below it, never the shadow's fade.
     func testBoardDepthPlacementReportsTheDrawnFaceAndSidewall() throws {
-        for theme: SurroundTheme in [.surroundStudio, .christmasKeepsakes] {
+        for theme: SurroundTheme in [.surroundStudio, .frostPine, .christmasKeepsakes] {
             for scheme: ColorScheme in [.light, .dark] {
                 let depth = try XCTUnwrap(theme.board(for: scheme).boardDepth)
                 let frame = CGRect(x: 30, y: 120, width: 700, height: 700)
@@ -1699,12 +1699,56 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    @MainActor
     func testFrostPineAppearanceAndAnalysisStayReadable() throws {
         assertAdaptiveColorsFollowRepeatedTraitChanges(.frostPine)
         try assertNightAnalysisMarksRemainReadable(.frostPine)
+        let cell: CGFloat = 20
+        let scale: CGFloat = 3
+        for scheme: ColorScheme in [.light, .dark] {
+            let board = SurroundTheme.frostPine.board(for: scheme)
+            XCTAssertEqual(board.surfaceColor(detailed: false), Color(themeHex: scheme == .light ? 0xBBC0B9 : 0x9FA9A5))
+            XCTAssertEqual(board.white.flat, Color(themeHex: scheme == .light ? 0xF1FAFF : 0xE4EFF6))
+            let ink = try XCTUnwrap(board.engravedInk)
+            XCTAssertGreaterThanOrEqual(contrast(ink.grid, board.boardColor), 3)
+            XCTAssertGreaterThanOrEqual(contrast(ink.coordinates, board.boardColor), 4.5)
+            let texture = try XCTUnwrap(board.boardTexture)
+            let diameter = cell - 2 * board.stonePadding(at: cell)
+            let image = try nativeMaterialPixels(board.surfaceColor(detailed: true)
+                .overlay {
+                    Image(uiImage: texture.image).resizable().colorMultiply(texture.tint)
+                        .frame(width: cell * 19, height: cell * 19)
+                        .modifier(BoardTextureVisibility(opacity: texture.opacity, cellSize: cell))
+                }
+                .frame(width: cell * 2, height: cell * 2).clipped()
+                .overlay {
+                    Stone(color: .white, shadowRadius: 1).frame(width: diameter, height: diameter)
+                }
+                .environment(\.boardAppearance, board)
+                .environment(\.colorScheme, scheme)
+                .environment(\.displayScale, scale), scale: scale)
+            func patch(offset: CGFloat) -> Double {
+                let x = image.width / 2 + Int(offset * cell * scale)
+                let y = image.height / 2 + Int(offset * cell * scale)
+                let radius = Int(cell * scale * 0.15)
+                var sum = 0.0
+                for row in y - radius ... y + radius {
+                    for column in x - radius ... x + radius {
+                        let i = (row * image.width + column) * 4
+                        sum += luminance(Color(.sRGB, red: Double(image.pixels[i]) / 255,
+                                               green: Double(image.pixels[i + 1]) / 255,
+                                               blue: Double(image.pixels[i + 2]) / 255))
+                    }
+                }
+                return sum / Double((2 * radius + 1) * (2 * radius + 1))
+            }
+            // The diagonal half-cell samples bare ice beyond the stone shadow.
+            XCTAssertGreaterThan((patch(offset: 0) + 0.05) / (patch(offset: 0.5) + 0.05), 1.7,
+                                 "The pale stone's center stays lighter than the adjacent detailed board in \(scheme)")
+        }
     }
 
-    func testFrostPineDayStonesBrightenWithoutChangingNightArtworkOrSilhouettes() throws {
+    func testFrostPineStoneGradesLiftPaleFacesAndPreserveSilhouettes() throws {
         let theme = SurroundTheme.frostPine
         let night = try XCTUnwrap(theme.board(for: .dark).stoneImages)
         let day = try XCTUnwrap(theme.board(for: .light).stoneImages)
@@ -1723,24 +1767,38 @@ final class SurroundThemeTests: XCTestCase {
                 XCTAssertEqual(light.width, source.width)
                 XCTAssertEqual(light.height, source.height)
                 let before = try rgbaPixels(for: source, side: source.width)
-                let after = try rgbaPixels(for: light, side: source.width)
-                XCTAssertEqual(try rgbaPixels(for: dark, side: source.width), before,
-                               "Night keeps the original ice artwork")
-                XCTAssertEqual(stride(from: 3, to: before.count, by: 4).map { before[$0] },
-                               stride(from: 3, to: after.count, by: 4).map { after[$0] },
-                               "Daylight grading must preserve the opaque interior and transparent edge")
                 func brightness(_ pixels: [UInt8], at offset: Int) -> Double {
                     0.2126 * Double(pixels[offset]) + 0.7152 * Double(pixels[offset + 1])
                         + 0.0722 * Double(pixels[offset + 2])
                 }
-                let middleTones = stride(from: 0, to: before.count, by: 4).filter {
-                    before[$0 + 3] == 255 && (20...220).contains(brightness(before, at: $0))
+                let isPale = family == "FrostPinePale"
+                let center = source.width / 3 ..< 2 * source.width / 3
+                let sample = stride(from: 0, to: before.count, by: 4).filter { offset in
+                    if isPale {
+                        let pixel = offset / 4
+                        return center.contains(pixel % source.width) && center.contains(pixel / source.width)
+                    }
+                    return before[offset + 3] == 255 && (20...220).contains(brightness(before, at: offset))
                 }
-                XCTAssertGreaterThan(middleTones.count, 1000)
-                let lift = middleTones.reduce(0.0) {
-                    $0 + brightness(after, at: $1) - brightness(before, at: $1)
-                } / Double(max(1, middleTones.count))
-                XCTAssertGreaterThan(lift, 8, "Both ice colors need a visible daylight lift")
+                XCTAssertGreaterThan(sample.count, 1000)
+                for (image, isNight) in [(light, false), (dark, true)] {
+                    let after = try rgbaPixels(for: image, side: source.width)
+                    if isNight && !isPale {
+                        XCTAssertEqual(after, before, "Midnight ice keeps its original night artwork")
+                        continue
+                    }
+                    XCTAssertTrue(stride(from: 3, to: before.count, by: 4).allSatisfy { after[$0] == before[$0] },
+                                  "Grading preserves the stone's silhouette and internal opacity")
+                    let lift = sample.reduce(0.0) {
+                        $0 + brightness(after, at: $1) - brightness(before, at: $1)
+                    } / Double(sample.count)
+                    XCTAssertGreaterThan(lift, 8, "\(family)\(index) needs a visible lift, night=\(isNight)")
+                    if isPale {
+                        let blueOverRed = sample.reduce(0) { $0 + Int(after[$1 + 2]) - Int(after[$1]) }
+                        XCTAssertGreaterThan(Double(blueOverRed) / Double(sample.count), 5,
+                                             "The brighter center still reads as blue ice")
+                    }
+                }
             }
         }
         // Resolving either appearance repeatedly must reuse its own images.
@@ -1874,8 +1932,21 @@ final class SurroundThemeTests: XCTestCase {
     func testFrostedBoardRimDoesNotMoveThePlayingSurface() throws {
         for scheme: ColorScheme in [.light, .dark] {
             let frost = try XCTUnwrap(SurroundTheme.frostPine.board(for: scheme).boardDepth)
-            var cut = frost
-            cut.edgeStyle = .cut
+            for pigment in [frost.upperFace, frost.lowerFace] {
+                var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+                XCTAssertTrue(UIColor(pigment).getRed(&red, green: &green, blue: &blue, alpha: &alpha))
+                XCTAssertGreaterThan(blue - red, 0.12, "The sidewall carries a visible blue tint")
+                XCTAssertGreaterThan(green, red)
+                XCTAssertLessThan(green, blue)
+                XCTAssertTrue((0.4...0.85).contains(alpha), "The ice remains visible while admitting scene color")
+            }
+            XCTAssertGreaterThan(luminance(frost.upperFace), luminance(frost.lowerFace))
+            // The original 0.8%-deep slab used the standard cut-board layout.
+            // Its face bounds still determine the playable points as the ice wall grows.
+            var originalDepth = frost
+            originalDepth.edgeStyle = .cut
+            originalDepth.thicknessRatio = 0.008
+            originalDepth.maximumThickness = 5
             for cell: CGFloat in [7, 13, 14, 15, 18, 20, 32, 48] {
                 for coordinates in [false, true] {
                     let side = cell * (coordinates ? 20 : 19)
@@ -1885,14 +1956,20 @@ final class SurroundThemeTests: XCTestCase {
                                            displayScale: 3, depth: depth)
                     }
                     let soft = geometry(frost)
-                    let original = geometry(cut)
-                    XCTAssertEqual(soft.faceRect, original.faceRect)
+                    let original = geometry(originalDepth)
+                    XCTAssertEqual(soft.faceRect.minX, original.faceRect.minX, accuracy: 0.000001)
+                    XCTAssertEqual(soft.faceRect.minY, original.faceRect.minY, accuracy: 0.000001)
+                    XCTAssertEqual(soft.faceRect.width, original.faceRect.width, accuracy: 0.000001)
+                    XCTAssertEqual(soft.faceRect.height, original.faceRect.height, accuracy: 0.000001)
                     XCTAssertEqual(soft.cellSize, original.cellSize)
-                    XCTAssertEqual(soft.thickness, original.thickness)
                     XCTAssertLessThanOrEqual(soft.cornerRadius, soft.cellSize / 2)
                     if cell > 14 {
+                        XCTAssertGreaterThan(soft.thickness, original.thickness * 1.2,
+                                             "The visible ice wall gains depth inside the same board slot")
+                        XCTAssertLessThan(soft.thickness, original.thickness * 1.5)
                         XCTAssertGreaterThan(soft.cornerRadius, original.cornerRadius)
                     } else {
+                        XCTAssertEqual(soft.thickness, 0)
                         XCTAssertEqual(soft.cornerRadius, 0)
                     }
                 }
@@ -2241,6 +2318,71 @@ final class SurroundThemeTests: XCTestCase {
                              "Frost must visibly collect around the perimeter rather than wash over the face")
         XCTAssertTrue(perimeter.contains { $0 > 0.5 }, "Preserve some distinct frost crystals")
         XCTAssertTrue(center.contains(0), "The overlay must have transparent clear space")
+    }
+
+    @MainActor
+    func testFrostPineCornerPatchCrossesTheLipAndFadesOnTheFrontEdge() throws {
+        let scale: CGFloat = 2
+        for scheme: ColorScheme in [.light, .dark] {
+            let board = SurroundTheme.frostPine.board(for: scheme)
+            let frost = try XCTUnwrap(board.surfaceFrost)
+            XCTAssertNotNil(frost.lowerLeftDeposit)
+            for side: CGFloat in [247, 400] {
+                let layout = BoardDepthGeometry(containerSize: CGSize(width: side, height: side),
+                                               boardWidth: 19, boardHeight: 19, showsCoordinates: false,
+                                               displayScale: scale, depth: board.boardDepth)
+                let result = try nativeMaterialPixelsUsingDirectContext(
+                    FrostPineCornerDeposit(surface: frost, layout: layout, cornerRadius: layout.cornerRadius)
+                        .frame(width: layout.visibleRect.width, height: layout.visibleRect.height)
+                        .environment(\.displayScale, scale)
+                        .environment(\.colorScheme, scheme), scale: scale)
+                func alpha(_ x: Int, _ y: Int) -> UInt8 { result.pixels[(y * result.width + x) * 4 + 3] }
+                if layout.cellSize < 14 {
+                    XCTAssertTrue(stride(from: 3, to: result.pixels.count, by: 4)
+                        .allSatisfy { result.pixels[$0] == 0 }, "Compact ice stays solid in \(scheme)")
+                    continue
+                }
+                let cell = layout.cellSize * scale
+                let lip = Int(layout.faceRect.height * scale)
+                let cornerWidth = Int(ceil(3 * cell))
+                var topPixels = 0, wallPixels = 0, outsidePixels = 0
+                for y in 0..<result.height {
+                    for x in 0..<result.width where alpha(x, y) > 0 {
+                        if x >= cornerWidth || y < lip - Int(ceil(cell)) {
+                            outsidePixels += 1
+                        } else if alpha(x, y) > 15 {
+                            if y < lip { topPixels += 1 } else { wallPixels += 1 }
+                        }
+                    }
+                }
+                XCTAssertEqual(outsidePixels, 0, "The remaining front edge and playing field stay clear")
+                XCTAssertGreaterThan(topPixels, 20, "Some crystals remain visible on the top in \(scheme)")
+                XCTAssertGreaterThan(wallPixels, 12, "The frost reaches the translucent sidewall in \(scheme)")
+                let acrossLip = (0..<cornerWidth).filter { alpha($0, lip - 1) > 8 && alpha($0, lip + 1) > 8 }
+                XCTAssertGreaterThan(acrossLip.count, 4, "Top and wall share a visible deposit at the lip")
+                func wallAlpha(startingAt offset: CGFloat) -> Int {
+                    let start = Int(offset * cell)
+                    var total = 0
+                    for y in (lip + 1)..<result.height {
+                        for x in start..<(start + Int(cell / 2)) { total += Int(alpha(x, y)) }
+                    }
+                    return total
+                }
+                let near = wallAlpha(startingAt: 0.5), far = wallAlpha(startingAt: 1.5)
+                XCTAssertGreaterThan(far, 0, "Fine frost reaches beyond the dense corner")
+                XCTAssertLessThan(far, near / 2, "The front edge fades back to clear ice")
+
+                let gridMargin = (layout.faceRect.width - 18 * layout.cellSize) * scale / 2
+                let lastRow = Int(layout.faceRect.height * scale - gridMargin)
+                for column in 0..<3 {
+                    let x = Int(gridMargin + CGFloat(column) * cell)
+                    for y in (lastRow - 1)...(lastRow + 1) {
+                        XCTAssertTrue(((x - 1)...(x + 1)).allSatisfy { alpha($0, y) == 0 },
+                                      "Frost must leave the lower-left grid crossings clear")
+                    }
+                }
+            }
+        }
     }
 
     @MainActor

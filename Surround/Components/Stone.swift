@@ -364,6 +364,8 @@ struct BoardSurfaceOverlay: Equatable {
     /// Fade inward across this fraction of the shorter face dimension.
     /// Nil retains the complete artwork; a bounded rim keeps the field calm.
     var perimeterFadeFraction: CGFloat? = nil
+    /// A connected patch of crystals that crosses the front lip of the ice.
+    var lowerLeftDeposit: UIImage? = nil
 }
 
 /// The surface layer stays mounted across the detail threshold, without
@@ -407,6 +409,44 @@ struct BoardSurfaceOverlayView: View {
     }
 }
 
+/// The same crystal branches continue from the top surface onto the blue wall.
+struct FrostPineCornerDeposit: View {
+    let surface: BoardSurfaceOverlay
+    let layout: BoardDepthGeometry
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        let slab = layout.visibleRect.size
+        Group {
+            if let image = surface.lowerLeftDeposit {
+                let aspect = image.size.width / max(1, image.size.height)
+                let topReach = min(12, layout.cellSize * 0.40, layout.rimThickness * 2.5)
+                let height = min(topReach + layout.thickness, slab.width * 0.20 / aspect)
+                Image(uiImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: height * aspect, height: height)
+                    .mask {
+                        LinearGradient(stops: [.init(color: .clear, location: 0),
+                                               .init(color: .white, location: 0.22)],
+                                       startPoint: .top, endPoint: .bottom)
+                    }
+                    .mask {
+                        LinearGradient(stops: [.init(color: .white, location: 0.32),
+                                               .init(color: .clear, location: 1)],
+                                       startPoint: .leading, endPoint: .trailing)
+                    }
+                    .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: cornerRadius, style: .circular))
+            }
+        }
+        .frame(width: slab.width, height: slab.height, alignment: .bottomLeading)
+        .environment(\.layoutDirection, .leftToRight)
+        .opacity(usesDetailedStoneRendering(at: layout.cellSize) ? min(1, surface.opacity * 1.3) : 0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 /// Light the polished board reflects: a broad sheen from the upper left,
 /// where the stones are lit from, and faint starry specks within it.
 struct BoardReflection: Equatable {
@@ -426,6 +466,7 @@ struct BoardReflection: Equatable {
 /// The material visible on a board's lower face, below the playing surface.
 struct BoardDepth: Equatable {
     static let porcelainCornerFraction: CGFloat = 0.015
+    static let frostedWallScale: CGFloat = 1.35
 
     enum EdgeStyle: Equatable {
         case cut, frosted, rolledTin, porcelain, whittled, shortbread
@@ -439,6 +480,11 @@ struct BoardDepth: Equatable {
     var thicknessRatio: CGFloat
     var maximumThickness: CGFloat
     var edgeStyle: EdgeStyle = .cut
+
+    static func frosted(upperFace: Color, lowerFace: Color, highlight: Color, shade: Color, shadow: Color) -> Self {
+        Self(upperFace: upperFace, lowerFace: lowerFace, highlight: highlight, shade: shade, shadow: shadow,
+             thicknessRatio: 0.008 * frostedWallScale, maximumThickness: 5 * frostedWallScale, edgeStyle: .frosted)
+    }
 }
 
 /// Match the board's existing coordinate gutters, including rectangular boards.
@@ -456,6 +502,7 @@ func boardGridSize(containerSize: CGSize, boardWidth: Int, boardHeight: Int, sho
 struct BoardDepthGeometry: Equatable {
     let faceRect: CGRect
     let thickness: CGFloat
+    let rimThickness: CGFloat
     let cellSize: CGFloat
     let cornerRadius: CGFloat
     let shadowRadius: CGFloat
@@ -477,17 +524,24 @@ struct BoardDepthGeometry: Equatable {
         // Grow out of the flat footprint continuously. At the cutoff there
         // is no inset, so fitting depth cannot push a detailed cell below it.
         let growth = min(1, max(0, (proposedCell - 14) / 4))
-        let thickness = depth.map { min($0.maximumThickness, max(0, side) * $0.thicknessRatio) * growth } ?? 0
+        // Frost borrows some of its reserved shadow space for the visible wall.
+        // The original rim still sizes the face, its corners and the playing grid.
+        let wallScale = depth?.edgeStyle == .frosted ? BoardDepth.frostedWallScale : 1
+        let rimThickness = depth.map {
+            min($0.maximumThickness / wallScale, max(0, side) * ($0.thicknessRatio / wallScale)) * growth
+        } ?? 0
         // Reserve three blur radii around the slab. Moving the face upward
         // by the shadow offset leaves the full fade below its lower edge.
-        let shadowRadius = thickness * 0.3
-        let shadowOffset = thickness * 0.2
-        let reserve = thickness + 6 * shadowRadius
+        let shadowRadius = rimThickness * 0.3
+        let shadowOffset = rimThickness * 0.2
+        let reserve = rimThickness + 6 * shadowRadius
         let factor = side > 0 ? max(0, 1 - reserve / side) : 1
         let faceSize = CGSize(width: containerSize.width * factor, height: containerSize.height * factor)
         self.faceRect = CGRect(x: (containerSize.width - faceSize.width) / 2,
-                               y: (containerSize.height - faceSize.height - thickness) / 2 - shadowOffset,
+                               y: (containerSize.height - faceSize.height - rimThickness) / 2 - shadowOffset,
                                width: faceSize.width, height: faceSize.height)
+        self.rimThickness = rimThickness
+        let thickness = rimThickness * wallScale
         self.thickness = thickness
         self.cellSize = floor(proposedCell * factor * scale) / scale
         switch depth?.edgeStyle {
@@ -496,7 +550,7 @@ struct BoardDepthGeometry: Equatable {
             let radius = min(faceSize.width, faceSize.height) * BoardDepth.porcelainCornerFraction * growth
             self.cornerRadius = min(radius, self.cellSize * 0.45)
         case .frosted:
-            self.cornerRadius = min(thickness * 2.8, self.cellSize * 0.45)
+            self.cornerRadius = min(rimThickness * 2.8, self.cellSize * 0.45)
         case .whittled:
             self.cornerRadius = min(thickness * 1.6, self.cellSize * 0.42)
         case .shortbread:
@@ -505,8 +559,11 @@ struct BoardDepthGeometry: Equatable {
         default:
             self.cornerRadius = min(thickness * 0.65, self.cellSize / 4)
         }
-        self.shadowRadius = shadowRadius
-        self.shadowOffset = shadowOffset
+        // The lower edge advances by extraWall. The six-radius shadow budget
+        // shrinks by the same distance and its center stays in the same slot.
+        let extraWall = thickness - rimThickness
+        self.shadowRadius = shadowRadius - extraWall / 6
+        self.shadowOffset = shadowOffset - extraWall / 2
     }
 
     /// The board as it is seen: its face and the sidewall below it, without
@@ -1096,6 +1153,8 @@ struct BoardAppearance: Equatable {
     var hasIvoryPaperBacking = false
     var gridColor: Color
     var coordinateColor: Color
+    /// Ink for engravings and coordinates on a detailed board with a different surface tone.
+    var engravedInk: EngravedInk? = nil
     var black: StonePalette
     var white: StonePalette
     /// Markup on an empty point.
@@ -1120,6 +1179,11 @@ struct BoardAppearance: Equatable {
     /// A dashed outline for dead stones, which otherwise fade into a dark
     /// board; nil leaves them translucent only.
     var removedStoneOutline: Color? = nil
+
+    struct EngravedInk: Equatable {
+        var grid: Color
+        var coordinates: Color
+    }
 
     struct CrosshairColors: Equatable {
         var valid = Color(UIColor.systemGreen)

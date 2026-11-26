@@ -172,6 +172,8 @@ struct Goban: View {
         let size = stoneSize(geometry: geometry, boardSize: max(width, height), displayScale: displayScale)
         let padded = appearance.gridStyle.usesPaddedCells(at: size)
         let engraved = appearance.gridStyle.usesEngraving(at: size)
+        let engravedInk = engraved ? appearance.engravedInk : nil
+        let coordinateColor = engravedInk?.coordinates ?? appearance.coordinateColor
         let coreOpacity = appearance.gridStyle.coreOpacity(at: size)
         let lineColor = appearance.gridColor.opacity(coreOpacity)
         #if DEBUG
@@ -203,14 +205,14 @@ struct Goban: View {
                     ForEach(0..<width, id: \.self) { col in
                         Text(verbatim: "\(coordinates[col])").font(.system(size: size > 30 ? size / 1.5 : size))
                             .minimumScaleFactor(0.2)
-                            .foregroundColor(appearance.coordinateColor)
+                            .foregroundColor(coordinateColor)
                             .frame(width: size, height: size)
                             .position(x: (CGFloat(col) + 0.5) * size, y: -0.5 * size)
                     }
                     ForEach(0..<height, id: \.self) { row in
                         Text(verbatim: "\(height - row)").font(.system(size: size > 30 ? size / 1.5 : size))
                             .minimumScaleFactor(0.2)
-                            .foregroundColor(appearance.coordinateColor)
+                            .foregroundColor(coordinateColor)
                             .frame(width: size, height: size)
                             .position(x: -0.5 * size, y: (CGFloat(row) + 0.5) * size)
                     }
@@ -237,7 +239,7 @@ struct Goban: View {
                     EngravedGobanGrid(
                         geometry: EngravedGridGeometry(width: width, height: height,
                                                       cellSize: size, lineScale: appearance.gridLineScale),
-                        color: appearance.gridColor
+                        color: engravedInk?.grid ?? appearance.gridColor
                     ).equatable()
                 }
                 if appearance.gridStyle == .shortbreadScore {
@@ -931,6 +933,27 @@ private struct ShortbreadBoardWall: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// One translucent silhouette lets the scene show through the lower ice wall.
+/// The opaque playing face covers the slab up to the start of the blue gradient.
+private struct FrostedBoardWall: View {
+    let material: BoardDepth
+    let layout: BoardDepthGeometry
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        let size = layout.visibleRect.size
+        let topOfWall = UnitPoint(x: 0.5, y: layout.faceRect.height / max(1, size.height))
+        RoundedRectangle(cornerRadius: cornerRadius, style: .circular)
+            .fill(LinearGradient(colors: [material.upperFace, material.lowerFace],
+                                 startPoint: topOfWall, endPoint: .bottom))
+            .frame(width: size.width, height: size.height)
+            .shadow(color: material.shadow, radius: layout.shadowRadius, y: layout.shadowOffset)
+            .frame(width: layout.faceRect.width, height: layout.faceRect.height, alignment: .top)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
 
@@ -2038,7 +2061,7 @@ struct BoardView: View {
                                     Group {
                                         if let depth = appearance.boardDepth, depth.edgeStyle == .frosted {
                                             FrostedBoardEdge(material: depth, cellSize: depthGeometry.cellSize,
-                                                             thickness: depthGeometry.thickness,
+                                                             thickness: depthGeometry.rimThickness,
                                                              cornerRadius: faceRadius)
                                         } else if let depth = appearance.boardDepth, depth.edgeStyle == .rolledTin {
                                             RolledTinBoardEdge(material: depth, cellSize: depthGeometry.cellSize,
@@ -2067,7 +2090,10 @@ struct BoardView: View {
                                         .fill(appearance.surfaceColor(detailed: detailed))
                                         .opacity(detailed ? 0 : 1)
                                     Group {
-                                        if depth.edgeStyle == .porcelain {
+                                        if depth.edgeStyle == .frosted {
+                                            FrostedBoardWall(material: depth, layout: depthGeometry,
+                                                             cornerRadius: faceRadius)
+                                        } else if depth.edgeStyle == .porcelain {
                                             PorcelainBoardWall(material: depth, texture: appearance.boardTexture,
                                                                layout: depthGeometry, cornerRadius: faceRadius)
                                         } else if depth.edgeStyle == .shortbread {
@@ -2090,7 +2116,11 @@ struct BoardView: View {
                             }
                         }
                         .overlay {
-                            if let depth = appearance.boardDepth, depth.edgeStyle == .whittled {
+                            if appearance.boardDepth?.edgeStyle == .frosted, let frost = appearance.surfaceFrost {
+                                FrostPineCornerDeposit(surface: frost, layout: depthGeometry, cornerRadius: faceRadius)
+                                    .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+                                    .animation(nil, value: detailed)
+                            } else if let depth = appearance.boardDepth, depth.edgeStyle == .whittled {
                                 WhittledBoardRim(material: depth, geometry: depthGeometry,
                                                 columns: boardPosition.width, rows: boardPosition.height)
                                     .opacity(detailed ? 1 : 0)
