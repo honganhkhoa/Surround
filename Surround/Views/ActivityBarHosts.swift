@@ -62,8 +62,9 @@ enum ActivityBarHosting {
 /// Whether a docked software keyboard shows, from the keyboard's
 /// notifications (`isAttachedSoftwareKeyboardVisible(from:)`): the custom bar
 /// hides while one does, so it never rides on the keyboard. One for the app,
-/// as an iPhone shows one window. It publishes a main-queue turn after a
-/// notification, never inside a layout pass.
+/// as an iPhone shows one window; an iPad window's custom bar reads whether
+/// the keyboard covers that window (`IPadTabContext`) instead. It publishes a
+/// main-queue turn after a notification, never inside a layout pass.
 final class ActivityDockedKeyboard: ObservableObject {
     static let shared = ActivityDockedKeyboard()
 
@@ -156,17 +157,18 @@ private struct ActivityCustomBarHost: ViewModifier {
 }
 
 /// The inset at a screen's bottom, always present, with the bar inside only
-/// while it shows: there is content, no docked keyboard shows, on a root the
-/// registry doesn't hide it and, on iPad, the sidebar copy says hidden or
-/// unavailable. A pushed game or conversation draws none of its own, so the
-/// registry's turn never adds an inset under one.
+/// while it shows: there is content, no docked keyboard covers the window,
+/// on a root the registry doesn't hide it and, on iPad, the sidebar copy says
+/// hidden or unavailable. A pushed game or conversation draws none of its
+/// own, so the registry's turn never adds an inset under one.
 private struct ActivityCustomBarInset: ViewModifier {
     let place: ActivityCustomBarPlace
     let root: RootView
     let container: ActivityHostPolicy.Container
     /// The iPad's context, whose sidebar copy the policy reads: shown as the
     /// sidebar starts to show, hidden once its hide completes, each a turn
-    /// later. Never the delivered metrics, which follow layout.
+    /// later. Never the delivered metrics, which follow layout. It also says
+    /// whether a docked keyboard covers this window.
     let iPadTabs: IPadTabContext?
     @ObservedObject var bar: ActivityBarState
     @ObservedObject var places: ActivityPlaceRegistry
@@ -181,9 +183,12 @@ private struct ActivityCustomBarInset: ViewModifier {
         let barContent = ActivityBarHosting.content(
             bar, placement: ActivityHostPolicy.hosts(for: facts, overrides: overrides).connectionStatus
         )
+        // A Stage Manager window can sit above a keyboard docked under
+        // another, and keeps its bar then.
+        let keyboardOverWindow = iPadTabs?.activityKeyboardOverWindow ?? keyboard.isShown
         let state = ActivityBarHostState(facts: facts, overrides: overrides,
                                          placeHidesBar: place == .root && places.hidesActivity(in: root),
-                                         hasContent: barContent != nil, isKeyboardOverWindow: keyboard.isShown)
+                                         hasContent: barContent != nil, isKeyboardOverWindow: keyboardOverWindow)
         let shown = state.shownBar == .customBar ? barContent : nil
         // The form comes from the vertical size class: one 48 pt line in
         // compact height, else two lines in 56 pt.
@@ -217,7 +222,7 @@ private struct ActivityCustomBarInset: ViewModifier {
                 NoticesHostProbeLog.event("bar.custom", [
                     ("root", root.rawValue), ("place", place == .root ? "root" : "pushed"),
                     ("shown", NoticesHostProbeLog.flag(isShown)), ("sidebar", facts.sidebar.rawValue),
-                    ("keyboard", NoticesHostProbeLog.flag(keyboard.isShown)),
+                    ("keyboard", NoticesHostProbeLog.flag(keyboardOverWindow)),
                 ])
             }
             #endif

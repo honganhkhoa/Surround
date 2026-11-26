@@ -17,6 +17,12 @@ final class IPadTabContext {
     /// show, hidden once its hide completes) and unavailable without a
     /// sidebar. Never `sidebarVisible`, which follows layout a turn late.
     private(set) var activitySidebar = ActivityHostPolicy.Sidebar.unavailable
+    /// A docked keyboard covers this window, as the coordinator reads each
+    /// keyboard notification's end frame against the window
+    /// (`ActivityBarHostState.keyboardIsOverWindow`): the custom Activity bar
+    /// hides while one does. Not whether the app shows one, which can be
+    /// docked under another window.
+    private(set) var activityKeyboardOverWindow = false
     @ObservationIgnored private var hiddenTabBarOwners = Set<UUID>()
     @ObservationIgnored var onTabBarVisibilityChange: (() -> Void)?
     @ObservationIgnored var onToggleSidebar: (() -> Void)?
@@ -59,6 +65,11 @@ final class IPadTabContext {
     fileprivate func setActivitySidebar(_ sidebar: ActivityHostPolicy.Sidebar) {
         guard sidebar != activitySidebar else { return }
         activitySidebar = sidebar
+    }
+
+    fileprivate func setActivityKeyboardOverWindow(_ over: Bool) {
+        guard over != activityKeyboardOverWindow else { return }
+        activityKeyboardOverWindow = over
     }
 }
 
@@ -902,6 +913,7 @@ struct IPadTabContainer: UIViewControllerRepresentable {
                 keyboardEnd: endInWindow, window: window.bounds)
             guard over != isKeyboardOverWindow else { return }
             isKeyboardOverWindow = over
+            for context in contexts.values { context.setActivityKeyboardOverWindow(over) }
             #if DEBUG && MAIN_APP
             NoticesHostProbeLog.event("bar.keyboard", [
                 ("container", "iPadTabContainer"), ("overWindow", NoticesHostProbeLog.flag(over)),
