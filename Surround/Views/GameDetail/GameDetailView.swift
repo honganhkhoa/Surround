@@ -1087,7 +1087,7 @@ struct GameDetailView: View {
                         let corners = anchors.pondControlReservations.map { scene[$0] }
                         KoiPondScene(scheme: colorScheme, boards: scene.boardShadowRegions(anchors.boards),
                                      gameArea: game, controlReservations: panels + corners,
-                                     windowInScene: windowGeometry?.bounds(relativeTo: scene.frame(in: .global)),
+                                     windowInScene: windowGeometry?.bounds(relativeTo: scene.frame(in: .global)) ?? .zero,
                                      layout: KoiPondSwimLayout(panel: interaction.panel,
                                                                divided: SingleGameView.activeDivision(in: geometry) != nil,
                                                                hidesChatBoard: interaction.isChatVisible && !showsCompactChatBoard),

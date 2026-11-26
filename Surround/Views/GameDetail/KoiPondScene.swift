@@ -40,6 +40,7 @@ struct KoiPondScene: View {
     var boardIsHidden = false
     var swimSession: KoiPondSwimSession?
     var gameID: GameID?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { scene in
@@ -75,9 +76,10 @@ struct KoiPondScene: View {
                     let routes = swimSession.routes(for: gameID, window: CGRect(origin: .zero, size: window.size),
                                                     water: water.applying(toWindow), board: measuredFace?.applying(toWindow),
                                                     detailed: detailed, avoiding: (reservations + otherBoards).map { $0.applying(toWindow) },
-                                                    layout: layout,
-                                                    elapsed: swimSession.elapsed)
-                    KoiPondMovingFish(scheme: scheme, session: swimSession, routes: routes, windowOrigin: window.origin)
+                                                    layout: layout, elapsed: swimSession.elapsed,
+                                                    reduceMotion: reduceMotion)
+                    KoiPondMovingFish(scheme: scheme, session: swimSession, routes: routes,
+                                      windowOrigin: window.origin, reduceMotion: reduceMotion)
                     // The irregular edges and gaps between the rocks occlude fish at the shoreline.
                     Canvas { context, _ in
                         KoiPondArtwork(context: context, scheme: scheme).drawBank(shore)
@@ -126,7 +128,6 @@ final class KoiPondSwimSession: ObservableObject {
     private lazy var school = KoiPondSwimSchool(seed: seed)
     private var habitat: Habitat?
     private(set) var planned: [KoiPondSwimRoute] = []
-    private var savedLaps: [KoiPondSwimRoute.ID: CGFloat] = [:]
     private var clock = KoiPondSwimClock()
     fileprivate var elapsed: TimeInterval { clock.elapsed(at: ProcessInfo.processInfo.systemUptime) }
 
@@ -141,31 +142,39 @@ final class KoiPondSwimSession: ObservableObject {
     func routes(for gameID: GameID?, window: CGRect, water: CGRect, board: CGRect?,
                 detailed: Bool, avoiding reservations: [CGRect],
                 layout: KoiPondSwimLayout = .init(),
-                elapsed: TimeInterval) -> [KoiPondSwimRoute] {
+                elapsed: TimeInterval, reduceMotion: Bool = false) -> [KoiPondSwimRoute] {
         let next = Habitat(gameID: gameID, window: window, layout: layout)
-        if next != habitat || planned.isEmpty {
-            // A preference can briefly disappear during layout. Wait for real
-            // measurements before choosing a course for a new game or display.
-            guard let board, !board.isEmpty, !window.isEmpty, !water.intersection(window).isEmpty else {
-                return habitat?.gameID == gameID ? planned : []
-            }
-            // Resizing changes the circuit's length. Carry the fractional lap
-            // across at this instant. Each fish keeps its stroke rhythm.
-            if habitat?.gameID == gameID {
-                for route in planned { savedLaps[route.id] = route.lapFraction(at: elapsed) }
-            } else {
-                savedLaps.removeAll(keepingCapacity: true)
-                let gameSeed: UInt64 = if case let .OGS(number)? = gameID { UInt64(truncatingIfNeeded: number) } else { 0 }
-                school = KoiPondSwimSchool(seed: seed ^ gameSeed)
-            }
-            planned = school.routes(in: window, gameArea: water, board: board, detailed: detailed,
-                                    avoiding: reservations)
-            for index in planned.indices {
-                let lap = savedLaps[planned[index].id]
-                planned[index].start(at: elapsed, from: lap)
-            }
-            habitat = next
+        planned.removeAll { !$0.isPresent(at: elapsed) }
+        guard next != habitat || planned.isEmpty else { return planned }
+        let sameGame = habitat.map { $0.gameID == gameID } ?? false
+        // Anchors can briefly disappear during layout. Keep the existing fish
+        // until the board and window can guide their next pass.
+        guard let board, !board.isEmpty, !window.isEmpty, !water.intersection(window).isEmpty else {
+            return sameGame ? planned : []
         }
+        if !sameGame {
+            let gameSeed: UInt64 = if case let .OGS(number)? = gameID { UInt64(truncatingIfNeeded: number) } else { 0 }
+            school = KoiPondSwimSchool(seed: seed ^ gameSeed)
+        }
+        let fitted = school.routes(in: window, gameArea: water, board: board, detailed: detailed,
+                                   avoiding: reservations)
+        let previous = sameGame ? planned : []
+        planned = school.drawingOrder.compactMap { id in
+            let prior = previous.first { $0.id == id }
+            guard var route = fitted.first(where: { $0.id == id }) else {
+                return prior?.departing(in: window, at: elapsed)
+            }
+            if let prior {
+                route.continueFrom(prior, at: elapsed)
+            } else if !sameGame && reduceMotion {
+                // A visit opened with motion disabled starts with a populated still pond.
+                route.startInOpenWater(at: elapsed)
+            } else {
+                route.enterFromEdge(at: elapsed)
+            }
+            return route
+        }
+        habitat = sameGame || !planned.isEmpty ? next : nil
         return planned
     }
 }
@@ -190,7 +199,7 @@ private struct KoiPondMovingFish: View {
     let session: KoiPondSwimSession
     let routes: [KoiPondSwimRoute]
     let windowOrigin: CGPoint
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let reduceMotion: Bool
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {

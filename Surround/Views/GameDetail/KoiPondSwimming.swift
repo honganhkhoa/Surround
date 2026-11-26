@@ -3,6 +3,7 @@ import Foundation
 
 struct KoiPondSwimPose: Equatable {
     let center: CGPoint
+    let length: CGFloat
     /// Clockwise in the scene's coordinates. Zero points right.
     let heading: Double
     let beat: Double
@@ -22,19 +23,18 @@ private struct SwimRandom {
     }
 }
 
-/// Conservative cross-sections of the alpha in the three *upright* portraits.
+/// Conservative cross-sections of the three portraits in their neutral glide pose.
 /// Each interval is in body lengths, from the head at -0.5 to the tail at +0.5.
-/// The tail is already bent in the photographs, particularly on the two red koi.
 private struct SwimOutline {
     let asset: String
     let sections: [CGRect]
 
     static let kohaku = SwimOutline("KoiPondKohaku",
-                                   widths: [0.00...0.21, -0.15...0.28, -0.16...0.08, -0.28 ... -0.05])
+                                   widths: [0.00...0.21, -0.16...0.33, -0.01...0.19, 0.01...0.18])
     static let sanke = SwimOutline("KoiPondSanke",
-                                  widths: [-0.07...0.18, -0.20...0.34, -0.24...0.07, -0.34 ... -0.08])
+                                  widths: [-0.08...0.19, -0.21...0.36, -0.09...0.19, -0.06...0.15])
     static let gold = SwimOutline("KoiPondGold",
-                                 widths: [-0.05...0.16, -0.25...0.24, -0.08...0.13, -0.02...0.14])
+                                 widths: [-0.06...0.17, -0.25...0.28, -0.04...0.18, -0.02...0.14])
 
     private init(_ asset: String, widths: [ClosedRange<CGFloat>]) {
         self.asset = asset
@@ -214,6 +214,78 @@ private struct SwimCourse {
     }
 }
 
+/// A moving fish may finish its current passage before the next layout takes
+/// effect. A leg is a value snapshot, so repeated resizes never form a chain.
+private struct SwimLeg {
+    let course: SwimCourse
+    let length, speed: CGFloat
+    var initialLap: CGFloat
+    var initialTime: TimeInterval
+    var tangent: CourseSample?
+
+    var duration: TimeInterval { course.distances.last! / speed }
+
+    func lap(at time: TimeInterval) -> CGFloat {
+        let turns = initialLap + (time - initialTime) / duration
+        return turns - floor(turns)
+    }
+
+    func sample(at time: TimeInterval) -> CourseSample {
+        guard let tangent else { return course.at(distance: lap(at: time) * course.distances.last!) }
+        let distance = speed * (time - initialTime)
+        return CourseSample(point: CGPoint(x: tangent.point.x + distance * cos(tangent.heading),
+                                           y: tangent.point.y + distance * sin(tangent.heading)),
+                            heading: tangent.heading,
+                            curvature: tangent.curvature * max(0, 1 - abs(distance) / (0.5 * length)))
+    }
+
+    /// On a tangent, crossing a rectangle padded by one full body length
+    /// guarantees that the entire silhouette is outside the physical window.
+    func rayExit(at time: TimeInterval, direction: CGFloat, in window: CGRect) -> TimeInterval {
+        let here = sample(at: time), padded = window.insetBy(dx: -length - 2, dy: -length - 2)
+        let dx = direction * cos(here.heading), dy = direction * sin(here.heading)
+        let x = dx == 0 ? .infinity : ((dx > 0 ? padded.maxX : padded.minX) - here.point.x) / dx
+        let y = dy == 0 ? .infinity : ((dy > 0 ? padded.maxY : padded.minY) - here.point.y) / dy
+        return time + direction * max(0, min(x, y)) / speed
+    }
+
+    /// Walk the arc-length table toward an exit, or backward to the entrance
+    /// for this fish's selected passage. Refine the crossing so a new fish
+    /// starts just outside the window. This runs only when the layout changes.
+    func hiddenTime(from time: TimeInterval, direction: CGFloat, in window: CGRect,
+                    outline: SwimOutline, clearanceTime: TimeInterval = 0.6) -> TimeInterval? {
+        let margin = 2 + speed * clearanceTime
+        let edge = window.insetBy(dx: -margin, dy: -margin)
+        func hidden(_ sample: CourseSample) -> Bool {
+            !outline.footprint(center: sample.point, heading: sample.heading,
+                               length: length, flex: -0.29...0.29).intersects(edge)
+        }
+        let here = sample(at: time)
+        if hidden(here) { return time }
+        if tangent != nil { return rayExit(at: time, direction: direction, in: window) }
+        let distances = course.distances, last = distances.count - 1
+        let total = distances[last], start = lap(at: time) * total
+        let next = distances.firstIndex { $0 >= start } ?? last
+        var index = direction > 0 ? next % last : (next + last - 1) % last
+        var inside: CGFloat = 0
+        for _ in 0..<last {
+            var outside = direction * (distances[index] - start)
+            if outside < 0 { outside += total }
+            if hidden(course.at(distance: distances[index])) {
+                for _ in 0..<7 {
+                    let middle = (inside + outside) / 2
+                    if hidden(sample(at: time + direction * middle / speed)) { outside = middle }
+                    else { inside = middle }
+                }
+                return time + direction * outside / speed
+            }
+            inside = outside
+            index = (index + (direction > 0 ? 1 : last - 1)) % last
+        }
+        return nil
+    }
+}
+
 struct KoiPondSwimRoute: Identifiable {
     struct ID: Hashable {
         let assetName: String
@@ -225,38 +297,35 @@ struct KoiPondSwimRoute: Identifiable {
     let assetName: String
     let submerged: Bool
     let opacity: Double
-    let length, speed: CGFloat
+    var length: CGFloat { destination.length }
+    var speed: CGFloat { destination.speed }
     /// Where the fish is guided through clear water; its journey can extend
     /// beyond this opening and behind real foreground objects.
     let habitat: CGRect
-    let visibleWater: CGRect
-    /// One circuit at the fish's mean pace.
-    let duration: TimeInterval
+    private(set) var visibleWater: CGRect
+    /// One circuit on the intended course at the fish's mean pace.
+    var duration: TimeInterval { destination.duration }
     private let swimmer: Swimmer
-    private let course: SwimCourse
     private let startingLap: CGFloat
-    private var initialLap: CGFloat
-    private var initialTravelTime: TimeInterval
+    private var destination: SwimLeg
+    private var departure: (leg: SwimLeg, ends: TimeInterval)?
+    private var approach: (leg: SwimLeg, ends: TimeInterval)?
+    private var retires = false
 
     fileprivate init(_ swimmer: Swimmer, guide: CGRect, window: CGRect, startObstacles: [CGRect],
                      length: CGFloat, knots: [CGPoint], startNear target: CGPoint, startingWater: CGRect? = nil) {
         self.swimmer = swimmer
-        initialTravelTime = swimmer.gait.at(0).travelTime
         assetName = swimmer.outline.asset
         submerged = swimmer.submerged
         opacity = swimmer.opacity
-        self.length = length
         habitat = guide
         visibleWater = window
         let course = SwimCourse(knots)
-        self.course = course
-        speed = length * swimmer.pace
         let total = course.distances.last!
-        duration = total / speed
 
-        // Start the visit in open water even though the connecting turns are
-        // offscreen. Subsequent layout changes retain the fish's existing phase.
-        let potentialFlex: ClosedRange<CGFloat> = swimmer.outline.asset == SwimOutline.gold.asset ? -0.29...0.29 : -0.29...0.46
+        // Choose a visible composition for a still school and a passage for
+        // live entrants to approach from beyond the window.
+        let potentialFlex: ClosedRange<CGFloat> = -0.29...0.29
         var bestScore = -CGFloat.infinity, bestLap = swimmer.phase
         for distance in course.distances {
             let sample = course.at(distance: distance)
@@ -277,41 +346,112 @@ struct KoiPondSwimRoute: Identifiable {
             if score > bestScore { bestScore = score; bestLap = lap }
         }
         startingLap = bestLap
-        initialLap = bestLap
+        destination = SwimLeg(course: course, length: length, speed: length * swimmer.pace,
+                              initialLap: bestLap, initialTime: swimmer.gait.at(0).travelTime)
     }
 
-    mutating func start(at elapsed: TimeInterval, from lap: CGFloat?) {
-        initialLap = lap ?? startingLap
-        initialTravelTime = swimmer.gait.at(elapsed).travelTime
+    mutating func startInOpenWater(at elapsed: TimeInterval) {
+        destination.initialLap = startingLap
+        destination.initialTime = swimmer.gait.at(elapsed).travelTime
+        departure = nil
+        approach = nil
+        retires = false
     }
 
-    func lapFraction(at seconds: TimeInterval) -> CGFloat {
-        lap(atTravelTime: swimmer.gait.at(seconds).travelTime)
+    private func leg(at time: TimeInterval) -> SwimLeg {
+        if let departure, retires || time < departure.ends { return departure.leg }
+        if let approach, time < approach.ends { return approach.leg }
+        return destination
     }
 
-    private func lap(atTravelTime time: TimeInterval) -> CGFloat {
-        let turns = initialLap + (time - initialTravelTime) / duration
-        return turns - floor(turns)
+    func isPresent(at elapsed: TimeInterval) -> Bool {
+        guard retires, let departure else { return true }
+        return swimmer.gait.at(elapsed).travelTime < departure.ends
+    }
+
+    mutating func enterFromEdge(at elapsed: TimeInterval) {
+        beginPassage(at: swimmer.gait.at(elapsed).travelTime)
+    }
+
+    private mutating func beginPassage(at time: TimeInterval) {
+        departure = nil
+        approach = nil
+        retires = false
+        destination.initialLap = startingLap
+        destination.initialTime = time
+        if let gate = destination.hiddenTime(from: time, direction: -1, in: visibleWater, outline: swimmer.outline,
+                                             clearanceTime: 0.4 + 1.6 * swimmer.phase) {
+            destination.initialLap = destination.lap(at: gate)
+        } else {
+            // If a course is entirely inside this window, approach its chosen
+            // point on the incoming tangent before joining the circuit.
+            var incoming = destination
+            incoming.tangent = incoming.sample(at: time)
+            let outside = incoming.rayExit(at: time, direction: -1, in: visibleWater)
+            let arrival = time + (time - outside)
+            incoming.initialTime = arrival
+            destination.initialTime = arrival
+            approach = (incoming, arrival)
+        }
+    }
+
+    private func outgoing(at time: TimeInterval, in window: CGRect) -> (leg: SwimLeg, ends: TimeInterval) {
+        var current = leg(at: time)
+        if let exit = current.hiddenTime(from: time, direction: 1, in: window, outline: swimmer.outline) {
+            return (current, exit)
+        }
+        // A larger viewport can contain the entire old circuit. Leave on its
+        // current tangent at the same speed, easing the remaining tail bend.
+        let point = current.sample(at: time)
+        current.initialLap = current.lap(at: time)
+        current.initialTime = time
+        current.tangent = point
+        return (current, current.rayExit(at: time, direction: 1, in: window))
+    }
+
+    mutating func continueFrom(_ previous: Self, at elapsed: TimeInterval) {
+        guard previous.isPresent(at: elapsed) else { enterFromEdge(at: elapsed); return }
+        let time = swimmer.gait.at(elapsed).travelTime
+        let outgoing = previous.outgoing(at: time, in: visibleWater)
+        beginPassage(at: outgoing.ends)
+        if outgoing.ends > time { departure = outgoing }
+    }
+
+    func departing(in window: CGRect, at elapsed: TimeInterval) -> Self? {
+        guard isPresent(at: elapsed) else { return nil }
+        let time = swimmer.gait.at(elapsed).travelTime
+        let outgoing = outgoing(at: time, in: window)
+        guard outgoing.ends > time else { return nil }
+        var leaving = self
+        leaving.visibleWater = window
+        leaving.departure = outgoing
+        leaving.retires = true
+        return leaving
     }
 
     func pose(at seconds: TimeInterval) -> KoiPondSwimPose {
-        let gait = swimmer.gait.at(seconds)
-        let sample = course.at(distance: lap(atTravelTime: gait.travelTime) * course.distances.last!)
-        return KoiPondSwimPose(center: sample.point, heading: sample.heading, beat: gait.beat, tailAmplitude: gait.amplitude,
-                               bend: max(-0.10, min(0.10, sample.curvature * length * 0.075)))
+        let gait = swimmer.gait.at(seconds), active = leg(at: gait.travelTime)
+        let sample = active.sample(at: gait.travelTime)
+        let steering = max(-0.10, min(0.10, sample.curvature * active.length * 0.075))
+        return KoiPondSwimPose(center: sample.point, length: active.length, heading: sample.heading,
+                               beat: gait.beat, tailAmplitude: gait.amplitude, bend: steering * gait.amplitude)
     }
 
     func bounds(at seconds: TimeInterval) -> CGRect {
+        guard isPresent(at: seconds) else { return .null }
         let pose = pose(at: seconds)
         let lateralBeat = 0.184 * pose.tailAmplitude
-        let straighterTail = assetName == SwimOutline.gold.asset ? 0 : 0.1725 + 0.0275 * (1 - pose.tailAmplitude)
-        let flex = (pose.bend + straighterTail - lateralBeat)...(pose.bend + straighterTail + lateralBeat)
-        return swimmer.outline.footprint(center: pose.center, heading: pose.heading, length: length, flex: flex)
+        let flex = (pose.bend - lateralBeat)...(pose.bend + lateralBeat)
+        return swimmer.outline.footprint(center: pose.center, heading: pose.heading, length: pose.length, flex: flex)
     }
 }
 
 struct KoiPondSwimSchool {
     private let swimmers: [Swimmer]
+
+    var drawingOrder: [KoiPondSwimRoute.ID] {
+        swimmers.map { KoiPondSwimRoute.ID(assetName: $0.outline.asset, submerged: $0.submerged) }
+    }
 
     init(seed: UInt64) {
         var random = SwimRandom(state: seed)
