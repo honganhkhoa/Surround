@@ -730,23 +730,30 @@ final class GameControlUITests: SurroundJourneyUITestCase {
 
     /// Opens a game from Home's list once bounded drags of Home's own
     /// content have brought the row's centre clear of the bars. A row not
-    /// yet in the tree lies below, and once a drag no longer moves the list,
-    /// above: at the largest text sizes it can lie seven drags down, past
-    /// the three drags after which `HomeRowSearch` turns.
+    /// yet in the tree lies below, and once two drags in a row no longer
+    /// move the list, above: one such drag can be a drag the list never
+    /// took. At the largest text sizes the row can lie seven drags down,
+    /// past the three drags after which `HomeRowSearch` turns, so the drags
+    /// leave room for a search that turns at the list's end.
     private func openFromHome(_ gameID: Int, in app: XCUIApplication,
                               file: StaticString = #filePath, line: UInt = #line) {
         let home = app.scrollViews.matching(identifier: ID.screenHome).firstMatch
         XCTAssertTrue(home.waitForExistence(timeout: 10), "Expected Home's list", file: file, line: line)
         let row = home.buttons.matching(identifier: ID.homeGame(gameID)).firstMatch
+        let maxDrags = 16
+        var drags = 0
         var liesAbove = false
         var listBeforeDrag: [CGRect]?
+        // Drags in a row that left the list where it stood, and the search's turns.
+        var stillDrags = 0
+        var turns = 0
         #if !targetEnvironment(macCatalyst)
         // A drag that carries the row past the viewport is followed by
         // shorter ones the other way, so the search settles.
         var damping: CGFloat = 1
         var draggedUp: Bool?
         #endif
-        for attempt in 0...10 {
+        for attempt in 0...maxDrags {
             let viewport = homeViewport(in: app)
             let isClear = row.exists && viewport.contains(CGPoint(x: row.frame.midX, y: row.frame.midY))
             #if targetEnvironment(macCatalyst)
@@ -764,15 +771,29 @@ final class GameControlUITests: SurroundJourneyUITestCase {
                 return
             }
             #endif
-            guard attempt < 10, !viewport.isEmpty else { break }
+            guard attempt < maxDrags, !viewport.isEmpty else { break }
+            drags += 1
             let delta: CGFloat
             if row.exists {
                 delta = row.frame.midY - viewport.midY
                 listBeforeDrag = nil
+                stillDrags = 0
             } else {
-                // A list dragged at its end springs back to where it stood.
-                let list = homeListFrames(home)
-                if listStoodStill(list, since: listBeforeDrag) { liesAbove.toggle() }
+                // A list dragged at its end springs back to where it stood,
+                // so it is read once it has stopped. One drag that left it
+                // there may be a drag it never took: the search turns at the
+                // second in a row, which starts further from the edge.
+                let list = settledListFrames(home)
+                if listStoodStill(list, since: listBeforeDrag) {
+                    stillDrags += 1
+                    if stillDrags == 2 {
+                        liesAbove.toggle()
+                        stillDrags = 0
+                        turns += 1
+                    }
+                } else {
+                    stillDrags = 0
+                }
                 listBeforeDrag = list
                 delta = liesAbove ? -viewport.height : viewport.height
             }
@@ -792,7 +813,8 @@ final class GameControlUITests: SurroundJourneyUITestCase {
             if row.exists, let draggedUp, draggedUp != (delta >= 0) { damping /= 2 }
             draggedUp = delta >= 0
             let distance = max(40, min(abs(delta), viewport.height * (row.exists ? 0.6 : 0.8)) * damping)
-            let startY = delta >= 0 ? viewport.maxY - 4 : viewport.minY + 4
+            let inset = stillDrags == 1 ? viewport.height / 4 : 4
+            let startY = delta >= 0 ? viewport.maxY - inset : viewport.minY + inset
             let origin = home.coordinate(withNormalizedOffset: .zero)
             let start = origin.withOffset(CGVector(dx: viewport.midX - home.frame.minX, dy: startY - home.frame.minY))
             let end = start.withOffset(CGVector(dx: 0, dy: delta >= 0 ? -distance : distance))
@@ -800,7 +822,8 @@ final class GameControlUITests: SurroundJourneyUITestCase {
             start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.3)
             #endif
         }
-        XCTFail("Expected game \(gameID) on Home, clear of its bars", file: file, line: line)
+        XCTFail("Expected game \(gameID) on Home, clear of its bars, after \(drags) drags and \(turns) turns",
+                file: file, line: line)
     }
 
     /// Every frame in Home's list, from one snapshot.
@@ -813,6 +836,18 @@ final class GameControlUITests: SurroundJourneyUITestCase {
             pending.append(contentsOf: node.children)
         }
         return frames
+    }
+
+    /// Home's list once two reads in a row agree, so that a list still
+    /// springing back from its end isn't taken to have moved.
+    private func settledListFrames(_ home: XCUIElement) -> [CGRect] {
+        var list = homeListFrames(home)
+        _ = pollUntil(timeout: 1) {
+            let again = homeListFrames(home)
+            defer { list = again }
+            return listStoodStill(again, since: list)
+        }
+        return list
     }
 
     /// Whether a drag left Home's list where it stood, as at the list's end.
