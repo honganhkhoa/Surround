@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Only the walnut fills the viewport. The flour and ingredients keep their
+/// Only the walnut fills the viewport. The linen and ingredients keep their
 /// proportions at the four physical corners as panels open or a Duo folds.
 struct GoldenCrumbScene: View {
     let scheme: ColorScheme
@@ -17,7 +17,9 @@ struct GoldenCrumbScene: View {
                     .scaledToFill()
                     .frame(width: size.width, height: size.height)
                     .overlay(alignment: .topLeading) {
-                        corner("GoldenCrumbFlourSweep", width: min(shortSide * 0.72, 470))
+                        // The cloth and its contact shadow occupy one seventh of the phone's
+                        // short side, leaving bare walnut between the hem and the clocks.
+                        corner("GoldenCrumbLinenCorner", width: min(shortSide / 7, 128))
                     }
                     .overlay(alignment: .bottomTrailing) {
                         corner("GoldenCrumbCutterImprint", width: min(shortSide * 0.37, 270))

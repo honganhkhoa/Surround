@@ -6465,6 +6465,7 @@ final class SurroundThemeTests: XCTestCase {
     func testGoldenCrumbWorkbenchKeepsCornerArtAndReadableLegacyChrome() throws {
         let theme = SurroundTheme.goldenCrumb
         let wood = try XCTUnwrap(UIImage(named: "GoldenCrumbWalnutBench", in: GoldenCrumb.bundle, compatibleWith: nil))
+        XCTAssertNotNil(UIImage(named: "GoldenCrumbLinenCorner", in: GoldenCrumb.bundle, compatibleWith: nil))
         for size in [CGSize(width: 360, height: 700), CGSize(width: 840, height: 390)] {
             let plain = try nativeMaterialPixelsUsingDirectContext(Image(uiImage: wood)
                 .resizable().scaledToFill().frame(width: size.width, height: size.height).clipped(), scale: 1)
@@ -6493,7 +6494,7 @@ final class SurroundThemeTests: XCTestCase {
                 }
                 if #available(iOS 26, macCatalyst 26, *) {
                     guard scheme == .light else { continue }
-                    // Native glass leaves the sweep, pastry, cocoa and cutter visible.
+                    // Native glass leaves the linen, pastry, cocoa and cutter visible.
                     // Compare their own regions with the identical bare-wood crop.
                     let edge = min(scene.width, scene.height) / 3
                     for x0 in [0, scene.width - edge] {
@@ -6509,6 +6510,22 @@ final class SurroundThemeTests: XCTestCase {
                                                  "Visible corner artwork at (\(x0), \(y0)) in \(size)")
                         }
                     }
+                    // The linen and its shadow occupy about 52 × 64 pt on a
+                    // 360 pt phone. The space below and to its right stays bare
+                    // through the middle of the compact clock row.
+                    let shortSide = min(scene.width, scene.height)
+                    let hemWidth = Int(ceil(Double(shortSide) * 0.15))
+                    let hemHeight = Int(ceil(Double(shortSide) * 0.19))
+                    var coveredWood = 0
+                    for y in stride(from: 1, to: edge, by: 2) {
+                        for x in stride(from: 1, to: centerX, by: 2) where x >= hemWidth || y >= hemHeight {
+                            let i = (y * scene.width + x) * 4
+                            if (0..<3).contains(where: { abs(Int(scene.pixels[i + $0]) - Int(plain.pixels[i + $0])) > 8 }) {
+                                coveredWood += 1
+                            }
+                        }
+                    }
+                    XCTAssertLessThanOrEqual(coveredWood, 2, "Leave clear walnut between the linen and the clocks in \(size)")
                 } else {
                     // Older navigation and toolbar labels sit on the scene's edge gradients.
                     let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light

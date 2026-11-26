@@ -4354,10 +4354,7 @@ struct ThemeStatusBarContrast: View {
         return switch theme {
         case .nightGarden: 0.8
         case .flowingInk, .flowingInkJade: 0.85
-        // The phone time sits on flour and the indicators on golden pastry.
-        // A longer iPad status line also reaches the bare walnut between them.
-        case .goldenCrumb: UIDevice.current.userInterfaceIdiom == .phone ? 0.22 : 0.55
-        case .rakedGarden, .frostPine, .surroundStudio, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight, .koiPond: 0.55
+        case .rakedGarden, .frostPine, .surroundStudio, .paperBlossoms, .sakuraStream, .whittledWoodland, .reefLight, .koiPond, .goldenCrumb: 0.55
         default: 0
         }
     }
@@ -4367,8 +4364,9 @@ struct ThemeStatusBarContrast: View {
         EmptyView()
         #else
         if !hidden, theme.showsSceneArt, opacity > 0 {
-            StatusBarContrastSurface(color: UIColor(theme.pageBackground),
-                                     opacity: opacity, gradesCornerTray: theme == .koiPond || theme == .goldenCrumb)
+            StatusBarContrastSurface(color: UIColor(theme.pageBackground), opacity: opacity,
+                                     gradesCornerTray: theme == .koiPond || theme == .goldenCrumb,
+                                     keepsLinenClear: theme == .goldenCrumb)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         }
@@ -4380,6 +4378,7 @@ private struct StatusBarContrastSurface: UIViewRepresentable {
     let color: UIColor
     let opacity: CGFloat
     let gradesCornerTray: Bool
+    let keepsLinenClear: Bool
 
     func makeUIView(context: Context) -> StatusBarContrastView {
         StatusBarContrastView()
@@ -4388,14 +4387,17 @@ private struct StatusBarContrastSurface: UIViewRepresentable {
     func updateUIView(_ view: StatusBarContrastView, context: Context) {
         view.color = color.withAlphaComponent(opacity)
         view.gradesCornerTray = gradesCornerTray
+        view.keepsLinenClear = keepsLinenClear
         view.setNeedsLayout()
     }
 
     final class StatusBarContrastView: UIView {
         var color: UIColor = .clear
         var gradesCornerTray = false
+        var keepsLinenClear = false
         private let gradient = CAGradientLayer()
         private let trayLight = CAGradientLayer()
+        private let phoneStatusMask = CAGradientLayer()
 
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -4478,6 +4480,22 @@ private struct StatusBarContrastSurface: UIViewRepresentable {
             // Keep even the shorter iPad status glyphs on stable pigment,
             // then feather only the lower edge of their margin.
             gradient.locations = [0, NSNumber(value: Double(max(0, frame.height - 3) / (frame.height + 18))), 1]
+            // Portrait phones with a sensor housing put the time to its left and
+            // indicators to its right. Leave the stitched hem in its own light.
+            if keepsLinenClear, window.traitCollection.userInterfaceIdiom == .phone,
+               window.bounds.height > window.bounds.width, windowFrame.height > 40 {
+                phoneStatusMask.frame = gradient.bounds
+                phoneStatusMask.startPoint = CGPoint(x: 0, y: 0.5)
+                phoneStatusMask.endPoint = CGPoint(x: 1, y: 0.5)
+                let time = UIColor.black.cgColor
+                let icons = UIColor.black.withAlphaComponent(0.4).cgColor
+                let clear = UIColor.clear.cgColor
+                phoneStatusMask.colors = [clear, time, time, clear, clear, icons, icons]
+                phoneStatusMask.locations = [0.10, 0.145, 0.245, 0.38, 0.64, 0.77, 1]
+                gradient.mask = phoneStatusMask
+            } else {
+                gradient.mask = nil
+            }
         }
     }
 }
