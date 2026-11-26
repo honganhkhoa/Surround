@@ -1,6 +1,8 @@
 import SwiftUI
 import UIKit
 
+private final class ChristmasOrnamentResources {}
+
 enum ChristmasOrnamentRole: Hashable, CaseIterable {
     case clock, player
 
@@ -25,6 +27,7 @@ struct ChristmasOrnamentSurface: View {
     let color: StoneColor
     let role: ChristmasOrnamentRole
     var compact: Bool = false
+    var clockHighlight: ChristmasClockHolly? = nil
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -32,7 +35,7 @@ struct ChristmasOrnamentSurface: View {
     var body: some View {
         ChristmasOrnamentMaterial(color: color, role: role, colorScheme: colorScheme,
                                   showsDetail: contrast != .increased && !reduceTransparency,
-                                  compact: compact)
+                                  compact: compact, clockHighlight: clockHighlight)
     }
 }
 
@@ -44,6 +47,7 @@ struct ChristmasOrnamentMaterial: View {
     let colorScheme: ColorScheme
     let showsDetail: Bool
     var compact: Bool = false
+    var clockHighlight: ChristmasClockHolly? = nil
 
     static let depthOutset: CGFloat = 7
 
@@ -58,36 +62,47 @@ struct ChristmasOrnamentMaterial: View {
             .overlay {
                 GeometryReader { geometry in
                     let size = geometry.size
-                    let allowance: CGFloat = compact ? 0 : Self.depthOutset
+                    let allowance: CGFloat = clockHighlight == nil ? (compact ? 0 : Self.depthOutset)
+                        : ChristmasClockHolly.canvasOutset + (compact ? 0 : 3)
                     Canvas { context, _ in
-                        guard detailed, let paint, let wood, size.width > 8, size.height > 8 else { return }
+                        guard size.width > 8, size.height > 8 else { return }
                         context.translateBy(x: allowance, y: allowance)
                         let bounds = CGRect(origin: .zero, size: size)
-                        let woodBounds = compact ? bounds : CGRect(x: -1, y: -1,
-                            width: size.width + 2, height: size.height + 3.5)
+                        let hasDepth = detailed && !compact
+                        let woodBounds = hasDepth ? CGRect(x: -1, y: -1,
+                            width: size.width + 2, height: size.height + 3.5) : bounds
                         let edge = outline.path(in: woodBounds)
-                        // The paint footprint and all text reservations stay
-                        // exactly where they were; thickness grows outward.
-                        let face = outline.inset(by: 2.4).path(in: bounds)
-                        if !compact {
+                        if hasDepth {
                             context.drawLayer { contact in
                                 contact.addFilter(.shadow(color: .black.opacity(0.3), radius: 0.6,
                                                           x: 0.35, y: 0.9, options: .shadowOnly))
                                 contact.fill(edge, with: .color(.black))
                             }
                         }
-                        context.clip(to: edge)
-                        context.fill(edge, with: .tiledImage(Image(uiImage: wood)))
-                        context.stroke(outline.inset(by: 0.45).path(in: woodBounds), with: .linearGradient(
-                            Gradient(colors: [.white.opacity(0.38), .clear, .black.opacity(0.32)]),
-                            startPoint: .zero, endPoint: CGPoint(x: size.width * 0.2, y: size.height + 2.5)),
-                            lineWidth: 1)
-                        context.fill(face, with: .tiledImage(Image(uiImage: paint)))
-                        context.stroke(face, with: .linearGradient(
-                            Gradient(colors: [OrnamentPigment.color(0xF3DEBB).opacity(0.82), .clear,
-                                              OrnamentPigment.color(0x765132).opacity(0.45)]),
-                            startPoint: .zero, endPoint: CGPoint(x: size.width * 0.2, y: size.height)),
-                            lineWidth: 0.55)
+                        if detailed, let paint, let wood {
+                            let face = outline.inset(by: 2.4).path(in: bounds)
+                            var material = context
+                            material.clip(to: edge)
+                            material.fill(edge, with: .tiledImage(Image(uiImage: wood)))
+                            material.stroke(outline.inset(by: 0.45).path(in: woodBounds), with: .linearGradient(
+                                Gradient(colors: [.white.opacity(0.38), .clear, .black.opacity(0.32)]),
+                                startPoint: .zero, endPoint: CGPoint(x: size.width * 0.2, y: size.height + 2.5)),
+                                lineWidth: 1)
+                            material.fill(face, with: .tiledImage(Image(uiImage: paint)))
+                            material.stroke(face, with: .linearGradient(
+                                Gradient(colors: [OrnamentPigment.color(0xF3DEBB).opacity(0.82), .clear,
+                                                  OrnamentPigment.color(0x765132).opacity(0.45)]),
+                                startPoint: .zero, endPoint: CGPoint(x: size.width * 0.2, y: size.height)),
+                                lineWidth: 0.55)
+                        }
+                        if role == .clock, let clockHighlight {
+                            // Keep even resampled leaf edges outside the clock's text padding.
+                            var corners = context
+                            let text = bounds.insetBy(dx: 8, dy: 4)
+                            if !text.isEmpty { corners.clip(to: Path(text), options: .inverse) }
+                            clockHighlight.draw(in: corners, around: woodBounds, hasDepth: hasDepth,
+                                                color: color, scheme: colorScheme, detailed: detailed)
+                        }
                     }
                     .frame(width: size.width + allowance * 2, height: size.height + allowance * 2)
                     .clipped()
@@ -99,11 +114,58 @@ struct ChristmasOrnamentMaterial: View {
     }
 }
 
+enum ChristmasClockHolly {
+    case running, warning
+
+    private static let maximumSide: CGFloat = 34
+    // The corner extends at most a quarter of the artwork beyond the wood.
+    fileprivate static let canvasOutset = ceil(maximumSide / 4)
+
+    fileprivate func draw(in context: GraphicsContext, around wood: CGRect, hasDepth: Bool,
+                          color: StoneColor, scheme: ColorScheme, detailed: Bool) {
+        let name = self == .running ? "ChristmasKeepsakesGoldHollyCorner" : "ChristmasKeepsakesCopperHollyCorner"
+        var sprig = context.resolve(Image(name, bundle: Bundle(for: ChristmasOrnamentResources.self))
+            .renderingMode(detailed ? .original : .template)
+            .interpolation(.high))
+        if !detailed {
+            let theme = SurroundTheme.christmasKeepsakes
+            sprig.shading = .color(self == .warning ? theme.clockSuddenDeathAccent(color, scheme: scheme)
+                                                   : theme.clockAccent(color))
+        }
+
+        // The selected 701 px plaque uses a 124 px corner tile. Short toolbar
+        // clocks keep a visible sprig and an open stretch of rim between the tips.
+        let side = min(hasDepth ? 32 : Self.maximumSide, max(20, wood.width * 124 / 701),
+                       min(wood.width, wood.height) * 0.55)
+        // The deeper wooden lips occupy 3.5 pt of the 8 pt gap between cards.
+        // Seat those sprigs on the chamfer so the leaves fit in the remaining gap.
+        let berry = hasDepth ? ChristmasOrnamentOutline.clockCornerCut(in: wood) / 2 - 0.5
+                             : min(1.5, 4 - side * 0.1)
+        let origin = berry - side / 4
+        let frame = CGRect(x: origin, y: origin, width: side, height: side)
+        for x: CGFloat in [1, -1] {
+            for y: CGFloat in [1, -1] {
+                var corner = context
+                corner.translateBy(x: x > 0 ? wood.minX : wood.maxX, y: y > 0 ? wood.minY : wood.maxY)
+                corner.scaleBy(x: x, y: y)
+                corner.draw(sprig, in: frame)
+                if !detailed {
+                    let radius = side * 0.08
+                    let fruit = CGRect(x: berry - radius, y: berry - radius, width: radius * 2, height: radius * 2)
+                    corner.fill(Path(ellipseIn: fruit), with: .color(OrnamentPigment.color(0xA82036)))
+                }
+            }
+        }
+    }
+}
+
 /// Parallel insets are essential here: retaining the outer chamfer would put
 /// the pale bevel under the compact column's 5 pt text reservation.
 struct ChristmasOrnamentOutline: InsettableShape {
     let role: ChristmasOrnamentRole
     var insetAmount: CGFloat = 0
+
+    static func clockCornerCut(in bounds: CGRect) -> CGFloat { min(6, bounds.height * 0.2) }
 
     func inset(by amount: CGFloat) -> ChristmasOrnamentOutline {
         var result = self
@@ -112,7 +174,7 @@ struct ChristmasOrnamentOutline: InsettableShape {
     }
 
     func path(in bounds: CGRect) -> Path {
-        let outerCut: CGFloat = role == .clock ? min(6, bounds.height * 0.2) : 6
+        let outerCut: CGFloat = role == .clock ? Self.clockCornerCut(in: bounds) : 6
         let rect = bounds.insetBy(dx: insetAmount, dy: insetAmount)
         let cut = max(0, outerCut - insetAmount * (2 - sqrt(2)))
         return Path { path in
@@ -135,7 +197,6 @@ struct ChristmasOrnamentOutline: InsettableShape {
 @MainActor
 enum ChristmasOrnamentTexture {
     enum Kind: Hashable, CaseIterable { case paintedWood, bareWood }
-    private final class ResourceBundle {}
     private struct Key: Hashable {
         let kind: Kind
         let role: ChristmasOrnamentRole
@@ -208,7 +269,7 @@ enum ChristmasOrnamentTexture {
     private static func field(_ kind: Kind) -> [UInt8]? {
         if let field = fields[kind] { return field }
         let name = kind == .paintedWood ? "ChristmasKeepsakesPaintedWood" : "ChristmasKeepsakesBareWood"
-        guard let source = UIImage(named: name, in: Bundle(for: ResourceBundle.self), compatibleWith: nil)?.cgImage else {
+        guard let source = UIImage(named: name, in: Bundle(for: ChristmasOrnamentResources.self), compatibleWith: nil)?.cgImage else {
             return nil
         }
         var bytes = [UInt8](repeating: 0, count: sourceSide * sourceSide)

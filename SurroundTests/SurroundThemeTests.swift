@@ -7266,6 +7266,7 @@ final class SurroundThemeTests: XCTestCase {
 
     @MainActor
     func testChristmasKeepsakeRunningClockPinstripeFollowsThePaintedFace() throws {
+        // Home and Activity keep the inset pinstripe on their clock chips.
         let theme = SurroundTheme.christmasKeepsakes
         let scale: CGFloat = 3
         for scheme: ColorScheme in [.light, .dark] {
@@ -7310,6 +7311,76 @@ final class SurroundThemeTests: XCTestCase {
                         runningInks.append(renderedInk)
                     }
                     XCTAssertNotEqual(runningInks[0], runningInks[1], "Low time changes the ink: \(detail)")
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testChristmasGameDetailHollyMarksOnlyTheFourClockCorners() throws {
+        let padding: CGFloat = 16
+        // Measure the visible leaves, allowing for the transparent margin of the artwork.
+        // The 156 pt phone and 182 pt tablet Zen clocks use approximately 28 and 32 pt tiles.
+        let cases: [(size: CGSize, compact: Bool, detail: Bool, side: StoneColor,
+                     scheme: ColorScheme, minimumExtent: CGFloat)] = [
+            (CGSize(width: 140, height: 28), true, true, .black, .light, 9),
+            (CGSize(width: 87, height: 34), true, false, .white, .light, 11),
+            (CGSize(width: 156, height: 68), true, true, .white, .dark, 23),
+            (CGSize(width: 182, height: 76), true, true, .black, .light, 26.5),
+            (CGSize(width: 300, height: 96), false, true, .black, .dark, 26.5)
+        ]
+        for sample in cases {
+            let plaque = CGRect(origin: CGPoint(x: padding, y: padding), size: sample.size)
+            let textArea = plaque.insetBy(dx: 8, dy: 4)
+            for scale: CGFloat in [2, 3] {
+                func render(_ highlight: ChristmasClockHolly?) throws -> (pixels: [UInt8], width: Int, height: Int) {
+                    try nativeMaterialPixelsUsingDirectContext(
+                        ChristmasOrnamentMaterial(color: sample.side, role: .clock, colorScheme: sample.scheme,
+                                                  showsDetail: sample.detail, compact: sample.compact,
+                                                  clockHighlight: highlight)
+                            .frame(width: plaque.width, height: plaque.height).padding(padding)
+                            .environment(\.colorScheme, sample.scheme), scale: scale)
+                }
+                let idle = try render(nil)
+                let running = try render(.running)
+                let warning = try render(.warning)
+                XCTAssertTrue(running.pixels != warning.pixels, "The last period changes the holly finish: \(sample)")
+                for active in [running, warning] {
+                    var visibleBeyondWood = [0, 0, 0, 0]
+                    var visibleBounds = Array(repeating: CGRect.null, count: 4)
+                    var changedElsewhere = 0
+                    for y in 0..<idle.height {
+                        for x in 0..<idle.width {
+                            let i = (y * idle.width + x) * 4
+                            guard active.pixels[i..<(i + 4)] != idle.pixels[i..<(i + 4)] else { continue }
+                            let point = CGPoint(x: (CGFloat(x) + 0.5) / scale, y: (CGFloat(y) + 0.5) / scale)
+                            let dx = min(point.x - plaque.minX, plaque.maxX - point.x)
+                            let dy = min(point.y - plaque.minY, plaque.maxY - point.y)
+                            if dx > plaque.width / 3 || dy > plaque.height / 2 - 2
+                                || min(dx, dy) < -padding + 1 || textArea.contains(point) {
+                                changedElsewhere += 1
+                            } else {
+                                let corner = (point.y < plaque.midY ? 0 : 2) + (point.x < plaque.midX ? 0 : 1)
+                                if idle.pixels[i + 3] < 16 && active.pixels[i + 3] > 64 {
+                                    visibleBeyondWood[corner] += 1
+                                }
+                                let visible = (i..<(i + 4)).contains { abs(Int(active.pixels[$0]) - Int(idle.pixels[$0])) >= 24 }
+                                if visible {
+                                    let pixel = CGRect(x: CGFloat(x) / scale, y: CGFloat(y) / scale,
+                                                       width: 1 / scale, height: 1 / scale)
+                                    visibleBounds[corner] = visibleBounds[corner].union(pixel)
+                                }
+                            }
+                        }
+                    }
+                    let detail = "\(sample), scale=\(scale)"
+                    XCTAssertEqual(changedElsewhere, 0, "Holly stays off text and the open edges: \(detail)")
+                    for corner in visibleBounds.indices {
+                        XCTAssertGreaterThan(visibleBeyondWood[corner], Int(scale), "Holly extends outside the wood: \(detail)")
+                        let bounds = visibleBounds[corner]
+                        XCTAssertGreaterThanOrEqual(min(bounds.width, bounds.height), sample.minimumExtent,
+                                                    "Both holly leaves should reach along the edge at corner \(corner): \(detail)")
+                    }
                 }
             }
         }

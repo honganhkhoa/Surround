@@ -688,7 +688,8 @@ private struct GameDetailClockCard: View {
             FeltControlSurface(color: color, shape: shape, runningClock: state.running, isWarning: state.suddenDeath)
         } else if theme == .christmasKeepsakes {
             ChristmasOrnamentSurface(color: color, role: .clock,
-                                     compact: style == .inline || columnCard || narrowFullCard || narrowCompactCard)
+                                     compact: style == .inline || columnCard || narrowFullCard || narrowCompactCard,
+                                     clockHighlight: state.running ? (state.suddenDeath ? .warning : .running) : nil)
         } else if theme == .nightGarden {
             NightGardenPaneSurface(color: color, role: .clock, compact: compactNightGardenPane,
                                    highlight: .init(active: state.running, warning: state.suddenDeath))
@@ -716,7 +717,12 @@ private struct GameDetailClockCard: View {
             if theme == .reefLight {
                 ReefLightClockHighlight(color: color, cornerRadius: clockCornerRadius, isRunning: state.running,
                                         isWarning: state.suddenDeath, plain: reduceTransparency || contrast == .increased)
-            } else if theme.isFlowingInk || theme == .christmasKeepsakes {
+            } else if theme == .christmasKeepsakes {
+                // The running clock carries holly on the wooden corners.
+                if !state.running && contrast == .increased {
+                    ChristmasOrnamentOutline(role: .clock).strokeBorder(foreground.opacity(0.5), lineWidth: 1)
+                }
+            } else if theme.isFlowingInk {
                 GameDetailMatteClockOutline(color: color, isRunning: state.running,
                                            isWarning: state.suddenDeath, cornerRadius: clockCornerRadius)
             } else if theme != .goldenCrumb || reduceTransparency || contrast == .increased {
