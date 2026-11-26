@@ -395,6 +395,11 @@ enum SurroundUITestContract {
             )
     }
 
+    /// Ordinary offline captures retain the composed artwork. The motion
+    /// review uses the same game fixture with the live swimming layer.
+    static let freezesKoiPond = isEnabled && (isCapturingAppStoreScreenshots
+        || !ProcessInfo.processInfo.arguments.contains("--surround-koi-swim-preview"))
+
     static var gameDetailDesignArtboard: Int? {
         gameDetailDesignArtboard(in: ProcessInfo.processInfo.arguments)
     }
@@ -784,6 +789,7 @@ enum SurroundUITestContract {
     static let isEnabled = false
     static let isCapturingAppStoreScreenshots = false
     static let isCapturingCompatibilityScreenshots = false
+    static let freezesKoiPond = false
     static let gameDetailDesignArtboard: Int? = nil
     static let simulatesGameDetailSocketDown = false
     static let ticksFixtureClocks = false

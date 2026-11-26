@@ -47,6 +47,7 @@ struct GameDetailView: View {
     @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
     private var gameThemeID = SurroundTheme.standard.rawValue
     @State private var flowingInkCycleRevision = 0
+    @StateObject private var koiPondVisit = KoiPondSwimSession()
 
     @Binding var currentGame: Game?
     /// Back clears the game as the slide-out begins. The screen keeps drawing
@@ -1071,10 +1072,32 @@ struct GameDetailView: View {
             SurroundUITestContract.AccessibilityID.gameDetail(currentGame)
         )
         .backgroundPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
+            Color.clear.preference(key: GameDetailForegroundAnchorsKey.self,
+                                   value: GameDetailForegroundAnchors(boards: anchors))
+        }
+        .backgroundPreferenceValue(GameDetailForegroundAnchorsKey.self) { anchors in
             Group {
-                if theme == .sakuraStream || theme == .reefLight {
+                if theme == .koiPond {
                     GeometryReader { scene in
-                        GameDetailBackdrop(sceneBoards: scene.boardShadowRegions(anchors))
+                        let layout = anchors.pondLayout
+                        let game = layout.map { scene[$0.bounds] }
+                        let panels = layout.map {
+                            KoiPondGameLayout.panelFrames($0.panels, in: scene[$0.bounds], direction: layoutDirection)
+                        } ?? []
+                        let corners = anchors.pondControlReservations.map { scene[$0] }
+                        KoiPondScene(scheme: colorScheme, boards: scene.boardShadowRegions(anchors.boards),
+                                     gameArea: game, controlReservations: panels + corners,
+                                     windowInScene: windowGeometry?.bounds(relativeTo: scene.frame(in: .global)),
+                                     layout: KoiPondSwimLayout(panel: interaction.panel,
+                                                               divided: SingleGameView.activeDivision(in: geometry) != nil,
+                                                               hidesChatBoard: interaction.isChatVisible && !showsCompactChatBoard),
+                                     boardIsHidden: layout?.showsBoard == false,
+                                     swimSession: SurroundUITestContract.freezesKoiPond ? nil : koiPondVisit,
+                                     gameID: currentGame.ID)
+                    }
+                } else if theme.usesBoardAlignedBackdrop {
+                    GeometryReader { scene in
+                        GameDetailBackdrop(sceneBoards: scene.boardShadowRegions(anchors.boards))
                     }
                 } else {
                     GameDetailBackdrop(usesPhoneLandscapeFraming: usesPhoneLandscapeRoomFraming(in: geometry))
@@ -1087,7 +1110,6 @@ struct GameDetailView: View {
                 ThemeStatusBarContrast(hidden: hidesZenChrome && hidesStatusBarInZen)
             }
             .ignoresSafeArea(.container)
-            .preference(key: GameDetailForegroundAnchorsKey.self, value: GameDetailForegroundAnchors(boards: anchors))
         }
         .overlayPreferenceValue(GameDetailForegroundAnchorsKey.self) { anchors in
             GeometryReader { scene in
@@ -1303,6 +1325,14 @@ private struct GameDetailWindowGeometry: Equatable {
     let screenBounds: CGRect
     let windowSize: CGSize
     let windowSafeAreaTop: CGFloat
+    /// The UIKit window expressed in SwiftUI's global space, including when
+    /// Game Detail occupies only part of a window.
+    let globalWindowOrigin: CGPoint
+
+    func bounds(relativeTo scene: CGRect) -> CGRect {
+        CGRect(x: globalWindowOrigin.x - scene.minX, y: globalWindowOrigin.y - scene.minY,
+               width: windowSize.width, height: windowSize.height)
+    }
     func hasAttachedKeyboard(_ keyboard: CGRect) -> Bool {
         !keyboard.isEmpty && keyboard.height > 100
             && keyboard.minX <= screenBounds.minX + 1
@@ -1338,6 +1368,7 @@ private struct GameDetailWindowGeometryReader: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: GeometryController, context: Context) {
         controller.geometryView.onChange = onChange
         controller.beginSizeTransition = beginSizeTransition
+        controller.geometryView.layoutFrame = layoutFrame
         controller.geometryView.reportGeometry()
     }
 
@@ -1405,6 +1436,7 @@ private struct GameDetailWindowGeometryReader: UIViewControllerRepresentable {
 
     final class GeometryView: UIView {
         var onChange: ((GameDetailWindowGeometry) -> Void)?
+        var layoutFrame: CGRect?
         private var lastGeometry: GameDetailWindowGeometry?
 
         override func didMoveToWindow() {
@@ -1418,15 +1450,17 @@ private struct GameDetailWindowGeometryReader: UIViewControllerRepresentable {
         }
 
         func reportGeometry() {
-            guard let window, !bounds.isEmpty else { return }
+            guard let window, let layoutFrame, !bounds.isEmpty else { return }
             let screenSpace = window.screen.coordinateSpace
+            let inWindow = convert(bounds, to: window)
             let geometry = GameDetailWindowGeometry(
                 owningWindow: window,
-                contentFrame: window.convert(convert(bounds, to: window), to: screenSpace),
+                contentFrame: window.convert(inWindow, to: screenSpace),
                 windowFrame: window.convert(window.bounds, to: screenSpace),
                 screenBounds: screenSpace.bounds,
                 windowSize: window.bounds.size,
-                windowSafeAreaTop: window.safeAreaInsets.top
+                windowSafeAreaTop: window.safeAreaInsets.top,
+                globalWindowOrigin: CGPoint(x: layoutFrame.minX - inWindow.minX, y: layoutFrame.minY - inWindow.minY)
             )
             guard geometry != lastGeometry else { return }
             lastGeometry = geometry

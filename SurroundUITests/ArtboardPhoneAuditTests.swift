@@ -428,6 +428,28 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         XCTAssertFalse(keyboardIsOnscreen(in: app), "Opening chat never raises the keyboard")
     }
 
+    func testKoiPondActionSlotWithAndWithoutAnotherWaitingGame() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone)
+        let active = launch(artboard: 1, theme: "koiPond", appearance: .light)
+        let next = element(ID.gameNext, in: active, matching: .button)
+        let more = element(ID.gameActionsMenu, in: active, matching: .button)
+        XCTAssertTrue(next.isHittable)
+        XCTAssertLessThan(next.frame.maxX, more.frame.maxX)
+        keepScreenshot("Koi – visible Next and More", in: active)
+        active.terminate()
+
+        let waiting = launchApp(additionalLaunchArguments: [SurroundUITestContract.activityStateLaunchArgument,
+                                                           SurroundUITestContract.ActivityFixtureState.nothingWaiting.rawValue,
+                                                           SurroundUITestContract.themeLaunchArgument, "koiPond"], orientation: .portrait)
+        let ownGame = element(ID.homeGame(SurroundUITestContract.fixtureGameID), in: waiting, matching: .button)
+        tap(ownGame, description: "Open the player's correspondence game while waiting for the opponent", in: waiting)
+        element(ID.gameBoard, in: waiting)
+        XCTAssertTrue(element(ID.gameActionsMenu, in: waiting, matching: .button).isHittable)
+        XCTAssertFalse(waiting.buttons[ID.gameNext].exists)
+        XCTAssertFalse(waiting.buttons["Pass"].exists)
+        keepScreenshot("Koi – waiting for the opponent with More only", in: waiting)
+    }
+
     func testPillKeepsItsSlotWhenPassBecomesSubmitMove() {
         // Rule 19: the pill reserves its phase's labels, so staging a move
         // (Pass becomes Submit move) never grows it leftwards.
@@ -985,6 +1007,22 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         try auditThemeStates(theme: "reefLight", title: "Reef Light", suffix: "-reef-light", appearance: .light)
     }
 
+    func testKoiPondThemeStates() throws {
+        try auditThemeStates(theme: "koiPond", title: "Koi Pond", suffix: "-koi-pond", appearance: .light)
+    }
+
+    func testKoiPondThemeScoring() throws {
+        try auditThemeScoring(theme: "koiPond", title: "Koi Pond", suffix: "-koi-pond-night", appearance: .dark)
+    }
+
+    func testKoiPondThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "koiPond", title: "Koi Pond", suffix: "-koi-pond", appearance: .light)
+    }
+
+    func testKoiPondClockAndPlayerInteractions() throws {
+        try auditThemeControlInteractions(theme: "koiPond", title: "Koi Pond", suffix: "koi-pond", checksBambooLedge: true)
+    }
+
     func testReefLightShellControlInteractions() throws {
         try auditThemeControlInteractions(theme: "reefLight", title: "Reef Light", suffix: "reef-light")
     }
@@ -1539,13 +1577,23 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
 
     /// Material backgrounds must leave the existing clock and profile buttons
     /// usable, including the compact clock after opening Chat.
-    private func auditThemeControlInteractions(theme: String, title: String, suffix: String) throws {
+    private func auditThemeControlInteractions(theme: String, title: String, suffix: String,
+                                              checksBambooLedge: Bool = false) throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
                           "This smoke test covers the phone's full and inline themed controls.")
         let app = launch(artboard: 1, theme: theme, appearance: .light)
         defer { app.terminate() }
         let position = element(ID.gameBoard, in: app).value as? String
         XCTAssertNotNil(position, "The smoke test retains an identifiable game position")
+        if checksBambooLedge {
+            let black = element("game.clock.black", in: app, matching: .button)
+            let white = element("game.clock.white", in: app, matching: .button)
+            XCTAssertTrue((black.value as? String)?.contains("running") == true)
+            XCTAssertFalse((white.value as? String)?.contains("running") == true)
+            keepScreenshot("koi-pond-interaction-full-clock-faces", in: app)
+            try assertBambooLedge(on: black, in: app, running: true)
+            try assertBambooLedge(on: white, in: app, running: false)
+        }
 
         tap("game.clock.black", in: app, matching: .button)
         element("game.details", in: app)
@@ -1565,12 +1613,58 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
 
         startChat(in: app, typing: false)
         let inlineClock = app.navigationBars.buttons.matching(identifier: "game.clock.black").firstMatch
+        if checksBambooLedge {
+            XCTAssertTrue(inlineClock.waitForExistence(timeout: 5))
+            keepScreenshot("koi-pond-interaction-inline-clock-face", in: app)
+            XCTAssertTrue((inlineClock.value as? String)?.contains("running") == true)
+            try assertBambooLedge(on: inlineClock, in: app, running: true, inline: true)
+        }
         tap(inlineClock, description: "Open the inline \(title) clock", in: app)
         XCTAssertTrue(app.staticTexts["Time control"].waitForExistence(timeout: 5))
         for color in ["black", "white"] {
             element("game.details.clock.\(color)", in: app)
         }
         keepScreenshot("\(suffix)-interaction-inline-clock-details", in: app)
+    }
+
+    /// The full face ends at the button edge. The Chat face is centered in
+    /// its 44-point touch target and its support uses the lower padding.
+    private func assertBambooLedge(on clock: XCUIElement, in app: XCUIApplication, running: Bool,
+                                   inline: Bool = false, file: StaticString = #filePath, line: UInt = #line) throws {
+        let screen = try XCTUnwrap(app.screenshot().image.cgImage)
+        let bounds = app.frame, frame = clock.frame
+        let faceBottom = inline ? frame.midY + 17 : frame.maxY
+        let strip = CGRect(x: frame.minX + frame.width * 0.1, y: faceBottom - 0.5,
+                           width: frame.width * 0.8, height: 6.5).intersection(bounds)
+        let sx = CGFloat(screen.width) / bounds.width, sy = CGFloat(screen.height) / bounds.height
+        let crop = CGRect(x: (strip.minX - bounds.minX) * sx, y: (strip.minY - bounds.minY) * sy,
+                          width: strip.width * sx, height: strip.height * sy)
+        let ledge = try XCTUnwrap(screen.cropping(to: crop.integral), file: file, line: line)
+        let width = max(2, Int(strip.width * 2)), height = max(2, Int(strip.height * 2))
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        try pixels.withUnsafeMutableBytes { bytes in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(ledge, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        // Require the finish across most of the support and for several rows.
+        // Pond texture between the clocks or a single rim highlight cannot pass.
+        var matchingRows = 0
+        for y in 0..<height {
+            var matchingPixels = 0
+            for x in 0..<width {
+                let i = (y * width + x) * 4
+                let r = Int(pixels[i]), g = Int(pixels[i + 1]), b = Int(pixels[i + 2])
+                let honey = r > 140 && r - g >= 17 && g - b >= 28
+                let smoke = (48...124).contains(g) && abs(r - g) < 8 && (9...32).contains(g - b)
+                if running ? honey : smoke { matchingPixels += 1 }
+            }
+            if matchingPixels > width * 2 / 3 { matchingRows += 1 }
+        }
+        XCTAssertGreaterThanOrEqual(matchingRows, inline ? 4 : 5,
+                                    "The \(running ? "honey" : "smoked") bamboo support must remain visible below the stone",
+                                    file: file, line: line)
     }
 
     func testSingleClockDetailsRetainsBothTimes() {

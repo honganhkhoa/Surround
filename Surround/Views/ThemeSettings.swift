@@ -45,10 +45,10 @@ struct ThemeLivePreview: View {
                     // Anchor the lower tree to the tile, not the oversized
                     // board whose corner fills this preview.
                     GameDetailBackdrop().frame(width: side, height: side)
-                } else if theme != .sakuraStream && theme != .reefLight {
+                } else if !theme.usesBoardAlignedBackdrop {
                     GameDetailBackdrop()
                 }
-                BoardView(boardPosition: Self.position, surfaceIsInScene: theme == .reefLight)
+                BoardView(boardPosition: Self.position, surfaceIsInScene: theme.usesSceneBoardSurface)
                     .environment(\.excludesBoardsFromSceneShadows,
                                  theme == .frostPine || theme == .sakuraStream)
                     .frame(width: boardSide, height: boardSide)
@@ -56,7 +56,7 @@ struct ThemeLivePreview: View {
             }
             .frame(width: side, height: side, alignment: .topLeading)
             .backgroundPreferenceValue(BoardSceneShadowExclusionKey.self) { anchors in
-                if theme == .sakuraStream || theme == .reefLight {
+                if theme.usesBoardAlignedBackdrop {
                     GeometryReader { scene in
                         GameDetailBackdrop(sceneBoards: scene.boardShadowRegions(anchors))
                     }

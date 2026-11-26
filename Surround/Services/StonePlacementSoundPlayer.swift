@@ -137,9 +137,10 @@ final class StonePlacementSoundPlayer: ObservableObject {
         self.uptime = uptime
     }
 
-    /// All Flowing Ink presentations use Classic's sound bank.
+    /// Koi Pond shares Night Garden’s glass contact. Flowing Ink uses Classic.
     private static func soundTheme(for theme: SurroundTheme) -> SurroundTheme {
-        theme.isFlowingInk ? .standard : theme
+        if theme == .koiPond { return .nightGarden }
+        return theme.isFlowingInk ? .standard : theme
     }
 
     static func assetName(theme: SurroundTheme, color: StoneColor, variation: Int) -> String {

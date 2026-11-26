@@ -429,6 +429,7 @@ final class SurroundThemeTests: XCTestCase {
             + ["FeltMeadowBlackStone", "FeltMeadowWhiteStone",
                "NightGardenBlackStone", "NightGardenWhiteStone",
                "ReefLightBlackStone", "ReefLightWhiteStone",
+               "KoiPondBlackStone", "KoiPondWhiteStone",
                "ChristmasKeepsakesRubyStone", "ChristmasKeepsakesIvoryStone"]
         let side = 128
         for name in names {
@@ -461,6 +462,820 @@ final class SurroundThemeTests: XCTestCase {
             XCTAssertLessThanOrEqual(abs(minX - (side - 1 - maxX)), marginTolerance, name)
             XCTAssertLessThanOrEqual(abs(minY - (side - 1 - maxY)), marginTolerance, name)
         }
+    }
+
+    func testKoiPondPanelFramesFollowTheLeadingEdgeOfTheGame() {
+        let game = CGRect(x: 40, y: 16, width: 200, height: 120)
+        let panel = CGRect(x: 20, y: 8, width: 50, height: 60)
+        XCTAssertEqual(KoiPondGameLayout.panelFrames([panel], in: game, direction: .leftToRight),
+                       [CGRect(x: 60, y: 24, width: 50, height: 60)])
+        XCTAssertEqual(KoiPondGameLayout.panelFrames([panel], in: game, direction: .rightToLeft),
+                       [CGRect(x: 170, y: 24, width: 50, height: 60)])
+    }
+
+    func testKoiPondSwimClockResumesAtItsFrozenPose() {
+        var clock = KoiPondSwimClock()
+        XCTAssertEqual(clock.elapsed(at: 10), 0)
+        clock.setRunning(true, at: 10)
+        clock.setRunning(true, at: 11)
+        XCTAssertEqual(clock.elapsed(at: 14.5), 4.5)
+        clock.setRunning(false, at: 14.5)
+        clock.setRunning(false, at: 50)
+        XCTAssertEqual(clock.elapsed(at: 125), 4.5)
+        clock.setRunning(true, at: 125)
+        XCTAssertEqual(clock.elapsed(at: 125), 4.5)
+        XCTAssertEqual(clock.elapsed(at: 127), 6.5)
+    }
+
+    /// Physical layout measured on an undivided landscape phone. Hiding the top
+    /// bar gives the game 78 more points while the outer window stays put.
+    private func koiZenLayout(in window: CGRect, zen: Bool) -> (water: CGRect, board: CGRect, panels: [CGRect]) {
+        let compact = window.width < 1000
+        let water: CGRect
+        if compact {
+            let top: CGFloat = zen ? 0 : 78
+            water = CGRect(x: 62, y: top, width: window.width - 124, height: window.height - top - 20)
+        } else {
+            water = window
+        }
+        let plan = GameDetailLayoutPlan(size: water.size, compact: compact, zen: zen, analyze: false,
+                                        chat: false, hidesBoard: false, keyboard: false, accessibility: false, foldsClock: false)
+        let board = plan[.board].offsetBy(dx: water.minX, dy: water.minY)
+        let panels = KoiPondGameLayout.panelFrames([plan[.clocks], plan[.status]].filter { !$0.isEmpty },
+                                                  in: water, direction: .leftToRight)
+        return (water, board, panels)
+    }
+
+    func testKoiPondKeepsTheSameSchoolAndTrajectoriesAcrossZen() {
+        for size in [CGSize(width: 956, height: 440), CGSize(width: 1180, height: 714)] {
+            let window = CGRect(origin: .zero, size: size)
+            let play = koiZenLayout(in: window, zen: false), zen = koiZenLayout(in: window, zen: true)
+            XCTAssertNotEqual(zen.board, play.board)
+            XCTAssertNotEqual(zen.panels, play.panels)
+            for startsInZen in [false, true] {
+                let session = KoiPondSwimSession(seed: 31)
+                func routes(zen useZen: Bool, at time: TimeInterval) -> [KoiPondSwimRoute] {
+                    let layout = useZen ? zen : play
+                    return session.routes(for: .OGS(26268404), window: window, water: layout.water, board: layout.board,
+                                          detailed: true, avoiding: layout.panels, elapsed: time)
+                }
+                let baseline = routes(zen: startsInZen, at: 0)
+                XCTAssertEqual(baseline.count, 4)
+                for (index, time) in [13.20, 13.24, 13.26, 15.0, 7200.0, 7200.05].enumerated() {
+                    let isZen = index.isMultiple(of: 2) ? !startsInZen : startsInZen
+                    let after = routes(zen: isZen, at: time)
+                    XCTAssertEqual(after.map(\.id), baseline.map(\.id))
+                    for (old, new) in zip(baseline, after) {
+                        XCTAssertEqual(new.length, old.length)
+                        XCTAssertEqual(new.opacity, old.opacity)
+                        for offset in [0, 0.05, 2.75, 36.0] {
+                            XCTAssertEqual(new.pose(at: time + offset), old.pose(at: time + offset))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testKoiPondFrozenSceneKeepsItsPixelsAcrossZen() throws {
+        let window = CGRect(x: 0, y: 0, width: 956, height: 440)
+        let session = KoiPondSwimSession(seed: 31)
+        func pixels(zen: Bool) throws -> [UInt8] {
+            let layout = koiZenLayout(in: window, zen: zen)
+            let board = BoardSceneShadowRegion(bounds: layout.board, isDetailed: true, cellSize: layout.board.width / 20)
+            let pond = KoiPondScene(scheme: .light, boards: [board], gameArea: layout.water,
+                                    controlReservations: layout.panels, swimSession: session, gameID: .OGS(26268404))
+                .frame(width: window.width, height: window.height)
+            return try nativeMaterialPixels(pond, scale: 1).pixels
+        }
+        let initial = try pixels(zen: false)
+        // Pause the actual scene clock at a nonzero instant, as Reduce Motion does.
+        session.setRunning(true, at: 0)
+        session.setRunning(false, at: 13.2)
+        let paused = try pixels(zen: false)
+        XCTAssertFalse(initial == paused, "The control frames must contain moving koi")
+        XCTAssertTrue(try pixels(zen: true) == paused, "Entering Zen moved the paused fish")
+        XCTAssertTrue(try pixels(zen: false) == paused, "Leaving Zen moved the paused fish")
+    }
+
+    func testKoiPondWaitsForTheFirstBoardAndSurvivesMissingZenAnchors() {
+        let window = CGRect(x: 0, y: 0, width: 956, height: 440)
+        let play = koiZenLayout(in: window, zen: false)
+        let session = KoiPondSwimSession(seed: 31)
+        func routes(_ session: KoiPondSwimSession, game: Int, board: CGRect?, at time: TimeInterval) -> [KoiPondSwimRoute] {
+            session.routes(for: .OGS(game), window: window, water: play.water, board: board,
+                           detailed: true, avoiding: play.panels, elapsed: time)
+        }
+        XCTAssertTrue(routes(session, game: 1, board: nil, at: 0).isEmpty)
+        let initial = routes(session, game: 1, board: play.board, at: 2)
+        let measured = routes(KoiPondSwimSession(seed: 31), game: 1, board: play.board, at: 2)
+        let absent = routes(session, game: 1, board: nil, at: 6)
+        XCTAssertEqual(initial.count, 4)
+        XCTAssertEqual(initial.map { $0.pose(at: 2) }, measured.map { $0.pose(at: 2) })
+        XCTAssertEqual(initial.map(\.length), measured.map(\.length))
+        XCTAssertEqual(absent.map(\.id), initial.map(\.id))
+        XCTAssertEqual(absent.map { $0.pose(at: 6) }, initial.map { $0.pose(at: 6) })
+
+        let restored = routes(session, game: 1, board: koiZenLayout(in: window, zen: true).board, at: 7)
+        XCTAssertEqual(restored.map { $0.pose(at: 7) }, initial.map { $0.pose(at: 7) })
+        XCTAssertTrue(routes(session, game: 2, board: nil, at: 8).isEmpty)
+        let next = routes(session, game: 2, board: play.board, at: 9)
+        let independent = routes(KoiPondSwimSession(seed: 31), game: 2, board: play.board, at: 9)
+        XCTAssertEqual(next.count, 4)
+        XCTAssertEqual(next.map { $0.pose(at: 9) }, independent.map { $0.pose(at: 9) })
+        XCTAssertNotEqual(next.map { $0.pose(at: 9) }, initial.map { $0.pose(at: 9) })
+    }
+
+    func testKoiPondRefitsItsRoutesForANewPanelOrDisplayDivision() {
+        let window = CGRect(x: 0, y: 0, width: 956, height: 440)
+        let play = koiZenLayout(in: window, zen: false)
+        for layout in [KoiPondSwimLayout(panel: .chat), KoiPondSwimLayout(divided: true)] {
+            let session = KoiPondSwimSession(seed: 31)
+            let old = session.routes(for: nil, window: window, water: play.water, board: play.board,
+                                     detailed: true, avoiding: play.panels, elapsed: 0)
+            let next = session.routes(for: nil, window: window, water: play.water, board: play.board.insetBy(dx: 30, dy: 30),
+                                      detailed: true, avoiding: play.panels, layout: layout, elapsed: 17.5)
+            XCTAssertEqual(next.map(\.id), old.map(\.id))
+            XCTAssertNotEqual(next.map(\.length), old.map(\.length))
+            for (before, after) in zip(old, next) {
+                XCTAssertEqual(after.lapFraction(at: 17.5), before.lapFraction(at: 17.5), accuracy: 0.000001)
+            }
+        }
+    }
+
+    @MainActor
+    func testKoiPondKeepsTheFishInWindowCoordinatesWhenZenMovesTheCanvas() throws {
+        let window = CGRect(x: 0, y: 0, width: 956, height: 440)
+        let session = KoiPondSwimSession(seed: 31)
+        func fishMask(in canvas: CGRect, zen: Bool) throws -> [Bool] {
+            let layout = koiZenLayout(in: window, zen: zen)
+            func local(_ rect: CGRect) -> CGRect { rect.offsetBy(dx: -canvas.minX, dy: -canvas.minY) }
+            let board = BoardSceneShadowRegion(bounds: local(layout.board), isDetailed: true)
+            func pixels(withFish: Bool) throws -> [UInt8] {
+                let pond = KoiPondScene(scheme: .light, boards: withFish ? [board] : [], gameArea: local(layout.water),
+                                        controlReservations: layout.panels.map(local), windowInScene: local(window),
+                                        swimSession: withFish ? session : KoiPondSwimSession(seed: 0))
+                    .frame(width: canvas.width, height: canvas.height)
+                return try nativeMaterialPixels(pond, scale: 1).pixels
+            }
+            let fish = try pixels(withFish: true), water = try pixels(withFish: false)
+            // Compare the same physical patch of water in both canvases. Subtract each
+            // canvas's own water so a different background crop cannot look like a fish.
+            return (90..<355).flatMap { y in
+                (185..<830).map { x in
+                    let i = ((y - Int(canvas.minY)) * Int(canvas.width) + x - Int(canvas.minX)) * 4
+                    return (0..<3).contains { abs(Int(fish[i + $0]) - Int(water[i + $0])) > 10 }
+                }
+            }
+        }
+        let play = try fishMask(in: window, zen: false)
+        let shifted = CGRect(x: 38, y: 27, width: 878, height: 398)
+        let zen = try fishMask(in: shifted, zen: true)
+        let union = zip(play, zen).filter { $0 || $1 }.count
+        let sameInk = zip(play, zen).filter { $0 && $1 }.count
+        XCTAssertGreaterThan(union, 400)
+        XCTAssertGreaterThan(Double(sameInk) / Double(max(1, union)), 0.9,
+                             "Moving the local canvas must leave the actual koi silhouettes at the same window points")
+    }
+
+    func testKoiPondSwimsKeepTheirLapWhenTheWindowResizesAfterHours() throws {
+        let session = KoiPondSwimSession(seed: 31)
+        func routes(width: CGFloat, at elapsed: TimeInterval) -> [KoiPondSwimRoute] {
+            let window = CGRect(x: 0, y: 0, width: width, height: 956)
+            let board = CGRect(x: 0, y: 285, width: width, height: width)
+            return session.routes(for: nil, window: window, water: window, board: board, detailed: true,
+                                  avoiding: [CGRect(x: 8, y: 125, width: width - 16, height: 96)], elapsed: elapsed)
+        }
+
+        let elapsed: TimeInterval = 7200
+        let old = routes(width: 440, at: 0), resized = routes(width: 437, at: elapsed)
+        XCTAssertEqual(old.count, 4)
+        XCTAssertEqual(old.count, resized.count)
+        var changedLapDuration = false
+        for previous in old where previous.duration > 0 {
+            let next = try XCTUnwrap(resized.first { $0.assetName == previous.assetName && $0.submerged == previous.submerged })
+            changedLapDuration = changedLapDuration || abs(next.duration - previous.duration) > 0.001
+            let before = previous.pose(at: elapsed), after = next.pose(at: elapsed)
+            XCTAssertEqual(next.lapFraction(at: elapsed), previous.lapFraction(at: elapsed), accuracy: 0.000001)
+            for offset: TimeInterval in [0, 0.05, 0.5, 2, 5] {
+                let original = previous.pose(at: elapsed + offset), refit = next.pose(at: elapsed + offset)
+                XCTAssertEqual(original.beat, refit.beat, accuracy: 0.000001)
+                XCTAssertEqual(original.tailAmplitude, refit.tailAmplitude, accuracy: 0.000001,
+                               "Resizing must preserve the ongoing stroke or glide")
+            }
+            if previous.submerged {
+                XCTAssertLessThan(hypot(after.center.x - before.center.x, after.center.y - before.center.y), 12,
+                                  "A three-point resize must not send a board koi to the other side of its circuit")
+            }
+        }
+        XCTAssertTrue(changedLapDuration, "The refit must exercise at least one changed lap duration")
+    }
+
+    func testKoiPondSlowSwimsFollowRepeatableButDistinctSeededRoutes() throws {
+        let window = CGRect(x: 0, y: 0, width: 720, height: 900)
+        let board = CGRect(x: 126, y: 240, width: 468, height: 468)
+        func routes(seed: UInt64) -> [KoiPondSwimRoute] {
+            KoiPondSwimSchool(seed: seed).routes(in: window, gameArea: window, board: board,
+                                                detailed: true, avoiding: [])
+        }
+        let first = routes(seed: 27)
+        let repeated = routes(seed: 27)
+        XCTAssertEqual(first.count, 4)
+        XCTAssertEqual(first.map(\.assetName), repeated.map(\.assetName))
+        XCTAssertEqual(first.filter(\.submerged).count, 2)
+        XCTAssertTrue(first.contains { !$0.submerged && $0.speed > 0 })
+        XCTAssertTrue(first.contains { $0.submerged && $0.speed > 0 })
+        for (left, right) in zip(first, repeated) {
+            XCTAssertEqual(left.length, right.length)
+            XCTAssertEqual(left.visibleWater, right.visibleWater)
+            XCTAssertEqual(left.duration, right.duration)
+            for time: TimeInterval in [0, 1.7, 8.4, 63] {
+                XCTAssertEqual(left.pose(at: time), right.pose(at: time))
+            }
+        }
+
+        // Compare where the fish goes over a whole circuit: a different
+        // starting phase on an otherwise identical circuit is not a new path.
+        func travelBounds(_ route: KoiPondSwimRoute) -> CGRect {
+            (0..<240).reduce(.null) { bounds, sample in
+                let center = route.pose(at: route.duration * Double(sample) / 240).center
+                return bounds.union(CGRect(origin: center, size: CGSize(width: 0.01, height: 0.01)))
+            }
+        }
+        let variants = routes(seed: 324)
+        var different = false
+        for route in first where route.duration > 0 {
+            let alternate = try XCTUnwrap(variants.first { $0.submerged == route.submerged && $0.assetName == route.assetName })
+            let a = travelBounds(route), b = travelBounds(alternate)
+            if abs(a.minX - b.minX) > 2 || abs(a.minY - b.minY) > 2
+                || abs(a.width - b.width) > 2 || abs(a.height - b.height) > 2 {
+                different = true
+            }
+        }
+        XCTAssertTrue(different, "Changing the session seed should change where at least one koi swims")
+    }
+
+    func testKoiPondSlowSwimsTravelNoseFirstAcrossTheVisiblePond() {
+        let window = CGRect(x: 0, y: 0, width: 440, height: 956)
+        let play = CGRect(x: 0, y: 116, width: 440, height: 768)
+        let board = CGRect(x: 0, y: 285, width: 440, height: 440)
+        let panels = [CGRect(x: 8, y: 125, width: 424, height: 96),
+                      CGRect(x: 8, y: 229, width: 150, height: 50),
+                      CGRect(x: 120, y: 728, width: 312, height: 50)]
+        for seed: UInt64 in [2, 31, 129] {
+            let routes = KoiPondSwimSchool(seed: seed).routes(in: window, gameArea: play, board: board,
+                                                              detailed: true, avoiding: panels)
+            XCTAssertEqual(routes.count, 4)
+            for route in routes {
+                XCTAssertGreaterThan(route.speed, 0)
+                XCTAssertLessThan(route.speed, route.length * 0.16, "Slow swimming takes several seconds per body length")
+                XCTAssertEqual(route.visibleWater, window)
+                let steps = 512
+                let interval = route.duration / Double(steps)
+                let poses = (0...2 * steps).map { route.pose(at: Double($0) * interval) }
+                var longest: CGFloat = 0
+                // Continue in real time across the lap instead of wrapping the clock at its mean period.
+                for start in stride(from: 0, to: steps, by: 8) {
+                    let first = poses[start]
+                    for step in 0..<steps {
+                        let pose = poses[start + step]
+                        guard (route.submerged ? board : window).contains(pose.center), !panels.contains(where: { $0.contains(pose.center) }),
+                              cos(pose.heading - first.heading) > 0.5 else { break }
+                        let forward = (pose.center.x - first.center.x) * cos(first.heading)
+                            + (pose.center.y - first.center.y) * sin(first.heading)
+                        longest = max(longest, forward)
+                    }
+                }
+                XCTAssertGreaterThan(longest, 2 * route.length,
+                                     "\(route.assetName) must visibly travel nose-first across the pond before turning")
+                for index in 0..<(poses.count - 1) {
+                    let a = poses[index], b = poses[index + 1]
+                    let time = interval * Double(index)
+                    if window.intersects(route.bounds(at: time)) {
+                        let forward = (b.center.x - a.center.x) * cos(a.heading) + (b.center.y - a.center.y) * sin(a.heading)
+                        XCTAssertGreaterThanOrEqual(forward, 0, "Every visible part of a pass must advance nose-first")
+                    }
+                    XCTAssertLessThan(hypot(b.center.x - a.center.x, b.center.y - a.center.y),
+                                      2.4 * route.speed * interval, "The center must stay continuous throughout a stroke and across the lap")
+                }
+            }
+        }
+    }
+
+    func testKoiPondStrokesVaryVisibleSpeedAndGlideWithAQuietTail() {
+        let window = CGRect(x: 0, y: 0, width: 440, height: 956)
+        let board = CGRect(x: 0, y: 285, width: 440, height: 440)
+        let routes = KoiPondSwimSchool(seed: 31).routes(in: window, gameArea: window, board: board,
+                                                       detailed: true, avoiding: [])
+        XCTAssertEqual(routes.count, 4)
+        let interval = 1.0 / 20
+        var rhythms: [[CGFloat]] = []
+        for route in routes {
+            var speeds: [CGFloat] = [], amplitudes: [CGFloat] = []
+            var quietSeconds = 0.0, longestVisibleGlide = 0.0, strongestVisibleStroke: CGFloat = 0
+            var previousSpeed: CGFloat?, previousAmplitude: CGFloat?
+            var strokeStartSpeed: CGFloat?, coastStartSpeed: CGFloat?
+            var greatestPush: CGFloat = 0, greatestCoastLoss: CGFloat = 0
+            for step in 0...3200 {
+                let time = Double(step) * interval
+                let current = route.pose(at: time), next = route.pose(at: time + interval)
+                amplitudes.append(current.tailAmplitude)
+                guard window.contains(current.center), window.contains(next.center) else {
+                    previousSpeed = nil
+                    previousAmplitude = nil
+                    strokeStartSpeed = nil
+                    coastStartSpeed = nil
+                    quietSeconds = 0
+                    continue
+                }
+                let dx = next.center.x - current.center.x, dy = next.center.y - current.center.y
+                let forward = (dx * cos(current.heading) + dy * sin(current.heading)) / interval
+                speeds.append(forward)
+                strongestVisibleStroke = max(strongestVisibleStroke, current.tailAmplitude)
+                if let previousSpeed {
+                    XCTAssertLessThan(abs(forward - previousSpeed), route.speed * 0.25,
+                                      "Propulsion must build and relax smoothly across consecutive visible samples")
+                }
+                if let previousAmplitude { XCTAssertLessThan(abs(current.tailAmplitude - previousAmplitude), 0.32) }
+                previousSpeed = forward
+                previousAmplitude = current.tailAmplitude
+                if current.tailAmplitude == 0 && next.tailAmplitude == 0 {
+                    if coastStartSpeed == nil { coastStartSpeed = forward }
+                    greatestCoastLoss = max(greatestCoastLoss, (coastStartSpeed ?? forward) - forward)
+                    strokeStartSpeed = nil
+                    XCTAssertEqual(current.beat, next.beat, accuracy: 0.000001)
+                    XCTAssertGreaterThan(forward, route.speed * 0.15, "A quiet-tailed koi must keep gliding nose-first")
+                    quietSeconds += interval
+                    longestVisibleGlide = max(longestVisibleGlide, quietSeconds)
+                } else {
+                    if strokeStartSpeed == nil { strokeStartSpeed = forward }
+                    greatestPush = max(greatestPush, forward - (strokeStartSpeed ?? forward))
+                    coastStartSpeed = nil
+                    quietSeconds = 0
+                }
+            }
+            XCTAssertGreaterThan(longestVisibleGlide, 0.9, "The tail must visibly settle between stroke bouts")
+            XCTAssertGreaterThan(strongestVisibleStroke, 0.72)
+            XCTAssertGreaterThan(greatestPush, route.speed * 0.25, "Tail strokes must generate forward momentum")
+            XCTAssertGreaterThan(greatestCoastLoss, route.speed * 0.25, "The koi must gradually slow as it coasts")
+            XCTAssertGreaterThan(speeds.count, 30)
+            if !speeds.isEmpty {
+                speeds.sort()
+                XCTAssertGreaterThan(speeds[speeds.count * 9 / 10] - speeds[speeds.count / 10], route.speed * 0.25,
+                                     "Visible forward speed should change across a swim cycle")
+            }
+            rhythms.append(amplitudes)
+        }
+        for i in rhythms.indices {
+            for previous in rhythms.prefix(i) {
+                let different = zip(previous, rhythms[i]).filter { abs($0 - $1) > 0.35 }.count
+                XCTAssertGreaterThan(different, previous.count / 10, "The school must not stroke and glide in unison")
+            }
+        }
+    }
+
+    func testKoiPondSlowSwimsRespectSolidBoardsAndTheClosedDuoRail() {
+        let window = CGRect(x: 0, y: 0, width: 240, height: 360)
+        let content = CGRect(x: 0, y: 0, width: 192, height: 360)
+        let board = CGRect(x: 10, y: 94, width: 176, height: 176)
+        let routes = KoiPondSwimSchool(seed: 54).routes(in: window, gameArea: content, board: board,
+                                                        detailed: false, avoiding: [content])
+        let rail = CGRect(x: content.maxX, y: 0, width: window.width - content.width, height: window.height)
+        XCTAssertFalse(routes.isEmpty)
+        var visibleRailTravel: CGFloat = 0
+        for route in routes {
+            XCTAssertFalse(route.submerged, "Solid boards cannot show underwater residents")
+            var positions = CGRect.null
+            for sample in 0..<300 {
+                let point = route.pose(at: route.duration * Double(sample) / 300).center
+                if rail.contains(point) { positions = positions.union(CGRect(origin: point, size: CGSize(width: 1, height: 1))) }
+            }
+            if !positions.isNull { visibleRailTravel = max(visibleRailTravel, positions.height) }
+        }
+        XCTAssertGreaterThan(visibleRailTravel, 24, "A koi should move through the exposed rail beside the covered game")
+    }
+
+    /// Sample the actual pond first with no fish in the target and then as a
+    /// planned route crosses it. Layout reservations are identical in both frames.
+    @MainActor
+    private func koiPondCrossing<Cover: View>(in probe: CGRect, reservations: [CGRect],
+                                             viewport: CGRect? = nil,
+                                             boardBounds: CGRect = CGRect(x: 0, y: 285, width: 440, height: 440),
+                                             scheme: ColorScheme = .light, seed: UInt64 = 6,
+                                             secondary: BoardSceneShadowRegion? = nil,
+                                             @ViewBuilder cover: () -> Cover) throws -> (clear: UIImage, fish: UIImage) {
+        let size = viewport?.size ?? CGSize(width: 440, height: 956)
+        let board = BoardSceneShadowRegion(bounds: boardBounds, isDetailed: true, cellSize: boardBounds.width / 20)
+        let school = KoiPondSwimSession(seed: seed)
+        let pond = ZStack(alignment: .topLeading) {
+            KoiPondScene(scheme: scheme, boards: [board] + [secondary].compactMap { $0 },
+                         gameArea: viewport ?? CGRect(x: 0, y: 116, width: 440, height: 768),
+                         controlReservations: reservations, swimSession: school)
+            cover()
+        }.environment(\.colorScheme, scheme).frame(width: size.width, height: size.height)
+        func render() throws -> UIImage { try XCTUnwrap(ImageRenderer(content: pond).uiImage) }
+        _ = try render()
+        XCTAssertEqual(school.planned.count, 4)
+        let times = stride(from: 0.0, through: 1800.0, by: 0.5)
+        let clearTime = try XCTUnwrap(times.first { time in !school.planned.contains { $0.bounds(at: time).intersects(probe) } })
+        func nearest(_ time: Double) -> CGFloat {
+            school.planned.map { route in
+                let center = route.pose(at: time).center
+                return hypot(center.x - probe.midX, center.y - probe.midY)
+            }.min() ?? .infinity
+        }
+        let crossingTime = try XCTUnwrap(times.filter { $0 > clearTime }.min { nearest($0) < nearest($1) })
+        func advance(by seconds: Double) {
+            school.setRunning(true, at: 0)
+            school.setRunning(false, at: seconds)
+        }
+        advance(by: clearTime)
+        let clear = try render()
+        advance(by: crossingTime - clearTime)
+        return (clear, try render())
+    }
+
+    private func koiPondClockFaces(in clocks: CGRect, stacked: Bool, direction: LayoutDirection = .leftToRight) -> some View {
+        let layout = stacked ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+        return layout {
+            ForEach([StoneColor.black, .white], id: \.self) { color in
+                KoiPondPebbleChip(color: color, cornerRadius: 17)
+                    .background(alignment: .bottom) {
+                        KoiPondBambooLedge(compact: false, running: color == .black)
+                            .offset(y: KoiPondBambooLedge.height - KoiPondBambooLedge.overlap)
+                    }
+            }
+        }
+        .environment(\.layoutDirection, direction)
+        .frame(width: clocks.width, height: clocks.height)
+        .position(x: clocks.midX, y: clocks.midY)
+    }
+
+    @MainActor
+    private func koiPondChangedPixels(_ pair: (clear: UIImage, fish: UIImage), in probe: CGRect) throws -> Int {
+        func sample(_ image: UIImage) throws -> [UInt8] {
+            let tile = try XCTUnwrap(image.cgImage?.cropping(to: probe))
+            return try nativeMaterialPixels(Image(decorative: tile, scale: 1), scale: 1).pixels
+        }
+        let base = try sample(pair.clear), fish = try sample(pair.fish)
+        return stride(from: 0, to: base.count, by: 4).filter { i in
+            (0..<3).contains { abs(Int(base[i + $0]) - Int(fish[i + $0])) > 8 }
+        }.count
+    }
+
+    @MainActor
+    func testKoiPondSwimsThroughTransparentPanelAndActionGaps() throws {
+        let clocks = CGRect(x: 8, y: 125, width: 424, height: 96)
+        let preview = CGRect(x: 8, y: 229, width: 424, height: 50)
+        let actions = CGRect(x: 120, y: 728, width: 312, height: 50)
+        let analysis = CGRect(x: 0, y: 728, width: 440, height: 50)
+        let probes: [(label: String, reservation: CGRect, gap: CGRect)] = [
+            ("Between the clock cards", clocks, CGRect(x: 217, y: 148, width: 6, height: 55)),
+            ("Below the White clock’s inner rounded corner", clocks, CGRect(x: 224, y: 216, width: 5, height: 5)),
+            ("Chat preview row", preview, CGRect(x: 180, y: 239, width: 72, height: 24)),
+            ("Opaque Analyze toolbar", analysis, CGRect(x: 178, y: 741, width: 64, height: 24)),
+            ("Vacant Next slot", actions, CGRect(x: 128, y: 741, width: 108, height: 24))
+        ]
+        for (label, reservation, probe) in probes {
+            XCTAssertTrue(reservation.contains(probe))
+            let pair = try koiPondCrossing(in: probe, reservations: [reservation]) {
+                if reservation == clocks {
+                    koiPondClockFaces(in: clocks, stacked: false)
+                } else if reservation == preview {
+                    RoundedRectangle(cornerRadius: 10).fill(.purple.opacity(0.08))
+                        .frame(width: preview.width, height: preview.height).position(x: preview.midX, y: preview.midY)
+                } else if reservation == analysis {
+                    SurroundTheme.koiPond.panel.frame(width: analysis.width, height: analysis.height)
+                        .position(x: analysis.midX, y: analysis.midY)
+                }
+            }
+            let changed = try koiPondChangedPixels(pair, in: probe)
+            if reservation == analysis {
+                let bare = try koiPondCrossing(in: probe, reservations: [reservation]) { EmptyView() }
+                XCTAssertGreaterThan(try koiPondChangedPixels(bare, in: probe), 100)
+                XCTAssertEqual(changed, 0, "The Analyze toolbar's actual panel fill covers the fish")
+            } else {
+                XCTAssertGreaterThan(changed, Int(probe.width * probe.height * 0.06),
+                                     "The fish must remain visible in the transparent part of the \(label) reservation")
+            }
+            if label == "Between the clock cards" {
+                let underStone = CGRect(x: 224, y: probe.minY, width: 12, height: probe.height)
+                let bare = try koiPondCrossing(in: probe, reservations: [reservation]) { EmptyView() }
+                XCTAssertGreaterThan(try koiPondChangedPixels(bare, in: underStone), 20, "The koi also passes beneath White")
+                XCTAssertEqual(try koiPondChangedPixels(pair, in: underStone), 0, "The stone face covers that part of the same koi")
+                for (name, frame) in [("Open water between clock faces", pair.clear), ("Koi passing between clock faces", pair.fish)] {
+                    let attachment = XCTAttachment(image: frame)
+                    attachment.name = name
+                    attachment.lifetime = .keepAlways
+                    add(attachment)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testKoiPondLandscapeStackAndAnalysisCornerExposeTheirOpenWater() throws {
+        let viewport = CGRect(x: 0, y: 0, width: 1180, height: 714)
+        for analyze in [false, true] {
+            let plan = GameDetailLayoutPlan(size: viewport.size, compact: false, zen: false, analyze: analyze,
+                                            chat: false, hidesBoard: false, keyboard: false, accessibility: false,
+                                            foldsClock: false)
+            func physical(_ slot: GameDetailLayoutPlan.Slot) -> CGRect {
+                KoiPondGameLayout.panelFrames([plan[slot]], in: viewport, direction: .rightToLeft)[0]
+            }
+            let clocks = physical(.clocks), tree = physical(.analysis)
+            let panels = [clocks, tree, physical(.analysisControls)].filter { !$0.isEmpty }
+            XCTAssertTrue(analyze ? plan.verticalAnalysisTree : plan.stackedClocks)
+            // Two points of open water remain beneath the upper card's bamboo.
+            let gap = analyze ? CGRect(x: tree.minX, y: tree.minY, width: 4, height: 4)
+                              : CGRect(x: clocks.midX - 35, y: clocks.midY + 2, width: 70, height: 2)
+            let interior = analyze ? CGRect(x: tree.minX + 6, y: tree.minY + 4, width: 10, height: 7)
+                                   : gap.offsetBy(dx: 0, dy: 10)
+            func sample(foreground: Bool) throws -> (clear: UIImage, fish: UIImage) {
+                try koiPondCrossing(in: gap, reservations: panels, viewport: viewport, boardBounds: physical(.board),
+                                    scheme: .dark, seed: analyze ? 84 : 13) {
+                    if foreground {
+                        koiPondClockFaces(in: clocks, stacked: plan.stackedClocks, direction: .rightToLeft)
+                        if analyze {
+                            RoundedRectangle(cornerRadius: 12).fill(SurroundTheme.koiPond.panel)
+                                .frame(width: tree.width, height: tree.height).position(x: tree.midX, y: tree.midY)
+                        }
+                    }
+                }
+            }
+            let painted = try sample(foreground: true), water = try sample(foreground: false)
+            let label = analyze ? "RTL Analyze tree corner" : "RTL stacked clock seam"
+            let exposed = try koiPondChangedPixels(painted, in: gap)
+            let underFace = try koiPondChangedPixels(water, in: interior)
+            let covered = try koiPondChangedPixels(painted, in: interior)
+            XCTAssertGreaterThan(exposed, analyze ? 3 : 10, label)
+            XCTAssertGreaterThan(underFace, 3, "The koi must also pass behind the adjacent foreground")
+            XCTAssertEqual(covered, 0, "Only the opaque face covers that part of the koi")
+            let counts = XCTAttachment(string: "Water gap: \(exposed). Adjacent pond layer: \(underFace). Adjacent foreground: \(covered).")
+            counts.name = "\(label) - Changed pixels"
+            counts.lifetime = .keepAlways
+            add(counts)
+            for (phase, image) in [("Clear", painted.clear), ("Passing", painted.fish), ("Pond layer", water.fish)] {
+                let attachment = XCTAttachment(image: image)
+                attachment.name = "\(label) - \(phase)"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+            }
+        }
+    }
+
+    @MainActor
+    func testKoiPondSecondaryBoardsShowFishThroughDetailedGlassOnly() throws {
+        let bounds = CGRect(x: 116, y: 185, width: 144, height: 144)
+        let probe = CGRect(x: 155, y: 233, width: 66, height: 35)
+        let appearance = KoiPondBoard.appearance(for: .light)
+        let tint = try XCTUnwrap(appearance.waterGlass)
+        for reduceTransparency in [false, true] {
+            let face = BoardSceneShadowRegion(bounds: bounds, isDetailed: true, cellSize: 16)
+            let pair = try koiPondCrossing(in: probe, reservations: [], secondary: face) {
+                KoiPondGlassFace(tint: tint, opaqueColor: appearance.surfaceColor(detailed: false), surfaceIsInScene: true,
+                                 cellSize: 16, cornerRadius: 4, reduceTransparency: reduceTransparency)
+                    .frame(width: bounds.width, height: bounds.height).position(x: bounds.midX, y: bounds.midY)
+            }
+            let changed = try koiPondChangedPixels(pair, in: probe)
+            if reduceTransparency { XCTAssertEqual(changed, 0, "The native Reduce Transparency face occludes the passing fish") }
+            else { XCTAssertGreaterThan(changed, 80, "A secondary glass board must let the passing fish show through") }
+        }
+    }
+
+    @MainActor
+    func testKoiPondNativeRenderingFollowsTheStrokeAndGlidePose() throws {
+        let window = CGRect(x: 0, y: 0, width: 440, height: 956)
+        let board = CGRect(x: 0, y: 285, width: 440, height: 440)
+        let routes = KoiPondSwimSchool(seed: 31).routes(in: window, gameArea: window, board: board,
+                                                       detailed: true, avoiding: [])
+        for route in routes {
+            var sawStroke = false, sawGlide = false
+            for index in 0...1000 {
+                let time = Double(index) * 0.15, pose = route.pose(at: time)
+                let stroke = pose.tailAmplitude > 0.72, glide = pose.tailAmplitude < 0.02
+                guard (stroke && !sawStroke) || (glide && !sawGlide), window.contains(route.bounds(at: time)) else { continue }
+                let side = ceil(route.length * 1.5)
+                func pixels(amplitude: CGFloat?) throws -> [UInt8] {
+                    let fish = Canvas { context, _ in
+                        var world = context
+                        world.translateBy(x: side * 0.5 - pose.center.x, y: side * 0.5 - pose.center.y)
+                        if let amplitude {
+                            KoiPondSwimmer.draw(in: world, asset: route.assetName, center: pose.center, length: route.length,
+                                                heading: pose.heading, tailPhase: pose.beat, amplitude: amplitude,
+                                                bend: pose.bend, opacity: route.opacity)
+                        } else {
+                            KoiPondSwimmer.draw(in: world, route: route, at: time)
+                        }
+                    }.frame(width: side, height: side)
+                    return try nativeMaterialPixels(fish, scale: 1).pixels
+                }
+                let actual = try pixels(amplitude: nil), expected = try pixels(amplitude: pose.tailAmplitude)
+                XCTAssertTrue(actual == expected, "The visible artwork must use this koi's instantaneous tail motion")
+                let opposite = try pixels(amplitude: stroke ? 0 : 1)
+                let changed = zip(actual, opposite).filter { abs(Int($0) - Int($1)) > 8 }.count
+                XCTAssertGreaterThan(changed, 20, "A continuing tail stroke must visibly differ from a settled glide")
+                sawStroke = sawStroke || stroke
+                sawGlide = sawGlide || glide
+                if sawStroke && sawGlide { break }
+            }
+            XCTAssertTrue(sawGlide && sawStroke, "Sample both poses while the packaged fish is fully visible")
+        }
+    }
+
+    @MainActor
+    func testKoiPondSlowSwimBoundsContainThePaintedKoiAndFlexedTail() throws {
+        let school = KoiPondSwimSchool(seed: 54)
+        let phone = CGRect(x: 0, y: 0, width: 440, height: 956)
+        let phoneFish = school.routes(in: phone, gameArea: phone,
+                                      board: CGRect(x: 0, y: 285, width: 440, height: 440), detailed: true, avoiding: [])
+        let narrowFish = school.routes(in: CGRect(x: 0, y: 0, width: 220, height: 370),
+                                       gameArea: CGRect(x: 0, y: 24, width: 220, height: 316),
+                                       board: CGRect(x: 0, y: 88, width: 220, height: 192), detailed: true,
+                                       avoiding: [CGRect(x: 0, y: 24, width: 220, height: 53),
+                                                  CGRect(x: 0, y: 280, width: 220, height: 32)])
+        let narrowExterior = narrowFish.filter { !$0.submerged }
+        XCTAssertEqual(Set(phoneFish.map(\.assetName)), ["KoiPondGold", "KoiPondSanke", "KoiPondKohaku"])
+        XCTAssertFalse(narrowExterior.isEmpty)
+        for route in phoneFish + narrowExterior {
+            for sample in 0..<8 {
+                let time = Double(sample) * (route.duration > 0 ? route.duration / 8 : 0.3)
+                let pose = route.pose(at: time), bounds = route.bounds(at: time)
+                let side = ceil(max(bounds.width, bounds.height)) + 24
+                let center = CGPoint(x: side / 2, y: side / 2)
+                let fish = Canvas { context, _ in
+                    KoiPondSwimmer.draw(in: context, asset: route.assetName, center: center,
+                                        length: route.length, heading: pose.heading, tailPhase: pose.beat,
+                                        amplitude: pose.tailAmplitude, bend: pose.bend)
+                }.frame(width: side, height: side)
+                let image = try nativeMaterialPixels(fish, scale: 1)
+                var painted = CGRect.null
+                for offset in stride(from: 3, to: image.pixels.count, by: 4) where image.pixels[offset] > 16 {
+                    let pixel = offset / 4
+                    painted = painted.union(CGRect(x: pixel % image.width, y: pixel / image.width, width: 1, height: 1))
+                }
+                let expected = bounds.offsetBy(dx: center.x - pose.center.x, dy: center.y - pose.center.y)
+                XCTAssertFalse(painted.isNull, "The native renderer must paint \(route.assetName)")
+                XCTAssertTrue(expected.insetBy(dx: -1, dy: -1).contains(painted),
+                              "\(route.assetName) extends beyond its reserved body and tail at \(time) seconds")
+            }
+        }
+    }
+
+    @MainActor
+    func testKoiPondGlassShowsTheSceneAndSuppliesWaterForIsolatedBoards() throws {
+        for scheme: ColorScheme in [.light, .dark] {
+            let board = KoiPondBoard.appearance(for: scheme)
+            let tint = try XCTUnwrap(board.waterGlass)
+            func centerAlpha(scene: Bool, reduceTransparency: Bool = false) throws -> UInt8 {
+                let pane = KoiPondGlassFace(tint: tint, opaqueColor: board.surfaceColor(detailed: false),
+                                            surfaceIsInScene: scene, cellSize: 22, cornerRadius: 0,
+                                            reduceTransparency: reduceTransparency)
+                    .frame(width: 90, height: 120)
+                    .environment(\.colorScheme, scheme)
+                let image = try nativeMaterialPixels(pane, scale: 1)
+                return image.pixels[((image.height / 2) * image.width + image.width / 2) * 4 + 3]
+            }
+            let glass = try centerAlpha(scene: true)
+            XCTAssertGreaterThan(glass, 0, "The pane tints the water")
+            XCTAssertLessThan(glass, 220, "The scene's submerged koi remain visible")
+            XCTAssertEqual(try centerAlpha(scene: false), 255, "Standalone boards supply their own pond")
+            XCTAssertEqual(try centerAlpha(scene: true, reduceTransparency: true), 255,
+                           "Reduce Transparency uses the legible solid pond color")
+        }
+    }
+
+    @MainActor
+    func testKoiPondSubmergedPairFollowsTheBoardAcrossLayouts() throws {
+        for landscape in [false, true] {
+            let size = landscape ? CGSize(width: 320, height: 152) : CGSize(width: 152, height: 320)
+            var preceding: [UInt8]?
+            for offset: CGFloat in [20, 172] {
+                let face = CGRect(x: landscape ? offset : 20, y: landscape ? 20 : offset, width: 112, height: 112)
+                func render(detailed: Bool) throws -> [UInt8] {
+                    let region = BoardSceneShadowRegion(bounds: face, isDetailed: detailed, cellSize: detailed ? 16 : 7)
+                    let scene = GameDetailBackdrop(sceneBoards: [region])
+                        .environment(\.surroundTheme, .koiPond)
+                        .environment(\.colorScheme, .light)
+                        .frame(width: size.width, height: size.height)
+                    return try nativeMaterialPixels(scene, scale: 1).pixels
+                }
+                let opened = try render(detailed: true)
+                let compact = try render(detailed: false)
+                var firstKoi = 0, secondKoi = 0, outside = 0, bankChanges = 0
+                let width = Int(size.width)
+                for y in 0..<Int(size.height) {
+                    for x in 0..<width {
+                        let i = 4 * (y * width + x)
+                        if let preceding, x < 12, y < 12, preceding[i..<(i+3)] != opened[i..<(i+3)] {
+                            bankChanges += 1
+                        }
+                        let changed = (0..<3).contains { abs(Int(opened[i + $0]) - Int(compact[i + $0])) > 5 }
+                        guard changed else { continue }
+                        let point = CGPoint(x: CGFloat(x) + 0.5, y: CGFloat(y) + 0.5)
+                        if !face.contains(point) { outside += 1 }
+                        else if point.x < face.midX { firstKoi += 1 }
+                        else { secondKoi += 1 }
+                    }
+                }
+                XCTAssertGreaterThan(firstKoi, 65, "The red and white koi follows the board's left half")
+                XCTAssertGreaterThan(secondKoi, 65, "The gold koi follows the board's right half")
+                XCTAssertEqual(outside, 0, "Only the submerged pair changes at the compact cutoff")
+                XCTAssertEqual(bankChanges, 0, "The bank stays anchored to the window when the board moves")
+                preceding = opened
+            }
+        }
+    }
+
+    @MainActor
+    func testKoiPondOuterPairFitsBesideTheCornerControls() throws {
+        // Upper-right space beside the opponent chip; lower-left space beside
+        // the actions. A full-width clock and another pane occupy the rest.
+        let game = CGRect(x: 22, y: 28, width: 156, height: 249)
+        let face = CGRect(x: 22, y: 118, width: 156, height: 115)
+        let panels = [CGRect(x: 22, y: 28, width: 156, height: 53),
+                      CGRect(x: 22, y: 81, width: 74, height: 37),
+                      CGRect(x: 101, y: 233, width: 77, height: 44)]
+        let above = CGRect(x: 96, y: 81, width: 82, height: 37)
+        let below = CGRect(x: 22, y: 233, width: 79, height: 44)
+        func render(_ controls: [CGRect]) throws -> [UInt8] {
+            let scene = KoiPondScene(scheme: .light, boards: [BoardSceneShadowRegion(bounds: face)],
+                                     gameArea: game, controlReservations: controls).frame(width: 200, height: 300)
+            return try nativeMaterialPixels(scene, scale: 1).pixels
+        }
+        let occupied = try render([game]), open = try render(panels)
+        var upperFish = 0, lowerFish = 0, clippedOrCovered = 0
+        for y in 0..<300 {
+            for x in 0..<200 {
+                let i = 4 * (y * 200 + x)
+                let changed = (0..<3).contains { abs(Int(open[i + $0]) - Int(occupied[i + $0])) > 5 }
+                guard changed else { continue }
+                let point = CGPoint(x: CGFloat(x) + 0.5, y: CGFloat(y) + 0.5)
+                if above.contains(point) { upperFish += 1 }
+                else if below.contains(point) { lowerFish += 1 }
+                else { clippedOrCovered += 1 }
+            }
+        }
+        XCTAssertGreaterThan(upperFish, 65)
+        XCTAssertGreaterThan(lowerFish, 65)
+        XCTAssertEqual(clippedOrCovered, 0, "Both fish should fit in the exposed water")
+    }
+
+    @MainActor
+    func testKoiPondOuterFishUseTheExposedRailWhenTheGameAreaIsFull() throws {
+        let window = CGRect(x: 0, y: 0, width: 240, height: 360)
+        let content = CGRect(x: 0, y: 0, width: 196, height: 360)
+        let board = BoardSceneShadowRegion(bounds: CGRect(x: 10, y: 175, width: 176, height: 176))
+        func render(_ gameArea: CGRect) throws -> [UInt8] {
+            try nativeMaterialPixels(KoiPondScene(scheme: .light, boards: [board], gameArea: gameArea,
+                                                 controlReservations: [gameArea]).frame(width: 240, height: 360),
+                                     scale: 1).pixels
+        }
+        let rail = try render(content), noRail = try render(window)
+        var upper = 0, lower = 0, outside = 0
+        for y in 0..<360 {
+            for x in 0..<240 {
+                let i = 4 * (y * 240 + x)
+                guard (0..<3).contains(where: { abs(Int(rail[i + $0]) - Int(noRail[i + $0])) > 5 })
+                else { continue }
+                if x >= 196, (211..<265).contains(y) { upper += 1 }
+                else if x >= 196, (265..<319).contains(y) { lower += 1 }
+                else { outside += 1 }
+            }
+        }
+        XCTAssertGreaterThan(upper, 120)
+        XCTAssertGreaterThan(lower, 120)
+        XCTAssertEqual(outside, 0, "Leave the board, status tray and lower rail button clear")
+    }
+
+    @MainActor
+    func testKoiPondFitsBothExteriorFishBelowASmallScoringBoard() throws {
+        let content = CGRect(x: 0, y: 24, width: 220, height: 316)
+        // Eleven points between the cards and board leave seven after their two-point clearances.
+        let face = CGRect(x: 0, y: 88, width: 220, height: 192)
+        let scoreCards = CGRect(x: 0, y: 24, width: 220, height: 53)
+        let actions = CGRect(x: 0, y: 280, width: 220, height: 32)
+        func render(controls: [CGRect]) throws -> [UInt8] {
+            let scene = KoiPondScene(scheme: .light, boards: [BoardSceneShadowRegion(bounds: face)],
+                                     gameArea: content, controlReservations: controls).frame(width: 220, height: 370)
+            return try nativeMaterialPixels(scene, scale: 1).pixels
+        }
+        let closed = try render(controls: [content]), open = try render(controls: [scoreCards, actions])
+        var left = 0, right = 0, elsewhere = 0
+        for y in 0..<370 {
+            for x in 0..<220 {
+                let i = 4 * (y * 220 + x)
+                guard (0..<3).contains(where: { abs(Int(open[i + $0]) - Int(closed[i + $0])) > 5 })
+                else { continue }
+                if !(312..<340).contains(y) { elsewhere += 1 }
+                else if x < 110 { left += 1 }
+                else { right += 1 }
+            }
+        }
+        XCTAssertGreaterThan(left, 120)
+        XCTAssertGreaterThan(right, 120)
+        XCTAssertEqual(elsewhere, 0, "The seven-point gap above the board is too shallow for a recognizable koi")
     }
 
     func testFrostPineSceneFitsEveryViewportWithoutMovingForPanels() {
@@ -3869,6 +4684,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "sakuraStream"), .sakuraStream)
         XCTAssertEqual(SurroundTheme.current(storedID: "whittledWoodland"), .whittledWoodland)
         XCTAssertEqual(SurroundTheme.current(storedID: "reefLight"), .reefLight)
+        XCTAssertEqual(SurroundTheme.current(storedID: "koiPond"), .koiPond)
         #else
         XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl"), .nebulaPearl)
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .rakedGarden)
@@ -3881,6 +4697,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "sakuraStream"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "whittledWoodland"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "reefLight"), .standard)
+        XCTAssertEqual(SurroundTheme.current(storedID: "koiPond"), .standard)
         #endif
     }
 
@@ -3889,7 +4706,7 @@ final class SurroundThemeTests: XCTestCase {
     func testPickersOfferTheReleasedThemesFirst() {
         XCTAssertEqual(SurroundTheme.released, [.standard, .surroundStudio, .rakedGarden, .nebulaPearl])
         let unreleased: [SurroundTheme] = [.frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes,
-                                          .paperBlossoms, .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain, .sakuraStream, .whittledWoodland, .reefLight]
+                                          .paperBlossoms, .flowingInk, .flowingInkJade, .flowingInkJadePlain, .flowingInkPlain, .sakuraStream, .whittledWoodland, .reefLight, .koiPond]
         XCTAssertEqual(SurroundTheme.allCases.filter(\.isDebugOnly), unreleased)
         #if DEBUG
         XCTAssertEqual(SurroundTheme.available, SurroundTheme.released + unreleased)
@@ -5066,6 +5883,95 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertGreaterThan(contrast(theme.userTurnMark, theme.idleGameMark(scheme: scheme), style: style), 3)
     }
 
+    @MainActor
+    func testKoiPondPebbleChipsCarryMineralGrainBehindReadableNames() throws {
+        let theme = SurroundTheme.koiPond
+        for scheme: ColorScheme in [.light, .dark] {
+            let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+            for stone: StoneColor in [.black, .white] {
+                let inks = [theme.identityForeground(stone), theme.identitySecondary(stone),
+                            theme.clockForeground(stone, scheme: scheme), theme.clockAccent(stone),
+                            theme.clockSuddenDeathAccent(stone, scheme: scheme),
+                            theme.roleColor(for: OGSUser(username: "moderator", id: 1, isModerator: true), on: stone),
+                            theme.roleColor(for: OGSUser(username: "supporter", id: 2, supporter: true), on: stone)]
+                for size in [CGSize(width: 150, height: 54), CGSize(width: 86, height: 36)] {
+                    let chip = KoiPondPebbleChip(color: stone, cornerRadius: 11)
+                        .frame(width: size.width, height: size.height)
+                        .environment(\.colorScheme, scheme)
+                    let image = try nativeMaterialPixels(chip, scale: 1)
+                    var grain = 0, low = 255, high = 0
+                    var darkest = Color.white, lightest = Color.black
+                    for y in 7..<(image.height - 7) {
+                        for x in 7..<(image.width - 7) {
+                            let i = (y * image.width + x) * 4
+                            // A smooth gradient has negligible curvature across adjacent
+                            // pixels. Real mineral grit survives inside the rim at both sizes.
+                            let center = Int(image.pixels[i])
+                            if abs(2 * center - Int(image.pixels[i - 4]) - Int(image.pixels[i + 4])) >= 3 {
+                                grain += 1
+                            }
+                            if center < low || center > high {
+                                XCTAssertEqual(image.pixels[i + 3], 255)
+                                let pigment = Color(red: Double(center) / 255,
+                                                    green: Double(image.pixels[i + 1]) / 255,
+                                                    blue: Double(image.pixels[i + 2]) / 255)
+                                if center < low { low = center; darkest = pigment }
+                                if center > high { high = center; lightest = pigment }
+                            }
+                        }
+                    }
+                    let sample = "\(scheme) \(stone) \(size)"
+                    XCTAssertGreaterThan(grain, 12, "The player chip retains the stone's grain: \(sample)")
+                    for ink in inks {
+                        XCTAssertGreaterThanOrEqual(contrast(ink, darkest, style: style), 4.5, sample)
+                        XCTAssertGreaterThanOrEqual(contrast(ink, lightest, style: style), 4.5, sample)
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testKoiPondBambooLedgeKeepsItsShapeAndChangesFinishAtBothSizes() throws {
+        for compact in [false, true] {
+            let width: CGFloat = compact ? 179 : 208
+            func render(_ running: Bool) throws -> (pixels: [UInt8], width: Int, height: Int) {
+                try nativeMaterialPixelsUsingDirectContext(
+                    KoiPondBambooLedge(compact: compact, running: running).frame(width: width), scale: 3)
+            }
+            let honey = try render(true), smoke = try render(false)
+            XCTAssertEqual(honey.width, Int(width) * 3)
+            XCTAssertEqual(honey.height, 18, "The ledge fits the existing six-point clearance")
+            XCTAssertEqual(honey.width, smoke.width)
+            XCTAssertEqual(honey.height, smoke.height)
+            let alpha = stride(from: 3, to: honey.pixels.count, by: 4)
+            XCTAssertTrue(alpha.allSatisfy { honey.pixels[$0] == smoke.pixels[$0] },
+                          "Changing the turn preserves the outline, nodes and shadow")
+            let midX = honey.width / 2
+            let body = (0..<honey.height).filter { honey.pixels[($0 * honey.width + midX) * 4 + 3] > 240 }
+            XCTAssertTrue((compact ? 11...14 : 14...17).contains(body.count),
+                          "The visible cane keeps its full or compact diameter")
+            let midY = try XCTUnwrap(body.dropFirst(body.count / 2).first)
+            let row = (0..<honey.width).filter { honey.pixels[(midY * honey.width + $0) * 4 + 3] > 240 }
+            let inset = compact ? 18 : 24
+            XCTAssertEqual(try XCTUnwrap(row.first), inset, accuracy: 2)
+            XCTAssertEqual(try XCTUnwrap(row.last), honey.width - inset - 1, accuracy: 2)
+            let center = (midY * honey.width + midX) * 4
+            let r = Int(honey.pixels[center]), g = Int(honey.pixels[center + 1]), b = Int(honey.pixels[center + 2])
+            XCTAssertGreaterThan(r - g, 15)
+            XCTAssertGreaterThan(g - b, 35)
+            XCTAssertGreaterThan(r - Int(smoke.pixels[center]), 75)
+            XCTAssertLessThan(abs(Int(smoke.pixels[center]) - Int(smoke.pixels[center + 1])), 8)
+        }
+    }
+
+    func testKoiPondControlSurfacesAndAnalysisMarksInBothAppearances() throws {
+        for scheme: ColorScheme in [.light, .dark] {
+            try assertNightControlFallbacksKeepReadableTextAndRoles(.koiPond, scheme: scheme)
+            try assertNightAnalysisMarksRemainReadable(.koiPond, scheme: scheme)
+        }
+    }
+
     func testGardenNightControlFallbacksKeepReadableTextAndRoles() throws {
         try assertNightControlFallbacksKeepReadableTextAndRoles(.rakedGarden)
     }
@@ -5099,7 +6005,7 @@ final class SurroundThemeTests: XCTestCase {
                 XCTAssertGreaterThan(contrast(theme.clockAccent(color), surface, style: style), 4.5)
                 XCTAssertGreaterThanOrEqual(
                     contrast(theme.clockSuddenDeathAccent(color, scheme: scheme), surface, style: style), 4.5)
-                if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland || theme == .reefLight {
+                if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland || theme == .reefLight || theme == .koiPond {
                     for (state, accent) in [
                         ("Accepted", theme.clockAgreementAccent(color, scheme: scheme)),
                         ("Disconnected", theme.clockDisconnectedAccent(color, scheme: scheme)),
@@ -5122,7 +6028,7 @@ final class SurroundThemeTests: XCTestCase {
         }
         XCTAssertGreaterThan(contrast(.white, try XCTUnwrap(theme.actionTint), style: style), 4.5)
         XCTAssertGreaterThan(contrast(.white, theme.statusBadge, style: style), 4.5)
-        if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland || theme == .reefLight {
+        if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes || theme == .paperBlossoms || theme == .sakuraStream || theme == .whittledWoodland || theme == .reefLight || theme == .koiPond {
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockUndoBadge(scheme: scheme), style: style), 4.5,
                                        "The Undo badge keeps its white text readable")
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockSuddenDeathBadge(scheme: scheme), style: style), 4.5,

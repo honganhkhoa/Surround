@@ -1006,6 +1006,9 @@ struct BoardAppearance: Equatable {
     /// The solid board below the detail threshold, matching the detailed
     /// surface's overall tone; nil uses `boardColor`.
     var compactBoardColor: Color? = nil
+    /// The tint of a transparent pane over the pond. Its opaque board color
+    /// backs compact boards and individual labels drawn on empty points.
+    var waterGlass: Color? = nil
     /// A thin edge around the board surface.
     var boardEdge: Color? = nil
     /// Ink drawings stay flat at every size, including standalone previews.

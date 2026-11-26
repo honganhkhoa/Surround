@@ -641,6 +641,18 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         auditThemeOrientations(theme: "reefLight", title: "Reef Light", suffix: "-reef-light", appearance: .light)
     }
 
+    func testKoiPondThemeOrientations() {
+        auditThemeOrientations(theme: "koiPond", title: "Koi Pond", suffix: "-koi-pond", appearance: .light)
+    }
+
+    func testKoiPondThemePanels() {
+        auditThemePanels(theme: "koiPond", title: "Koi Pond", suffix: "-koi-pond-night", appearance: .dark)
+    }
+
+    func testKoiPondThemeNarrowWindow() {
+        auditNarrowNativeWindowArtboard(theme: "koiPond", suffix: "-koi-pond", appearance: .light)
+    }
+
     func testReefLightThemePanels() {
         auditThemePanels(theme: "reefLight", title: "Reef Light", suffix: "-reef-light-night", appearance: .dark)
     }
@@ -1651,7 +1663,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                                                  requestedSize: CGSize = CGSize(width: 375, height: 548)) {
         let app = launchGame(artboard: 84, portrait: true, theme: theme, appearance: appearance)
         defer {
-            if theme?.hasPrefix("flowingInk") == true || theme == "paperBlossoms" || theme == "sakuraStream" || theme == "reefLight" {
+            if theme?.hasPrefix("flowingInk") == true || ["paperBlossoms", "sakuraStream", "reefLight", "koiPond"].contains(theme) {
                 restoreFullWindow(in: app)
                 app.terminate()
             }

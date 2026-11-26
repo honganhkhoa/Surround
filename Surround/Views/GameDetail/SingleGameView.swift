@@ -311,7 +311,7 @@ struct SingleGameView: View {
                     boardPosition: selectedChatPosition,
                     variation: selectedChatPreview?.variation,
                     showsCoordinate: showsBoardCoordinates,
-                    surfaceIsInScene: theme == .reefLight,
+                    surfaceIsInScene: theme.usesSceneBoardSurface,
                     highlightCoordinates: selectedChatPreview?.coordinates ?? [],
                     markups: .constant(
                         selectedChatPreview?.variation?.markups ?? [:]
@@ -326,7 +326,7 @@ struct SingleGameView: View {
                     newMove: $analyticsPendingMove,
                     newPosition: $analyticsPendingPosition,
                     allowsSelfCapture: game.gameData?.allowSelfCapture ?? false,
-                    surfaceIsInScene: theme == .reefLight,
+                    surfaceIsInScene: theme.usesSceneBoardSurface,
                     boardTool: analysisToolSelection,
                     markups: analyzeMarkupsBinding(for: analyticsPosition)
                 )
@@ -354,7 +354,7 @@ struct SingleGameView: View {
                     newPosition: $pendingPosition,
                     allowsSelfCapture: game.gameData?.allowSelfCapture ?? false,
                     stoneRemovalSelectedPoints: stoneRemovalSelection,
-                    surfaceIsInScene: theme == .reefLight,
+                    surfaceIsInScene: theme.usesSceneBoardSurface,
                     highlightCoordinates: selectedChatPreview?.coordinates ?? [],
                     undoRequestCoordinates: game.undoRequestCoordinates
                 )
@@ -848,6 +848,7 @@ struct SingleGameView: View {
                     .layoutPriority(stacksCorner ? 0 : 1)
             }
         }
+        .koiPondControlReservation(theme == .koiPond && !plan[.actions].isEmpty)
         .frame(maxWidth: stacksCorner ? nil : .infinity, maxHeight: stacksCorner ? .infinity : nil,
                alignment: stacksCorner ? .bottom : .trailing)
     }
@@ -1090,6 +1091,7 @@ struct SingleGameView: View {
                                              compactColumn: plan.compactColumnIdentity,
                                              columnSecondLine: columnChipSecondLine(plan),
                                              wrapsName: plan.wrapsColumnNames)
+                        .koiPondControlReservation(theme == .koiPond && !plan[.opponent].isEmpty)
                         .layoutPriority(1)
                     if showsChatPreview && plan.previewInOpponentRow {
                         chatPreviewBar.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1121,6 +1123,15 @@ struct SingleGameView: View {
                     .gameDetailSlot(.composer, plan: chatPlan)
                 Group { if showsChatPreview && !plan.previewInOpponentRow { chatPreviewBar } }
                     .gameDetailSlot(.preview, plan: plan)
+            }
+            .transformAnchorPreference(key: GameDetailForegroundAnchorsKey.self, value: .bounds) { anchors, bounds in
+                guard theme == .koiPond else { return }
+                var panels = [plan[.clocks], plan[.status], plan[.analysis], plan[.analysisControls],
+                              plan[.information], plan[.preview]]
+                if showsChatPanel { panels += [chatPlan[.chat], chatPlan[.composer]] }
+                if showsChatPreview && plan.previewInOpponentRow { panels.append(plan[.opponent]) }
+                anchors.pondLayout = KoiPondGameLayout(bounds: bounds, panels: panels.filter { !$0.isEmpty },
+                                                       showsBoard: !plan[.board].isEmpty)
             }
             .preference(key: GameDetailClocksInHeaderPreferenceKey.self, value: plan.clocksInHeader)
             .preference(key: GameDetailCurrentPlayerClockInHeaderPreferenceKey.self,

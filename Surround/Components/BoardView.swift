@@ -1740,6 +1740,7 @@ struct PositionBoardView: View, Equatable {
 struct BoardView: View {
     @Environment(\.boardAppearance) private var appearance
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     var widgetRenderingMode: WidgetRenderingMode = .fullColor
     @ObservedObject var boardPosition: BoardPosition
     var variation: Variation?
@@ -1884,8 +1885,22 @@ struct BoardView: View {
             let padded = appearance.gridStyle.usesPaddedCells(at: cellSize)
             let feltRadius = padded ? min(12, cellSize * 0.24) : 0
             let faceRadius = max(cornerRadius, detailed ? max(depthGeometry.cornerRadius, feltRadius) : 0)
+            #if MAIN_APP || TESTING
+            let showsWaterGlass = appearance.waterGlass != nil
+            #else
+            let showsWaterGlass = false
+            #endif
             ZStack(alignment: .center) {
                 if widgetRenderingMode == .fullColor {
+                    #if MAIN_APP || TESTING
+                    if let glass = appearance.waterGlass {
+                        KoiPondGlassFace(tint: glass, opaqueColor: appearance.surfaceColor(detailed: false),
+                                         surfaceIsInScene: surfaceIsInScene, cellSize: cellSize,
+                                         cornerRadius: cornerRadius, reduceTransparency: reduceTransparency)
+                            .opacity(detailed ? 1 : 0)
+                            .animation(nil, value: detailed)
+                    }
+                    #endif
                     appearance.surfaceColor(detailed: detailed)
                         .overlay {
                             if let texture = appearance.boardTexture {
@@ -1998,7 +2013,7 @@ struct BoardView: View {
                                     .opacity(detailed ? 1 : 0)
                             }
                         }
-                        .opacity(surfaceIsInScene && detailed ? 0 : 1)
+                        .opacity((surfaceIsInScene || showsWaterGlass) && detailed ? 0 : 1)
                         .animation(nil, value: detailed)
                         .animation(nil, value: padded)
                 } else {

@@ -491,13 +491,13 @@ private struct GameDetailClockCard: View {
                     }
                 }
                 .overlay {
-                    if theme != .whittledWoodland && theme != .frostPine && theme != .nightGarden && theme != .paperBlossoms {
+                    if theme != .koiPond && theme != .whittledWoodland && theme != .frostPine && theme != .nightGarden && theme != .paperBlossoms {
                         clockOutline
                     }
                 }
                 .modifier(GameDetailClearGlass(shape: shape,
                                                enabled: theme.allowsGlassOnPlayerSurfaces
-                                                   && (theme != .sakuraStream || style != .inline)
+                                                   && (style != .inline || theme != .sakuraStream)
                                                    && !reduceTransparency
                                                    && (!theme.usesLightSceneSurfaces || contrast != .increased),
                                                tint: showsThemeGlass ? theme.clockGlassTint(color) : nil))
@@ -591,7 +591,7 @@ private struct GameDetailClockCard: View {
         if !badgeTitle.isEmpty {
             if style == .inline {
                 HStack(spacing: 4) {
-                    Rectangle().fill(foreground.opacity(0.3)).frame(width: 1, height: 12 * scale)
+                    if theme != .koiPond || !mirrored { inlineStatusDivider }
                     if state.showsConnectionMark {
                         ProgressView().controlSize(.mini).tint(inlineStatusForeground)
                     } else if state.ownsUndoRequest {
@@ -601,6 +601,7 @@ private struct GameDetailClockCard: View {
                     }
                     Text(verbatim: badgeTitle)
                     if hasUndoMenu { Image(systemName: "chevron.down").font(.system(size: 8 * scale)) }
+                    if theme == .koiPond && mirrored { inlineStatusDivider }
                 }
                 .font(.system(size: 12 * scale, weight: .semibold))
                 .foregroundStyle(inlineStatusForeground)
@@ -613,7 +614,7 @@ private struct GameDetailClockCard: View {
                     Image(systemName: "arrow.uturn.left").font(.system(size: 10 * scale))
                 } else if state.showsEstimateBadge {
                     Image(systemName: "dot.squareshape.split.2x2").font(.system(size: 10 * scale))
-                } else if state.running && !state.ownsUndoRequest && !state.notStarted {
+                } else if theme != .koiPond && state.running && !state.ownsUndoRequest && !state.notStarted {
                     // The hourglass, like the glow, means the time is running.
                     Image(systemName: "hourglass").font(.system(size: 10 * scale))
                 }
@@ -629,6 +630,10 @@ private struct GameDetailClockCard: View {
         }
     }
 
+    private var inlineStatusDivider: some View {
+        Rectangle().fill(foreground.opacity(0.3)).frame(width: 1, height: 12 * scale)
+    }
+
     /// Scene clocks in a glass theme; header chips already sit on the bar's
     /// glass, and accessibility settings keep the solid surfaces.
     private var showsThemeGlass: Bool {
@@ -641,7 +646,15 @@ private struct GameDetailClockCard: View {
     }
 
     @ViewBuilder private var surface: some View {
-        if theme == .reefLight {
+        if theme == .koiPond {
+            KoiPondPebbleChip(color: color, cornerRadius: clockCornerRadius)
+                .background(alignment: .bottom) {
+                    // The rail occupies the clearance below the face. It has
+                    // no part in sizing the clock or its button.
+                    KoiPondBambooLedge(compact: style != .full, running: state.running)
+                        .offset(y: KoiPondBambooLedge.height - KoiPondBambooLedge.overlap)
+                }
+        } else if theme == .reefLight {
             ReefLightShellSurface(color: color, cornerRadius: clockCornerRadius, role: .clock,
                                   compact: style != .full || narrowFullCard || columnCard)
         } else if theme == .whittledWoodland {
@@ -777,18 +790,48 @@ private struct GameDetailClockCard: View {
                     connectionSpinner
                 }
             } else if state.canShowTimer {
-                TimerView(timeControl: state.valueTimeControl,
-                          clock: state.valueClock, player: color,
-                          mainFont: mainFont, subFont: smallFont.monospacedDigit())
-                    .foregroundStyle(state.suddenDeath ? accent : foreground)
-                if showsTimeDetail || !hasOptionalInlineTimeDetail {
-                    Text(state.paused ? state.pauseReason : state.inlineTimeDetail).font(detailFont)
+                let statusFirst = theme == .koiPond && mirrored
+                if statusFirst {
+                    turnSlot { inlineTurnIndicator }
+                    inlineDetailText(showsTimeDetail: showsTimeDetail)
                 }
-                inlineTurnIndicator
+                inlineValue { clock in countdown(for: clock) }
+                    .foregroundStyle(state.suddenDeath ? accent : foreground)
+                if !statusFirst {
+                    inlineDetailText(showsTimeDetail: showsTimeDetail)
+                    turnSlot { inlineTurnIndicator }
+                }
             } else {
                 Text(state.compactUnavailableTimeText).font(mainFont)
                 inlineTurnIndicator
             }
+        }
+    }
+
+    @ViewBuilder private func inlineDetailText(showsTimeDetail: Bool) -> some View {
+        if showsTimeDetail || !hasOptionalInlineTimeDetail {
+            inlineValue { clock in
+                Text(clock.paused ? clock.pauseReason : clock.inlineTimeDetail).font(detailFont)
+            }
+        }
+    }
+
+    /// A single native title chip hugs its contents and follows the turn. Fit
+    /// its countdown and period slots to either player before choosing a title
+    /// variant, so a handoff between a long and a short clock keeps its width.
+    @ViewBuilder private func inlineValue<Value: View>(
+        @ViewBuilder _ value: (GameDetailClockState) -> Value
+    ) -> some View {
+        if theme == .koiPond && revealsBothClocks && !cardWidth.isFinite && !state.notStarted && !state.paused {
+            let other = GameDetailClockState(game: game, color: color.opponentColor(), clockOverride: clockOverride)
+            ZStack(alignment: .leading) {
+                if other.canShowTimer && other.autoResign == nil {
+                    value(other).hidden().accessibilityHidden(true)
+                }
+                value(state)
+            }
+        } else {
+            value(state)
         }
     }
 
@@ -867,7 +910,7 @@ private struct GameDetailClockCard: View {
             // Every variant carries a lost connection, the smallest as the
             // badge's spinner beside the countdown.
             connectionSpinner
-        } else if state.paused || inlineDetail == .full {
+        } else if state.paused || (inlineDetail == .full && theme != .koiPond) {
             // A chip fitted to its slot reserves no hidden hourglass. While
             // paused, only the side to move shows the pause glyph.
             Image(systemName: state.paused ? "pause.fill" : "hourglass")
@@ -892,7 +935,10 @@ private struct GameDetailClockCard: View {
             }
         }
         .font(detailFont.weight(.medium)).lineLimit(1)
-        .frame(minHeight: 14)
+        // Keep the full clock's komi, countdown and footer at the same height
+        // when the normal turn capsule appears on the opposite stone.
+        .frame(minHeight: theme == .koiPond && !columnCard && displaysStatus && state.canShowTimer
+               ? ceil(UIFont.systemFont(ofSize: 12 * scale, weight: .semibold).lineHeight) + 4 : 14)
     }
 
     @ViewBuilder private var komiHeader: some View {
@@ -917,8 +963,44 @@ private struct GameDetailClockCard: View {
             }
         } else if displaysStatus {
             statusBadgeSlot
-        } else if state.running {
+        } else if state.running && theme != .koiPond {
             Image(systemName: "hourglass").foregroundStyle(accent)
+        }
+    }
+
+    private func countdown(for clock: GameDetailClockState) -> some View {
+        TimerView(timeControl: clock.valueTimeControl, clock: clock.valueClock, player: clock.color,
+                  mainFont: mainFont, subFont: style == .inline ? smallFont.monospacedDigit() : detailFont)
+    }
+
+    /// Leave room for the normal turn label while its clock is waiting. The stone,
+    /// countdown and adjacent period count then stay put when the bamboo changes sides.
+    @ViewBuilder private func turnSlot<Mark: View>(@ViewBuilder mark: () -> Mark) -> some View {
+        if theme == .koiPond && displaysStatus && !state.paused && !state.notStarted
+            && (style != .inline || inlineDetail == .full) {
+            ZStack(alignment: mirrored ? .trailing : .leading) {
+                ZStack {
+                    Text("Passed")
+                    if (style != .inline && cardWidth < 125) || game.userStoneColor == nil {
+                        Text("To move")
+                    } else {
+                        if revealsBothClocks || game.userStoneColor == color {
+                            Text("Your move", comment: "Status indicating that it is the player's turn to move.")
+                            if game.rengo { Text("Teammate") }
+                        }
+                        if revealsBothClocks || game.userStoneColor != color { Text("Their move") }
+                    }
+                }
+                .font(.system(size: 12 * scale, weight: .semibold))
+                .lineLimit(1).minimumScaleFactor(0.7)
+                .padding(.horizontal, style == .inline ? 2.5 : 6)
+                .padding(.vertical, style == .inline ? 0 : 2)
+                .hidden()
+                .accessibilityHidden(true)
+                mark()
+            }
+        } else {
+            mark()
         }
     }
 
@@ -974,17 +1056,18 @@ private struct GameDetailClockCard: View {
                 if style == .compact && narrowCompactCard { compactStatusRow }
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     if style == .compact && !narrowCompactCard && mirrored { compactKomi }
-                    if style == .compact && !displaysStatus && state.running {
+                    if style == .compact && !narrowCompactCard && theme == .koiPond && mirrored {
+                        turnSlot { statusBadgeSlot }
+                    }
+                    if style == .compact && !displaysStatus && state.running && theme != .koiPond {
                         Image(systemName: "hourglass")
                             .font(smallFont).foregroundStyle(accent)
                     }
-                    TimerView(timeControl: state.valueTimeControl,
-                              clock: state.valueClock, player: color,
-                              mainFont: mainFont, subFont: detailFont)
+                    countdown(for: state)
                         .lineLimit(1).minimumScaleFactor(0.75)
                         .frame(maxWidth: .infinity, alignment: frameAlignment)
-                    if style == .compact && !narrowCompactCard {
-                        statusBadgeSlot
+                    if style == .compact && !narrowCompactCard && (theme != .koiPond || !mirrored) {
+                        turnSlot { statusBadgeSlot }
                     }
                     if style == .compact && !narrowCompactCard && !mirrored { compactKomi }
                 }
@@ -1324,7 +1407,9 @@ struct GameDetailPlayerIdentity: View {
             }
         }
         .background {
-            if theme == .reefLight {
+            if theme == .koiPond {
+                KoiPondPebbleChip(color: color, cornerRadius: chipCornerRadius)
+            } else if theme == .reefLight {
                 ReefLightShellSurface(color: color, cornerRadius: chipCornerRadius, role: .player,
                                       compact: navigationHeader || compactHeader || compactColumn || avatarOnly,
                                       shellOnLeading: shellOnLeading, hairlineOnly: avatarOnly)
