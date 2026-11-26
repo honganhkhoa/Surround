@@ -722,8 +722,11 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
         showIPadSidebar(false, in: app)
         backToHome(from: FixtureID.harborMistGameID, in: app)
         showIPadSidebar(true, in: app)
-        XCTAssertTrue(pollUntil(timeout: 10) { self.rootStatusReading(in: app).element == .reconnecting },
-                      "Back on Home, the status row shows: the outage is \(Int(Date().timeIntervalSince(dropped))) s old")
+        // A slow runner can come back after the outage's 30 s, when the row
+        // says Can’t reach OGS: either way it shows.
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            [.reconnecting, .unreachable].contains(self.rootStatusReading(in: app).element)
+        }, "Back on Home, the status row shows: the outage is \(Int(Date().timeIntervalSince(dropped))) s old")
         post(.restore)
         #endif
     }
@@ -954,14 +957,17 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
 
         openPopover(byClicking: all, name: "All activity", in: app)
         openPopover(byClicking: challenge, name: "the challenge's row", in: app)
-        // The card is pushed at once, so the list itself is never in sight.
+        // The card is pushed at once, so the list itself is never in sight:
+        // Escape closes the card's popover, and its window goes.
         let windows = app.windows.count
         click(view, name: "View")
-        XCTAssertTrue(app.navigationBars["Challenge"].firstMatch.waitForExistence(timeout: 10),
-                      "View pushes the challenge's card")
+        let card = app.navigationBars["Challenge"].firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "View pushes the challenge's card")
         XCTAssertGreaterThan(app.windows.count, windows, "View opens a popover, a window of its own")
         keepWindowScreenshots("The challenge's card from View", in: app)
-        closeWithEscape("View's popover", in: app)
+        closeWithEscape("View's popover", leaving: card, in: app)
+        XCTAssertTrue(pollUntil(timeout: stateSettleTimeout) { app.windows.count == windows },
+                      "View's popover closes with its window: \(app.windows.count) windows, \(windows) before")
 
         click(game, name: "HarborMist's game")
         element(ID.gameDetail(FixtureID.harborMistGameID), in: app)
@@ -1217,10 +1223,12 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
         return frame
     }
 
-    private func closeWithEscape(_ name: String, in app: XCUIApplication,
+    /// Escape closes the popover `name`: what it shows leaves, Activity's
+    /// list unless `shown` names something else on top of it.
+    private func closeWithEscape(_ name: String, leaving shown: XCUIElement? = nil, in app: XCUIApplication,
                                  file: StaticString = #filePath, line: UInt = #line) {
         app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
-        XCTAssertTrue(waitForAbsence(query(ID.activityList, in: app), timeout: stateSettleTimeout),
+        XCTAssertTrue(waitForAbsence(shown ?? query(ID.activityList, in: app), timeout: stateSettleTimeout),
                       "Escape closes \(name)", file: file, line: line)
     }
 
