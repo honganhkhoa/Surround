@@ -1072,6 +1072,9 @@ private final class IPadTabBarController: UITabBarController {
     /// A rotation or window resize, during which UIKit moves the sidebar
     /// itself.
     private(set) var isTransitioningSize = false
+    /// Counts size transitions, so only the latest one's end clears
+    /// `isTransitioningSize`.
+    private var sizeTransitions = 0
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -1098,20 +1101,27 @@ private final class IPadTabBarController: UITabBarController {
     override func viewWillTransition(to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator) {
         let keepsSidebarClosed = isTabBarHidden && sidebar.isHidden
         isTransitioningSize = true
+        sizeTransitions &+= 1
+        let transition = sizeTransitions
         super.viewWillTransition(to: size, with: coordinator)
+        // Ends this transition, whichever way UIKit runs it, unless a later
+        // one has begun: UIKit may run the completion even when it queued no
+        // animation, and a late completion mustn't end the next transition.
+        let complete: () -> Void = { [weak self] in
+            guard let self else { return }
+            if keepsSidebarClosed { self.closeSidebarIfReopened() }
+            if self.sizeTransitions == transition { self.isTransitioningSize = false }
+            self.onTransitionCompleted?()
+        }
         let queued = coordinator.animate(alongsideTransition: { [weak self] _ in
             if keepsSidebarClosed { self?.closeSidebarIfReopened() }
         }) { [weak self] _ in
             if keepsSidebarClosed { self?.closeSidebarIfReopened() }
             // UIKit can apply its restored visibility after the completion.
-            DispatchQueue.main.async { [weak self] in
-                if keepsSidebarClosed { self?.closeSidebarIfReopened() }
-                self?.isTransitioningSize = false
-                self?.onTransitionCompleted?()
-            }
+            DispatchQueue.main.async(execute: complete)
         }
         // Not queued, the change happens as this returns: complete after it.
-        if !queued { DispatchQueue.main.async { [weak self] in self?.onTransitionCompleted?() } }
+        if !queued { DispatchQueue.main.async(execute: complete) }
     }
 
     private func closeSidebarIfReopened() {
