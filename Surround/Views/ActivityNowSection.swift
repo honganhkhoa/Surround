@@ -313,7 +313,8 @@ private struct ActivityNowGameRow: View {
             itemID: itemID, tile: .user(facts.opponent), lineOne: name, rank: rank,
             lineTwo: ActivityRowContents.liveGame(facts).detail, clock: clock,
             accessibility: .liveGame(opponent: name, rank: rank, isYourMove: isYourMove, isSuddenDeath: isSuddenDeath,
-                                     timeLeft: clockState.running ? timeLeft : nil, ticks: clockState.running),
+                                     state: ActivityRowContents.pauseState(of: game), timeLeft: timeLeft,
+                                     ticks: clockState.running),
             largeContent: name, tap: open
         )
     }

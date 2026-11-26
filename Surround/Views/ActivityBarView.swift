@@ -204,7 +204,8 @@ private struct ActivityBarGameRow: View {
             return ActivityBarRowModel(
                 tile: .user(facts.opponent), lineOne: ActivityBarWords.gameStarted,
                 lineTwo: lineTwoStatus ?? .text(details.joined(separator: " · ")),
-                lead: ActivityBarLeadModel(accessibility: .gameStarted(opponent: name), largeContent: name, tap: open),
+                lead: ActivityBarLeadModel(accessibility: .gameStarted(opponent: name, status: status),
+                                           largeContent: name, tap: open),
                 action: ActivityBarActionModel(
                     action: .openGame, label: ActivityBarWords.action(.openGame),
                     accessibilityLabel: ActivityBarAccessibility.openGame(opponent: name), tap: open
@@ -231,8 +232,8 @@ private struct ActivityBarGameRow: View {
             clock: clock,
             lead: ActivityBarLeadModel(
                 accessibility: .liveGame(opponent: name, rank: rank, isYourMove: isYourMove, isSuddenDeath: isSuddenDeath,
-                                         timeLeft: clockState.running ? timeLeft : nil, ticks: clockState.running,
-                                         isOffline: status != nil),
+                                         state: ActivityRowContents.pauseState(of: game), timeLeft: timeLeft,
+                                         ticks: clockState.running, status: status),
                 largeContent: name, tap: open
             )
         )
@@ -256,7 +257,8 @@ private struct ActivityBarChallengeRow: View {
             lineTwo: status.map { .badge(ActivityBarWords.status($0)) }
                 ?? .text(([ActivityBarWords.challenge] + content.details).joined(separator: " · ")),
             lead: ActivityBarLeadModel(
-                accessibility: .challenge(challenger: name, rank: content.rank, details: content.details),
+                accessibility: .challenge(challenger: name, rank: content.rank, details: content.details,
+                                          status: status),
                 largeContent: name, tap: { context.openActivity(.top) }
             ),
             action: ActivityBarActionModel(
@@ -346,7 +348,7 @@ private struct ActivityBarWaitingFace: View {
             lineOne: lineOne,
             lineTwo: status.map { .badge(ActivityBarWords.status($0)) } ?? .text(lineTwo.joined(separator: " · ")),
             lead: ActivityBarLeadModel(
-                accessibility: .waiting(subject, details: spokenDetails, waited: waited, ticks: ticks),
+                accessibility: .waiting(subject, details: spokenDetails, waited: waited, ticks: ticks, status: status),
                 largeContent: lineOne, tap: { context.openActivity(.top) }
             ),
             action: withdrawsInPlace ? ActivityBarActionModel(
@@ -396,7 +398,7 @@ private struct ActivityBarNothingLeadsRow: View {
                 tile: .glyph("tray", tint: .primary, background: Color(uiColor: .tertiarySystemFill)),
                 lineOne: lineOne,
                 lineTwo: status.map { .badge(ActivityBarWords.status($0)) } ?? .text(breakdown.lineTwo),
-                lead: ActivityBarLeadModel(accessibility: .nothingLeads(count: count, breakdown),
+                lead: ActivityBarLeadModel(accessibility: .nothingLeads(count: count, breakdown, status: status),
                                            largeContent: lineOne, tap: { context.openActivity(.top) })
             ),
             context: context

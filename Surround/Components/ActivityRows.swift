@@ -227,16 +227,21 @@ enum ActivityRowContents {
         return user.formattedRank
     }
 
+    /// What a live game's row says in place of the turn: "Stone removal"
+    /// while it is scored, "Paused" while paused; nil otherwise.
+    static func pauseState(of game: Game) -> String? {
+        if game.gamePhase == .stoneRemoval {
+            return String(localized: "Stone removal", comment: "pause reason")
+        }
+        if game.pauseControl?.isPaused() ?? false {
+            return String(localized: "Paused", comment: "pause reason")
+        }
+        return nil
+    }
+
     static func liveGame(_ facts: HomeGameFacts) -> ActivityRowContent {
         let game = facts.game
-        let state: String
-        if game.gamePhase == .stoneRemoval {
-            state = String(localized: "Stone removal", comment: "pause reason")
-        } else if game.pauseControl?.isPaused() ?? false {
-            state = String(localized: "Paused", comment: "pause reason")
-        } else {
-            state = facts.turnText
-        }
+        let state = pauseState(of: game) ?? facts.turnText
         let clock = game.gameData?.timeControl.system.shortDescription ?? ""
         return ActivityRowContent(
             title: facts.opponent?.username ?? "",

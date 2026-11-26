@@ -1027,10 +1027,13 @@ final class ActivityBarModelTests: XCTestCase {
         XCTAssertFalse(theirs.updatesFrequently)
 
         let offline = Spoken.liveGame(opponent: "HarborMist", rank: "1d", isYourMove: true, timeLeft: 42, ticks: true,
-                                      isOffline: true, locale: english)
+                                      status: .reconnecting, locale: english)
         XCTAssertEqual(offline.value, "42 seconds left, Reconnecting to OGS")
-        XCTAssertEqual(Spoken.liveGame(opponent: "HarborMist", rank: "1d", isYourMove: false, isOffline: true,
+        XCTAssertEqual(Spoken.liveGame(opponent: "HarborMist", rank: "1d", isYourMove: false, status: .reconnecting,
                                        locale: english).value, "Reconnecting to OGS")
+        XCTAssertEqual(Spoken.liveGame(opponent: "HarborMist", rank: "1d", isYourMove: true, timeLeft: 42, ticks: true,
+                                       status: .connecting, locale: english).value,
+                       "42 seconds left, Connecting…", "As the badge says it before the first connection.")
 
         XCTAssertEqual(Spoken.liveGame(opponent: "HarborMist", rank: nil, isYourMove: true, locale: english).label,
                        "Live game with HarborMist. Your move", "No rank while ranks are hidden.")
@@ -1038,16 +1041,28 @@ final class ActivityBarModelTests: XCTestCase {
                                       locale: english)
         XCTAssertEqual(stopped.value, "42 seconds left")
         XCTAssertFalse(stopped.updatesFrequently, "A clock that doesn't run doesn't tick.")
+        let paused = Spoken.liveGame(opponent: "HarborMist", rank: "1d", isYourMove: true, state: "Paused",
+                                     timeLeft: 42, ticks: false, locale: english)
+        XCTAssertEqual(paused.value, "Paused, 42 seconds left", "What line two says, then the time the clock shows.")
+        XCTAssertFalse(paused.updatesFrequently)
+        XCTAssertEqual(Spoken.liveGame(opponent: "MapleRidge", rank: "3d", isYourMove: false, state: "Stone removal",
+                                       timeLeft: 130, locale: english).value, "Stone removal")
     }
 
     func testAStartedGameAChallengeAndYourOwnItems() {
         let started = Spoken.gameStarted(opponent: "CedarWave")
         XCTAssertEqual(started.label, "Game started with CedarWave")
+        XCTAssertEqual(started.value, "")
         XCTAssertEqual(started.hint, "Opens that game.")
+        XCTAssertEqual(Spoken.gameStarted(opponent: "CedarWave", status: .reconnecting).value, "Reconnecting to OGS",
+                       "What the lead's badge says in place of line two.")
 
         let challenge = Spoken.challenge(challenger: "CedarWave", rank: "5k", details: ["19×19", "Ranked", "Live"])
         XCTAssertEqual(challenge.label, "Challenge from CedarWave, 5k: 19×19, Ranked, Live")
+        XCTAssertEqual(challenge.value, "")
         XCTAssertEqual(challenge.hint, "Opens Activity.")
+        XCTAssertEqual(Spoken.challenge(challenger: "CedarWave", rank: "5k", details: ["19×19"], status: .connecting)
+            .value, "Connecting…")
 
         let search = Spoken.waiting(.search, details: ["Quick match", "Live", "19×19"], waited: 72, ticks: true,
                                     locale: english)
@@ -1057,6 +1072,8 @@ final class ActivityBarModelTests: XCTestCase {
         XCTAssertEqual(search.hint, "Opens Activity.")
         XCTAssertFalse(Spoken.waiting(.search, details: ["Quick match"], waited: 72, ticks: false,
                                       locale: english).updatesFrequently, "UI tests stop the time searched.")
+        XCTAssertEqual(Spoken.waiting(.search, details: ["Quick match"], waited: 72, ticks: true, status: .reconnecting,
+                                      locale: english).value, "1 minute, 12 seconds, Reconnecting to OGS")
 
         let open = Spoken.waiting(.openChallenge, details: ["Live", "19×19"], waited: 45, ticks: true, locale: english)
         XCTAssertEqual(open.label, "Open challenge: Live, 19×19")
@@ -1064,6 +1081,8 @@ final class ActivityBarModelTests: XCTestCase {
         let sent = Spoken.waiting(.sentChallenge(to: "QuietPine"), details: ["Live", "19×19"], locale: english)
         XCTAssertEqual(sent.label, "Challenge to QuietPine: Live, 19×19")
         XCTAssertEqual(sent.value, "")
+        XCTAssertEqual(Spoken.waiting(.sentChallenge(to: "QuietPine"), details: ["Live"], status: .reconnecting,
+                                      locale: english).value, "Reconnecting to OGS")
         XCTAssertEqual(Spoken.waiting(.rengo("Weekend 19×19"), details: ["Live", "19×19", "3 players"],
                                       locale: english).label,
                        "Rengo · Weekend 19×19: Live, 19×19, 3 players")
@@ -1076,7 +1095,10 @@ final class ActivityBarModelTests: XCTestCase {
         let nothingLeads = Spoken.nothingLeads(count: 3, waiting, locale: english)
         XCTAssertEqual(nothingLeads.label,
                        "3 waiting for you: a correspondence challenge from CedarWave and 2 unread conversations")
+        XCTAssertEqual(nothingLeads.value, "")
         XCTAssertEqual(nothingLeads.hint, "Opens Activity.")
+        XCTAssertEqual(Spoken.nothingLeads(count: 3, waiting, status: .reconnecting, locale: english).value,
+                       "Reconnecting to OGS")
 
         let beyond = ActivityBarBreakdown([.challenge(liveChallenge(5)), .conversation(peerID: 1),
                                            .conversation(peerID: 2)], challenger: names)

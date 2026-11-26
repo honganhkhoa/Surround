@@ -42,16 +42,22 @@ extension ActivityBarAccessibility {
     /// A live game's lead, or its Now row: "Live game with HarborMist, 1d.
     /// Your move", and "42 seconds left" as the value, which changes each
     /// second while the user's clock runs. Sudden death comes before the
-    /// time; their move has no time; "Reconnecting to OGS" follows while the
-    /// window's connection is down.
+    /// time; their move has no time. While the game is paused or scored,
+    /// what line two says comes first, and the time stays as the clock
+    /// shows it. The window's status follows where the lead's badge says it.
     /// - Parameters:
     ///   - rank: As the row shows it (`ActivityRowContents.rank`); nil while
     ///     the user hides ranks.
+    ///   - state: "Paused" or "Stone removal" while the game is
+    ///     (`ActivityRowContents.pauseState(of:)`); nil otherwise.
     ///   - timeLeft: The user's time left on that game's clock, said on the
     ///     user's move; nil without a countdown.
     ///   - ticks: The user's clock runs, so the time changes each second.
+    ///   - status: What the lead's badge says, as "Connecting…" or
+    ///     "Reconnecting to OGS".
     static func liveGame(opponent: String, rank: String?, isYourMove: Bool, isSuddenDeath: Bool = false,
-                         timeLeft: TimeInterval? = nil, ticks: Bool = false, isOffline: Bool = false,
+                         state: String? = nil, timeLeft: TimeInterval? = nil, ticks: Bool = false,
+                         status: RootConnectionLine.Words? = nil,
                          locale: Locale = GameControlAccessibility.appLocale) -> Self {
         let who = player(opponent, rank: rank)
         let label = switch (isYourMove, isSuddenDeath) {
@@ -60,28 +66,36 @@ extension ActivityBarAccessibility {
         case (false, _): Words.liveTheirMove(who)
         }
         var value = [String]()
+        if let state {
+            value.append(state)
+        }
         let time = isYourMove ? timeLeft : nil
         if let time {
             value.append(Words.left(GameControlAccessibility.spokenDuration(time, locale: locale)))
         }
-        if isOffline {
-            value.append(Words.reconnectingToOGS)
+        if let status {
+            value.append(Self.status(status).label)
         }
         return Self(label: label, value: joined(value), hint: Words.opensThatGame,
                     updatesFrequently: time != nil && ticks)
     }
 
     /// A live game that started elsewhere: "Game started with CedarWave".
-    static func gameStarted(opponent: String) -> Self {
-        Self(label: GameControlAccessibility.gameStarted(with: opponent), hint: Words.opensThatGame)
+    /// - Parameter status: What the lead's badge says in place of line two.
+    static func gameStarted(opponent: String, status: RootConnectionLine.Words? = nil) -> Self {
+        Self(label: GameControlAccessibility.gameStarted(with: opponent), value: spoken(status),
+             hint: Words.opensThatGame)
     }
 
     /// A live challenge sent to the user: "Challenge from CedarWave, 5k:
     /// 19×19, Ranked, Live".
-    /// - Parameter details: The row's line two (`ActivityRowContents.challenge`).
-    static func challenge(challenger: String, rank: String?, details: [String]) -> Self {
+    /// - Parameters:
+    ///   - details: The row's line two (`ActivityRowContents.challenge`).
+    ///   - status: What the lead's badge says in place of line two.
+    static func challenge(challenger: String, rank: String?, details: [String],
+                          status: RootConnectionLine.Words? = nil) -> Self {
         Self(label: Words.challenge(from: player(challenger, rank: rank), details: list(details)),
-             hint: Words.opensActivity)
+             value: spoken(status), hint: Words.opensActivity)
     }
 
     /// One of the user's own searches or challenges: "Searching for a game:
@@ -90,8 +104,11 @@ extension ActivityBarAccessibility {
     ///   - details: Line two without the time searched.
     ///   - waited: The time searched, for a search or an open challenge.
     ///   - ticks: The time searched moves (`ActivityElapsed.stopsAt` is nil).
+    ///   - status: What the lead's badge says in place of line two, after
+    ///     the time searched.
     static func waiting(_ subject: WaitingSubject, details: [String], waited: TimeInterval? = nil,
-                        ticks: Bool = false, locale: Locale = GameControlAccessibility.appLocale) -> Self {
+                        ticks: Bool = false, status: RootConnectionLine.Words? = nil,
+                        locale: Locale = GameControlAccessibility.appLocale) -> Self {
         let what = list(details)
         let label = switch subject {
         case .search: Words.searching(what)
@@ -99,15 +116,18 @@ extension ActivityBarAccessibility {
         case .sentChallenge(let name): Words.sentChallenge(to: name, details: what)
         case .rengo(let name): Words.rengo(name, details: what)
         }
-        return Self(label: label, value: waited.map { GameControlAccessibility.spokenDuration($0, locale: locale) } ?? "",
+        let time = waited.map { GameControlAccessibility.spokenDuration($0, locale: locale) }
+        return Self(label: label, value: joined([time, status.map { Self.status($0).label }].compactMap { $0 }),
                     hint: Words.opensActivity, updatesFrequently: waited != nil && ticks)
     }
 
     /// Nothing live leads: "3 waiting for you: a correspondence challenge
     /// from CedarWave and 2 unread conversations".
-    static func nothingLeads(count: Int, _ breakdown: ActivityBarBreakdown,
+    /// - Parameter status: What the lead's badge says in place of line two.
+    static func nothingLeads(count: Int, _ breakdown: ActivityBarBreakdown, status: RootConnectionLine.Words? = nil,
                              locale: Locale = GameControlAccessibility.appLocale) -> Self {
-        Self(label: Words.waitingForYou(count, breakdown.spoken(locale: locale)), hint: Words.opensActivity)
+        Self(label: Words.waitingForYou(count, breakdown.spoken(locale: locale)), value: spoken(status),
+             hint: Words.opensActivity)
     }
 
     /// +N: "3 more waiting for you: a challenge from CedarWave and 2 unread
@@ -194,6 +214,12 @@ extension ActivityBarAccessibility {
     /// Details as one comma-separated phrase.
     private static func list(_ parts: [String]) -> String {
         parts.filter { !$0.isEmpty }.joined(separator: ", ")
+    }
+
+    /// The window's status as a lead's value, as its badge says it; empty
+    /// without one.
+    private static func spoken(_ status: RootConnectionLine.Words?) -> String {
+        status.map { Self.status($0).label } ?? ""
     }
 
     /// Value parts, each after a comma.
