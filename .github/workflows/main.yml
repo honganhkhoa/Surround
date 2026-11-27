@@ -20,15 +20,15 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
-# Every "part N of M" step below, and each composer step, keeps a 50-minute
-# limit: run-ipad-ui-tests.sh interrupts xcodebuild at 46 minutes and needs
-# the rest to save the result bundle and failure evidence. The game control,
-# iPad Activity bar and continuity steps keep 45 minutes, interrupted at 41,
-# and the iPad Activity steps keep 30, interrupted at 26. Change
-# part_deadline_seconds, isolated_phase_deadline_seconds and
-# activity_phase_deadline_seconds with these limits. The iPhone lanes' Activity
-# bar step keeps 30 minutes and runs xcodebuild directly, with five minutes a
-# test and no interruption.
+# Every main, profile and Messages "part N of M" step below, and each composer
+# step, keeps a 50-minute limit: run-ipad-ui-tests.sh interrupts xcodebuild at
+# 46 minutes and needs the rest to save the result bundle and failure
+# evidence. The game control and iPad Activity bar steps, and continuity's two
+# part steps, keep 45 minutes, interrupted at 41, and the iPad Activity steps
+# keep 30, interrupted at 26. Change part_deadline_seconds,
+# isolated_phase_deadline_seconds and activity_phase_deadline_seconds with
+# these limits. The iPhone lanes' Activity bar step keeps 30 minutes and runs
+# xcodebuild directly, with five minutes a test and no interruption.
 jobs:
   test:
     runs-on: macos-26
@@ -716,12 +716,14 @@ jobs:
 
   # Keep keyboard-sensitive journeys off the main/profile runners. Composer
   # and continuity have independent limits so adding fold journeys cannot
-  # consume the existing composer's budget. Leave 25 minutes for setup,
-  # building, and uploads beyond the 5 + 45 + 45 minute UI step limits.
+  # consume the existing composer's budget, and continuity runs in two parts
+  # so that neither reaches its interrupt and each can rerun its longest test.
+  # Leave 25 minutes for setup, building, and uploads beyond the
+  # 10 + 50 + 45 + 45 minute UI step limits.
   ipad-composer-ui-tests:
     name: iPadOS ${{ matrix.ios }} composer and continuity
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 130
+    timeout-minutes: 175
     strategy:
       fail-fast: false
       matrix:
@@ -776,12 +778,20 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh composer \
             "${{ steps.simulator.outputs.id }}" "iPadOS${{ matrix.ios }}"
 
-      - name: Run iPad game continuity UI tests
+      - name: Run iPad game continuity UI tests, part 1 of 2
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 45
         shell: bash
         run: |
-          .github/ci-tools/run-ipad-ui-tests.sh continuity \
+          .github/ci-tools/run-ipad-ui-tests.sh continuity-1 \
+            "${{ steps.simulator.outputs.id }}" "iPadOS${{ matrix.ios }}"
+
+      - name: Run iPad game continuity UI tests, part 2 of 2
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh continuity-2 \
             "${{ steps.simulator.outputs.id }}" "iPadOS${{ matrix.ios }}"
 
       - name: Upload iPad composer and continuity UI test results
