@@ -183,6 +183,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.ActivityFixtureState.liveYourMove.rawValue,
         ], orientation: preferredOrientation)
         element(ID.screenHome, in: app)
+        restoreFullSizeWindowOnIPad(in: app)
         let game = element(ID.homeGame(harborMistGameID), in: app, matching: .button)
         let cover = query(ID.superchatCover, in: app)
         post(.echo)
@@ -222,6 +223,8 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
         // where the header's 40% cap applies.
         XCUIDevice.shared.orientation = .portrait
         XCTAssertTrue(pollUntil(timeout: 10) { app.frame.height > app.frame.width }, "The app turns to portrait")
+        // An iPad keeps a window size per orientation.
+        restoreFullSizeWindowOnIPad(in: app)
         assertCoverFits("portrait", in: app)
         assertEndCardFits("portrait", in: app)
         #endif
@@ -234,6 +237,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
         try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad, "iPad only: the hidden sidebar's full-size board.")
         let app = launchApp()
         element(ID.screenHome, in: app)
+        restoreFullSizeWindowOnIPad(in: app)
         let settingsRow = app.cells.matching(identifier: ID.navigationSettings).firstMatch
         XCTAssertTrue(waitUntilHittable(settingsRow, timeout: 10), "Landscape opens with the sidebar shown")
         guard let hide = nativeSidebarToggle(in: app) else { return XCTFail("Expected the sidebar's own toggle") }
@@ -429,6 +433,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.ActivityFixtureState.superchat.rawValue,
         ] + arguments, orientation: orientation ?? preferredOrientation)
         element(ID.superchatCover, in: app, file: file, line: line)
+        restoreFullSizeWindowOnIPad(in: app)
         return app
     }
 
@@ -437,7 +442,17 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
         let app = launchApp(additionalLaunchArguments: arguments, launchEnvironment: environment,
                             orientation: preferredOrientation)
         element(ID.screenHome, in: app)
+        restoreFullSizeWindowOnIPad(in: app)
         return app
+    }
+
+    /// An iPad keeps a window another run resized, which could be compact,
+    /// so the journeys measure a full-size window, as the Activity journeys
+    /// do. The Mac keeps its own window.
+    private func restoreFullSizeWindowOnIPad(in app: XCUIApplication) {
+        #if !targetEnvironment(macCatalyst)
+        if UIDevice.current.userInterfaceIdiom == .pad { restoreFullSizeWindow(in: app) }
+        #endif
     }
 
     /// The journeys that post Debug commands run on iOS. On the Mac, where

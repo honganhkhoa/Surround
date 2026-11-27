@@ -10,6 +10,7 @@
 //  with the press timing; and what VoiceOver says.
 //
 
+import Combine
 import XCTest
 import SwiftUI
 import UIKit
@@ -58,6 +59,120 @@ final class GameControlModelTests: XCTestCase {
         XCTAssertEqual(GameControlSlot(input, context: .home), first, "Nothing carries over between reads.")
         XCTAssertEqual(GameControlSlot(input, context: Context(isZen: true)), first, "Zen keeps only the chip.")
         XCTAssertNil(GameControlSlot(Model.Input(), context: .home), "A root screen has no slot.")
+    }
+
+    func testAHiddenChallengeLeavesTheControlsPlusN() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1), yourMove(2, left: 100)]
+        input.challengesReceived = [Model.Challenge(id: 5, isLive: true), Model.Challenge(id: 6, isLive: false)]
+        input.place = .game(id: 90, isOwnGame: true, isLive: false, isOver: false)
+        XCTAssertEqual(GameControlSlot(input, context: .home), .chip(gameID: 2, plusN: 3, hasDot: false))
+        XCTAssertEqual(GameControlSlot(input.hiding(["challenge-5"]), context: .home),
+                       .chip(gameID: 2, plusN: 2, hasDot: false),
+                       "A challenge rejected in the popover leaves +N at once, before OGS's next update.")
+    }
+
+    // MARK: A conversation's control
+
+    func testAConversationsSlotShowsTheGameThatNeedsYouWithNothingBeyondIt() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1, left: 200), yourMove(2, left: 100)]
+        input.challengesReceived = [Model.Challenge(id: 5, isLive: true)]
+        input.place = .conversation
+        XCTAssertEqual(GameControlSlot(conversation: input), .chip(gameID: 2, plusN: 0, hasDot: false),
+                       "Least time first, with no +N and no dot.")
+
+        input.liveGames.append(Model.LiveGame(id: 7, isYourMove: false))
+        input.startedGames = [7: 1_000]
+        input.now = 1_005
+        XCTAssertEqual(GameControlSlot(conversation: input), .gameStarted(gameID: 7, plusN: 0, hasDot: false))
+
+        input.liveGames = [Model.LiveGame(id: 3, isYourMove: false)]
+        input.startedGames = [:]
+        XCTAssertNil(GameControlSlot(conversation: input), "Nothing shows unless a live game needs you.")
+
+        input.liveGames = [yourMove(1)]
+        input.place = .root(isMessagesTab: true)
+        XCTAssertNil(GameControlSlot(conversation: input), "Only a conversation's input gives the slot.")
+    }
+
+    func testEachItemRoleHasItsOwnIdentifier() {
+        typealias ID = SurroundUITestContract.AccessibilityID
+        XCTAssertEqual(GameControlItemRole.activeGames.accessibilityIdentifier, ID.gameActiveGamesButton)
+        XCTAssertEqual(GameControlItemRole.zen.accessibilityIdentifier, ID.gameZenControl)
+        XCTAssertEqual(GameControlItemRole.conversation.accessibilityIdentifier, "messages.conversation.gameControl")
+        XCTAssertEqual(Set(GameControlItemRole.allCases.map(\.accessibilityIdentifier)).count,
+                       GameControlItemRole.allCases.count, "A journey for one control never passes against another.")
+        XCTAssertFalse(GameControlItemRole.activeGames.isTapOnly, "The slot's item holds for its popover.")
+        XCTAssertTrue(GameControlItemRole.zen.isTapOnly)
+        XCTAssertTrue(GameControlItemRole.conversation.isTapOnly, "A conversation's control has no hold and no popover.")
+    }
+
+    /// One row for each line of where a conversation shows the game that
+    /// needs you, from the window's size classes, the Duo's vertical toolbar
+    /// and the platform alone.
+    func testAConversationsControlGoesWhereItsWindowSays() {
+        typealias Placement = ConversationGameControlPlacement
+        func place(pane: Bool = false, activity: Bool = false, vertical: Bool = false,
+                   compactWidth: Bool, compactHeight: Bool, catalyst: Bool = false) -> Placement {
+            Placement(.init(isPane: pane, isInActivityStack: activity, isVerticalToolbar: vertical,
+                            isCompactWidth: compactWidth, isCompactHeight: compactHeight, isCatalyst: catalyst))
+        }
+        // Pushed with a horizontal bar in compact width and regular height: a
+        // phone in portrait, or a compact iPad window.
+        XCTAssertEqual(place(compactWidth: true, compactHeight: false), .barIcon)
+        // Pushed with a horizontal bar elsewhere: an iPhone in landscape, a
+        // Max in landscape, an iPad in regular width.
+        XCTAssertEqual(place(compactWidth: true, compactHeight: true), .barChip)
+        XCTAssertEqual(place(compactWidth: false, compactHeight: true), .barChip)
+        XCTAssertEqual(place(compactWidth: false, compactHeight: false), .barChip)
+        // Pushed with the Duo's vertical toolbar: Closed upright, Book and Open.
+        XCTAssertEqual(place(vertical: true, compactWidth: true, compactHeight: false), .railIcon)
+        XCTAssertEqual(place(vertical: true, compactWidth: false, compactHeight: false), .railIcon)
+        // Messages' side pane with a horizontal bar: an iPad, a phone's two
+        // columns in landscape.
+        XCTAssertEqual(place(pane: true, compactWidth: false, compactHeight: false), .headingChip)
+        XCTAssertEqual(place(pane: true, compactWidth: true, compactHeight: true), .headingChip)
+        XCTAssertEqual(place(pane: true, compactWidth: false, compactHeight: true), .headingChip)
+        // Messages' side pane on the Duo's wide poses, with a vertical toolbar.
+        XCTAssertEqual(place(pane: true, vertical: true, compactWidth: false, compactHeight: false), .railIcon)
+        // Any conversation on the closed Duo turned sideways: compact both
+        // ways, with a vertical bar edge.
+        XCTAssertEqual(place(pane: true, vertical: true, compactWidth: true, compactHeight: true), .none)
+        XCTAssertEqual(place(vertical: true, compactWidth: true, compactHeight: true), .none)
+        // The Mac: pushed from a profile, and Messages' two columns.
+        XCTAssertEqual(place(compactWidth: false, compactHeight: false, catalyst: true), .macToolbarIcon)
+        XCTAssertEqual(place(pane: true, compactWidth: false, compactHeight: false, catalyst: true), .headingChip)
+        // Inside Activity's own stack, whatever the window.
+        for pane in [false, true] {
+            for vertical in [false, true] {
+                for compactWidth in [false, true] {
+                    for compactHeight in [false, true] {
+                        for catalyst in [false, true] {
+                            XCTAssertEqual(place(pane: pane, activity: true, vertical: vertical,
+                                                 compactWidth: compactWidth, compactHeight: compactHeight,
+                                                 catalyst: catalyst), .none,
+                                           "\(pane) \(vertical) \(compactWidth) \(compactHeight) \(catalyst)")
+                        }
+                    }
+                }
+            }
+        }
+        // Each place's form: the chip draws in the top bar's, the icons are
+        // native items, whose labels carry no time.
+        XCTAssertNil(Placement.none.form)
+        XCTAssertEqual(Placement.barChip.form, .topBar)
+        XCTAssertEqual(Placement.headingChip.form, .topBar)
+        XCTAssertEqual(Placement.barIcon.form, .narrowTopBar)
+        XCTAssertEqual(Placement.railIcon.form, .rail)
+        XCTAssertEqual(Placement.macToolbarIcon.form, .mac)
+        for placement in [Placement.barIcon, .railIcon, .macToolbarIcon] {
+            XCTAssertEqual(placement.form?.isNative, true, "\(placement)")
+        }
+        for slot in [GameControlSlot.chip(gameID: 7, plusN: 0, hasDot: false), .gameStarted(gameID: 8, plusN: 0, hasDot: false)] {
+            XCTAssertEqual(GameControlNativeItem(slot, allowsPicker: false), GameControlNativeItem(icon: .grid, badge: .count(1)),
+                           "\(slot): the grid icon with a badge of 1")
+        }
     }
 
     // MARK: The window
@@ -559,6 +674,22 @@ final class GameControlModelTests: XCTestCase {
         }
     }
 
+    /// A conversation's control acts as Zen's: a tap shows the game, the
+    /// one that started included, and a hold does nothing.
+    func testAConversationsControlOnlyShowsItsGame() {
+        let role = GameControlItemRole.conversation
+        for form in [GameControlForm.topBar, .narrowTopBar, .rail, .mac] {
+            for (slot, gameID) in [(GameControlSlot.chip(gameID: 7, plusN: 0, hasDot: false), 7),
+                                   (.gameStarted(gameID: 8, plusN: 0, hasDot: false), 8)] {
+                let interaction = Interaction(slot, form: form, isZen: role.isTapOnly)
+                XCTAssertEqual(interaction.tap, .show(gameID: gameID), "\(form) \(slot)")
+                XCTAssertEqual(interaction.hold, .none, "\(form) \(slot): no popover")
+                XCTAssertFalse(interaction.offersOpenActivity)
+                XCTAssertEqual(interaction.release(after: 0.8, holdFired: false), .none, "\(form) \(slot)")
+            }
+        }
+    }
+
     func testAReleaseHalfASecondAfterThePressNeverSwitches() {
         XCTAssertEqual(Interaction.holdDuration, 0.5)
         let chip = Interaction(.chip(gameID: 7, plusN: 3, hasDot: false), form: .bottomBar)
@@ -754,6 +885,31 @@ final class GameControlModelTests: XCTestCase {
                        Spoken(label: "HarborMist, your move in your live game", value: nil,
                               hint: "Switches to that game.", updatesFrequently: false, offersOpenActivity: false),
                        "The Mac's Zen item: no time in a native label")
+    }
+
+    /// A conversation's control is spoken as Zen's chip, and a game that
+    /// started elsewhere says that a tap opens it.
+    func testVoiceOverSaysAConversationsControlAsZensChip() {
+        let isZen = GameControlItemRole.conversation.isTapOnly
+        XCTAssertEqual(Spoken(.chip(gameID: 7, plusN: 0, hasDot: false), form: .topBar, isZen: isZen,
+                              allowsPicker: false, name: "HarborMist", timeLeft: 42, locale: english),
+                       Spoken(label: "HarborMist, your move in your live game, 42 seconds left", value: nil,
+                              hint: "Switches to that game.", updatesFrequently: true, offersOpenActivity: false))
+        XCTAssertEqual(Spoken(.gameStarted(gameID: 8, plusN: 0, hasDot: false), form: .topBar, isZen: isZen,
+                              allowsPicker: false, name: "CedarWave", locale: english),
+                       Spoken(label: "Game started with CedarWave", value: nil, hint: "Opens that game.",
+                              updatesFrequently: false, offersOpenActivity: false))
+        for form in [GameControlForm.narrowTopBar, .rail, .mac] {
+            XCTAssertEqual(Spoken(.chip(gameID: 7, plusN: 0, hasDot: false), form: form, isZen: isZen,
+                                  allowsPicker: false, name: "HarborMist", timeLeft: 42, locale: english),
+                           Spoken(label: "HarborMist, your move in your live game", value: nil,
+                                  hint: "Switches to that game.", updatesFrequently: false, offersOpenActivity: false),
+                           "\(form): no time in a native label")
+            XCTAssertEqual(Spoken(.gameStarted(gameID: 8, plusN: 0, hasDot: false), form: form, isZen: isZen,
+                                  allowsPicker: false, name: "CedarWave", locale: english),
+                           Spoken(label: "Game started with CedarWave", value: nil, hint: "Opens that game.",
+                                  updatesFrequently: false, offersOpenActivity: false), "\(form)")
+        }
     }
 
     /// A Game Detail that a stack keeps under another screen, or one in
@@ -1151,6 +1307,59 @@ final class GameControlModelTests: XCTestCase {
         window.game.gamePhase = .finished
         XCTAssertTrue(window.ogs.liveGames.contains { $0 === window.game }, "The service still lists it as live.")
         XCTAssertEqual(slot(), .base(plusN: 1), "Game over releases what waited, read from the game itself.")
+    }
+
+    /// Answers every reject at once, as OGS's 2xx does.
+    private static let confirmingClient = ActivityResults.Client(
+        accept: { _ in Empty(completeImmediately: false).eraseToAnyPublisher() },
+        withdrawOrDecline: { _ in Just(()).setFailureType(to: Error.self).eraseToAnyPublisher() },
+        cancelAutomatch: { _ in true },
+        leaveRengo: { _ in Empty(completeImmediately: false).eraseToAnyPublisher() },
+        startRengo: { _ in Empty(completeImmediately: false).eraseToAnyPublisher() },
+        hasActiveGame: { _ in false },
+        automatchLifecycleEvents: Empty(completeImmediately: false).eraseToAnyPublisher()
+    )
+
+    private final class SilentNavigator: ActivityNavigating {
+        func openGame(_ gameID: Int, closesNewGame: Bool) {}
+        func announce(_ announcement: AppAnnouncement) {}
+    }
+
+    /// Holds every block, so nothing the store schedules runs.
+    private final class HeldScheduler: OGSWebsocketScheduling {
+        func async(_ block: @escaping () -> Void) {}
+        func schedule(after delay: TimeInterval, _ block: @escaping () -> Void) -> Cancellable { AnyCancellable {} }
+        func scheduleRepeating(every interval: TimeInterval, _ block: @escaping () -> Void) -> Cancellable {
+            AnyCancellable {}
+        }
+    }
+
+    /// Game Detail's control reads the window's input, so a challenge
+    /// rejected in its popover leaves +N, and the game-over card, as soon as
+    /// OGS confirms it, though the service lists it until OGS's next update.
+    func testAChallengeRejectedInThePopoverLeavesTheControlAtOnce() throws {
+        let window = try openWindow(.challengeReceived)
+        window.game.gamePhase = .finished
+        let navigator = SilentNavigator()
+        let nav = NavigationService()
+        nav.activityResults.attach(client: Self.confirmingClient, navigator: navigator, scheduler: HeldScheduler())
+        func slot(_ context: Context) -> GameControlSlot? {
+            let input = Model.Input.window(ogs: window.ogs, nav: nav, place: Model.Place(showing: window.game),
+                                           now: clock.now, fixture: nil)
+            return GameControlSlot(input, context: context)
+        }
+        let card = Context(cardChallengeID: ID.usualChallengeID)
+        XCTAssertEqual(slot(.home), .base(plusN: 1))
+        XCTAssertEqual(slot(card), .gameOverCard(challengeID: ID.usualChallengeID, plusN: 0))
+
+        let challenge = try XCTUnwrap(window.ogs.challengesReceived.first { $0.id == ID.usualChallengeID })
+        nav.activityResults.reject(challenge: challenge, session: UUID(), itemID: "challenge-\(challenge.id)",
+                                   display: ActivityRowDisplay(title: "CedarWave", detail: "19×19"),
+                                   section: .challengesReceived, after: nil)
+        XCTAssertTrue(window.ogs.challengesReceived.contains { $0.id == ID.usualChallengeID },
+                      "The service lists it until OGS's next update.")
+        XCTAssertEqual(slot(.home), .base(plusN: 0), "It leaves +N at once.")
+        XCTAssertEqual(slot(card), .base(plusN: 0), "And the card, whose popover keeps its result.")
     }
 
     /// Signed out there is no slot, and no item keeps its place, not even

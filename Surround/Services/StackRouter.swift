@@ -29,6 +29,17 @@ extension StackRoute {
         default: false
         }
     }
+
+    /// Whether the screen draws Activity's custom bar where its window hosts
+    /// one: every pushed screen but Game Detail's routes, a linked game's
+    /// loading and error screens included, and conversations.
+    var drawsActivityBar: Bool {
+        switch self {
+        case .homeGame, .historyGame, .publicGame, .game, .messagesConversation, .conversation: false
+        case .gameHistory, .waitingGames, .playerHistory, .playerActiveGames, .playerAbout, .profile, .challenge,
+             .opponentPicker, .activityItem: true
+        }
+    }
 }
 
 enum OpponentSelectionAction: Equatable {
@@ -86,8 +97,38 @@ final class StackRouter: ObservableObject {
     }
 
     @Published var path: [StackRoute] = [] {
-        didSet { discardInactiveState() }
+        didSet {
+            discardInactiveState()
+            reportTopRouteShowsGame()
+        }
     }
+
+    /// The top route shows Game Detail: a game's route, a linked game's
+    /// loading and error screens included.
+    var topRouteShowsGame: Bool { path.last?.showsGameDetail == true }
+
+    /// Told as the top route starts or stops showing Game Detail, from the
+    /// path's own change: as soon as a game is asked for, before the game's
+    /// first layout. A tab's stack in the iPad container installs it, so the
+    /// container takes the Activity bar away before a game lays out beside it.
+    private var topRouteShowsGameReport: ((Bool) -> Void)?
+    private var reportedTopRouteShowsGame = false
+
+    /// Installs `report` and tells it at once whether the top route shows a
+    /// game now; later, each time that changes. Nil stops the reports.
+    func reportTopRouteShowsGame(to report: ((Bool) -> Void)?) {
+        topRouteShowsGameReport = report
+        reportedTopRouteShowsGame = topRouteShowsGame
+        report?(reportedTopRouteShowsGame)
+    }
+
+    private func reportTopRouteShowsGame() {
+        let shows = topRouteShowsGame
+        guard shows != reportedTopRouteShowsGame else { return }
+        reportedTopRouteShowsGame = shows
+        topRouteShowsGameReport?(shows)
+    }
+
     private(set) var users: [Int: OGSUser] = [:]
     @Published private(set) var games: [Int: Game] = [:]
     private(set) var activeGamesByPlayer: [Int: ProfileActiveGames] = [:]
@@ -176,9 +217,21 @@ final class StackRouter: ObservableObject {
     /// does: a game opened from a profile there closes the list and opens
     /// in the window instead of being pushed.
     var gameOpenOverride: ((Int) -> Void)?
-    /// The connection status of the Activity list in this stack. The cards
-    /// the list pushes dim their actions by it, as its rows do.
-    weak var activityConnection: ConnectionStatusSource?
+    /// The connection status of the Activity list in this stack, while the
+    /// list is in it. The cards the list pushes dim their actions by it, as
+    /// its rows do, and a conversation pushed above it is Activity's.
+    private(set) weak var activityConnection: ConnectionStatusSource?
+    /// Where the Activity list is: nil at the stack's root, where it stays
+    /// for the stack's life, else the route it was pushed at.
+    private var activityListRoute: StackRoute?
+
+    /// The Activity list at `route`, or at the stack's root for nil, shows
+    /// with `connection`. A list whose route has left the path sets nothing.
+    func setActivityList(_ connection: ConnectionStatusSource, at route: StackRoute?) {
+        if let route, !path.contains(route) { return }
+        activityConnection = connection
+        activityListRoute = route
+    }
 
     /// Opening a game already below the profile returns to that same screen,
     /// retaining its analysis, chat draft and connection owner.
@@ -377,6 +430,12 @@ final class StackRouter: ObservableObject {
             if case .challenge(let id) = route { return id }; return nil
         }).union(selections.values.compactMap(\.draftID))
         drafts = drafts.filter { draftIDs.contains($0.key) }
+        // A list pushed at a route leaves with it, its connection too, though
+        // the window keeps the source: what is pushed later isn't Activity's.
+        if let route = activityListRoute, !path.contains(route) {
+            activityConnection = nil
+            activityListRoute = nil
+        }
     }
 }
 
@@ -698,6 +757,10 @@ struct AppNavigationLink<Label: View, Destination: View>: View {
     var body: some View {
         NavigationLink {
             destination()
+                // A pushed screen has no line under its title, though it
+                // was built inside the root.
+                .environment(\.sceneTitleConnectionLine, nil)
+                .activityCustomBar(.pushed)
                 .modifier(AppNavigationContentLayout())
         } label: {
             label
@@ -714,6 +777,8 @@ extension View {
     ) -> some View {
         navigationDestination(isPresented: isPresented) {
             destination()
+                .environment(\.sceneTitleConnectionLine, nil)
+                .activityCustomBar(.pushed)
                 .modifier(AppNavigationContentLayout())
         }
     }
@@ -737,7 +802,7 @@ private struct ActivityConnectionKey: EnvironmentKey {
 extension EnvironmentValues {
     /// In a stack with an Activity list, the list's connection status, so a
     /// conversation it pushes goes offline with it. Nil in every other
-    /// stack, Messages' own included.
+    /// stack, Messages' own included, and in New game's once its list closes.
     var activityConnection: ConnectionStatusSource? {
         get { self[ActivityConnectionKey.self] }
         set { self[ActivityConnectionKey.self] = newValue }
@@ -799,23 +864,24 @@ struct AppNavigationStack<Content: View>: View {
     var body: some View {
         NavigationStack(path: $navigation.path) {
             content()
-                #if DEBUG
-                .modifier(NoticesHostProbeRoot(rootView: rootView))
-                #endif
+                // The window's status under the root's title, where the
+                // window says it there; none in a presented stack.
+                .rootConnectionLine(rootView)
+                // Each screen draws its own custom bar, so it slides with
+                // each push and pop; a route that shows a game or a
+                // conversation draws none.
+                .activityCustomBar(.root)
                 .modifier(AppNavigationContentLayout())
                 .environment(\.owningStackRoute, nil)
                 .navigationDestination(for: StackRoute.self) { route in
                     destination(for: route)
-                        #if DEBUG && targetEnvironment(macCatalyst)
-                        .modifier(NoticesHostProbeDestination())
-                        #endif
+                        .activityCustomBar(route.drawsActivityBar ? .pushed : nil)
                         .modifier(AppNavigationContentLayout(overlaysIPadSidebar: route.showsGameDetail))
                         .environment(\.owningStackRoute, route)
                 }
         }
         .modifier(GameDetailLegacyTint(color: legacyGameDetailTint))
         .environmentObject(navigation)
-        .environment(\.hasGlobalNotificationOverlay, rootView != nil)
         // Presented stacks reset it: a sheet or popover inherits its
         // presenter's environment, but never hides that tab's bar.
         .environment(\.owningTabRoot, rootView)
@@ -829,6 +895,7 @@ struct AppNavigationStack<Content: View>: View {
         .onAppear {
             isVisible = true
             updateActivity()
+            reportGameRoutes()
         }
         .onDisappear {
             isVisible = false
@@ -854,6 +921,18 @@ struct AppNavigationStack<Content: View>: View {
 
     private func updateActivity() {
         navigation.setActive(isVisible && (rootView == nil || rootView == nav.main.rootView))
+    }
+
+    /// A tab's own stack in the iPad container tells its tab's context
+    /// whether its top route shows a game, from the path itself, which every
+    /// way a game opens in a tab goes through. The container then takes its
+    /// bar away before the game's first layout. Presented stacks inherit
+    /// their presenter's context but never report for its tab.
+    private func reportGameRoutes() {
+        guard rootView != nil, let iPadTabContext else { return }
+        navigation.reportTopRouteShowsGame { [weak iPadTabContext] shows in
+            iPadTabContext?.setGameAskedFor(shows)
+        }
     }
 
     @ViewBuilder

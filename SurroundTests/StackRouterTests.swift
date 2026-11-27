@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import XCTest
 
@@ -252,6 +253,50 @@ final class StackRouterTests: XCTestCase {
         router.remove(.activityItem("waiting-rengo-95301"))
         XCTAssertEqual(router.path, [.activityItem("challenge-95002")])
         XCTAssertFalse(StackRoute.activityItem("challenge-95002").showsGameDetail)
+    }
+
+    func testAnActivityListLendsItsConnectionWhileItIsInTheStack() {
+        let connection = ConnectionStatusSource(socketIsConnected: Just(true).eraseToAnyPublisher(),
+                                                path: ConstantNetworkPath.satisfied, reconnect: {})
+        // New game's Searching link pushes the list, and a conversation
+        // pushed above it is Activity's.
+        let newGame = Router()
+        newGame.present(.waitingGames)
+        newGame.setActivityList(connection, at: .waitingGames)
+        newGame.openConversation(firstPlayer)
+        XCTAssertIdentical(newGame.activityConnection, connection)
+        newGame.path = []
+        XCTAssertNil(newGame.activityConnection, "The list closed with its route, though the window keeps the source.")
+        newGame.openProfile(secondPlayer)
+        newGame.openConversation(secondPlayer)
+        XCTAssertNil(newGame.activityConnection, "A conversation from a challenger's profile later isn't Activity's.")
+        newGame.setActivityList(connection, at: .waitingGames)
+        XCTAssertNil(newGame.activityConnection, "A list whose route has left sets nothing.")
+
+        // A list at its stack's root, as in the window's sheet, stays.
+        let sheet = Router()
+        sheet.setActivityList(connection, at: nil)
+        sheet.present(.activityItem("challenge-95002"))
+        sheet.path = []
+        XCTAssertIdentical(sheet.activityConnection, connection)
+    }
+
+    func testOnlyGamesAndConversationsDrawNoActivityBar() {
+        let id = UUID()
+        let noBar: [StackRoute] = [.homeGame, .historyGame, .publicGame, .game(26268404),
+                                   .messagesConversation(765826), .conversation(765826)]
+        let bar: [StackRoute] = [.gameHistory, .waitingGames, .playerHistory(playerID: 101, opponentID: nil),
+                                 .playerActiveGames(101), .playerAbout(101), .profile(playerID: 101, selectionID: nil),
+                                 .challenge(id), .opponentPicker(id), .activityItem("challenge-95002")]
+        for route in noBar {
+            XCTAssertFalse(route.drawsActivityBar, "\(route) hides the bar")
+        }
+        for route in bar {
+            XCTAssertTrue(route.drawsActivityBar, "\(route) draws the bar")
+        }
+        // Every route that shows a game hides it, so a push never adds an
+        // inset under a game.
+        XCTAssertTrue((noBar + bar).filter(\.showsGameDetail).allSatisfy { !$0.drawsActivityBar })
     }
 
     func testProfileListsRetainOnlyTheirOwnPayloads() throws {
@@ -841,5 +886,35 @@ final class StackRouterTests: XCTestCase {
         XCTAssertTrue(router.isOnTop(profile))
         XCTAssertFalse(router.isOnTop(.messagesConversation(firstPlayer.id)),
                        "One column puts the conversation under Profile.")
+    }
+}
+
+extension StackRouterTests {
+    /// The iPad's early clear: a tab's router reports as soon as its top
+    /// route starts or stops showing a game, from the path itself, once per
+    /// change, whatever opened it.
+    func testTheTopRouteReportsAsAGameIsAskedForAndGoes() {
+        let router = Router()
+        var reports = [Bool]()
+        router.reportTopRouteShowsGame { reports.append($0) }
+        XCTAssertEqual(reports, [false], "Installing tells the current value at once.")
+
+        router.present(.homeGame)
+        XCTAssertEqual(reports, [false, true], "Before the game's first layout: the path's own change.")
+        router.openProfile(firstPlayer)
+        XCTAssertEqual(reports, [false, true, false], "A profile pushed over the game shows none.")
+        router.openGame(gameID: 77, using: NavigationService(), service: OGSService.previewInstance())
+        XCTAssertEqual(reports, [false, true, false, true], "A linked game from a pushed profile.")
+        router.remove(.game(77))
+        XCTAssertEqual(reports, [false, true, false, true, false])
+        router.openProfile(secondPlayer)
+        XCTAssertEqual(reports.count, 5, "Routes that show no game on top report nothing new.")
+        router.path = []
+        XCTAssertEqual(reports.count, 5)
+
+        router.present(.publicGame)
+        router.reportTopRouteShowsGame(to: nil)
+        router.path = []
+        XCTAssertEqual(reports, [false, true, false, true, false, true], "Nil stops the reports.")
     }
 }

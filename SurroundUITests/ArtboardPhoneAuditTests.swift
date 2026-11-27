@@ -134,6 +134,7 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         let blackClock = app.buttons["game.clock.black"].firstMatch
         let whiteClock = app.buttons["game.clock.white"].firstMatch
         let more = app.buttons[ID.gameActionsMenu].firstMatch
+        let activityBar = app.descendants(matching: .any).matching(identifier: ID.activityBar).firstMatch
         let text = """
         Artboard: \(number)\(suffix)
         Window: \(app.frame)
@@ -147,7 +148,7 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         Black clock state: \(blackClock.exists ? String(describing: blackClock.value) : "absent")
         White clock state: \(whiteClock.exists ? String(describing: whiteClock.value) : "absent")
         Latest chat bubble: \(latest.exists ? String(describing: latest.frame) : "absent")
-        Global message overlay: \(app.buttons[ID.messagesButton].exists)
+        Activity bar: \(activityBar.exists ? String(describing: activityBar.frame) : "absent")
         Keyboard visible: \(app.keyboards.firstMatch.exists)
         Keyboard frame: \(app.keyboards.firstMatch.exists ? String(describing: app.keyboards.firstMatch.frame) : "absent")
         Software keyboard onscreen: \(keyboardIsOnscreen(in: app))
@@ -1841,11 +1842,12 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
 
     func testPhoneNotificationAccess() {
         let app = launch()
-        // A game has no Messages button: the in-game control's popover
-        // reaches Messages (SurroundUITests covers it). This fixture has no
-        // unread messages, so the toolbar is drawn without any.
-        XCTAssertFalse(app.buttons[ID.messagesButton].exists,
-                       "The design review fixture starts without private messages")
+        // A game shows no Activity bar: the in-game control's popover
+        // reaches Activity and Messages (SurroundUITests covers it). This
+        // fixture has no unread messages, so the toolbar is drawn without
+        // any.
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: ID.activityBar).firstMatch.exists,
+                       "A game shows no Activity bar")
         keepScreenshot("game-settings-toolbar-without-message-badge", in: app)
         tap(ID.gameOptions, in: app, matching: .button)
         element(ID.screenGameOptions, in: app)

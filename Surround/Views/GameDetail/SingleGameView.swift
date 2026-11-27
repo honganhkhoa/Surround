@@ -375,6 +375,10 @@ struct SingleGameView: View {
                     .accessibilityValue(
                         Text(verbatim: boardUITestAccessibilityValue)
                     )
+                    // The board's window frame at each size, in the hosts' log.
+                    .background {
+                        if NoticesProbeBoardMarker.logs { NoticesProbeBoardMarker() }
+                    }
             }
             #endif
         }
@@ -780,7 +784,8 @@ struct SingleGameView: View {
                        pendingMove: $pendingMove, pendingPosition: $pendingPosition,
                        goToNextGame: goToNextGame, stoneRemovalOption: $stoneRemovalOption,
                        connectionAction: connectionPlacement.action,
-                       connectionStatusShows: connection.status.showsInGame)
+                       connectionWords: connection.status.gameActionWords(hasConnected: connection.hasConnected,
+                                                                          socket: ogs.socketStatus))
     }
 
 

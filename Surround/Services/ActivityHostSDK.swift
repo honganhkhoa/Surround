@@ -5,11 +5,10 @@
 //  The only file that names the Activity hosts' iOS 26 and 27 APIs. Each helper
 //  is a pass-through where the SDK or platform lacks the API. Floors, read from
 //  the local SDKs: SwiftUI 7.2.5 = the iOS 26.2 SDK, the oldest that declares
-//  tabViewBottomAccessory(isEnabled:) and every other 26.x API here; 8.0 = the
-//  iOS 27 SDK, as DuoTabContainer's gate; 8.0.85 = 27.1, as
-//  GeometryProxy.messagesDivisionFrames, never for Catalyst, whose SwiftUI in
-//  Xcode 27.1 is 8.0.84. The accessory and minimizing never compile for Mac
-//  Catalyst.
+//  tabViewBottomAccessory(isEnabled:) and every other 26.x API here; 8.0.85 =
+//  27.1, as GeometryProxy.messagesDivisionFrames, never for Catalyst, whose
+//  SwiftUI in Xcode 27.1 is 8.0.84. The accessory and minimizing never compile
+//  for Mac Catalyst.
 //
 
 import SwiftUI
@@ -27,10 +26,7 @@ extension ActivityHostPolicy.Facts {
     /// This process's platform, OS and SDK, for `container`.
     static func current(_ container: ActivityHostPolicy.Container,
                         sidebar: ActivityHostPolicy.Sidebar = .unavailable) -> Self {
-        let release: ActivityHostPolicy.Release
-        if #available(iOS 26.1, *) { release = .iOS26_1 }
-        else if #available(iOS 26.0, *) { release = .iOS26_0 }
-        else { release = .iOS18 }
+        let release = ActivityHostPolicy.Release(ProcessInfo.processInfo.operatingSystemVersion)
         #if targetEnvironment(macCatalyst)
         let platform = ActivityHostPolicy.Platform.mac
         #else
@@ -75,7 +71,7 @@ private struct ActivityAccessoryPlacementReader: View {
             }
     }
 
-    private static func hostPlacement(
+    static func hostPlacement(
         _ placement: TabViewBottomAccessoryPlacement?
     ) -> ActivityHostPolicy.AccessoryPlacement {
         if placement == nil { return .notInAccessory }
@@ -84,7 +80,41 @@ private struct ActivityAccessoryPlacementReader: View {
         return .unspecified
     }
 }
+
+@available(iOS 26.0, *)
+private struct ActivityAccessoryPlacementEnvironment<Content: View>: View {
+    @Environment(\.tabViewBottomAccessoryPlacement) private var placement
+    let content: (ActivityHostPolicy.AccessoryPlacement) -> Content
+
+    var body: some View {
+        content(ActivityAccessoryPlacementReader.hostPlacement(placement))
+    }
+}
 #endif
+
+/// Draws `content` for where SwiftUI places the bottom accessory it sits
+/// in, read from the environment in body, so it keeps no state of its own:
+/// from iOS 26 with the 26.2 SDK. Elsewhere, Catalyst included, for
+/// `.unavailable`.
+struct ActivityAccessoryPlacementReading<Content: View>: View {
+    private let content: (ActivityHostPolicy.AccessoryPlacement) -> Content
+
+    init(@ViewBuilder content: @escaping (ActivityHostPolicy.AccessoryPlacement) -> Content) {
+        self.content = content
+    }
+
+    var body: some View {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 7.2.5)
+        if #available(iOS 26.0, *) {
+            ActivityAccessoryPlacementEnvironment(content: content)
+        } else {
+            content(.unavailable)
+        }
+        #else
+        content(.unavailable)
+        #endif
+    }
+}
 
 extension View {
     /// SwiftUI's bottom accessory, hidden while `isEnabled` is false: iOS 26.1
@@ -122,61 +152,14 @@ extension View {
         #endif
     }
 
-    /// The navigation subtitle: from iOS 26, and on the Mac. Nil sets an empty
-    /// subtitle instead of removing it, so a subtitle that comes and goes keeps
-    /// its identity.
+    /// The navigation item's subtitle text, from iOS 26, which the line under
+    /// root titles is: always set, empty while it says nothing, so it keeps
+    /// one identity. Never on the Mac, where UIKit's subtitle changes the
+    /// window's title, and unchanged before iOS 26.
     @ViewBuilder
-    func activityNavigationSubtitle(_ subtitle: Text?) -> some View {
-        #if targetEnvironment(macCatalyst)
-        navigationSubtitle(subtitle ?? Text(verbatim: ""))
-        #elseif os(iOS) && canImport(SwiftUI, _version: 7.2.5)
-        if #available(iOS 26.0, *) { navigationSubtitle(subtitle ?? Text(verbatim: "")) } else { self }
-        #else
-        self
-        #endif
-    }
-
-    /// A toolbar item in the subtitle, or in the large title's subtitle, from
-    /// iOS 26 and on the Mac.
-    @ViewBuilder
-    func activitySubtitleItem<Item: View>(largeTitle: Bool = false, isPresent: Bool = true,
-                                          @ViewBuilder _ item: @escaping () -> Item) -> some View {
-        #if os(iOS) && canImport(SwiftUI, _version: 7.2.5)
-        if #available(iOS 26.0, *) {
-            toolbar {
-                if isPresent {
-                    ToolbarItem(placement: largeTitle ? ToolbarItemPlacement.largeSubtitle : .subtitle,
-                                content: item)
-                }
-            }
-        } else {
-            self
-        }
-        #else
-        self
-        #endif
-    }
-
-    /// Keeps the navigation bar full size while scrolling, from iOS 27.
-    @ViewBuilder
-    func activityNavigationBarNeverMinimizes(_ neverMinimizes: Bool) -> some View {
-        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
-        if #available(iOS 27.0, *) {
-            toolbarMinimizationBehavior(neverMinimizes ? .never : .automatic, for: .navigationBar)
-        } else {
-            self
-        }
-        #else
-        self
-        #endif
-    }
-
-    /// The Mac sidebar's bottom bar. Apply it unconditionally and vary only
-    /// its content. Elsewhere, unchanged.
-    @ViewBuilder
-    func activityMacSidebarBottomBar<Bar: View>(@ViewBuilder content: () -> Bar) -> some View {
-        #if targetEnvironment(macCatalyst)
-        tabViewSidebarBottomBar(content: content)
+    func activityNavigationSubtitle(_ subtitle: Text) -> some View {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 7.2.5)
+        if #available(iOS 26.0, *) { navigationSubtitle(subtitle) } else { self }
         #else
         self
         #endif
@@ -254,6 +237,26 @@ extension UIView {
         if #available(iOS 27.1, *) {
             return reservedRegions(kind: .division).filter(\.isActive).map(\.frame)
         }
+        #endif
+        return []
+    }
+}
+
+extension UITraitCollection {
+    /// The system puts the tabs on a vertical edge, as the Duo's rail when
+    /// it's closed: from iOS 27.1. False before it and on the Mac.
+    var activityHasVerticalBarEdge: Bool {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+        if #available(iOS 27.1, *) { return verticalBarEdge != .unspecified }
+        #endif
+        return false
+    }
+
+    /// The traits whose changes can change `activityHasVerticalBarEdge`, for
+    /// `registerForTraitChanges`; none before iOS 27.1 and on the Mac.
+    static var activityTraitsAffectingVerticalBarEdge: [UITrait] {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+        if #available(iOS 27.1, *) { return systemTraitsAffectingVerticalBarEdge }
         #endif
         return []
     }

@@ -3,9 +3,12 @@
 //  SurroundTests
 //
 //  The Activity rules from the in-app notices design: what leads the bar,
-//  what +N counts, the list's order, low time and the in-game control.
+//  what +N counts, the list's order, low time, the Now section, the in-game
+//  control, a conversation's control, and one window's input with what OGS
+//  confirmed gone left out.
 //
 
+import Combine
 import XCTest
 
 final class ActivityModelTests: XCTestCase {
@@ -471,6 +474,386 @@ final class ActivityModelTests: XCTestCase {
         XCTAssertEqual(Model.gameControl(input, context: card), .dot, "Only a finished game has the card.")
         input.place = .game(id: 3, isOwnGame: false, isLive: true, isOver: true)
         XCTAssertEqual(Model.gameControl(input, context: card), .inbox(count: 2), "Nor does a game you watched.")
+    }
+
+    // MARK: What +N counted
+
+    func testWhatAddsToPlusN() {
+        XCTAssertTrue(Model.counts(.liveGame(yourMove(1)), onMessagesTab: false))
+        XCTAssertFalse(Model.counts(.liveGame(theirMove(2)), onMessagesTab: false))
+        XCTAssertTrue(Model.counts(.challenge(Model.Challenge(id: 7, isLive: false)), onMessagesTab: true),
+                      "Every challenge counts, a correspondence one too.")
+        XCTAssertTrue(Model.counts(.conversation(unread(30)), onMessagesTab: false))
+        XCTAssertFalse(Model.counts(.conversation(unread(30)), onMessagesTab: true))
+        XCTAssertFalse(Model.counts(.conversation(read(31, at: 50)), onMessagesTab: false))
+        XCTAssertFalse(Model.counts(.waiting(waiting("search")), onMessagesTab: false))
+        XCTAssertFalse(Model.counts(.correspondenceGames(count: 2, mostUrgentID: 90), onMessagesTab: false))
+    }
+
+    func testCountedNamesWhatPlusNCountsBesideALead() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1), yourMove(2, left: 100), theirMove(3)]
+        input.challengesReceived = [Model.Challenge(id: 7, isLive: false)]
+        input.conversations = [unread(30), read(31, at: 50)]
+        input.waiting = [waiting("search")]
+        input.correspondenceGamesOnYourMove = [Model.CorrespondenceGame(id: 90, timeUntilTimeout: 3_600)]
+        let snapshot = Model.snapshot(input)
+        XCTAssertEqual(snapshot.lead, .item(.liveGame(yourMove(2, left: 100))))
+        XCTAssertEqual(snapshot.counted.map(\.id), ["game-1", "challenge-7", "conversation-30"],
+                       "The lead never counts itself, and neither do their move, your search, a read conversation "
+                           + "or a correspondence game.")
+        XCTAssertEqual(snapshot.counted.count, snapshot.plusN)
+
+        input.startedGames = [3: 1_000]
+        input.now = 1_010
+        XCTAssertEqual(Model.snapshot(input).lead, .gameStarted(theirMove(3)))
+        XCTAssertEqual(Model.snapshot(input).counted.map(\.id), ["game-2", "game-1", "challenge-7", "conversation-30"],
+                       "A started game on their move counts nothing.")
+    }
+
+    func testCountedIsWhatNWaitingCounts() {
+        var input = Model.Input()
+        input.challengesReceived = [Model.Challenge(id: 7, isLive: false)]
+        input.conversations = [unread(30), unread(31)]
+        input.waiting = [waiting("correspondence search", live: false)]
+        let snapshot = Model.snapshot(input)
+        XCTAssertEqual(snapshot.lead, .waiting(count: 3))
+        XCTAssertEqual(snapshot.counted.map(\.id), ["challenge-7", "conversation-30", "conversation-31"])
+        XCTAssertEqual(snapshot.plusN, 0, "N waiting counts them itself.")
+    }
+
+    func testTheMessagesTabLeavesConversationsOutOfCounted() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1)]
+        input.conversations = [unread(30)]
+        input.place = .root(isMessagesTab: true)
+        XCTAssertEqual(Model.snapshot(input).counted, [])
+        input.place = .root(isMessagesTab: false)
+        XCTAssertEqual(Model.snapshot(input).counted.map(\.id), ["conversation-30"])
+        input.isMessagesTabSelected = true
+        XCTAssertEqual(Model.snapshot(input).counted, [], "The window's selected tab says it too.")
+    }
+
+    func testNothingIsCountedWithoutALeadOrAwayFromARoot() {
+        XCTAssertEqual(Model.snapshot(Model.Input()).counted, [])
+        var input = Model.Input()
+        input.liveGames = [yourMove(1), yourMove(2)]
+        input.conversations = [unread(30)]
+        for place: Model.Place in [.conversation, .game(id: 1, isOwnGame: true, isLive: true, isOver: false)] {
+            input.place = place
+            XCTAssertEqual(Model.snapshot(input).counted, [], "\(place)")
+        }
+    }
+
+    // MARK: The Now section
+
+    func testTheNowSectionListsTwoRowsInTheLeadOrder() {
+        var input = Model.Input()
+        input.liveGames = [theirMove(3), yourMove(1, left: 200), yourMove(2, left: 100)]
+        input.challengesReceived = [Model.Challenge(id: 9, isLive: true), Model.Challenge(id: 8, isLive: false)]
+        input.waiting = [waiting("search")]
+        input.conversations = [unread(30)]
+        let section = Model.nowSection(input, rows: Model.nowSectionRows)
+        XCTAssertEqual(Model.nowSectionRows, 2)
+        XCTAssertEqual(section.rows, [.item(.liveGame(yourMove(2, left: 100))), .item(.liveGame(yourMove(1, left: 200)))])
+        XCTAssertEqual(section.rows.first, Model.snapshot(input).lead, "The first row is the bar's lead.")
+        XCTAssertEqual(section.counted.map(\.id), ["challenge-8", "challenge-9", "conversation-30"])
+        XCTAssertEqual(section.plusN, 3, "All activity counts what the rows don't show.")
+    }
+
+    func testTheNowSectionFollowsTheLeadOrderAcrossKinds() {
+        var input = Model.Input()
+        input.liveGames = [theirMove(3), yourMove(1), theirMove(7)]
+        input.startedGames = [7: 1_000]
+        input.now = 1_010
+        input.challengesReceived = [Model.Challenge(id: 9, isLive: true), Model.Challenge(id: 8, isLive: false)]
+        input.waiting = [waiting("correspondence search", live: false), waiting("live search", since: 5)]
+        XCTAssertEqual(Model.nowSection(input, rows: 10).rows, [
+            .gameStarted(theirMove(7)), .item(.liveGame(yourMove(1))),
+            .item(.challenge(Model.Challenge(id: 9, isLive: true))), .item(.liveGame(theirMove(3))),
+            .item(.waiting(waiting("live search", since: 5))),
+        ], "A started game, your move, a live challenge, their move, then your live searches, each once. "
+            + "Correspondence never leads.")
+    }
+
+    func testTheNowSectionLeavesTheGameOnScreenOut() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1, left: 100), yourMove(2, left: 200)]
+        input.conversations = [unread(30)]
+        input.place = .game(id: 1, isOwnGame: true, isLive: true, isOver: false)
+        let section = Model.nowSection(input, rows: 2)
+        XCTAssertEqual(section.rows, [.item(.liveGame(yourMove(2, left: 200)))])
+        XCTAssertEqual(section.counted.map(\.id), ["conversation-30"])
+        XCTAssertNil(Model.snapshot(input).lead, "The bar has no lead over a game, but the Now section answers.")
+    }
+
+    func testTheGameOnScreenCountsForLowTimeButNeverAsOneThatStarted() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1, left: 10), theirMove(7)]
+        input.startedGames = [7: 1_000]
+        input.now = 1_005
+        input.place = .game(id: 1, isOwnGame: true, isLive: true, isOver: false)
+        XCTAssertEqual(Model.nowSection(input, rows: 2).rows, [.item(.liveGame(theirMove(7)))],
+                       "Low time in the game on screen keeps the started game from leading, as in the game's control.")
+        input.liveGames = [yourMove(1), theirMove(7)]
+        input.place = .game(id: 7, isOwnGame: true, isLive: true, isOver: false)
+        XCTAssertEqual(Model.nowSection(input, rows: 2).rows, [.item(.liveGame(yourMove(1)))])
+    }
+
+    func testTheNowSectionAnswersInAConversationWithTheMessagesTabFromTheSelectedTab() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1)]
+        input.conversations = [unread(30), unread(31)]
+        input.place = .conversation
+        let section = Model.nowSection(input, rows: 2)
+        XCTAssertEqual(section.rows, [.item(.liveGame(yourMove(1)))])
+        XCTAssertEqual(section.plusN, 2)
+        input.isMessagesTabSelected = true
+        XCTAssertEqual(Model.nowSection(input, rows: 2).plusN, 0,
+                       "A conversation in Messages' pane reads as a conversation; the selected tab leaves them out.")
+    }
+
+    func testTheNowSectionShowsNWaitingWhenNothingThatCanLeadWaits() {
+        var input = Model.Input()
+        input.challengesReceived = [Model.Challenge(id: 7, isLive: false)]
+        input.conversations = [unread(30), unread(31)]
+        let section = Model.nowSection(input, rows: 2)
+        XCTAssertEqual(section.rows, [.waiting(count: 3)])
+        XCTAssertEqual(section.rows.first, Model.snapshot(input).lead)
+        XCTAssertEqual(section.plusN, 0, "The row stands for what it counts.")
+        XCTAssertEqual(section.counted.map(\.id), ["challenge-7", "conversation-30", "conversation-31"])
+        XCTAssertEqual(Model.nowSection(input, rows: 0),
+                       Model.NowSection(rows: [], plusN: 3, counted: section.counted), "No room for the row.")
+    }
+
+    func testTheNowSectionIsEmptyWhenNothingWaits() {
+        XCTAssertEqual(Model.nowSection(Model.Input(), rows: 2), Model.NowSection(rows: [], plusN: 0, counted: []))
+        var input = Model.Input()
+        input.waiting = [waiting("correspondence search", live: false)]
+        input.correspondenceGamesOnYourMove = [Model.CorrespondenceGame(id: 90, timeUntilTimeout: 3_600)]
+        XCTAssertEqual(Model.nowSection(input, rows: 2), Model.NowSection(rows: [], plusN: 0, counted: []),
+                       "What neither leads nor counts stays in Activity.")
+    }
+
+    func testOneRowLeavesTheNextItemToAllActivity() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1, left: 100), yourMove(2, left: 200)]
+        input.challengesReceived = [Model.Challenge(id: 9, isLive: true)]
+        let two = Model.nowSection(input, rows: 2)
+        let one = Model.nowSection(input, rows: 1)
+        XCTAssertEqual(one.rows, [.item(.liveGame(yourMove(1, left: 100)))])
+        XCTAssertEqual(one.plusN, two.plusN + 1, "All activity's +N takes the item the status row displaced.")
+        XCTAssertEqual(Model.nowSection(input, rows: 0).plusN, 3)
+    }
+
+    // MARK: A conversation's control
+
+    func testAConversationShowsYourLiveGameWithTheLeastTime() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1, left: 200), yourMove(2, left: 100), theirMove(3)]
+        input.challengesReceived = [Model.Challenge(id: 9, isLive: true)]
+        input.conversations = [unread(30)]
+        input.place = .conversation
+        XCTAssertEqual(Model.conversationControl(input), .chip(yourMove(2, left: 100), plusN: 0, hasDot: false),
+                       "Least time first, never +N or a dot.")
+    }
+
+    func testAConversationShowsAGameThatStartedElsewhereFirst() {
+        var input = Model.Input()
+        input.liveGames = [yourMove(1), theirMove(7)]
+        input.startedGames = [7: 1_000]
+        input.now = 1_010
+        input.place = .conversation
+        XCTAssertEqual(Model.conversationControl(input), .gameStarted(theirMove(7), plusN: 0, hasDot: false))
+        input.now = 1_030
+        XCTAssertEqual(Model.conversationControl(input), .chip(yourMove(1), plusN: 0, hasDot: false),
+                       "Its 30 s are over.")
+        input.now = 1_010
+        input.liveGames = [yourMove(1, left: 10), theirMove(7)]
+        XCTAssertEqual(Model.conversationControl(input), .chip(yourMove(1, left: 10), plusN: 0, hasDot: false),
+                       "A game on your move low on time keeps the started game out.")
+    }
+
+    func testAConversationShowsNothingWithoutAGameOnYourMove() {
+        var input = Model.Input()
+        input.liveGames = [theirMove(3)]
+        input.challengesReceived = [Model.Challenge(id: 9, isLive: true)]
+        input.conversations = [unread(30)]
+        input.waiting = [waiting("search")]
+        input.place = .conversation
+        XCTAssertNil(Model.conversationControl(input), "Nothing but a game that needs you shows.")
+        input.liveGames = [yourMove(1)]
+        for place: Model.Place in [.root(isMessagesTab: true), .game(id: 5, isOwnGame: true, isLive: true, isOver: false)] {
+            input.place = place
+            XCTAssertNil(Model.conversationControl(input), "Only a conversation has this control: \(place)")
+        }
+    }
+
+    // MARK: Leaving out what OGS confirmed gone
+
+    func testAHiddenItemNeverLeadsCountsOrShows() {
+        var input = Model.Input()
+        input.liveGames = [theirMove(3)]
+        input.challengesReceived = [Model.Challenge(id: 9, isLive: true), Model.Challenge(id: 8, isLive: false)]
+        input.waiting = [waiting("open-4", kind: .openChallenge)]
+        input.conversations = [unread(30)]
+        XCTAssertEqual(Model.snapshot(input).lead, .item(.challenge(Model.Challenge(id: 9, isLive: true))))
+
+        let hidden = input.hiding(["challenge-9", "challenge-8", "waiting-open-4", "challenge-404"])
+        XCTAssertEqual(hidden.hiddenListedIDs, ["challenge-9", "challenge-8", "waiting-open-4"],
+                       "Only what the service still lists is left out.")
+        let snapshot = Model.snapshot(hidden)
+        XCTAssertEqual(snapshot.lead, .item(.liveGame(theirMove(3))))
+        XCTAssertEqual(snapshot.counted.map(\.id), ["conversation-30"])
+        XCTAssertEqual(snapshot.list.map(\.id), ["game-3", "conversation-30"])
+        XCTAssertEqual(Model.nowSection(hidden, rows: 2).rows, [.item(.liveGame(theirMove(3)))])
+        XCTAssertEqual(input.hiding([]), input)
+    }
+
+    /// Answers every request at once, as OGS's 2xx does.
+    private func confirmingClient() -> ActivityResults.Client {
+        ActivityResults.Client(
+            accept: { _ in Just(1).setFailureType(to: Error.self).eraseToAnyPublisher() },
+            withdrawOrDecline: { _ in Just(()).setFailureType(to: Error.self).eraseToAnyPublisher() },
+            cancelAutomatch: { _ in true },
+            leaveRengo: { _ in Just(()).setFailureType(to: Error.self).eraseToAnyPublisher() },
+            startRengo: { _ in Just(1).setFailureType(to: Error.self).eraseToAnyPublisher() },
+            hasActiveGame: { _ in false },
+            automatchLifecycleEvents: Empty().eraseToAnyPublisher()
+        )
+    }
+
+    private final class SilentNavigator: ActivityNavigating {
+        func openGame(_ gameID: Int, closesNewGame: Bool) {}
+        func announce(_ announcement: AppAnnouncement) {}
+    }
+
+    /// Holds every block, so nothing the store schedules runs.
+    private final class HeldScheduler: OGSWebsocketScheduling {
+        func async(_ block: @escaping () -> Void) {}
+        func schedule(after delay: TimeInterval, _ block: @escaping () -> Void) -> Cancellable { AnyCancellable {} }
+        func scheduleRepeating(every interval: TimeInterval, _ block: @escaping () -> Void) -> Cancellable {
+            AnyCancellable {}
+        }
+    }
+
+    private let navigator = SilentNavigator()
+
+    /// A window whose results store hides the challenges `rejected`, as after
+    /// OGS confirmed their reject.
+    private func navigation(rejecting rejected: [Int] = []) -> NavigationService {
+        let nav = NavigationService()
+        nav.activityResults.attach(client: confirmingClient(), navigator: navigator, scheduler: HeldScheduler())
+        for id in rejected {
+            var challenge = OGSChallengeSampleData.sampleChallenge
+            challenge.id = id
+            nav.activityResults.reject(challenge: challenge, session: UUID(), itemID: "challenge-\(id)",
+                                       display: ActivityRowDisplay(title: "Challenger", detail: "9×9"),
+                                       section: .challengesReceived, after: nil)
+        }
+        return nav
+    }
+
+    /// The services a test made, kept until it ends, since a window's stores
+    /// hold theirs weakly.
+    private var services = [OGSService]()
+
+    /// A signed-in service on a socket that never opens.
+    private func signedInService(_ build: (inout OGSService.BootstrapState) -> Void = { _ in }) -> OGSService {
+        var state = OGSService.BootstrapState()
+        state.user = OGSUser(username: "current", id: 1, rank: 25)
+        state.isLoggedIn = true
+        build(&state)
+        let suite = "com.honganhkhoa.Surround.ActivityModelTests.\(UUID().uuidString)"
+        preferenceSuites.append(suite)
+        let service = OGSService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: OGSOfflineRejectingHTTPClient(), preferences: UserDefaults(suiteName: suite)!,
+            ogsWebsocket: OGSOfflineNoOpWebsocket(), connectsAutomatically: false,
+            usesSurroundOverviewService: false, enablesAppSideEffects: false, startsTimers: false,
+            installsObservers: false, initialState: state
+        )
+        services.append(service)
+        return service
+    }
+
+    private func received(_ id: Int) -> OGSDirectChallenge {
+        var challenge = OGSChallengeSampleData.sampleChallenge
+        challenge.id = id
+        return challenge
+    }
+
+    func testTheWindowsInputReadsEachOfTheWindowsStores() {
+        ActivitySession.reset()
+        defer { ActivitySession.reset() }
+        let nav = navigation()
+
+        // The window's live games that started elsewhere.
+        let account = CurrentValueSubject<Int?, Never>(1)
+        let loading = CurrentValueSubject<Bool, Never>(false)
+        let applied = CurrentValueSubject<Int, Never>(1)
+        let live = CurrentValueSubject<Set<Int>, Never>([1])
+        let opened = CurrentValueSubject<Set<Int>, Never>([])
+        nav.startedGamesRecorder.attach(StartedGamesRecorder.Feed(
+            accountID: account.eraseToAnyPublisher(), isLoadingOverview: loading.eraseToAnyPublisher(),
+            appliedOverviews: applied.eraseToAnyPublisher(), liveGameIDs: live.eraseToAnyPublisher(),
+            openedGameIDs: opened.eraseToAnyPublisher()
+        ), now: { 1_000 })
+        live.send([1, 7])
+
+        // The app's first sightings of items without a creation time.
+        ActivitySession.record([Model.WaitingID.sentChallenge(5)], at: 900)
+
+        // The window's last-known open challenges, from while its socket was up.
+        var open = OGSChallengeSampleData.sampleOpenChallenge
+        open.id = 4
+        nav.activityLastKnown.attach(ogs: signedInService { $0.openChallengeSentById = [4: open] })
+
+        nav.main.rootView = .privateMessages
+        let ogs = signedInService { $0.challengesSent = [self.received(5)] }
+        let input = Model.Input.window(ogs: ogs, nav: nav, place: .root(isMessagesTab: true), now: 1_010, fixture: nil)
+        XCTAssertEqual(input.startedGames, [7: 1_000])
+        XCTAssertEqual(input.waiting.first { $0.id == "sent-5" }?.since, 900)
+        XCTAssertNotNil(input.waiting.first { $0.id == "open-4" },
+                        "While the socket is down the last-known copy stands in for the service's own rows.")
+        XCTAssertTrue(input.isMessagesTabSelected)
+        XCTAssertEqual(input.now, 1_010)
+        XCTAssertEqual(input.sessionStart, 0, "Every read conversation counts as a recent one.")
+        XCTAssertEqual(input.hiddenListedIDs, [])
+    }
+
+    func testTheWindowsInputLeavesOutWhatOGSConfirmedGone() {
+        let ogs = signedInService { $0.challengesReceived = [self.received(9), self.received(8)] }
+        XCTAssertEqual(Model.Input.window(ogs: ogs, nav: navigation(), place: .root(isMessagesTab: false), now: 0,
+                                          fixture: nil).challengesReceived.map(\.id), [9, 8])
+
+        let nav = navigation(rejecting: [9])
+        XCTAssertEqual(nav.activityResults.hiddenIDs, ["challenge-9"])
+        let input = Model.Input.window(ogs: ogs, nav: nav, place: .root(isMessagesTab: false), now: 0, fixture: nil)
+        XCTAssertEqual(input.challengesReceived.map(\.id), [8])
+        XCTAssertEqual(input.hiddenListedIDs, ["challenge-9"])
+        XCTAssertEqual(Model.snapshot(input).counted.map(\.id), ["challenge-8"], "A hidden challenge never counts.")
+
+        let updated = signedInService { $0.challengesReceived = [self.received(8)] }
+        XCTAssertEqual(Model.Input.window(ogs: updated, nav: nav, place: .root(isMessagesTab: false), now: 0,
+                                          fixture: nil).hiddenListedIDs, [],
+                       "Once the service drops it, nothing is left out, and the store can forget it.")
+    }
+
+    func testADebugStatesInputStandsInForTheServicesLessWhatOGSConfirmedGone() {
+        let nav = navigation(rejecting: [9])
+        nav.main.rootView = .privateMessages
+        var fixture = Model.Input()
+        fixture.liveGames = [yourMove(1)]
+        fixture.challengesReceived = [Model.Challenge(id: 9, isLive: true), Model.Challenge(id: 8, isLive: false)]
+        fixture.now = 42
+        let ogs = signedInService { $0.challengesReceived = [self.received(7)] }
+        var expected = fixture
+        expected.challengesReceived = [Model.Challenge(id: 8, isLive: false)]
+        expected.isMessagesTabSelected = true
+        expected.hiddenListedIDs = ["challenge-9"]
+        XCTAssertEqual(Model.Input.window(ogs: ogs, nav: nav, place: .conversation, now: 1_000, fixture: fixture),
+                       expected, "The state's input passes through on its own clock.")
     }
 
     // MARK: Reading a game

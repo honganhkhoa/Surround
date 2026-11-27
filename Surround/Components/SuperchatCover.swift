@@ -177,6 +177,15 @@ struct SuperchatCoverView: View {
         }
     }
 
+    /// What the header says while offline, as every carrier of the window's
+    /// status says it: "Connecting…" before the window's first connection,
+    /// while its socket is on its first attempt, else "Reconnecting…".
+    private var offlineWords: String {
+        let words = RootConnectionLine.words(status: connection.status, hasConnected: connection.hasConnected,
+                                             socket: ogs.socketStatus)
+        return words == .connecting ? ActivityBarWords.connecting : ActivityBarWords.reconnecting
+    }
+
     private var homeTheme: SurroundTheme {
         SurroundTheme.current(storedID: gameThemeID, appliesToWholeApp: themeAppliesToWholeApp)
     }
@@ -322,8 +331,9 @@ struct SuperchatCoverView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The title, and offline Reconnecting… beside it, or under it where the
-    /// two don't fit on one line: squeezed side by side, both break inside a word.
+    /// The title, and offline Reconnecting… (Connecting… before the window's
+    /// first connection) beside it, or under it where the two don't fit on
+    /// one line: squeezed side by side, both break inside a word.
     @ViewBuilder private var titleRow: some View {
         let title = Text("Moderator chat")
             .font(.headline)
@@ -334,7 +344,7 @@ struct SuperchatCoverView: View {
                 ProgressView()
                     .controlSize(.mini)
                     .accessibilityHidden(true)
-                Text("Reconnecting…")
+                Text(verbatim: offlineWords)
             }
             .font(.subheadline)
             .foregroundStyle(.secondary)

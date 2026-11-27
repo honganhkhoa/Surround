@@ -75,6 +75,10 @@ struct MainView: View {
     /// Records this window's waiting items as they arrive, for Activity's
     /// order. Set once, with the window's Activity stores.
     @State private var activityFirstSeen: ActivityFirstSeenObserver?
+    #if targetEnvironment(macCatalyst)
+    /// This window's Activity command in the Mac's View menu.
+    @State private var activityMenuTarget = ActivityMenuTarget()
+    #endif
 
     @EnvironmentObject var nav: NavigationService
 
@@ -110,7 +114,11 @@ struct MainView: View {
     }
 
     /// Connects the window's Activity stores and producers to its service,
-    /// and its list to this presenter, once.
+    /// and its list to this presenter, once. The window's bar state comes
+    /// last, so its first value, computed here before the first layout,
+    /// reads the stores attached before it, and it speaks the root's first
+    /// leads. Roots built without MainView never attach it, so it publishes
+    /// nothing there.
     private func attachActivity() {
         guard activityFirstSeen == nil else { return }
         nav.activityResults.attach(client: .live(ogs), navigator: nav,
@@ -126,6 +134,15 @@ struct MainView: View {
             isCovered: { [weak ogs] in ogs?.superchatCover != nil },
             gamesOnScreen: { [weak nav] in nav?.ownLiveGameIDsOnScreen ?? [] }
         )
+        // The Now section says the window's status where the bar does.
+        nav.activityBar.nowSectionSaysStatus = ActivityBarHosting.carriesConnectionStatus
+        // VoiceOver hears a started game or a live challenge as it first
+        // leads a root screen, once per app from the window in front.
+        nav.activityBar.postsFirstLeads = true
+        nav.activityBar.attach(ogs: ogs, nav: nav, connection: environment.connectionStatus) { [weak nav, weak ogs] in
+            guard let nav, let ogs, let announcement = ActivityBarState.appAnnouncement($0, in: ogs) else { return }
+            nav.announce(announcement)
+        }
     }
 
     /// Another account's list, results, drafts and last-known rows don't
@@ -178,9 +195,10 @@ struct MainView: View {
         })
     }
     
-    private func hostedTabContent(_ root: RootView) -> AnyView {
-        AnyView(root.navigationView
-            .id(root == .privateMessages || root == .profile ? ogs.user?.id : nil)
+    /// The window's environment for content that UIKit hosts outside this
+    /// view's tree: the UIKit containers' tabs and their Activity bar.
+    private func windowEnvironment(_ content: some View) -> some View {
+        content
             .environmentObject(ogs)
             .environmentObject(sgs)
             .environmentObject(nav)
@@ -197,9 +215,21 @@ struct MainView: View {
             // and the window's measured width class and shape.
             .environment(\.connectionStatus, environment.connectionStatus)
             .environment(\.gameControlWindowClass, environment.gameControlWindowClass)
+    }
+
+    private func hostedTabContent(_ root: RootView) -> AnyView {
+        AnyView(windowEnvironment(root.navigationView
+            .id(root == .privateMessages || root == .profile ? ogs.user?.id : nil))
             .modifier(AppReviewHostedPresentation(root: root))
             .environment(\.appReviewCoordinator, environment.appReviewCoordinator)
             .environment(\.appReviewPresentationRelay, environment.appReviewPresentationRelay))
+    }
+
+    /// The Activity bar in UIKit's accessory, and the Now section in the
+    /// sidebar's bottom bar on iPad and the Mac, with the window's
+    /// environment.
+    private func hostedAccessoryContent(_ bar: AnyView) -> AnyView {
+        AnyView(windowEnvironment(bar))
     }
 
     @ViewBuilder
@@ -215,11 +245,12 @@ struct MainView: View {
                 isLoggedIn: ogs.isLoggedIn,
                 messagesBadgeCount: messagesBadgeCount,
                 onAccountSheet: { nav.main.accountSheet = $0 },
-                content: hostedTabContent
+                content: hostedTabContent,
+                activityPlaces: nav.activityPlaces,
+                activityBar: nav.activityBar,
+                accessoryContent: hostedAccessoryContent,
+                closeNowSectionPopover: { nav.closeActivityPopover(openedFrom: .nowSection) }
             )
-            #if DEBUG
-            .withNoticesHostProbe(places: nav.activityPlaces)
-            #endif
             .ignoresSafeArea()
         } else {
             #if canImport(SwiftUI, _version: 8.0)
@@ -228,11 +259,11 @@ struct MainView: View {
                     selection: navigationCurrentView,
                     isLoggedIn: ogs.isLoggedIn,
                     messagesBadgeCount: messagesBadgeCount,
-                    content: hostedTabContent
+                    content: hostedTabContent,
+                    activityPlaces: nav.activityPlaces,
+                    activityBar: nav.activityBar,
+                    accessoryContent: hostedAccessoryContent
                 )
-                #if DEBUG
-                .withNoticesHostProbe(places: nav.activityPlaces)
-                #endif
                 // UIKit owns the window and keyboard avoidance.
                 .ignoresSafeArea()
             } else {
@@ -321,8 +352,21 @@ struct MainView: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .modifier(MainTabPlacement(horizontalSizeClass: horizontalSizeClass))
-        #if DEBUG
-        .modifier(NoticesHostProbeTabs(places: nav.activityPlaces, root: nav.main.rootView))
+        // The Mac has no accessory and no minimizing, so it attaches neither.
+        // Its Now section is the sidebar's bottom bar, set on the TabView's
+        // own controller once the window appears and checked again after
+        // each sign-in change, which changes the tabs.
+        #if targetEnvironment(macCatalyst)
+        .background {
+            ActivityMacNowSectionHost(nav: nav, isLoggedIn: ogs.isLoggedIn, menuTarget: activityMenuTarget) { openers in
+                hostedAccessoryContent(AnyView(ActivityNowSection(bar: nav.activityBar, openers: openers)))
+            }
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
+        }
+        #else
+        .modifier(ActivityBottomAccessoryHost(bar: nav.activityBar, places: nav.activityPlaces,
+                                              root: nav.main.rootView))
         #endif
     }
 
@@ -337,13 +381,7 @@ struct MainView: View {
                 }
             }
         }
-        return ZStack(alignment: .top) {
-            tabNavigation
-                .modifier(ActivitySheetPresenter())
-            if ogs.isLoggedIn {
-                NotificationPopupHost(places: nav.activityPlaces, selectedTab: nav.main.rootView)
-            }
-        }
+        return tabNavigation.modifier(ActivitySheetPresenter())
         // The popover's anchor, above everything it may be opened from.
         .overlay { ActivityPopoverPresenter() }
         .sheet(item: $nav.main.accountSheet) { destination in
@@ -409,6 +447,13 @@ struct MainView: View {
         // This window's place in the app-wide announcer, which speaks and
         // plays haptics once per app, for the window the user is in.
         .modifier(AppAnnouncerWindowRegistration(window: nav.announcerWindow))
+        #if targetEnvironment(macCatalyst)
+        // View > Activity acts on the window in front; the moderator's
+        // cover leaves it nothing to open, and signed out there is no
+        // Activity.
+        .focusedSceneValue(\.activityMenuTarget,
+                           ogs.superchatCover == nil && ogs.isLoggedIn ? activityMenuTarget : nil)
+        #endif
         .onOpenURL { url in
             nav.handle(appURL: url)
         }
@@ -422,43 +467,6 @@ struct MainView: View {
         )
         .environment(\.surroundAllowsRemoteActivity, allowsRemoteActivity)
         .environmentObject(gameChatSessions)
-    }
-}
-
-/// NotificationPopup, while the selected tab doesn't show a game. A game
-/// says its connection status itself, and its control and the control's
-/// popover carry what the popup's pills and Messages button offer.
-/// Conversations keep the popup. A game in a presented stack, such as the
-/// iPad Profile sheet, has no tab, so the popup stays under the sheet.
-///
-/// Both halves settle after the layout pass: the registry a main-queue turn
-/// after the screens change, and the selected tab, which changes as soon as
-/// one is picked, as this host's copy a turn after it does.
-private struct NotificationPopupHost: View {
-    @ObservedObject var places: ActivityPlaceRegistry
-    let selectedTab: RootView
-    @State private var settledTab: RootView
-
-    init(places: ActivityPlaceRegistry, selectedTab: RootView) {
-        self.places = places
-        self.selectedTab = selectedTab
-        _settledTab = State(initialValue: selectedTab)
-    }
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            // Always here, so the host follows the selected tab while the
-            // popup is unmounted.
-            Color.clear
-                .frame(width: 0, height: 0)
-                .accessibilityHidden(true)
-            if places.place(in: settledTab).gameID == nil {
-                NotificationPopup()
-            }
-        }
-        .onChange(of: selectedTab) { _, tab in
-            DispatchQueue.main.async { settledTab = tab }
-        }
     }
 }
 

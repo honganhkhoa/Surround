@@ -218,8 +218,10 @@ struct GameControlRow: View {
     /// What the actions that need the connection show while it is down, by
     /// the game's connection placement.
     var connectionAction = GameConnectionPlacement.Action.disabled
-    /// The window's connection status shows: Reconnecting… or Can’t reach OGS.
-    var connectionStatusShows = false
+    /// What they say while the window's connection status shows: Connecting…
+    /// before the window's first connection, else Reconnecting…; nil while
+    /// nothing shows (`ConnectionStatusModel.Status.gameActionWords`).
+    var connectionWords: RootConnectionLine.Words?
 
     @Setting(.autoSubmitForLiveGames) var autoSubmitForLiveGames: Bool
     @Setting(.autoSubmitForCorrespondenceGames) var autoSubmitForCorrespondenceGames: Bool
@@ -228,34 +230,32 @@ struct GameControlRow: View {
         state.blocksGameActions || ogs.socketStatus != .connected
     }
 
-    /// VoiceOver hears why an action that needs the connection waits.
-    private var waitsForConnection: Bool {
-        connectionAction != .none && connectionStatusShows
-    }
-
-    /// Where nothing else in the game says the connection is down (no title
-    /// slot, no clock in play), the main action reads Reconnecting… instead.
-    private var relabelsMainAction: Bool {
-        connectionAction == .relabelled && connectionStatusShows
-    }
-
     /// An action that needs the connection: disabled at once while the
     /// socket is down, in every layout. While the window's status shows it
-    /// says Reconnecting…, as its VoiceOver value, or in place of its name
-    /// where the game relabels it; VoiceOver keeps the name.
+    /// says Reconnecting…, or Connecting… before the window's first
+    /// connection, as its VoiceOver value, so VoiceOver hears why it waits,
+    /// and in place of its name where nothing else in the game says the
+    /// connection is down (no title slot, no clock in play), where the game
+    /// relabels it; VoiceOver keeps the name.
     private func connectionGatedButton(_ name: Text, perform: @escaping () -> Void) -> some View {
         Button(action: perform) {
-            if relabelsMainAction {
+            if let relabel = connectionAction.relabel(connectionWords) {
                 // One word: in the Duo's narrow column it shrinks to fit a
                 // line rather than breaking mid-word.
-                Text("Reconnecting…").lineLimit(1).minimumScaleFactor(0.5)
+                connectionText(relabel).lineLimit(1).minimumScaleFactor(0.5)
             } else {
                 name
             }
         }
         .disabled(blocksGameActions)
         .accessibilityLabel(name)
-        .accessibilityValue(waitsForConnection ? Text("Reconnecting…") : Text(verbatim: ""))
+        .accessibilityValue(connectionAction.value(connectionWords).map(connectionText) ?? Text(verbatim: ""))
+    }
+
+    private func connectionText(_ words: RootConnectionLine.Words) -> Text {
+        words == .connecting
+            ? Text("Connecting…", comment: "While the app first connects to OGS: a game's clock badge and title capsule, and the connection status in the Activity bar, the Now section, under root titles, in the Activity list and on the moderator cover")
+            : Text("Reconnecting…")
     }
 
     private var moreForeground: Color {

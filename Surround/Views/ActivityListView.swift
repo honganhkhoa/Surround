@@ -56,8 +56,9 @@ struct ActivityListView: View {
     /// Detail does, in place on Home's route; nil opens the game on Home's
     /// route and resets the window's stacks.
     var switchGame: ((Game) -> Void)?
-    /// The window's connection status, which a game's popover shares with
-    /// its game. Nil makes the list's own.
+    /// The window's connection status, which root lists and a game's
+    /// popover share with the window's other carriers. Nil makes the list's
+    /// own, as in captures, which have no window source.
     var connection: ConnectionStatusSource?
 
     @EnvironmentObject private var ogs: OGSService
@@ -88,10 +89,11 @@ struct ActivityListView: View {
 
 // MARK: - What the list shows
 
-/// What one window's Activity list shows now, from the service, the window's
-/// last-known seek graph rows and its results; in Debug runs with an
-/// Activity state, from the fixture and its clock. The pushed cards read the
-/// same, so their actions keep the row's place.
+/// What one window's Activity list shows now, from the window's input
+/// (`ActivityModel.Input.window`), which the window's bar and Game Detail's
+/// control read too, its last-known seek graph rows and its results; in
+/// Debug runs with an Activity state, from the fixture and its clock. The
+/// pushed cards read the same, so their actions keep the row's place.
 @MainActor
 struct ActivityListSource {
     let ogs: OGSService
@@ -109,8 +111,8 @@ struct ActivityListSource {
         var sections: [ActivityListSections.Section]
         /// The user's open and Rengo challenges, as the rows read them.
         var openChallenges: ActivityLastKnown.OpenChallenges
-        /// Ids the store hides that the model no longer lists, so they need
-        /// no hiding.
+        /// Ids the store hides that the service no longer lists
+        /// (`ActivityModel.Input.hiddenListedIDs`), so they need no hiding.
         var settledHiddenIDs: Set<String>
 
         /// No card and no section: the list reads "Nothing waiting".
@@ -172,10 +174,12 @@ struct ActivityListSource {
     func snapshot(now: TimeInterval, card: ActivityGameOverCard = ActivityGameOverCard(),
                   showing cardChallengeID: Int? = nil) -> Snapshot {
         let openChallenges = openChallenges
-        let input = input(now: now, openChallenges: openChallenges)
+        let input = ActivityModel.Input.window(ogs: ogs, nav: nav, place: place, now: now)
         let model = ActivityModel.snapshot(input)
         let results = nav.activityResults
         let hidden = results.hiddenIDs
+        // The input already leaves out what OGS confirmed gone; the list
+        // keeps its own filter for the resolved rows it shows.
         let listed = model.list.filter { !hidden.contains($0.id) }
         let resolved = results.resolvedRows
         let cardRow = card.row(showing: cardChallengeID, listed: listed, resolved: resolved)
@@ -184,21 +188,7 @@ struct ActivityListSource {
             sections: ActivityListSections.sections(list: listed, resolved: resolved,
                                                     excluding: Set(cardRow.map { [$0.id] } ?? [])),
             openChallenges: openChallenges,
-            settledHiddenIDs: hidden.subtracting(model.list.map(\.id))
-        )
-    }
-
-    private func input(now: TimeInterval, openChallenges: ActivityLastKnown.OpenChallenges) -> ActivityModel.Input {
-        #if DEBUG && MAIN_APP
-        if let input = ActivityFixtures.selectedInput(ogs, place: place) {
-            return input
-        }
-        #endif
-        // Recent read conversations are the saved peers Messages lists, so
-        // the session starts at the distant past.
-        return ActivityModel.Input(
-            ogs: ogs, place: place, firstSeen: ActivitySession.firstSeen, sessionStart: 0, now: now,
-            openChallenges: openChallenges
+            settledHiddenIDs: hidden.subtracting(input.hiddenListedIDs)
         )
     }
 
@@ -218,12 +208,15 @@ struct ActivityListSource {
         }
     }
 
+    /// A waiting row's content, its time searched at `now`, or where UI
+    /// tests stop it (`ActivityElapsed.stopsAt`).
     func content(of target: WaitingTarget, waiting: ActivityModel.Waiting, now: TimeInterval) -> ActivityRowContent {
-        switch target {
+        let waited = ActivityElapsed.waited(since: waiting.since, now: now)
+        return switch target {
         case .search(let entry):
-            ActivityRowContents.quickMatch(entry, waited: now - waiting.since)
+            ActivityRowContents.quickMatch(entry, waited: waited)
         case .openChallenge(let challenge):
-            ActivityRowContents.openChallenge(challenge, isLive: waiting.isLive, waited: now - waiting.since)
+            ActivityRowContents.openChallenge(challenge, isLive: waiting.isLive, waited: waited)
         case .sentChallenge(let challenge):
             ActivityRowContents.sentChallenge(challenge, isLive: waiting.isLive)
         case .rengo(let challenge):
@@ -345,15 +338,16 @@ private struct ActivityListContent: View {
                 }
             }
         }
-        .navigationTitle(Text("Activity", comment: "Title of the list of the user's games, challenges, searches and messages"))
+        .navigationTitle(Text("Activity", comment: "Title of the list of the user's games, challenges, searches and messages. Also the Activity bar's VoiceOver name and the Mac's View menu command that opens the list"))
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: cardChallengeID, initial: true) { _, challengeID in card.remember(challengeID) }
         .onAppear {
             results.begin(session: session)
             isPresented = true
             // The cards this list pushes dim by its status: the window's,
-            // in a game's popover.
-            navigation.activityConnection = connection
+            // in a game's popover. Pushed at a route, it lends it while its
+            // route is in the stack.
+            navigation.setActivityList(connection, at: owningStackRoute)
             if lifetime.release == nil {
                 let results = results
                 let session = session
@@ -420,16 +414,14 @@ private struct ActivityListContent: View {
                     .accessibilityIdentifier(ID.activityEmpty)
                 }
             } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            scrolledContent(snapshot)
-                        }
-                        .padding(.horizontal, density == .regular ? 16 : 0)
-                        .padding(.bottom, 20)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        scrolledContent(snapshot)
                     }
-                    .onAppear { applyFocus(proxy, snapshot) }
+                    .padding(.horizontal, density == .regular ? 16 : 0)
+                    .padding(.bottom, 20)
                 }
+                .onAppear { applyFocus(snapshot) }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -451,34 +443,36 @@ private struct ActivityListContent: View {
         header
         ForEach(snapshot.sections) { section in
             sectionView(section, snapshot)
-                .id(section.kind)
         }
     }
 
-    /// Opened at Messages, the list scrolls there on its first appearance.
-    /// With exactly one unread conversation it also opens that one at once,
-    /// so Back shows the list at Messages.
-    private func applyFocus(_ proxy: ScrollViewProxy, _ snapshot: ActivityListSource.Snapshot) {
-        guard focus == .messages, !hasFocused else { return }
+    /// Opened at an item, as View in the bar or a Now row opens it, the list
+    /// pushes that item's card on its first appearance, so Back shows the
+    /// list.
+    private func applyFocus(_ snapshot: ActivityListSource.Snapshot) {
+        guard focus != .top, !hasFocused else { return }
         hasFocused = true
-        let conversation = focus.conversationToOpen(in: snapshot.model.list).flatMap { peer($0) }
-        // After the first layout, so the section has its place and the
-        // stack has appeared.
+        let opening = focus.opening(in: snapshot.model.list)
+        // After the first layout, so the stack has appeared.
         DispatchQueue.main.async {
-            proxy.scrollTo(ActivitySection.messages, anchor: .top)
-            guard let conversation else { return }
             var transaction = Transaction()
             transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                navigation.openConversation(conversation)
+            switch opening {
+            case .none:
+                break
+            case .card(let itemID):
+                withTransaction(transaction) {
+                    push(itemID)
+                }
             }
         }
     }
 
-    /// Under the title: "Reconnecting…", or "Can’t reach OGS" with Retry.
+    /// Under the title: "Reconnecting…", "Connecting…" before the window's
+    /// first connection, or "Can’t reach OGS" with Retry.
     @ViewBuilder private var statusLine: some View {
         if isOffline {
-            ActivityStatusLine(connection: connection)
+            ActivityStatusLine(connection: connection, socket: ogs.socketStatus)
                 .padding(.top, 4)
         }
     }
@@ -969,14 +963,18 @@ private struct ActivityItemCardContent: View {
     }
 }
 
-/// The list's offline line: "Reconnecting…", or "Can’t reach OGS" with
-/// Retry. It shows under the list's title, and above the composer of a
-/// conversation the list pushed, where the list's own line is out of sight.
-/// At accessibility sizes Retry goes under the words, so neither breaks
-/// inside a word.
+/// The list's offline line: "Reconnecting…", "Connecting…" before the
+/// window's first connection, or "Can’t reach OGS" with Retry, in the words
+/// every carrier of the window's status says (`RootConnectionLine`). It
+/// shows under the list's title, and above the composer of a conversation,
+/// where the list's own line is out of sight or none shows. At
+/// accessibility sizes Retry goes under the words, so neither breaks inside
+/// a word.
 struct ActivityStatusLine: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var connection: ConnectionStatusSource
+    /// The window's socket, which tells a first attempt from a reconnect.
+    let socket: OGSWebsocketStatus
     var statusIdentifier = ID.activityStatus
     var retryIdentifier = ID.activityStatusRetry
 
@@ -997,7 +995,7 @@ struct ActivityStatusLine: View {
                 ProgressView()
                     .controlSize(.mini)
                     .accessibilityHidden(true)
-                Text("Reconnecting…")
+                Text(verbatim: waitingWords)
                     .accessibilityIdentifier(statusIdentifier)
             }
         }
@@ -1005,6 +1003,14 @@ struct ActivityStatusLine: View {
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity, minHeight: 32)
+    }
+
+    /// "Connecting…" before the window's first connection, while its socket
+    /// is on its first attempt; "Reconnecting…" otherwise.
+    private var waitingWords: String {
+        let words = RootConnectionLine.words(status: connection.status, hasConnected: connection.hasConnected,
+                                             socket: socket)
+        return words == .connecting ? ActivityBarWords.connecting : ActivityBarWords.reconnecting
     }
 }
 
@@ -1033,9 +1039,11 @@ extension ConnectionStatusSource {
 /// is shown it has a session of its own.
 struct ActivityRouteList: View {
     @State private var session = UUID()
+    /// The window's source; none in the capture scene, which makes its own.
+    @Environment(\.connectionStatus) private var connection
 
     var body: some View {
-        ActivityListView(session: session, placement: .route, focus: .top)
+        ActivityListView(session: session, placement: .route, focus: .top, connection: connection)
     }
 }
 
@@ -1046,6 +1054,8 @@ struct ActivityRouteList: View {
 struct ActivitySheetPresenter: ViewModifier {
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
+    /// The window's source, which the list says, as every root carrier does.
+    @Environment(\.connectionStatus) private var connection
 
     private var request: Binding<ActivityRequest?> {
         Binding(
@@ -1062,7 +1072,8 @@ struct ActivitySheetPresenter: ViewModifier {
         content
             .sheet(item: request) { request in
                 AppNavigationStack {
-                    ActivityListView(session: request.sessionID, placement: .sheet, focus: request.focus)
+                    ActivityListView(session: request.sessionID, placement: .sheet, focus: request.focus,
+                                     connection: connection)
                         .toolbar {
                             ToolbarItem(placement: .confirmationAction) {
                                 Button("Done") { nav.main.activity = nil }
@@ -1079,14 +1090,17 @@ struct ActivitySheetPresenter: ViewModifier {
 }
 
 /// The window's Activity list as a popover, for a popover request: regular
-/// widths, and games opened from the window's pills. It hangs off this
-/// always-mounted, invisible anchor, placed at the opener's frame as it was
-/// tapped, so the popover never depends on its opener staying on screen. An
-/// outside tap or Escape closes the request. The in-game control's requests
-/// are its own popover's, so this presenter never shows them.
+/// widths, and over a game, as the Now section and the Mac's Activity
+/// command open it there. It hangs off this always-mounted, invisible
+/// anchor, placed at the opener's frame as it was tapped, so the popover
+/// never depends on its opener staying on screen. An outside tap or Escape
+/// closes the request. The in-game control's requests are its own
+/// popover's, so this presenter never shows them.
 struct ActivityPopoverPresenter: View {
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
+    /// The window's source, which the list says, as every root carrier does.
+    @Environment(\.connectionStatus) private var connection
     /// The latest popover request, whose content stays while it closes.
     @State private var latest: ActivityRequest?
 
@@ -1136,7 +1150,8 @@ struct ActivityPopoverPresenter: View {
             ActivityListView(
                 session: request.sessionID,
                 placement: request.place.gameID == nil ? .popover : .gamePopover,
-                focus: request.focus
+                focus: request.focus,
+                connection: connection
             )
         }
         .environmentObject(ogs)
@@ -1172,9 +1187,8 @@ struct ActivityOpenerButton<Label: View>: View {
 }
 
 /// An opener's latest frame in the window's global space, held by
-/// reference so a new frame redraws nothing. A control that opens the list
-/// only sometimes, as the live pill does, keeps one in `@State` and records
-/// it with `activityOpenerFrame(_:source:)`.
+/// reference so a new frame redraws nothing. `ActivityOpenerButton` keeps
+/// one in `@State` and records it with `activityOpenerFrame(_:source:)`.
 final class ActivityOpenerFrame {
     fileprivate(set) var value = CGRect.zero
 }

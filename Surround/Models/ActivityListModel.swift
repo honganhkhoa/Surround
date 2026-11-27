@@ -44,32 +44,52 @@ struct ActivityRequest: Identifiable, Equatable {
     /// What opened the list.
     enum Source: Equatable {
         case homeSearching
-        case waitingPill
-        case challengePill
-        case livePill
-        case messagesButton
         case debug
         /// Game Detail's in-game control, which presents the list as its own
         /// popover.
         case gameControl
+        /// The Activity bar: its lead, +N or View.
+        case activityBar
+        /// The iPad's and the Mac's Now section: a row, its View, or All
+        /// activity.
+        case nowSection
+        /// The Mac's Activity command in its View menu, which opens the list
+        /// as All activity does.
+        case menuCommand
     }
 
     /// Where the list starts.
     enum Focus: Equatable {
         case top
-        /// Scrolled to Messages, as the Messages button opens it. With
-        /// exactly one unread conversation, that one opens at once.
-        case messages
+        /// With this item's full card pushed, as View in the bar or a Now
+        /// row asks: a challenge sent to the user, or one of the user's own
+        /// waiting items, by its `ActivityModel.Item.id`.
+        case item(String)
 
-        /// The peer whose conversation the list opens at once: with
-        /// Messages in focus and exactly one unread conversation listed.
-        func conversationToOpen(in list: [ActivityModel.Item]) -> Int? {
-            guard self == .messages else { return nil }
-            let unread = list.compactMap { item -> Int? in
-                guard case .conversation(let conversation) = item, conversation.isUnread else { return nil }
-                return conversation.peerID
+        /// The item whose card the list pushes at once
+        /// (`StackRoute.activityItem`): the item in focus, while the list
+        /// still has it and it has a card. A card whose item has gone would
+        /// only pop itself.
+        func cardToOpen(in list: [ActivityModel.Item]) -> String? {
+            guard case .item(let itemID) = self, ActivityItemRef.parse(itemID) != nil,
+                  list.contains(where: { $0.id == itemID }) else { return nil }
+            return itemID
+        }
+
+        /// What the list does as it first appears with this focus.
+        enum Opening: Equatable {
+            case none
+            /// Pushes this item's full card (`StackRoute.activityItem`), as
+            /// View in the bar or a Now row asks.
+            case card(String)
+        }
+
+        /// What the list does as it first appears, from what it lists then.
+        func opening(in list: [ActivityModel.Item]) -> Opening {
+            switch self {
+            case .top: .none
+            case .item: cardToOpen(in: list).map(Opening.card) ?? .none
             }
-            return unread.count == 1 ? unread[0] : nil
         }
     }
 
@@ -436,6 +456,27 @@ enum ActivityElapsed {
         formatter.allowedUnits = whole < 86_400 ? [.hour, .minute] : [.day, .hour]
         formatter.maximumUnitCount = 2
         return formatter.string(from: whole) ?? ""
+    }
+
+    /// The time searched: how long a search or one of the user's own
+    /// challenges has waited at `now`, from its `since`, or at `stopsAt`
+    /// where that stands still.
+    static func waited(since: TimeInterval, now: TimeInterval,
+                       stopsAt: TimeInterval? = ActivityElapsed.stopsAt) -> TimeInterval {
+        max(0, (stopsAt ?? now) - since)
+    }
+
+    /// Nil, so the time searched moves; in a Debug UI-test run, the second
+    /// it stands still at, as search spinners stop there (`SearchSpinner`),
+    /// so a screen that shows it never redraws each second for it. An
+    /// Activity state whose clock runs (`--surround-activity-clock running`)
+    /// keeps it moving.
+    static var stopsAt: TimeInterval? {
+        #if DEBUG && MAIN_APP
+        return ActivityFixtures.timeSearchedStopsAt
+        #else
+        return nil
+        #endif
     }
 }
 

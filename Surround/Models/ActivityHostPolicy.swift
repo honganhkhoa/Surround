@@ -24,8 +24,30 @@ enum ActivityHostPolicy {
 
     /// The running OS in the steps the hosts care about.
     enum Release: Int, Comparable, CaseIterable {
-        case iOS18, iOS26_0, iOS26_1   // iOS26_1: 26.1 and later
+        case iOS18
+        case iOS26_0
+        /// 26.1 up to 27.
+        case iOS26_1
+        case iOS27_0
+        case iOS27_1
+        /// 27.2 and later.
+        case iOS27_2
+
         static func < (lhs: Release, rhs: Release) -> Bool { lhs.rawValue < rhs.rawValue }
+
+        /// The release a version of iOS or iPadOS runs. Below 26 is iOS 18's
+        /// row; 26.1 and its updates are one step, and so is 27.2 with every
+        /// later release.
+        init(_ version: OperatingSystemVersion) {
+            switch (version.majorVersion, version.minorVersion) {
+            case (..<26, _): self = .iOS18
+            case (26, 0): self = .iOS26_0
+            case (26, _): self = .iOS26_1
+            case (27, 0): self = .iOS27_0
+            case (27, 1): self = .iOS27_1
+            default: self = .iOS27_2
+            }
+        }
     }
 
     /// IPadTabContainer's sidebar, from container state, never from geometry.
@@ -47,11 +69,17 @@ enum ActivityHostPolicy {
 
     enum Bar: String { case swiftUIAccessory, uiKitAccessory, customBar }
     enum NowSection: String { case iPadSidebar, macSidebar }
+    /// Where a window says its connection status.
     enum ConnectionStatus: String {
-        case rootSubtitle         // navigationSubtitle under root titles
-        case customBar            // the custom bar's line two, before iOS 26
-        case nowSectionFirstRow   // with Retry, iPadOS 18 with the sidebar shown
-        case windowSubtitle       // Mac
+        /// iPhones and the Duo from iOS 26: the line under root titles, with
+        /// "Can’t reach OGS" and Retry in the bar.
+        case rootSubtitle
+        /// The floating bar says all of it: the custom bar before iOS 26, and
+        /// the iPad's floating bar, custom or the system's, on every iPadOS.
+        case floatingBar
+        /// The Now section's first row, with Retry: the iPad while its
+        /// sidebar shows, on every iPadOS, and the Mac.
+        case nowSectionFirstRow
     }
     enum Minimize: String, CaseIterable { case automatic, never, onScrollDown, onScrollUp }
     /// Where SwiftUI or UIKit says an accessory sits; `notInAccessory` is UIKit's `.none`.
@@ -64,48 +92,71 @@ enum ActivityHostPolicy {
         var minimize: Minimize?          // nil: leave the tab bar alone
     }
 
-    /// Debug probe overrides; production passes none.
+    /// Debug overrides; production passes none.
     struct Overrides: Equatable {
         var forcesCustomBar = false
         var minimize: Minimize?
     }
 
-    /// Containers whose tab bar a device check showed minimizing in every
-    /// tab. Empty until one passes, so accessory hosts keep .never.
-    static let verifiedMinimizingContainers: Set<Container> = []
+    /// Containers whose tab bar a scrolled run showed minimizing in every
+    /// tab, each from the earliest release a run verified. A container that
+    /// isn't here, or a release before its floor, keeps .never; so does a
+    /// whole container once one of its tabs fails.
+    static let verifiedMinimizingContainers: [Container: Release] = [.duoTabContainer: .iOS27_0]
+
+    /// The iPad's floating bar while its sidebar is hidden or the window is
+    /// compact, one entry per release: the custom bar on iPadOS 18, and the
+    /// system's from 26, which the coordinator clears as soon as a game is
+    /// asked for, so the game's board never lays out beside it.
+    static func iPadFloatingBar(on release: Release) -> Bar {
+        switch release {
+        case .iOS18: .customBar
+        case .iOS26_0: .uiKitAccessory
+        case .iOS26_1: .uiKitAccessory
+        // A turn on 27.0 can leave the sidebar's toggle blank while the
+        // system's bar and the Now section show together; .customBar here
+        // gives 27.0 and 27.1 the custom bar instead.
+        case .iOS27_0, .iOS27_1: .uiKitAccessory
+        case .iOS27_2: .uiKitAccessory
+        }
+    }
 
     static func hosts(for facts: Facts, overrides: Overrides = Overrides(),
-                      verifiedMinimizing: Set<Container> = verifiedMinimizingContainers) -> Hosts {
+                      verifiedMinimizing: [Container: Release] = verifiedMinimizingContainers) -> Hosts {
         // Catalyst shares swiftUITabs but never gets an accessory or minimizing.
         if facts.platform == .mac {
-            return Hosts(bar: nil, nowSection: .macSidebar, connectionStatus: .windowSubtitle, minimize: nil)
+            return Hosts(bar: nil, nowSection: .macSidebar, connectionStatus: .nowSectionFirstRow, minimize: nil)
         }
         let release: Release = switch facts.container {
-        case .duoTabContainer: .iOS26_1   // it exists only on iOS 27 with the iOS 27 SDK
+        // It exists only on iOS 27 with the iOS 27 SDK, so nothing earlier
+        // can be the OS's.
+        case .duoTabContainer: max(facts.release, .iOS27_0)
         case .swiftUITabView, .iPadTabContainer: facts.sdkHasHostAPIs ? facts.release : .iOS18
         }
-        let hasSubtitle = release >= .iOS26_0
-        var hosts = Hosts(bar: nil, nowSection: nil,
-                          connectionStatus: hasSubtitle ? .rootSubtitle : .customBar, minimize: nil)
+        var hosts = Hosts(bar: nil, nowSection: nil, connectionStatus: .floatingBar, minimize: nil)
         switch facts.container {
         case .duoTabContainer:
             hosts.bar = .uiKitAccessory
+            hosts.connectionStatus = .rootSubtitle
         case .iPadTabContainer:
+            // iPad status stays where iPadOS 18 has it on every release: no
+            // line under the titles of its top tab bar.
             hosts.nowSection = .iPadSidebar
             if facts.sidebar == .shown {
-                if !hasSubtitle { hosts.connectionStatus = .nowSectionFirstRow }
+                hosts.connectionStatus = .nowSectionFirstRow
             } else {
-                hosts.bar = hasSubtitle ? .uiKitAccessory : .customBar
+                hosts.bar = iPadFloatingBar(on: release)
             }
         case .swiftUITabView:
             hosts.bar = release >= .iOS26_1 ? .swiftUIAccessory : .customBar
+            if release >= .iOS26_0 { hosts.connectionStatus = .rootSubtitle }
         }
         if overrides.forcesCustomBar, hosts.bar != nil { hosts.bar = .customBar }
         // Only iPhone tab bars minimize; the custom bar keeps them full size.
         if facts.platform == .iPhone, release >= .iOS26_0 {
             if let forced = overrides.minimize {
                 hosts.minimize = forced
-            } else if hosts.bar != .customBar, verifiedMinimizing.contains(facts.container) {
+            } else if hosts.bar != .customBar, let floor = verifiedMinimizing[facts.container], release >= floor {
                 hosts.minimize = .onScrollDown
             } else {
                 hosts.minimize = .never

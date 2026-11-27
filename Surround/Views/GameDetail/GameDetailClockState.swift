@@ -78,7 +78,7 @@ struct GameDetailClockState {
     func badgeTitle(narrow: Bool = false) -> String {
         if showsConnectionMark {
             return recoversConnection ? String(localized: "Reconnecting…")
-                : String(localized: "Connecting…", comment: "Clock badge while the app first connects to OGS")
+                : String(localized: "Connecting…", comment: "While the app first connects to OGS: a game's clock badge and title capsule, and the connection status in the Activity bar, the Now section, under root titles, in the Activity list and on the moderator cover")
         }
         guard !isFinished, !isScoring else { return "" }
         if ownsUndoRequest {

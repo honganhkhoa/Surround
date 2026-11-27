@@ -1209,6 +1209,7 @@ struct GameDetailView: View {
                 game: currentGame,
                 gameControlState: gameControlState,
                 connection: connection,
+                activityResults: nav.activityResults,
                 selectedConditionalVariation: $selectedConditionalVariation,
                 interaction: $interaction,
                 showsCompactChatBoard: $showsCompactChatBoard,
@@ -1478,6 +1479,9 @@ private struct GameToolbarLayout: ViewModifier {
     /// The window's connection status, for the title slot's capsule and
     /// the header clocks' mark.
     @ObservedObject var connection: ConnectionStatusSource
+    /// The window's Activity results, so the in-game control drops what OGS
+    /// confirmed gone as soon as the store hides it.
+    @ObservedObject var activityResults: ActivityResults
     /// Redraws the in-game control where time alone changes its state.
     @StateObject private var gameControlDeadlines = GameControlDeadlines()
     /// The control's last state, which it keeps while its popover is open
@@ -1838,7 +1842,9 @@ private struct GameToolbarLayout: ViewModifier {
             ToolbarItem(placement: .principal) { headerClocks }
         }
         if principalItem == .status {
-            ToolbarItem(placement: .principal) { GameConnectionStatusCapsule(connection: connection) }
+            ToolbarItem(placement: .principal) {
+                GameConnectionStatusCapsule(connection: connection, socket: ogs.socketStatus)
+            }
         }
         if principalItem == .identity {
             ToolbarItem(placement: .principal) { headerIdentity }
@@ -1930,15 +1936,13 @@ private struct GameToolbarLayout: ViewModifier {
         #endif
     }
 
-    /// One read of the window's state for the game on screen, as Activity
-    /// reads it: in Debug runs with an Activity state, the state's own on its
-    /// clock.
+    /// One read of the window's state for the game on screen, the input the
+    /// window's bar and Activity read (`ActivityModel.Input.window`): less
+    /// what OGS confirmed gone, so a challenge rejected in the popover leaves
+    /// the control at once, and in Debug runs with an Activity state, the
+    /// state's own on its clock.
     private func gameControlInput() -> ActivityModel.Input {
-        let place = ActivityModel.Place(showing: game)
-        #if DEBUG && MAIN_APP
-        if let input = ActivityFixtures.selectedInput(ogs, place: place) { return input }
-        #endif
-        return ActivityModel.Input(ogs: ogs, place: place, startedGames: nav.startedGamesRecorder.startedGames)
+        ActivityModel.Input.window(ogs: ogs, nav: nav, place: ActivityModel.Place(showing: game))
     }
 
     private func opponentName(in game: Game?) -> String? {
@@ -2034,7 +2038,7 @@ private struct GameToolbarLayout: ViewModifier {
         let model = GameControlItemModel(
             slot: value, windowClass: gameControl.windowClass, modeCount: 2,
             sizeCategory: UIContentSizeCategory(dynamicTypeSize), allowsPicker: allowsPicker,
-            game: other, challenger: nil, show: gameControl.show, openPopover: {}, isZen: true
+            game: other, challenger: nil, show: gameControl.show, openPopover: {}, role: .zen
         )
         if exitsZenFromContent { return (.hidden, model) }
         // Where the chip and Exit would reach over the board, the content
@@ -2258,18 +2262,20 @@ private struct GameToolbarChatButton: View {
 
 /// The window's connection status in the title slot, where no clock is in
 /// play and neither Chat nor Analyze is open: a filled indigo capsule.
-/// Reconnecting…, then Can’t reach OGS once the window's source gives up
-/// waiting (at once with no network), with Retry where both fit and the
-/// words alone where they don't. VoiceOver reads the words as one element,
-/// and Retry as its own button. It never says Connected: the slot goes back
-/// to what it held once the outage ends.
+/// Reconnecting… (Connecting… before the window's first connection), then
+/// Can’t reach OGS once the window's source gives up waiting (at once with
+/// no network), with Retry where both fit and the words alone where they
+/// don't. VoiceOver reads the words as one element, and Retry as its own
+/// button. It never says Connected: the slot goes back to what it held
+/// once the outage ends.
 private struct GameConnectionStatusCapsule: View {
     @ObservedObject var connection: ConnectionStatusSource
+    /// The window's socket, which tells a first attempt from a reconnect.
+    let socket: OGSWebsocketStatus
 
-    private static func words(for status: ConnectionStatusModel.Status) -> Text {
-        status.offersRetry
-            ? Text("Can’t reach OGS", comment: "Activity: under the title while the app can't connect to OGS; shown with Retry")
-            : Text("Reconnecting…")
+    private var words: Text {
+        let words = connection.status.gameCapsuleWords(hasConnected: connection.hasConnected, socket: socket)
+        return Text(verbatim: ActivityBarWords.status(words ?? .reconnecting))
     }
 
     var body: some View {
@@ -2283,7 +2289,7 @@ private struct GameConnectionStatusCapsule: View {
 
     private func capsule(offersRetry: Bool) -> some View {
         HStack(spacing: 8) {
-            Self.words(for: connection.status)
+            words
                 .font(.system(size: 15, weight: .bold))
                 .lineLimit(1)
                 .minimumScaleFactor(offersRetry ? 1 : 0.7)

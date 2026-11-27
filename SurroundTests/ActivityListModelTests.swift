@@ -235,22 +235,22 @@ final class ActivityListModelTests: XCTestCase {
 
     func testAPopoversAnchorStaysInsideItsWindow() {
         let window = CGSize(width: 800, height: 600)
-        let pill = CGRect(x: 100, y: 60, width: 120, height: 44)
-        XCTAssertEqual(ActivityRequest.anchor(pill, inside: window), pill, "An anchor inside stays.")
-        XCTAssertEqual(ActivityRequest.anchor(pill.offsetBy(dx: 900, dy: 700), inside: window),
+        let opener = CGRect(x: 100, y: 60, width: 120, height: 44)
+        XCTAssertEqual(ActivityRequest.anchor(opener, inside: window), opener, "An anchor inside stays.")
+        XCTAssertEqual(ActivityRequest.anchor(opener.offsetBy(dx: 900, dy: 700), inside: window),
                        CGRect(x: 680, y: 556, width: 120, height: 44),
                        "After the window narrows, the opener's old frame moves back inside, keeping its size.")
-        XCTAssertEqual(ActivityRequest.anchor(pill.offsetBy(dx: -300, dy: -100), inside: window),
+        XCTAssertEqual(ActivityRequest.anchor(opener.offsetBy(dx: -300, dy: -100), inside: window),
                        CGRect(x: 0, y: 0, width: 120, height: 44))
         XCTAssertEqual(ActivityRequest.anchor(CGRect(x: 0, y: 500, width: 900, height: 200), inside: window),
                        CGRect(x: 0, y: 400, width: 800, height: 200), "A frame wider than the window takes its width.")
-        XCTAssertEqual(ActivityRequest.anchor(pill, inside: .zero), pill, "Before layout there is nothing to fit.")
+        XCTAssertEqual(ActivityRequest.anchor(opener, inside: .zero), opener, "Before layout there is nothing to fit.")
     }
 
     func testARequestIsItsSession() {
         let session = UUID()
-        let request = ActivityRequest(sessionID: session, source: .messagesButton, focus: .messages, style: .popover,
-                                      anchor: CGRect(x: 10, y: 20, width: 44, height: 44))
+        let request = ActivityRequest(sessionID: session, source: .activityBar, focus: .item("challenge-7"),
+                                      style: .popover, anchor: CGRect(x: 10, y: 20, width: 44, height: 44))
         XCTAssertEqual(request.id, session)
         XCTAssertEqual(ActivityRequest(source: .homeSearching, style: .sheet).focus, .top)
         XCTAssertEqual(ActivityRequest(source: .homeSearching, style: .sheet).place, .root(isMessagesTab: false),
@@ -259,16 +259,41 @@ final class ActivityListModelTests: XCTestCase {
                           ActivityRequest(source: .debug, style: .sheet).id)
     }
 
-    func testOpenedAtMessagesTheOnlyUnreadConversationOpensAtOnce() {
-        let read = Item.conversation(ActivityModel.Conversation(peerID: 32, isUnread: false, lastMessageTime: 200))
-        let one = [game(1), challenge(7), conversation(31), read]
-        XCTAssertEqual(ActivityRequest.Focus.messages.conversationToOpen(in: one), 31,
-                       "Read conversations don't count.")
-        XCTAssertNil(ActivityRequest.Focus.top.conversationToOpen(in: one), "Only the Messages button's focus opens one.")
-        XCTAssertNil(ActivityRequest.Focus.messages.conversationToOpen(in: [conversation(31), conversation(30), read]),
-                     "With two unread, the list stays at Messages.")
-        XCTAssertNil(ActivityRequest.Focus.messages.conversationToOpen(in: [game(1), read]))
-        XCTAssertNil(ActivityRequest.Focus.messages.conversationToOpen(in: []))
+    func testTheBarAndTheNowSectionOpenTheListAsSourcesOfTheirOwn() {
+        for source in [ActivityRequest.Source.activityBar, .nowSection] {
+            let request = ActivityRequest(source: source, focus: .item("challenge-7"), style: .popover)
+            XCTAssertEqual(request.source, source)
+            XCTAssertEqual(request.focus, .item("challenge-7"))
+            XCTAssertEqual(ActivityRequest(source: source, style: .sheet).focus, .top, "+N and All activity open at the top.")
+        }
+        XCTAssertNotEqual(ActivityRequest.Source.activityBar, .nowSection)
+    }
+
+    func testViewOpensTheListWithTheItemsCardPushed() {
+        let list = [game(1), challenge(7), waiting("open-4"), waiting("quick-match-a", kind: .quickMatch), conversation(31)]
+        XCTAssertEqual(ActivityRequest.Focus.item("challenge-7").cardToOpen(in: list), "challenge-7")
+        XCTAssertEqual(ActivityRequest.Focus.item("waiting-open-4").cardToOpen(in: list), "waiting-open-4")
+        XCTAssertEqual(ActivityRequest.Focus.item("waiting-quick-match-a").cardToOpen(in: list), "waiting-quick-match-a")
+        XCTAssertNil(ActivityRequest.Focus.item("challenge-8").cardToOpen(in: list),
+                     "An item that has gone pushes no card, which would only pop itself.")
+        XCTAssertNil(ActivityRequest.Focus.item("game-1").cardToOpen(in: list), "A live game has no card.")
+        XCTAssertNil(ActivityRequest.Focus.item("conversation-31").cardToOpen(in: list))
+        XCTAssertNil(ActivityRequest.Focus.top.cardToOpen(in: list))
+        XCTAssertNotEqual(ActivityRequest.Focus.item("challenge-7"), .item("challenge-8"))
+    }
+
+    /// What the list does as it first appears: View's focus pushes the
+    /// item's card, as the list itself pushes it from the row; the top does
+    /// nothing.
+    func testTheListOpensAsItsFocusAsks() {
+        typealias Focus = ActivityRequest.Focus
+        let list = [game(1), challenge(7), waiting("open-4"), conversation(31)]
+        XCTAssertEqual(Focus.item("challenge-7").opening(in: list), .card("challenge-7"),
+                       "View in the bar or a Now row opens the challenge's card.")
+        XCTAssertEqual(Focus.item("waiting-open-4").opening(in: list), .card("waiting-open-4"))
+        XCTAssertEqual(Focus.item("challenge-8").opening(in: list), .none, "An item that has gone opens the list.")
+        XCTAssertEqual(Focus.item("game-1").opening(in: list), .none, "A live game has no card.")
+        XCTAssertEqual(Focus.top.opening(in: list), .none)
     }
 
     // MARK: Row controls

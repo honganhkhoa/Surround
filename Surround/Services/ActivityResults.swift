@@ -2,13 +2,16 @@
 //  ActivityResults.swift
 //  Surround
 //
-//  What the user does in a window's Activity list, and what came of it. The
-//  store sends every request the list and its pushed cards start, so a
-//  request outlives the row, the push and the list that started it. Results
-//  are kept by the list's session and the row's item id, so a row shows its
-//  result until its list closes. One per window, held by NavigationService.
-//  Main thread by convention, like its owner; it is not actor-isolated,
-//  because NavigationService makes it in a property initializer.
+//  What the user does in a window's Activity list and its chrome, and what
+//  came of it. The store sends every request the list, its pushed cards, the
+//  Activity bar and the Now section start, so a request outlives the row,
+//  the push and the list that started it. Results are kept by the list's
+//  session and the row's item id, so a row shows its result until its list
+//  closes. The bar and the Now section share one standing session of their
+//  own, published apart from the lists', whose result shows for 4 s after it
+//  settles. One per window, held by NavigationService. Main thread by
+//  convention, like its owner; it is not actor-isolated, because
+//  NavigationService makes it in a property initializer.
 //
 
 import Alamofire
@@ -71,6 +74,17 @@ final class ActivityResults: ObservableObject {
     /// The latest begun session, whose entries publish: the list on screen,
     /// which a card it pushed acts for.
     var liveSession: UUID? { sessionOrder.last }
+
+    /// The window's chrome, the Activity bar and the Now section, share this
+    /// standing session. No list begins or ends it, so it is never the live
+    /// session, and no list's session hides its results.
+    let chromeSession = UUID()
+    /// The chrome's actions, in the order they were sent, a Retry last: each
+    /// pending, then its result until `chromeResultDuration` after it
+    /// settles. The bar shows the latest.
+    @Published private(set) var chromeResults: [ActivityBarResult] = []
+    /// How long the chrome shows a result after it settles.
+    static let chromeResultDuration: TimeInterval = 4
 
     /// The live session's entries as rows to merge into the list, by id.
     var resolvedRows: [ActivityResolvedRow] {
@@ -170,7 +184,7 @@ final class ActivityResults: ObservableObject {
     /// The request never answered.
     private struct NoReply: Error {}
 
-    private let now: () -> TimeInterval
+    private var now: () -> TimeInterval
     private var client: Client?
     private weak var navigator: ActivityNavigating?
     private var scheduler: OGSWebsocketScheduling = OGSMainQueueWebsocketScheduler.shared
@@ -185,6 +199,10 @@ final class ActivityResults: ObservableObject {
     /// cancel from OGS.
     private var quickMatchWithdraws: [Int: QuickMatchWithdraw] = [:]
     private var deadline: Cancellable?
+    /// When each of the chrome's results settled, by item id, on `now`'s clock.
+    private var chromeSettledAt: [String: TimeInterval] = [:]
+    /// Wakes the store as the chrome's oldest result ends.
+    private var chromeDeadline: Cancellable?
     /// Items whose announcement waits for the next turn, and how many wait.
     private var awaitingAnnouncement: [String: Int] = [:]
     private var claimedIDs: Set<String> = []
@@ -195,22 +213,30 @@ final class ActivityResults: ObservableObject {
     ///   while the device sleeps, as `DispatchTime` does.
     init(now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
         self.now = now
+        records[chromeSession] = [:]
     }
 
     deinit {
         deadline?.cancel()
+        chromeDeadline?.cancel()
     }
 
     /// Connects the store to its window: the window's requests, its
     /// navigation and the queue its deadlines and announcements run on.
+    /// - Parameter now: The queue's clock, in place of the one the store was
+    ///   made with; nil keeps that one.
     func attach(
         client: Client,
         navigator: ActivityNavigating,
-        scheduler: OGSWebsocketScheduling = OGSMainQueueWebsocketScheduler.shared
+        scheduler: OGSWebsocketScheduling = OGSMainQueueWebsocketScheduler.shared,
+        now: (() -> TimeInterval)? = nil
     ) {
         self.client = client
         self.navigator = navigator
         self.scheduler = scheduler
+        if let now {
+            self.now = now
+        }
         lifecycleSubscription = client.automatchLifecycleEvents
             .sink { [weak self] event in self?.receive(event.kind) }
     }
@@ -220,6 +246,7 @@ final class ActivityResults: ObservableObject {
     /// A list appeared. The latest begun session is the live one, whose
     /// entries publish; an earlier one keeps its entries until it ends.
     func begin(session: UUID) {
+        guard session != chromeSession else { return }
         sessionOrder.removeAll { $0 == session }
         sessionOrder.append(session)
         if records[session] == nil {
@@ -231,6 +258,7 @@ final class ActivityResults: ObservableObject {
     /// A list closed or went away: its entries go. Its requests still
     /// finish, record nothing and still speak, and a live game still opens.
     func end(session: UUID) {
+        guard session != chromeSession else { return }
         sessionOrder.removeAll { $0 == session }
         records[session] = nil
         // Its failed Quick Match withdraws have no row left to correct.
@@ -250,12 +278,16 @@ final class ActivityResults: ObservableObject {
         deadline?.cancel()
         deadline = nil
         records = records.mapValues { _ in [:] }
+        chromeSettledAt = [:]
+        chromeDeadline?.cancel()
+        chromeDeadline = nil
         awaitingAnnouncement = [:]
         claimedIDs = []
         if !hiddenIDs.isEmpty {
             hiddenIDs = []
         }
         publishLiveSession()
+        publishChrome()
     }
 
     // MARK: Requests
@@ -313,9 +345,10 @@ final class ActivityResults: ObservableObject {
              display: display, section: section, after: after)
     }
 
-    /// Repeats the live session's failed action on `itemID`.
-    func retry(itemID: String) {
-        guard let session = sessionOrder.last, let record = records[session]?[itemID],
+    /// Repeats a session's failed action on `itemID`: the live session's,
+    /// or the chrome's for `chromeSession`.
+    func retry(itemID: String, session: UUID? = nil) {
+        guard let session = session ?? sessionOrder.last, let record = records[session]?[itemID],
               record.entry.state == .failed else {
             return
         }
@@ -361,6 +394,9 @@ final class ActivityResults: ObservableObject {
             // A Retry takes over from the failed withdraw it repeats.
             quickMatchWithdraws = quickMatchWithdraws.filter {
                 $0.value.attempt.session != session || $0.value.attempt.itemID != itemID
+            }
+            if session == chromeSession, chromeSettledAt.removeValue(forKey: itemID) != nil {
+                scheduleChromeDeadline()
             }
             publish(session)
         }
@@ -570,16 +606,53 @@ final class ActivityResults: ObservableObject {
         case .removed:
             guard records[attempt.session]?[itemID]?.attemptID == attempt.id else { return }
             records[attempt.session]?[itemID] = nil
+            if attempt.session == chromeSession, chromeSettledAt.removeValue(forKey: itemID) != nil {
+                scheduleChromeDeadline()
+            }
             publish(attempt.session)
         }
     }
 
     /// Records a state for the attempt, unless its session ended or a later
-    /// attempt took over.
+    /// attempt took over. The chrome's result starts its 4 s as it settles.
     private func record(_ state: ActivityActionState, for attempt: Attempt) {
         guard records[attempt.session]?[attempt.itemID]?.attemptID == attempt.id else { return }
         records[attempt.session]?[attempt.itemID]?.entry.state = state
+        if attempt.session == chromeSession, !state.isPending {
+            chromeSettledAt[attempt.itemID] = now()
+            scheduleChromeDeadline()
+        }
         publish(attempt.session)
+    }
+
+    // MARK: The chrome's results
+
+    /// Wakes the store as the chrome's oldest result ends, if one has settled.
+    private func scheduleChromeDeadline() {
+        chromeDeadline?.cancel()
+        chromeDeadline = nil
+        guard let oldest = chromeSettledAt.values.min() else { return }
+        chromeDeadline = scheduler.schedule(after: max(0, oldest + Self.chromeResultDuration - now())) { [weak self] in
+            self?.chromeResultsEnded()
+        }
+    }
+
+    /// The results that have shown for `chromeResultDuration` go, and the
+    /// chrome shows what the window has instead. A Quick Match withdraw that
+    /// failed and went with its result has no row left to correct.
+    private func chromeResultsEnded() {
+        chromeDeadline = nil
+        let time = now()
+        for (itemID, settled) in chromeSettledAt where time - settled >= Self.chromeResultDuration {
+            chromeSettledAt[itemID] = nil
+            records[chromeSession]?[itemID] = nil
+        }
+        quickMatchWithdraws = quickMatchWithdraws.filter { _, withdraw in
+            withdraw.attempt.session != chromeSession || withdraw.withdrawal.state.isPending
+                || records[chromeSession]?[withdraw.attempt.itemID]?.attemptID == withdraw.attempt.id
+        }
+        publishChrome()
+        scheduleChromeDeadline()
     }
 
     /// Speaks one turn later, unless the row claimed the result by then. A
@@ -600,6 +673,10 @@ final class ActivityResults: ObservableObject {
     }
 
     private func publish(_ session: UUID) {
+        if session == chromeSession {
+            publishChrome()
+            return
+        }
         guard session == sessionOrder.last else { return }
         publishLiveSession()
     }
@@ -608,6 +685,19 @@ final class ActivityResults: ObservableObject {
         let live = sessionOrder.last.flatMap { records[$0] }?.mapValues(\.entry) ?? [:]
         if entries != live {
             entries = live
+        }
+    }
+
+    /// The chrome's entries apart from the lists', each attempt in its turn.
+    private func publishChrome() {
+        let chrome = (records[chromeSession] ?? [:])
+            .sorted { $0.value.attemptID < $1.value.attemptID }
+            .map { itemID, record in
+                ActivityBarResult(itemID: itemID, action: record.entry.action, state: record.entry.state,
+                                  display: record.entry.display)
+            }
+        if chromeResults != chrome {
+            chromeResults = chrome
         }
     }
 }

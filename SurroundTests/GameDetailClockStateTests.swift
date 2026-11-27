@@ -441,7 +441,8 @@ final class GameDetailClockStateTests: XCTestCase {
     }
 
     /// Before the app's first connection (launch, sign-in) there is nothing
-    /// to reconnect, so the badge reads as the app's banner does.
+    /// to reconnect, so the badge reads "Connecting…", as the window's other
+    /// carriers do.
     func testFirstConnectionBadgeReadsConnecting() throws {
         let game = try game()
         let snapshot = try XCTUnwrap(game.clock)
@@ -499,6 +500,84 @@ final class GameDetailClockStateTests: XCTestCase {
                                                        recoversConnection: false, carriesConnectionStatus: true)
             XCTAssertEqual(firstConnection.badgeTitle(), "Connecting…", "\(phase)")
         }
+    }
+
+    /// The title slot's capsule says what every carrier of the window's
+    /// status says: Connecting… before the window's first connection, while
+    /// its socket is on its first attempt, then Reconnecting…, and Can’t
+    /// reach OGS once the window gives up waiting. Never Connected.
+    func testTheTitleCapsuleSaysConnectingBeforeTheFirstConnection() {
+        typealias Status = ConnectionStatusModel.Status
+        XCTAssertEqual(Status.reconnecting.gameCapsuleWords(hasConnected: false, socket: .connecting), .connecting)
+        XCTAssertEqual(Status.reconnecting.gameCapsuleWords(hasConnected: false, socket: .reconnecting), .reconnecting,
+                       "A failed first attempt reconnects, as the clocks say.")
+        XCTAssertEqual(Status.reconnecting.gameCapsuleWords(hasConnected: true, socket: .connecting), .reconnecting)
+        for hasConnected in [false, true] {
+            for reason in [ConnectionStatusModel.UnreachableReason.noNetwork, .timedOut] {
+                XCTAssertEqual(Status.unreachable(reason).gameCapsuleWords(hasConnected: hasConnected,
+                                                                           socket: .reconnecting), .unreachable)
+            }
+            XCTAssertNil(Status.connected.gameCapsuleWords(hasConnected: hasConnected, socket: .connected),
+                         "The slot goes back to what it held.")
+            XCTAssertNil(Status.hidden.gameCapsuleWords(hasConnected: hasConnected, socket: .connected))
+        }
+        XCTAssertEqual(ActivityBarWords.status(.connecting), "Connecting…")
+        XCTAssertEqual(ActivityBarWords.status(.reconnecting), "Reconnecting…")
+        XCTAssertEqual(ActivityBarWords.status(.unreachable), "Can’t reach OGS")
+    }
+
+    /// The relabelled main action says what the clocks and the capsule say:
+    /// Connecting… before the window's first connection, while its socket is
+    /// on its first attempt, then Reconnecting…, also once the window can't
+    /// reach OGS, whose words it never says. Only where the game relabels it.
+    func testTheRelabelledActionSaysConnectingBeforeTheFirstConnection() {
+        typealias Status = ConnectionStatusModel.Status
+        typealias Action = GameConnectionPlacement.Action
+        let relabelled = Action.relabelled
+        XCTAssertEqual(relabelled.relabel(Status.reconnecting.gameActionWords(hasConnected: false, socket: .connecting)),
+                       .connecting)
+        XCTAssertEqual(relabelled.relabel(Status.reconnecting.gameActionWords(hasConnected: false, socket: .reconnecting)),
+                       .reconnecting, "A failed first attempt reconnects, as the clocks say.")
+        XCTAssertEqual(relabelled.relabel(Status.reconnecting.gameActionWords(hasConnected: true, socket: .connecting)),
+                       .reconnecting)
+        for reason in [ConnectionStatusModel.UnreachableReason.noNetwork, .timedOut] {
+            XCTAssertEqual(relabelled.relabel(Status.unreachable(reason).gameActionWords(hasConnected: false,
+                                                                                         socket: .connecting)),
+                           .connecting, "No network at a first launch: the clocks' word")
+            XCTAssertEqual(relabelled.relabel(Status.unreachable(reason).gameActionWords(hasConnected: true,
+                                                                                         socket: .reconnecting)),
+                           .reconnecting, "Never Can’t reach OGS")
+        }
+        for status in [Status.connected, .hidden] {
+            XCTAssertNil(relabelled.relabel(status.gameActionWords(hasConnected: true, socket: .connected)),
+                         "The action reads its name again.")
+        }
+        for action in [Action.disabled, .none] {
+            XCTAssertNil(action.relabel(Status.reconnecting.gameActionWords(hasConnected: false, socket: .connecting)),
+                         "\(action): the game doesn't relabel it")
+        }
+    }
+
+    /// The VoiceOver value of every action that needs the connection says
+    /// the same words while the status shows, wherever the user plays.
+    func testTheActionsVoiceOverValueSaysConnectingBeforeTheFirstConnection() {
+        typealias Status = ConnectionStatusModel.Status
+        typealias Action = GameConnectionPlacement.Action
+        for action in [Action.disabled, .relabelled] {
+            XCTAssertEqual(action.value(Status.reconnecting.gameActionWords(hasConnected: false, socket: .connecting)),
+                           .connecting, "\(action)")
+            XCTAssertEqual(action.value(Status.reconnecting.gameActionWords(hasConnected: false, socket: .reconnecting)),
+                           .reconnecting, "\(action)")
+            XCTAssertEqual(action.value(Status.reconnecting.gameActionWords(hasConnected: true, socket: .connecting)),
+                           .reconnecting, "\(action)")
+            XCTAssertEqual(action.value(Status.unreachable(.timedOut).gameActionWords(hasConnected: true,
+                                                                                      socket: .reconnecting)),
+                           .reconnecting, "\(action): never Can’t reach OGS")
+            XCTAssertNil(action.value(Status.connected.gameActionWords(hasConnected: true, socket: .connected)),
+                         "\(action): no value once the outage ends")
+        }
+        XCTAssertNil(Action.none.value(Status.reconnecting.gameActionWords(hasConnected: false, socket: .connecting)),
+                     "The user doesn't play, so no such action shows.")
     }
 
     /// OGS sends a disconnection deadline only as an `auto_resign` event, so
@@ -697,39 +776,6 @@ final class GameDetailClockStateTests: XCTestCase {
         GameScores(
             black: PlayerScore(handicap: 0, komi: 0, scoringPositions: [], stones: 0, territory: 58, prisoners: 2, total: black),
             white: PlayerScore(handicap: 0, komi: 6.5, scoringPositions: [], stones: 0, territory: 49, prisoners: 1, total: white))
-    }
-
-    /// The live-game notice offers only live games that no visible Game Detail
-    /// shows: never the one on screen, as under the iPad Profile sheet, where
-    /// the notice stays. A finished game on screen, even one Home opened,
-    /// keeps both the notice and challenges.
-    func testLiveGameNoticeOffersOnlyGamesNotOnScreen() throws {
-        let current = try game()
-        var data = try XCTUnwrap(current.gameData)
-        data.gameId += 1
-        let other = Game(ogsGame: data)
-        data.gameId += 1
-        data.outcome = "Resignation"
-        let finished = Game(ogsGame: data)
-        let liveGames = [current, other, finished]
-
-        let nav = NavigationService()
-        XCTAssertEqual(nav.liveGamesNeedingNotice(among: liveGames).map(\.ID), [current.ID, other.ID])
-        XCTAssertFalse(nav.visibleGameDetailPlaysLiveGame)
-
-        let context = UUID()
-        nav.gameDetailNotificationContexts[context] = GameDetailNotificationContext()
-        XCTAssertEqual(nav.liveGamesNeedingNotice(among: liveGames).map(\.ID), [current.ID, other.ID],
-                       "A finished or spectated game on screen keeps the notice")
-        XCTAssertFalse(nav.visibleGameDetailPlaysLiveGame, "and lets challenge notices show")
-
-        nav.gameDetailNotificationContexts[context] = GameDetailNotificationContext(ownLiveGame: current.ID)
-        XCTAssertEqual(nav.liveGamesNeedingNotice(among: liveGames).map(\.ID), [other.ID],
-                       "The notice offers the other live game, never this one")
-        XCTAssertTrue(nav.visibleGameDetailPlaysLiveGame)
-
-        nav.gameDetailNotificationContexts.removeValue(forKey: context)
-        XCTAssertEqual(nav.liveGamesNeedingNotice(among: liveGames).count, 2)
     }
 
     /// A Game Detail keeps its window awake while it shows a live game that

@@ -205,9 +205,73 @@ final class ConnectionStatusModelTests: XCTestCase {
         XCTAssertEqual(window.status, .hidden)
         window.wait(0.5)
         XCTAssertEqual(window.status, .reconnecting)
+        XCTAssertEqual(window.announcements, [], "A launch isn't an outage someone saw: nothing is said yet.")
         window.wait(28)
         XCTAssertEqual(window.status, .unreachable(.timedOut))
-        XCTAssertEqual(window.announcements, [.reconnecting])
+        XCTAssertEqual(window.announcements, [.unreachable],
+                       "Before the first connection, Can't reach OGS is said at the 30 s turn.")
+    }
+
+    func testAFirstConnectionsOutageSaysOnlyCantReachOGSOnce() {
+        var window = Window.onScreen(connected: false)
+        window.wait(30)
+        XCTAssertEqual(window.status, .unreachable(.timedOut))
+        XCTAssertEqual(window.announcements, [.unreachable])
+        window.send(.retry)
+        XCTAssertEqual(window.connects, 1)
+        XCTAssertEqual(window.status, .reconnecting, "Retry visibly does something.")
+        window.wait(30)
+        XCTAssertEqual(window.status, .unreachable(.timedOut))
+        XCTAssertEqual(window.announcements, [.unreachable], "Said once per outage, though it shows again.")
+
+        var losing = Window.onScreen(connected: false)
+        losing.wait(5)
+        XCTAssertEqual(losing.status, .reconnecting)
+        losing.send(.path(.unsatisfied))
+        XCTAssertEqual(losing.status, .unreachable(.noNetwork))
+        XCTAssertEqual(losing.announcements, [.unreachable], "A network that goes says it at once.")
+        losing.send(.path(.satisfied))
+        XCTAssertEqual(losing.status, .reconnecting)
+        losing.send(.path(.unsatisfied))
+        losing.wait(2)
+        XCTAssertEqual(losing.status, .unreachable(.noNetwork))
+        XCTAssertEqual(losing.announcements, [.unreachable], "Still the same outage.")
+
+        var returning = Window.onScreen(connected: false)
+        returning.wait(30)
+        returning.send(.visibility(false))
+        returning.send(.visibility(true))
+        returning.wait(30)
+        XCTAssertEqual(returning.announcements, [.unreachable, .unreachable],
+                       "An outage seen again after a return is a new one.")
+    }
+
+    func testAFirstConnectionSaysNoConnected() {
+        var window = Window.onScreen(connected: false)
+        window.wait(5)
+        XCTAssertEqual(window.status, .reconnecting)
+        window.send(.socket(isConnected: true))
+        XCTAssertEqual(window.status, .hidden, "The first connection ends no outage someone saw.")
+        XCTAssertNil(window.deadline, "No Connected to time.")
+        XCTAssertEqual(window.announcements, [])
+
+        var unreachable = Window()
+        unreachable.send(.socket(isConnected: false))
+        unreachable.send(.path(.unsatisfied))
+        unreachable.send(.visibility(true))
+        XCTAssertEqual(unreachable.status, .unreachable(.noNetwork))
+        unreachable.send(.path(.satisfied))
+        unreachable.send(.socket(isConnected: true))
+        XCTAssertEqual(unreachable.status, .hidden, "Nor after Can't reach OGS.")
+        XCTAssertEqual(unreachable.announcements, [.unreachable])
+
+        window.send(.socket(isConnected: false))
+        window.wait(2)
+        XCTAssertEqual(window.status, .reconnecting)
+        XCTAssertEqual(window.announcements, [.reconnecting], "A later drop is a lost connection, said as before.")
+        window.send(.socket(isConnected: true))
+        XCTAssertEqual(window.status, .connected)
+        XCTAssertEqual(window.announcements, [.reconnecting, .connected])
     }
 
     func testAFirstConnectionWithinTwoSecondsShowsNothing() {

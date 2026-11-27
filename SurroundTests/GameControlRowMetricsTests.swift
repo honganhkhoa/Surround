@@ -51,7 +51,7 @@ final class GameControlRowMetricsTests: XCTestCase {
                 let relabelling = GameControlRowMetrics(dynamicTypeSize: size, locale: locale, phase: phase,
                                                         relabelsOffline: true)
                 let expected = GameControlRowMetrics(dynamicTypeSize: size, locale: locale,
-                                                     localizedLabels: labels + ["Reconnecting…"])
+                                                     localizedLabels: labels + ["Reconnecting…", "Connecting…"])
                 XCTAssertEqual(relabelling.horizontalSize, expected.horizontalSize, "\(phase) \(size)")
                 XCTAssertEqual(relabelling.rowHeight(at: 160), expected.rowHeight(at: 160), "\(phase) \(size)")
                 XCTAssertEqual(relabelling.columnRowHeight(width: 126), expected.columnRowHeight(width: 126),

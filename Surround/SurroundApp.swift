@@ -56,6 +56,8 @@ struct SurroundApp: App {
             height: CatalystDesktopWindowMetrics.defaultContentHeight
         )
         .windowResizability(.contentMinSize)
+        // View > Activity, the keyboard's way to the window's Activity.
+        .commands { ActivityMenuCommands() }
         #endif
         #if DEBUG && MAIN_APP
         // The Superchat (Debug) menu; empty outside offline UI-test runs.

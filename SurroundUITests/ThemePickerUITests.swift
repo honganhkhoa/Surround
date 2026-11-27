@@ -528,8 +528,6 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .phone, "This checks the iPhone popover.")
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.themeGamesOnlyLaunchArgument,
-            // The live-game banner can cover Appearance at large text sizes.
-            SurroundUITestContract.homeFinishedOnlyLaunchArgument,
             "-UIPreferredContentSizeCategoryName", UIContentSizeCategory.accessibilityExtraLarge.rawValue,
         ], orientation: .portrait)
         let popover = openHomeAppearance(in: app)
@@ -658,8 +656,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
 
     /// Appearance is a button laid out in the bar, and the bar has no More
     /// menu, at the top of Home and, where Home has more than fits, scrolled
-    /// down. (The fixture's live-game banner can cover the bar at the largest
-    /// text sizes, so the button need not be hittable.)
+    /// down.
     private func assertBarShowsAppearance(in app: XCUIApplication, context: String,
                                           file: StaticString = #filePath, line: UInt = #line) {
         // An open iPad sidebar has its own navigation bar, listed first.
@@ -682,21 +679,18 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         }
     }
 
-    /// Scrolls Home down by dragging inside its content: below the live-game
-    /// banner, which can cover most of a small window at large text sizes
-    /// (and opens the game when touched), and clear of a bottom tab bar and
+    /// Scrolls Home down by dragging inside its content, clear of the bottom
+    /// chrome (a bottom tab bar, the Activity bar or a docked keyboard) and
     /// of the window's bottom edge, where a drag goes to the Home Screen.
     /// Returns whether Home moved; when it all fits there is nothing to scroll.
     private func scrollHomeDown(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) -> Bool {
         let window = app.windows.firstMatch
         let frame = window.frame
         let home = app.scrollViews.matching(identifier: ID.screenHome).firstMatch.frame
-        let banner = app.buttons.matching(identifier: ID.liveGameBanner).firstMatch
-        // A tab bar counts only at the bottom: iPad floats its tab bar at the top.
-        let tabBar = app.tabBars.firstMatch
-        let tabBarTop = tabBar.exists && tabBar.frame.minY > frame.midY ? tabBar.frame.minY : frame.maxY - 60
-        let top = max(home.minY, banner.exists ? banner.frame.maxY : home.minY) + 12
-        let bottom = min(home.maxY, tabBarTop) - 12
+        // With no bottom chrome measured, 60 pt up from the window's bottom.
+        let chromeTop = bottomChromeTop(over: home, in: app) ?? frame.maxY - 60
+        let top = home.minY + 12
+        let bottom = min(home.maxY, chromeTop) - 12
         guard bottom - top > 40 else { return false }
         let newGame = app.descendants(matching: .any).matching(identifier: ID.homeNewGame).firstMatch
         let before = newGame.frame.minY

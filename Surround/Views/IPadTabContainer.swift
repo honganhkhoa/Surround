@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import UIKit
 import Observation
@@ -10,9 +11,25 @@ final class IPadTabContext {
     private(set) var sidebarVisible = false
     private(set) var sidebarInsets = EdgeInsets()
     private(set) var physicalHorizontalInsets = EdgeInsets()
+    /// The sidebar as the window's SwiftUI chrome reads it: the custom
+    /// Activity bar and the host policy's facts. It is the coordinator's
+    /// sidebar record a main-queue turn later (shown as the sidebar starts to
+    /// show, hidden once its hide completes) and unavailable without a
+    /// sidebar. Never `sidebarVisible`, which follows layout a turn late.
+    private(set) var activitySidebar = ActivityHostPolicy.Sidebar.unavailable
+    /// A docked keyboard covers this window, as the coordinator reads each
+    /// keyboard notification's end frame against the window
+    /// (`ActivityBarHostState.keyboardIsOverWindow`): the custom Activity bar
+    /// hides while one does. Not whether the app shows one, which can be
+    /// docked under another window.
+    private(set) var activityKeyboardOverWindow = false
     @ObservationIgnored private var hiddenTabBarOwners = Set<UUID>()
     @ObservationIgnored var onTabBarVisibilityChange: (() -> Void)?
     @ObservationIgnored var onToggleSidebar: (() -> Void)?
+    /// This tab's top route shows Game Detail, from its stack's own path:
+    /// set as soon as a game is asked for, before the game's first layout.
+    @ObservationIgnored private(set) var isGameAskedFor = false
+    @ObservationIgnored var onGameAskedForChange: (() -> Void)?
 
     /// Before iPadOS 27, the sidebar toggle lives in the tab bar; a screen
     /// that hides the tab bar draws its own.
@@ -28,12 +45,31 @@ final class IPadTabContext {
     }
 
     func removeTabBarHiddenRequest(owner: UUID) { setTabBarHidden(false, owner: owner) }
+
+    /// From the tab's StackRouter, as its top route starts or stops showing a
+    /// game: handed to the coordinator at once.
+    func setGameAskedFor(_ asked: Bool) {
+        guard asked != isGameAskedFor else { return }
+        isGameAskedFor = asked
+        onGameAskedForChange?()
+    }
+
     fileprivate var prefersTabBarHidden: Bool { !hiddenTabBarOwners.isEmpty }
     fileprivate func update(_ metrics: IPadTabMetrics) {
         sidebarAvailable = metrics.sidebarAvailable
         sidebarVisible = metrics.sidebarVisible
         sidebarInsets = metrics.insets.occlusion
         physicalHorizontalInsets = metrics.insets.physical
+    }
+
+    fileprivate func setActivitySidebar(_ sidebar: ActivityHostPolicy.Sidebar) {
+        guard sidebar != activitySidebar else { return }
+        activitySidebar = sidebar
+    }
+
+    fileprivate func setActivityKeyboardOverWindow(_ over: Bool) {
+        guard over != activityKeyboardOverWindow else { return }
+        activityKeyboardOverWindow = over
     }
 }
 
@@ -66,6 +102,9 @@ extension EnvironmentValues {
 #if os(iOS) && !targetEnvironment(macCatalyst)
 /// Native overlay navigation with account rows that open the shared
 /// sheet presenter. Each SwiftUI root retains its own navigation stack.
+/// It also hosts the window's Activity: the floating bar in UIKit's bottom
+/// accessory from iPadOS 26 while the sidebar is hidden or the window is
+/// compact, and the Now section in the sidebar's bottom bar.
 @available(iOS 18.0, *)
 struct IPadTabContainer: UIViewControllerRepresentable {
     @Binding var selection: RootView
@@ -73,9 +112,18 @@ struct IPadTabContainer: UIViewControllerRepresentable {
     var messagesBadgeCount = 0
     let onAccountSheet: (AccountSheet) -> Void
     let content: (RootView) -> AnyView
-    #if DEBUG
-    var noticesProbePlaces: ActivityPlaceRegistry? = nil
-    #endif
+    /// The window's registry: its settled place for the selected tab hides
+    /// the Activity bar.
+    let activityPlaces: ActivityPlaceRegistry
+    /// The window's bar state, observed, so each change of it calls the
+    /// coordinator's `update(...)`.
+    @ObservedObject var activityBar: ActivityBarState
+    /// Gives the bar and the Now section the window's environment: MainView's
+    /// function, the one its tabs' content goes through.
+    let accessoryContent: (AnyView) -> AnyView
+    /// Closes the window's Activity popover where the Now section opened it,
+    /// as the sidebar it hangs from goes.
+    let closeNowSectionPopover: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -124,8 +172,48 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         private var changingSidebar = false
         private var selectingTab = false
         private var revealedByPerson = false
-        #if DEBUG
-        private var noticesProbe: NoticesHostProbeUIKit?
+
+        // MARK: The Activity bar's records
+        //
+        // UIKit's accessory follows these and the window's bar state
+        // (`ActivityBarHostState`), never isTabBarHidden, the sidebar's
+        // isHidden or a frame. Each changes only outside layout: around
+        // setTabBarHidden, as a tab's stack asks for a game, as the sidebar
+        // starts to show or its hide completes, a main-queue turn after a
+        // keyboard notification, or as the view comes into a window.
+
+        private let accessory = ActivityAccessoryHost(container: .iPadTabContainer)
+        /// The Now section's host in the sidebar's bottom bar, made once. It
+        /// sizes itself to its content, down to nothing, and its root view is
+        /// updated in place.
+        private let nowSection = UIHostingController(rootView: AnyView(EmptyView()))
+        private weak var subscribedPlaces: ActivityPlaceRegistry?
+        private var registrySubscription: AnyCancellable?
+        private var keyboardSubscription: AnyCancellable?
+        /// The tab-bar state last asked of UIKit: hidden just before
+        /// setTabBarHidden(true), shown once setTabBarHidden(false) has
+        /// returned and the person's sidebar choice is restored.
+        private var requestedTabBar = ActivityTabBarRecord.shown
+        /// A setTabBarHidden call runs. A request made inside its layout
+        /// waits for it to return, so the record never changes mid-call.
+        private var tabBarChangeInProgress = false
+        private var tabBarRequestWaits = false
+        /// The container's view has come into a window: the first set waits
+        /// for it.
+        private var isInWindow = false
+        /// The sidebar as the accessory sees it: shown as it starts to show,
+        /// hidden once its hide completes, or at once for a change that
+        /// starts no transition. Never the sidebar's isHidden, which already
+        /// holds where a slide goes as it starts.
+        private var isSidebarRecordShown = false
+        /// A sidebar change made here started a transition.
+        private var sidebarChangeStartedTransition = false
+        /// The show whose animator takes the bar away, until it does.
+        private var sidebarClearWaits: UUID?
+        private var isKeyboardOverWindow = false
+        private var sidebarCopyScheduled = false
+        #if DEBUG && MAIN_APP
+        private var nowSectionFocusObserver: NSObjectProtocol?
         #endif
 
         init(_ parent: IPadTabContainer) { self.parent = parent }
@@ -142,15 +230,25 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             if SurroundUITestContract.isEnabled { controller.customizationIdentifier = UUID().uuidString }
             if prefersSidebarHidden { controller.sidebar.isHidden = true }
             controller.sidebar.delegate = self
-            controller.onHorizontalSizeClassChange = { [weak self] in
-                self?.hiddenHostBaselines.removeAll()
-                self?.applyTabs(regularWidth: $0)
+            controller.onHorizontalSizeClassChange = { [weak self] in self?.horizontalSizeClassDidChange($0) }
+            controller.onLayout = { [weak self] in self?.layoutDidChange() }
+            controller.onIsAppearing = { [weak self] in self?.viewIsAppearing() }
+            controller.onTransitionCompleted = { [weak self] in self?.sizeTransitionCompleted() }
+            controller.onTextSizeChange = { [weak self] in
+                DispatchQueue.main.async { [weak self] in self?.readWindowForNowSection() }
             }
-            controller.onLayout = { [weak self] in self?.measureLayout() }
+            // The bar's environment before any recompute draws it.
+            connect()
+            keyboardSubscription = SystemPlatformServices.shared.keyboardWillChangeFramePublisher
+                // A main-queue turn after each notification, outside the
+                // layout it may arrive in.
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] notification in self?.keyboardDidChange(notification) }
             for root in RootView.allCases {
                 let tabContext = IPadTabContext()
                 tabContext.onTabBarVisibilityChange = { [weak self] in self?.applyTabBarVisibility() }
                 tabContext.onToggleSidebar = { [weak self] in self?.toggleSidebar() }
+                tabContext.onGameAskedForChange = { [weak self] in self?.gameAskedForDidChange(root) }
                 contexts[root] = tabContext
                 let host = IPadTabHostingController(rootView: hostedContent(root))
                 host.onLayout = { [weak self] in self?.measureLayout() }
@@ -181,32 +279,30 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             tabs[.about]?.preferredPlacement = .fixed
             applyLayoutDirection(layoutDirection)
             applyTabs(regularWidth: regularWidth)
-            #if DEBUG
-            noticesProbe = NoticesHostProbeUIKit.make(container: .iPadTabContainer, places: parent.noticesProbePlaces)
-            noticesProbe?.install(on: controller) { [weak self] in self?.noticesProbeState() }
+            // Seeded once the tabs are in place: from iPadOS 26 UIKit
+            // restores the sidebar itself. No view has read the copies yet.
+            seedSidebarRecord(reason: "make", recomputes: false)
+            for context in contexts.values { context.setActivitySidebar(accessorySidebar) }
+            // The Now section, in the sidebar's bottom bar on every iPadOS.
+            nowSection.sizingOptions = .intrinsicContentSize
+            // The sidebar's own insets, but not the keyboard's. A keyboard
+            // over the sidebar would otherwise change the section's size,
+            // the sidebar would lay its bottom bar out again at that size,
+            // which changes how much of it the keyboard covers, and so on
+            // without end: the app would stop responding.
+            nowSection.safeAreaRegions = .container
+            nowSection.view.backgroundColor = .clear
+            nowSection.rootView = nowSectionRoot()
+            controller.sidebar.bottomBarView = nowSection.view
+            #if DEBUG && MAIN_APP
+            observeNowSectionFocus()
             #endif
             return controller
         }
 
-        #if DEBUG
-        /// Reads the sidebar as measureLayout does: container state, never geometry.
-        private func noticesProbeState() -> NoticesHostProbeUIKit.State? {
-            guard let controller else { return nil }
-            let available: Bool
-            #if canImport(SwiftUI, _version: 8.0)
-            if #available(iOS 27.0, *) { available = controller.sidebar.isAvailable }
-            else { available = regularWidth && controller.mode != .tabBar }
-            #else
-            available = regularWidth && controller.mode != .tabBar
-            #endif
-            let sidebar: ActivityHostPolicy.Sidebar = !available ? .unavailable
-                : controller.sidebar.isHidden ? .hidden : .shown
-            return .init(root: selectedRoot, tabBarHidden: controller.isTabBarHidden, sidebar: sidebar)
-        }
-        #endif
-
         func update(_ parent: IPadTabContainer, regularWidth: Bool, layoutDirection: LayoutDirection) {
             self.parent = parent
+            connect()
             applyLayoutDirection(layoutDirection)
             for (root, host) in hosts {
                 host.rootView = hostedContent(root)
@@ -215,10 +311,28 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             tabs[.privateMessages]?.badgeValue = parent.messagesBadgeCount > 0
                 ? String(parent.messagesBadgeCount) : nil
             applyTabs(regularWidth: regularWidth)
+            nowSection.rootView = nowSectionRoot()
+            // The bar state, sign-in or a tab's content changed.
+            recomputeAccessory(reason: "update")
+        }
+
+        /// MainView's inputs; the registry is subscribed to once.
+        private func connect() {
+            accessory.setEnvironment(parent.accessoryContent)
+            guard subscribedPlaces !== parent.activityPlaces else { return }
+            subscribedPlaces = parent.activityPlaces
+            // Sent after the settled state is stored, a main-queue turn after
+            // the screens change.
+            registrySubscription = parent.activityPlaces.stateDidChange
+                .sink { [weak self] _ in self?.recomputeAccessory(reason: "registry") }
         }
 
         private func hostedContent(_ root: RootView) -> AnyView {
             AnyView(parent.content(root).environment(\.iPadTabContext, contexts[root]))
+        }
+
+        private func nowSectionRoot() -> AnyView {
+            parent.accessoryContent(AnyView(ActivityNowSection(bar: parent.activityBar)))
         }
 
         private func isPrimary(_ root: RootView) -> Bool {
@@ -228,6 +342,16 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         private var selectedRoot: RootView {
             let root = parent.selection
             return !parent.isLoggedIn && (root == .profile || root == .privateMessages) ? .home : root
+        }
+
+        /// Whether the window has a sidebar, from the controller's state:
+        /// none in compact width, where a bottom tab bar takes its place.
+        private var isSidebarAvailable: Bool {
+            guard let controller else { return false }
+            #if canImport(SwiftUI, _version: 8.0)
+            if #available(iOS 27.0, *) { return controller.sidebar.isAvailable }
+            #endif
+            return regularWidth && controller.mode != .tabBar
         }
 
         private func applyLayoutDirection(_ direction: LayoutDirection) {
@@ -257,8 +381,10 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         private func setSidebarHidden(_ hidden: Bool) {
             guard let controller, controller.sidebar.isHidden != hidden else { return }
             changingSidebar = true
+            sidebarChangeStartedTransition = false
             controller.sidebar.isHidden = hidden
             changingSidebar = false
+            sidebarChangedWithoutTransition()
         }
 
         private func saveSidebarChoice(hidden: Bool) {
@@ -275,6 +401,7 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             } else if sidebarBesideContentSize == controller.view.bounds.size {
                 setSidebarHidden(false)
             }
+            scheduleSidebarCopy()
         }
 
         private func applyTabs(regularWidth: Bool) {
@@ -379,6 +506,11 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         func tabBarController(_ controller: UITabBarController, sidebarAvailabilityDidChange sidebar: UITabBarController.Sidebar) {
             applyTabs(regularWidth: controller.traitCollection.horizontalSizeClass == .regular)
             measureLayout()
+            // A sidebar that goes or comes with its availability may send no
+            // transition: the record follows UIKit a turn later.
+            DispatchQueue.main.async { [weak self] in self?.seedSidebarRecord(reason: "sidebar.availability") }
+            scheduleSidebarCopy()
+            recomputeAccessory(reason: "sidebar.availability")
         }
 
         func tabBarController(_ controller: UITabBarController, sidebarVisibilityWillChange sidebar: UITabBarController.Sidebar,
@@ -396,7 +528,34 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             }
             sidebarTransitionID = UUID()
             sidebarTransitionInProgress = true
+            sidebarChangeStartedTransition = true
             let transitionID = sidebarTransitionID
+            // isHidden already holds where the sidebar is going.
+            let showing = !sidebar.isHidden
+            #if DEBUG && MAIN_APP
+            let started = CACurrentMediaTime()
+            logSidebar("willChange", transitionID, [("target", showing ? "shown" : "hidden")])
+            #endif
+            if showing {
+                // The record turns shown as the sidebar starts to show, and
+                // the bar goes inside the sidebar's own animator, with no
+                // animation of its own: an animated change here stalls the
+                // slide, and an unanimated one before it snaps it open. The
+                // animator runs before the main queue's next turn; on iPadOS
+                // 26.1 an app's own show can run neither its animator nor its
+                // completion, and the bar then goes on that turn.
+                setSidebarRecord(true, reason: "sidebar.willShow", recomputes: false)
+                sidebarClearWaits = transitionID
+                animator.addAnimations { [weak self] in
+                    #if DEBUG && MAIN_APP
+                    self?.logSidebar("animations", transitionID, [])
+                    #endif
+                    self?.clearBesideSidebar(transitionID, reason: "sidebar.animator")
+                }
+                DispatchQueue.main.async { [weak self] in
+                    self?.clearBesideSidebar(transitionID, reason: "sidebar.nextTurn")
+                }
+            }
             animator.addAnimations { [weak self] in self?.measureLayout() }
             animator.addCompletion { [weak self] in
                 DispatchQueue.main.async { [weak self] in
@@ -412,9 +571,17 @@ struct IPadTabContainer: UIViewControllerRepresentable {
                         self.saveSidebarChoice(hidden: false)
                     }
                     self.revealedByPerson = false
-                    #if DEBUG
-                    self.noticesProbe?.refresh(reason: "sidebar")
+                    #if DEBUG && MAIN_APP
+                    self.logSidebar("completion", transitionID, [
+                        ("afterMs", String(Int((CACurrentMediaTime() - started) * 1000))),
+                    ])
                     #endif
+                    // A show whose animator never ran still takes the bar away.
+                    self.clearBesideSidebar(transitionID, reason: "sidebar.completed")
+                    // The record follows where the sidebar ended, so a hide's
+                    // set comes here, at its completion.
+                    self.seedSidebarRecord(reason: "sidebar.completed")
+                    self.scheduleSidebarCopy()
                 }
             }
         }
@@ -434,6 +601,14 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             item.contentConfiguration = configuration
         }
 
+        private func layoutDidChange() {
+            measureLayout()
+            #if DEBUG && MAIN_APP
+            // Only logs.
+            accessory.logFrame()
+            #endif
+        }
+
         private func measureLayout() {
             guard let controller, controller.isViewLoaded,
                   let host = hosts[selectedRoot], host.isViewLoaded,
@@ -446,13 +621,7 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             let physicalBottom = max(0, bounds.maxY - physicalFrame.maxY)
             let rightToLeft = host.view.effectiveUserInterfaceLayoutDirection == .rightToLeft
             let hostInsets = host.view.safeAreaInsets
-            let available: Bool
-            #if canImport(SwiftUI, _version: 8.0)
-            if #available(iOS 27.0, *) { available = controller.sidebar.isAvailable }
-            else { available = regularWidth && controller.mode != .tabBar }
-            #else
-            available = regularWidth && controller.mode != .tabBar
-            #endif
+            let available = isSidebarAvailable
             let visible = available && !controller.sidebar.isHidden
             if visible && !controller.isTabBarHidden && !sidebarTransitionInProgress {
                 // Beside content, the host's leading inset makes room for it;
@@ -473,13 +642,10 @@ struct IPadTabContainer: UIViewControllerRepresentable {
                     current: logical(hostInsets), closed: hiddenHostBaselines[key].map(logical),
                     physicalTop: physicalTop, physicalBottom: physicalBottom)
             let occluded = visible || revealing
-            #if DEBUG
-            let samplesBaseline = !occluded && !sidebarTransitionInProgress && noticesProbe?.changePending != true
-            noticesProbe?.baselineSample(root: selectedRoot, insets: hostInsets, recorded: samplesBaseline,
-                                         revealing: revealing, tabBarHidden: controller.isTabBarHidden)
+            let samplesBaseline = !occluded && !sidebarTransitionInProgress
             if samplesBaseline { hiddenHostBaselines[key] = hostInsets }
-            #else
-            if !occluded && !sidebarTransitionInProgress { hiddenHostBaselines[key] = hostInsets }
+            #if DEBUG && MAIN_APP
+            logBaseline(hostInsets, recorded: samplesBaseline, revealing: revealing)
             #endif
             // Rotation may introduce a new baseline while the drawer is open.
             // With hidden tabs, this outer host reserves only physical vertical
@@ -514,33 +680,329 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             for context in contexts.values { context.update(latest) }
         }
 
+        /// A screen's own toggle, the person's choice.
         private func toggleSidebar() {
             guard let controller, regularWidth, controller.mode != .tabBar else { return }
+            sidebarChangeStartedTransition = false
             controller.sidebar.isHidden.toggle()
+            sidebarChangedWithoutTransition()
         }
 
+        /// Shows or hides the tab bar as the selected tab asks, in
+        /// `ActivityAccessoryOrder`'s order: a hide records hidden and clears
+        /// the accessory, then drops the closed baselines and calls
+        /// setTabBarHidden(true); a show calls setTabBarHidden(false), closes
+        /// the sidebar and restores the person's choice, then records shown
+        /// and recomputes, which sets the accessory only once the sidebar
+        /// record says hidden. The tab bar changes only where UIKit's differs
+        /// from the request, and every call recomputes.
         private func applyTabBarVisibility() {
             guard let controller else { return }
-            let hidden = contexts[selectedRoot]?.prefersTabBarHidden ?? false
-            if controller.isTabBarHidden != hidden {
-                // Hide the tab bar before closing the sidebar. On iPadOS 27,
-                // closing an open sidebar first leaves the closed host with
-                // the drawer's bottom inset, which shrinks the game's board.
-                hiddenHostBaselines.removeAll()
-                #if DEBUG
-                noticesProbe?.tabBarWillChange(hidden: hidden)
-                #endif
-                controller.setTabBarHidden(hidden, animated: controller.view.window != nil)
-                #if DEBUG
-                noticesProbe?.tabBarDidChange(hidden: hidden)
-                #endif
-                setSidebarHidden(true)
-                restoreSidebarChoice()
+            guard !tabBarChangeInProgress else {
+                // Asked inside setTabBarHidden's own layout: the record holds
+                // until the call returns, and the request is applied then.
+                tabBarRequestWaits = true
+                recomputeAccessory(reason: "tabs.duringChange")
+                return
             }
-            #if DEBUG
-            noticesProbe?.refresh(reason: "tabs")
-            #endif
+            let hidden = contexts[selectedRoot]?.prefersTabBarHidden ?? false
+            let requested: ActivityTabBarRecord = hidden ? .hidden : .shown
+            let from = controller.isTabBarHidden == hidden ? requestedTabBar : (hidden ? .shown : .hidden)
+            let reason = from == requested ? "tabs" : hidden ? "tabBar.hide" : "tabBar.show"
+            for step in ActivityAccessoryOrder.tabBar(from: from, to: requested) {
+                switch step {
+                case .record(let record):
+                    requestedTabBar = record
+                case .recompute:
+                    recomputeAccessory(reason: reason)
+                case .clearWithoutAnimation:
+                    accessory.clearWithoutAnimation(on: controller, reason: reason)
+                case .changeTabBar(let hidden):
+                    guard controller.isTabBarHidden != hidden else { continue }
+                    // Hide the tab bar before closing the sidebar. On iPadOS 27,
+                    // closing an open sidebar first leaves the closed host with
+                    // the drawer's bottom inset, which shrinks the game's board.
+                    // The accessory's clear lays out once with the tab bar still
+                    // shown; its baseline goes here.
+                    hiddenHostBaselines.removeAll()
+                    tabBarChangeInProgress = true
+                    controller.setTabBarHidden(hidden, animated: controller.view.window != nil)
+                    tabBarChangeInProgress = false
+                    // UIKit animates a sidebar change as a morph with the
+                    // floating tab bar. In a turn or a resize that bar can
+                    // still be outside the window just after the tab bar comes
+                    // back, and a morph from a view outside a window stops the
+                    // app, so there the sidebar changes without animation.
+                    let closeSidebar = {
+                        self.setSidebarHidden(true)
+                        self.restoreSidebarChoice()
+                    }
+                    if controller.isTransitioningSize {
+                        UIView.performWithoutAnimation(closeSidebar)
+                    } else {
+                        closeSidebar()
+                    }
+                }
+            }
+            if tabBarRequestWaits {
+                tabBarRequestWaits = false
+                applyTabBarVisibility()
+            }
         }
+
+        private func horizontalSizeClassDidChange(_ regular: Bool) {
+            hiddenHostBaselines.removeAll()
+            applyTabs(regularWidth: regular)
+            scheduleSidebarCopy()
+            recomputeAccessory(reason: "sizeClass")
+            // A popover from the Now section hangs from a sidebar the new
+            // width may not have.
+            DispatchQueue.main.async { [weak self] in
+                self?.parent.closeNowSectionPopover()
+                self?.readWindowForNowSection()
+            }
+        }
+
+        // MARK: The Activity bar
+
+        /// The sidebar as the accessory reads it.
+        private var accessorySidebar: ActivityHostPolicy.Sidebar {
+            !isSidebarAvailable ? .unavailable : isSidebarRecordShown ? .shown : .hidden
+        }
+
+        private var barTraits: ActivityBarTraits {
+            ActivityBarTraits(bar: .uiKitAccessory, container: .iPadTabContainer, isCompactWidth: !regularWidth)
+        }
+
+        /// Sets UIKit's accessory where `ActivityBarHostState` says it shows,
+        /// from the records, the registry's settled place for the selected
+        /// tab and the window's bar state, and clears it otherwise. A call
+        /// inside a layout reads the same records, so it gives the same
+        /// answer. While a showing sidebar's animator is to take the bar
+        /// away, nothing else does.
+        private func recomputeAccessory(reason: String, animated: Bool? = nil) {
+            guard let controller else { return }
+            let facts = ActivityHostPolicy.Facts.current(.iPadTabContainer, sidebar: accessorySidebar)
+            let overrides = ActivityBarHosting.overrides(afterLaunch: true)
+            let placement = ActivityHostPolicy.hosts(for: facts, overrides: overrides).connectionStatus
+            let content = ActivityBarHosting.content(parent.activityBar, placement: placement)
+            var state = ActivityBarHostState(facts: facts, overrides: overrides)
+            state.placeHidesBar = parent.activityPlaces.hidesActivity(in: selectedRoot)
+            state.hasContent = content != nil
+            state.requestedTabBar = requestedTabBar
+            state.isInWindow = isInWindow
+            state.isGameAskedFor = contexts[selectedRoot]?.isGameAskedFor ?? false
+            state.isKeyboardOverWindow = isKeyboardOverWindow
+            state.hasBottomTabBar = !regularWidth
+            if sidebarClearWaits != nil, controller.hasActivityAccessory, state.shownBar != .uiKitAccessory {
+                #if DEBUG && MAIN_APP
+                NoticesHostProbeLog.event("bar.accessory", [
+                    ("container", "iPadTabContainer"), ("action", "waits"), ("reason", reason),
+                ])
+                #endif
+                return
+            }
+            accessory.apply(state, content: content, traits: barTraits,
+                            isOffline: ActivityBarHosting.isOffline(parent.activityBar),
+                            to: controller, animated: animated ?? (controller.view.window != nil), reason: reason)
+        }
+
+        /// The first set comes here, once the view is in a window.
+        private func viewIsAppearing() {
+            if !isInWindow {
+                isInWindow = true
+                // UIKit may restore the sidebar after the controller is made.
+                seedSidebarRecord(reason: "isAppearing", recomputes: false)
+            }
+            readWindowForNowSection()
+            recomputeAccessory(reason: "isAppearing")
+        }
+
+        /// After each turn or resize, a main-queue turn after its completion:
+        /// the sidebar has settled, and the window may be shorter or taller.
+        private func sizeTransitionCompleted() {
+            seedSidebarRecord(reason: "transition", recomputes: false)
+            scheduleSidebarCopy()
+            readWindowForNowSection()
+            recomputeAccessory(reason: "transition")
+        }
+
+        /// A tab's stack started or stopped showing a game on top. For the
+        /// selected tab the bar clears at once, before the game's first
+        /// layout. Nothing sets it again while that tab's top route shows a
+        /// game, so a clear that lands inside a layout can't flip back; if
+        /// the route goes before the tab bar hides, the bar comes back.
+        private func gameAskedForDidChange(_ root: RootView) {
+            let asked = contexts[root]?.isGameAskedFor ?? false
+            #if DEBUG && MAIN_APP
+            NoticesHostProbeLog.event("ipad.gameAskedFor", [
+                ("root", root.rawValue), ("asked", NoticesHostProbeLog.flag(asked)),
+                ("selected", selectedRoot.rawValue),
+                ("accessory", NoticesHostProbeLog.flag(controller?.hasActivityAccessory == true)),
+                ("tabBarHidden", NoticesHostProbeLog.flag(controller?.isTabBarHidden == true)),
+            ])
+            #endif
+            guard root == selectedRoot else { return }
+            recomputeAccessory(reason: asked ? "gameAskedFor" : "gameAskedFor.ended")
+        }
+
+        /// The bar goes beside a showing sidebar: inside its animator, with no
+        /// animation of its own, or without one on the main queue's next turn
+        /// where the animator hasn't run by then, or at its completion.
+        private func clearBesideSidebar(_ transitionID: UUID, reason: String) {
+            guard sidebarClearWaits == transitionID else { return }
+            sidebarClearWaits = nil
+            recomputeAccessory(reason: reason, animated: false)
+        }
+
+        private func setSidebarRecord(_ shown: Bool, reason: String, recomputes: Bool = true) {
+            guard shown != isSidebarRecordShown else { return }
+            isSidebarRecordShown = shown
+            #if DEBUG && MAIN_APP
+            NoticesHostProbeLog.event("bar.sidebar", [("phase", "record"), ("shown", NoticesHostProbeLog.flag(shown)),
+                                                      ("reason", reason)])
+            #endif
+            scheduleSidebarCopy()
+            if recomputes { recomputeAccessory(reason: reason) }
+        }
+
+        /// The sidebar as UIKit has it, read only while no sidebar
+        /// transition runs: while one does, its own start and completion
+        /// keep the record.
+        private func seedSidebarRecord(reason: String, recomputes: Bool = true) {
+            guard let controller, !sidebarTransitionInProgress else { return }
+            setSidebarRecord(isSidebarAvailable && !controller.sidebar.isHidden, reason: reason,
+                             recomputes: recomputes)
+        }
+
+        /// A change made here that started no transition: the record follows
+        /// UIKit at once.
+        private func sidebarChangedWithoutTransition() {
+            guard let controller, !sidebarChangeStartedTransition else { return }
+            setSidebarRecord(isSidebarAvailable && !controller.sidebar.isHidden, reason: "sidebar.set")
+        }
+
+        /// SwiftUI's copy of the sidebar, a main-queue turn after it changes,
+        /// so nothing publishes inside the layout that changed it. As it
+        /// turns from shown, a popover the Now section opened closes: it
+        /// would point at nothing.
+        private func scheduleSidebarCopy() {
+            guard !sidebarCopyScheduled else { return }
+            sidebarCopyScheduled = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.sidebarCopyScheduled = false
+                let copy = self.accessorySidebar
+                let wasShown = self.contexts.values.contains { $0.activitySidebar == .shown }
+                for context in self.contexts.values { context.setActivitySidebar(copy) }
+                #if DEBUG && MAIN_APP
+                NoticesHostProbeLog.event("bar.sidebar", [("phase", "copy"), ("sidebar", copy.rawValue)],
+                                          key: "bar.sidebar.copy")
+                #endif
+                if wasShown, copy != .shown { self.parent.closeNowSectionPopover() }
+            }
+        }
+
+        private func keyboardDidChange(_ notification: Notification) {
+            guard let window = controller?.view.window else { return }
+            let end = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
+            let screen = window.windowScene?.screen.coordinateSpace
+            let endInWindow = end.flatMap { frame in screen.map { window.convert(frame, from: $0) } } ?? .null
+            let over = ActivityBarHostState.keyboardIsOverWindow(
+                docked: SystemPlatformServices.shared.isAttachedSoftwareKeyboardVisible(from: notification),
+                keyboardEnd: endInWindow, window: window.bounds)
+            guard over != isKeyboardOverWindow else { return }
+            isKeyboardOverWindow = over
+            for context in contexts.values { context.setActivityKeyboardOverWindow(over) }
+            #if DEBUG && MAIN_APP
+            NoticesHostProbeLog.event("bar.keyboard", [
+                ("container", "iPadTabContainer"), ("overWindow", NoticesHostProbeLog.flag(over)),
+                ("end", NoticesHostProbeLog.rect(endInWindow)), ("window", NoticesHostProbeLog.rect(window.bounds)),
+            ])
+            #endif
+            recomputeAccessory(reason: "keyboard")
+        }
+
+        /// How many rows the Now section has room for, from the window
+        /// scene's height, the text size and the language the sidebar is
+        /// drawn in: as the window comes, after each turn or resize, and as
+        /// the text size changes. Never the section's own geometry.
+        private func readWindowForNowSection() {
+            guard let controller, let scene = controller.view.window?.windowScene else { return }
+            let height = scene.coordinateSpace.bounds.height
+            let category = controller.traitCollection.preferredContentSizeCategory
+            let language = ActivityNowSectionRows.Language.app
+            let rows = ActivityNowSectionRows.count(windowHeight: height, sizeCategory: category, language: language)
+            #if DEBUG && MAIN_APP
+            NoticesHostProbeLog.event("now.rows", [
+                ("rows", "\(rows)"), ("windowHeight", NoticesHostProbeLog.number(height)),
+                ("textSize", category.rawValue), ("strings", language.strings), ("lines", language.lines),
+            ], key: "now.rows")
+            #endif
+            parent.activityBar.setNowSectionRows(rows)
+        }
+
+        #if DEBUG && MAIN_APP
+        // MARK: The Debug host log
+
+        private func logSidebar(_ phase: String, _ transitionID: UUID, _ fields: [(String, String)]) {
+            guard let controller else { return }
+            NoticesHostProbeLog.event("ipad.sidebar", [
+                ("phase", phase), ("transition", String(transitionID.uuidString.prefix(8))),
+                ("isHidden", NoticesHostProbeLog.flag(controller.sidebar.isHidden)),
+                ("record", NoticesHostProbeLog.flag(isSidebarRecordShown)),
+                ("tabBarHidden", NoticesHostProbeLog.flag(controller.isTabBarHidden)),
+                ("accessory", NoticesHostProbeLog.flag(controller.hasActivityAccessory)),
+                ("app", NoticesHostProbeLog.flag(changingSidebar)),
+                ("sizeTransition", NoticesHostProbeLog.flag(controller.isTransitioningSize)),
+                ("root", selectedRoot.rawValue),
+            ] + fields)
+        }
+
+        /// Keyboard focus moving into, within or out of the Now section, for a
+        /// person's check with a hardware keyboard: the focused item's frame
+        /// in the window. Only logs.
+        private func observeNowSectionFocus() {
+            nowSectionFocusObserver = NotificationCenter.default.addObserver(
+                forName: UIFocusSystem.didUpdateNotification, object: nil, queue: .main
+            ) { [weak self] notification in
+                let context = notification.userInfo?[UIFocusSystem.focusUpdateContextUserInfoKey] as? UIFocusUpdateContext
+                MainActor.assumeIsolated { self?.logNowSectionFocus(context) }
+            }
+        }
+
+        private func logNowSectionFocus(_ context: UIFocusUpdateContext?) {
+            guard let window = nowSection.view.window else { return }
+            let section = nowSection.view.convert(nowSection.view.bounds, to: window)
+            func frame(_ item: UIFocusItem?) -> CGRect? {
+                guard let item else { return nil }
+                if let view = item as? UIView { return view.convert(view.bounds, to: window) }
+                guard let space = item.parentFocusEnvironment?.focusItemContainer?.coordinateSpace else { return nil }
+                return space.convert(item.frame, to: window)
+            }
+            let next = frame(context?.nextFocusedItem), previous = frame(context?.previouslyFocusedItem)
+            let inSection = { (rect: CGRect?) in rect.map { section.contains(CGPoint(x: $0.midX, y: $0.midY)) } ?? false }
+            guard inSection(next) || inSection(previous) else { return }
+            NoticesHostProbeLog.event("now.focus", [
+                ("next", NoticesHostProbeLog.rect(next)), ("nextInSection", NoticesHostProbeLog.flag(inSection(next))),
+                ("previous", NoticesHostProbeLog.rect(previous)), ("section", NoticesHostProbeLog.rect(section)),
+            ])
+        }
+
+        /// The closed-baseline sampling, as measureLayout does it.
+        private func logBaseline(_ insets: UIEdgeInsets, recorded: Bool, revealing: Bool) {
+            guard let controller else { return }
+            let number = NoticesHostProbeLog.number
+            let flag = NoticesHostProbeLog.flag
+            NoticesHostProbeLog.event("ipad.baseline", [
+                ("root", selectedRoot.rawValue),
+                ("insets", [insets.top, insets.left, insets.bottom, insets.right].map(number).joined(separator: ",")),
+                ("recorded", flag(recorded)), ("revealing", flag(revealing)),
+                ("tabBarHidden", flag(controller.isTabBarHidden)),
+                ("accessory", flag(controller.hasActivityAccessory)),
+            ], key: "ipad.baseline.\(selectedRoot.rawValue)")
+        }
+        #endif
 
         private func accessibilityIdentifier(_ root: RootView) -> String? {
             switch root {
@@ -556,18 +1018,6 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         }
     }
 }
-
-#if DEBUG
-@available(iOS 18.0, *)
-extension IPadTabContainer {
-    /// Lets the notices host probe read this window's registry.
-    func withNoticesHostProbe(places: ActivityPlaceRegistry) -> Self {
-        var copy = self
-        copy.noticesProbePlaces = places
-        return copy
-    }
-}
-#endif
 
 @available(iOS 18.0, *)
 private final class IPadTabGroupContentController: UIViewController {
@@ -613,16 +1063,35 @@ private final class IPadTabGroupContentController: UIViewController {
 private final class IPadTabBarController: UITabBarController {
     var onHorizontalSizeClassChange: ((Bool) -> Void)?
     var onLayout: (() -> Void)?
+    /// The view is in a window, with its traits, before its first layout.
+    var onIsAppearing: (() -> Void)?
+    /// A turn or a resize has finished, a main-queue turn after it.
+    var onTransitionCompleted: (() -> Void)?
+    /// The person's text size changed, inside trait propagation.
+    var onTextSizeChange: (() -> Void)?
     /// A rotation or window resize, during which UIKit moves the sidebar
     /// itself.
     private(set) var isTransitioningSize = false
+    /// Counts size transitions, so only the latest one's end clears
+    /// `isTransitioningSize`.
+    private var sizeTransitions = 0
 
     override func viewDidLoad() {
         super.viewDidLoad()
         registerForTraitChanges([UITraitHorizontalSizeClass.self]) { (controller: IPadTabBarController, _: UITraitCollection) in
             controller.onHorizontalSizeClassChange?(controller.traitCollection.horizontalSizeClass == .regular)
         }
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) {
+            (controller: IPadTabBarController, _: UITraitCollection) in
+            controller.onTextSizeChange?()
+        }
     }
+
+    override func viewIsAppearing(_ animated: Bool) {
+        super.viewIsAppearing(animated)
+        onIsAppearing?()
+    }
+
     override func viewDidLayoutSubviews() { super.viewDidLayoutSubviews(); onLayout?() }
 
     /// While a game hides the tab bar, a size transition must not open the
@@ -632,17 +1101,27 @@ private final class IPadTabBarController: UITabBarController {
     override func viewWillTransition(to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator) {
         let keepsSidebarClosed = isTabBarHidden && sidebar.isHidden
         isTransitioningSize = true
+        sizeTransitions &+= 1
+        let transition = sizeTransitions
         super.viewWillTransition(to: size, with: coordinator)
-        coordinator.animate(alongsideTransition: { [weak self] _ in
+        // Ends this transition, whichever way UIKit runs it, unless a later
+        // one has begun: UIKit may run the completion even when it queued no
+        // animation, and a late completion mustn't end the next transition.
+        let complete: () -> Void = { [weak self] in
+            guard let self else { return }
+            if keepsSidebarClosed { self.closeSidebarIfReopened() }
+            if self.sizeTransitions == transition { self.isTransitioningSize = false }
+            self.onTransitionCompleted?()
+        }
+        let queued = coordinator.animate(alongsideTransition: { [weak self] _ in
             if keepsSidebarClosed { self?.closeSidebarIfReopened() }
         }) { [weak self] _ in
             if keepsSidebarClosed { self?.closeSidebarIfReopened() }
             // UIKit can apply its restored visibility after the completion.
-            DispatchQueue.main.async { [weak self] in
-                if keepsSidebarClosed { self?.closeSidebarIfReopened() }
-                self?.isTransitioningSize = false
-            }
+            DispatchQueue.main.async(execute: complete)
         }
+        // Not queued, the change happens as this returns: complete after it.
+        if !queued { DispatchQueue.main.async(execute: complete) }
     }
 
     private func closeSidebarIfReopened() {

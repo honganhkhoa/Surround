@@ -838,7 +838,7 @@ private struct GameDetailClockCard: View {
         let statusWidth: CGFloat
         if showsStatus {
             let titles = [String(localized: "Reconnecting…"),
-                          String(localized: "Connecting…", comment: "Clock badge while the app first connects to OGS"),
+                          String(localized: "Connecting…", comment: "While the app first connects to OGS: a game's clock badge and title capsule, and the connection status in the Activity bar, the Now section, under root titles, in the Activity list and on the moderator cover"),
                           String(localized: "Undo?"),
                           String(localized: "Undo asked"), String(localized: "Passed"),
                           String(localized: "Not started"), String(localized: "To move"),

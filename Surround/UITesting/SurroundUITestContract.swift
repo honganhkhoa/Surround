@@ -136,16 +136,10 @@ enum SurroundUITestContract {
         "--surround-structured-chat-formats"
     static let appReviewPresentationLaunchArgument =
         "--surround-app-review-presentation"
-    /// DEBUG notices host probes (TESTING.md); any Debug run, with or without
-    /// `--surround-ui-testing`.
-    static let noticesPlaceholderBarLaunchArgument = "--surround-notices-placeholder-bar"
-    static let noticesPlaceholderBarOrderLaunchArgument = "--surround-notices-placeholder-bar-order"
-    static let noticesPlaceholderBarKeyboardLaunchArgument = "--surround-notices-placeholder-bar-keyboard"
+    /// DEBUG notices host flags (TESTING.md), which the real hosts read; any
+    /// Debug run, with or without `--surround-ui-testing`.
     static let noticesForceCustomBarLaunchArgument = "--surround-notices-force-custom-bar"
     static let noticesTabBarMinimizeLaunchArgument = "--surround-notices-tab-bar-minimize"
-    static let noticesPlaceholderNowLaunchArgument = "--surround-notices-placeholder-now"
-    static let noticesPlaceholderSubtitleLaunchArgument = "--surround-notices-placeholder-subtitle"
-    static let noticesNavigationBarMinimizeLaunchArgument = "--surround-notices-navigation-bar-minimize"
     static let preferencesSuite = "com.honganhkhoa.Surround.UITests"
     static let appStoreScreenshotWidgetGameCount = 3
     static let compatibilityWidgetGameCount = 4
@@ -778,6 +772,14 @@ enum SurroundUITestContract {
         }
         return actions
     }()
+
+    /// Whether this UI-testing launch starts signed out and offline, read
+    /// once. A combination it can't take stops the launch.
+    static let startsSignedOutOffline: Bool = {
+        guard isEnabled else { return false }
+        do { return try parseSignedOutOffline(ProcessInfo.processInfo.arguments) }
+        catch { preconditionFailure("\(error)") }
+    }()
     #else
     static let isEnabled = false
     static let isCapturingAppStoreScreenshots = false
@@ -944,6 +946,32 @@ enum SurroundUITestContract {
         }
         /// A row's result or failure line, which replaces its actions.
         static func activityRowResult(_ itemID: String) -> String { "activity.row.\(itemID).result" }
+        /// The Activity bar, the same on every host. Journeys measure it
+        /// with the tab bar as the screen's bottom chrome.
+        static let activityBar = "activity.bar"
+        /// The bar's lead, its trailing action (View, Open game, Withdraw,
+        /// or a failed result's Retry) and its +N.
+        static let activityBarLead = "activity.bar.lead"
+        static let activityBarAction = "activity.bar.action"
+        static let activityBarMore = "activity.bar.more"
+        #if DEBUG
+        /// Hidden: what the window's host applied, such as "live
+        /// game-26268404 uiKitAccessory expanded", or "none".
+        static let activityBarState = "activity.bar.state"
+        #endif
+        /// The iPad's and the Mac's Now section, its rows and their
+        /// actions by item id, and All activity. On the Mac the section's
+        /// own identifier never reaches XCTest; its rows do.
+        static let activityNow = "activity.now"
+        static func activityNowRow(_ itemID: String) -> String { "activity.now.row.\(itemID)" }
+        static func activityNowRowAction(_ itemID: String) -> String { "activity.now.row.\(itemID).action" }
+        static let activityNowAll = "activity.now.all"
+        /// The window's connection status on root screens: the bar's status
+        /// kinds and the Now section's status row, on every host, and its
+        /// Retry wherever it sits. The line under root titles is the
+        /// navigation item's subtitle text, which takes none.
+        static let rootConnectionStatus = "root.connectionStatus"
+        static let rootConnectionStatusRetry = "root.connectionStatus.retry"
 
         static let profileRengoMenuPrefix = "profile.menu.rengo."
         static let profileActiveGames = "profile.active-games"
@@ -1118,14 +1146,6 @@ enum SurroundUITestContract {
         static let newGameRengoWaiting = "newGame.rengoWaiting"
         /// Home's Searching card, which opens Activity.
         static let homeSearching = "home.searching"
-        static let liveGameBanner = "notification.liveGame"
-        /// The waiting and challenge pills, which open Activity.
-        static let waitingBanner = "notification.waiting"
-        static let challengeBanner = "notification.challenge"
-        /// The Messages button beside the pills, with the unread count as its
-        /// value. It opens Activity at Messages.
-        static let messagesButton = "global.privateMessages"
-        static let connectionBanner = "notification.connection"
         static let homePreferredSettings = "home.preferredSettings"
         static let homePreferredSettingsEdit = "home.preferredSettings.edit"
         static let homePreferredSettingsAdd = "home.preferredSettings.add"
@@ -1306,6 +1326,10 @@ enum SurroundUITestContract {
         /// Zen's control beside Exit: the circle, or the bar item before
         /// a native Exit, for another live game on your move.
         static let gameZenControl = "game.zenControl"
+        /// A conversation's control while a live game needs you: its own,
+        /// never a game's, so a journey that finds Game Detail's control
+        /// can't pass against a conversation's.
+        static let messagesConversationGameControl = "messages.conversation.gameControl"
         /// The window's connection status in a game's title slot, and its
         /// Retry where it offers one.
         static let gameConnectionStatus = "game.connectionStatus"
@@ -1332,7 +1356,8 @@ enum SurroundUITestContract {
 
 #if DEBUG
 extension SurroundUITestContract {
-    /// The notices host probe flags, parsed. Foundation only: this file also
+    /// The notices host flags, parsed: the two the real hosts read, through
+    /// `ActivityHostPolicy.Overrides`. Foundation only: this file also
     /// builds into SurroundTests, SurroundUITests and the widget extension.
     struct NoticesHostProbe: Equatable {
         enum TabBarMinimize: String, CaseIterable {
@@ -1341,71 +1366,21 @@ extension SurroundUITestContract {
             /// workaround to try for the first tab's animation at launch.
             case onScrollDownAfterLaunch = "on-scroll-down-after-launch"
         }
-        /// When a UIKit container sets or clears its accessory, relative to
-        /// setTabBarHidden. Deferred also stops IPadTabContainer sampling closed
-        /// baselines until the change lands.
-        enum BarOrder: String, CaseIterable { case before, after, deferred }
-        /// The custom bar with a docked software keyboard: a plain safeAreaInset;
-        /// the root ignoring the keyboard safe area; hidden while it shows.
-        enum BarKeyboard: String, CaseIterable { case standard, ignore, hide }
-        /// "Reconnecting…"; "Can’t reach OGS" + Retry; or the status alternating
-        /// with an empty subtitle every 4 s.
-        enum Subtitle: String, CaseIterable { case status, retry, cycle }
-        enum NavigationBarMinimize: String, CaseIterable { case automatic, never }
         enum ParseError: Error, Equatable {
             case missingValue(flag: String), invalidValue(flag: String, value: String)
-            case needs(flag: String, primary: String)
-        }
-        enum AccessibilityID {
-            static let bar = "notices.placeholderBar", barLine1 = "notices.placeholderBar.line1"
-            static let barLine2 = "notices.placeholderBar.line2", barSheet = "notices.placeholderBar.sheet"
-            static let barPopover = "notices.placeholderBar.popover", barPresented = "notices.placeholderBar.presented"
-            static let now = "notices.placeholderNow", nowRetry = "notices.placeholderNow.retry"
-            static func nowRow(_ index: Int) -> String { "notices.placeholderNow.row.\(index)" }
-            static let nowAdd = "notices.placeholderNow.add", nowRemove = "notices.placeholderNow.remove"
-            static let nowReassign = "notices.placeholderNow.reassign", nowAll = "notices.placeholderNow.all"
-            static let nowAllContent = "notices.placeholderNow.allContent"
-            static let subtitleRetry = "notices.placeholderSubtitle.retry"
-            static let subtitleLargeRetry = "notices.placeholderSubtitle.largeRetry"
         }
 
-        var showsBar = false
         var forcesCustomBar = false
-        var barOrder = BarOrder.before
-        var barKeyboard = BarKeyboard.standard
         var tabBarMinimize: TabBarMinimize?
-        var showsNow = false
-        var subtitle: Subtitle?
-        var navigationBarMinimize: NavigationBarMinimize?
 
-        /// Nil without any notices host flag. A malformed value, or a companion
-        /// flag without its primary, throws. The first occurrence of a flag wins.
+        /// Nil without either flag. A malformed value throws. The first
+        /// occurrence of a flag wins.
         static func parse(_ arguments: [String]) throws -> NoticesHostProbe? {
             typealias C = SurroundUITestContract
             var probe = NoticesHostProbe()
             probe.forcesCustomBar = arguments.contains(C.noticesForceCustomBarLaunchArgument)
-            probe.showsBar = probe.forcesCustomBar || arguments.contains(C.noticesPlaceholderBarLaunchArgument)
-            probe.showsNow = arguments.contains(C.noticesPlaceholderNowLaunchArgument)
             probe.tabBarMinimize = try value(C.noticesTabBarMinimizeLaunchArgument, in: arguments)
-            probe.subtitle = try value(C.noticesPlaceholderSubtitleLaunchArgument, in: arguments)
-            if let order: BarOrder = try value(C.noticesPlaceholderBarOrderLaunchArgument, in: arguments) {
-                try require(probe.showsBar, C.noticesPlaceholderBarOrderLaunchArgument, C.noticesPlaceholderBarLaunchArgument)
-                probe.barOrder = order
-            }
-            if let keyboard: BarKeyboard = try value(C.noticesPlaceholderBarKeyboardLaunchArgument, in: arguments) {
-                try require(probe.showsBar, C.noticesPlaceholderBarKeyboardLaunchArgument, C.noticesPlaceholderBarLaunchArgument)
-                probe.barKeyboard = keyboard
-            }
-            if let bar: NavigationBarMinimize = try value(C.noticesNavigationBarMinimizeLaunchArgument, in: arguments) {
-                try require(probe.subtitle != nil, C.noticesNavigationBarMinimizeLaunchArgument,
-                            C.noticesPlaceholderSubtitleLaunchArgument)
-                probe.navigationBarMinimize = bar
-            }
             return probe == NoticesHostProbe() ? nil : probe
-        }
-
-        private static func require(_ condition: Bool, _ flag: String, _ primary: String) throws {
-            guard condition else { throw ParseError.needs(flag: flag, primary: primary) }
         }
 
         private static func value<Value: RawRepresentable>(_ flag: String, in arguments: [String]) throws -> Value?
@@ -1466,16 +1441,23 @@ extension SurroundUITestContract {
 
     /// The offline service answers Accept, Reject and Withdraw itself, 0.35 s
     /// after each is sent, where it would fail at once: `--surround-activity-actions
-    /// succeed`, or `fail-once`, where each challenge's first action fails and
-    /// later ones succeed. An accepted challenge starts an active game
+    /// succeed`; `fail-once`, where each challenge's first action fails and
+    /// later ones succeed; or `succeed-listed`, which answers as `succeed`
+    /// does but leaves each item in the service's lists, as OGS does until
+    /// its next update. An accepted challenge starts an active game
     /// (`ActivityFixtureID.acceptedGameID`); a rejected or withdrawn one leaves
-    /// its list. A Quick Match withdraw still goes to the socket, which never
-    /// confirms it. It needs an Activity state (`--surround-activity-state`).
+    /// its list, but under `succeed-listed`. A Quick Match withdraw still goes
+    /// to the socket, which never confirms it. It needs an Activity state
+    /// (`--surround-activity-state`).
     static let activityActionsLaunchArgument = "--surround-activity-actions"
 
     enum ActivityActions: String, CaseIterable {
         case succeed
         case failOnce = "fail-once"
+        case succeedListed = "succeed-listed"
+
+        /// Whether an item an action succeeded on leaves the service's lists.
+        var removesTheItem: Bool { self != .succeedListed }
     }
 
     enum ActivityActionsError: Error, Equatable, CustomStringConvertible {
@@ -1504,6 +1486,41 @@ extension SurroundUITestContract {
         guard let actions = ActivityActions(rawValue: raw) else { throw ActivityActionsError.unknownValue(raw) }
         guard arguments.contains(activityStateLaunchArgument) else { throw ActivityActionsError.needsActivityState }
         return actions
+    }
+
+    /// Starts a plain offline launch signed out, with every window's socket
+    /// down (`.reconnecting`), as after the connection is lost: root screens
+    /// with no account and no connection. Public games stay, as OGS shows
+    /// them to anyone; the user's games, challenges and conversations go.
+    /// The Debug connection commands bring the socket back.
+    static let signedOutOfflineLaunchArgument = "--surround-signed-out-offline"
+
+    enum SignedOutOfflineError: Error, Equatable, CustomStringConvertible {
+        case cannotCombine(String)
+
+        var description: String {
+            switch self {
+            case .cannotCombine(let flag): "\(signedOutOfflineLaunchArgument) can't be combined with \(flag)."
+            }
+        }
+    }
+
+    /// Captures, which keep their own data and connection; the App Review
+    /// presentation, another root; and Activity states, which build on the
+    /// plain journey's signed-in user.
+    static let signedOutOfflineConflictingArguments = [
+        screenshotLaunchArgument, compatibilityScreenshotLaunchArgument, appReviewPresentationLaunchArgument,
+        activityStateLaunchArgument,
+    ]
+
+    /// Whether the launch starts signed out and offline. Combined with a
+    /// capture, the App Review presentation or an Activity state, it throws.
+    static func parseSignedOutOffline(_ arguments: [String]) throws -> Bool {
+        guard arguments.contains(signedOutOfflineLaunchArgument) else { return false }
+        if let flag = signedOutOfflineConflictingArguments.first(where: { arguments.contains($0) }) {
+            throw SignedOutOfflineError.cannotCombine(flag)
+        }
+        return true
     }
 
     // MARK: The in-game control's drivers

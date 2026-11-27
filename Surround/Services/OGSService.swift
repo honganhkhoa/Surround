@@ -1216,7 +1216,7 @@ class OGSService: ObservableObject {
     #if DEBUG && (MAIN_APP || TESTING)
     /// An Activity state's service installs no observers, so it counts its
     /// own live searches and challenges once, as the observer counts them,
-    /// for the waiting pill.
+    /// for display sleep and App Review.
     func countWaitingLiveGamesForActivityFixture() {
         waitingLiveGames = challengesSent.filter { OGSService.isWaitingLive($0.game) }.count
             + openChallengeSentById.values.filter { OGSService.isWaitingLive($0.game) }.count
@@ -1251,8 +1251,11 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
 
-    /// A challenge the user withdrew, rejected or accepted leaves its list.
-    private func removeChallengeForActivityFixture(_ id: Int) {
+    /// A challenge the user withdrew, rejected or accepted leaves its list,
+    /// as OGS's next update takes it, but under `succeed-listed`, where it
+    /// stays listed, as OGS keeps it until then.
+    private func removeChallengeForActivityFixture(_ id: Int, actions: ActivityFixtures.Actions) {
+        guard actions.mode.removesTheItem else { return }
         if challengesReceived.contains(where: { $0.id == id }) { challengesReceived.removeAll { $0.id == id } }
         if challengesSent.contains(where: { $0.id == id }) { challengesSent.removeAll { $0.id == id } }
         if openChallengeSentById[id] != nil { openChallengeSentById[id] = nil }
@@ -1262,7 +1265,7 @@ class OGSService: ObservableObject {
     }
 
     /// The game an accepted challenge starts joins the active games, and the
-    /// challenge goes; the game's id answers.
+    /// challenge goes, but under `succeed-listed`; the game's id answers.
     private func startGameForActivityFixture(from challenge: any OGSSubmittedChallenge,
                                              actions: ActivityFixtures.Actions) -> Int? {
         guard let user, let template = activeGames[SurroundUITestContract.fixtureGameID],
@@ -1271,7 +1274,7 @@ class OGSService: ObservableObject {
         game.ogs = self
         activeGames[gameID] = game
         sortActiveGames(activeGames: activeGames.values)
-        removeChallengeForActivityFixture(challenge.id)
+        removeChallengeForActivityFixture(challenge.id, actions: actions)
         return gameID
     }
     #endif
@@ -2097,6 +2100,16 @@ class OGSService: ObservableObject {
         }
     }
     
+    /// Publishes the active games again after an event that can change who
+    /// must act with no clock event after it: a game's snapshot; whether it
+    /// is played, scored or over; the stones each player accepted; and the
+    /// stones marked dead. As after a clock event, the lists sort again, and
+    /// what reads who must act, such as the Activity bar, reads the game anew.
+    private func republishActiveGame(_ game: Game, id: Int) {
+        guard activeGames[id] != nil else { return }
+        activeGames[id] = game
+    }
+
     private func onWebsocketServerGameEvent(ogsGameId: Int, eventName: String, data: Any?) {
         guard let connectedGame = self.connectedGames[ogsGameId] else {
             return
@@ -2134,6 +2147,7 @@ class OGSService: ObservableObject {
                 if self.activeGames[ogsGameId] != nil {
                     preferences[.latestOGSOverviewOutdated] = true
                 }
+                republishActiveGame(connectedGame, id: ogsGameId)
                 failConditionalMoveSubmissionIfStale(
                     gameID: ogsGameId,
                     game: connectedGame
@@ -2249,6 +2263,7 @@ class OGSService: ObservableObject {
             if let removedStoneData = data as? [String: Any] {
                 if let removedString = removedStoneData["all_removed"] as? String {
                     connectedGame.setRemovedStones(removedString: removedString)
+                    republishActiveGame(connectedGame, id: ogsGameId)
                 }
             }
         case "removed_stones_accepted":
@@ -2256,6 +2271,7 @@ class OGSService: ObservableObject {
                 if let playerId = removedStoneAcceptedData["player_id"] as? Int, let color = connectedGame.stoneColor(ofPlayerWithId: playerId),
                    let stones = removedStoneAcceptedData["stones"] as? String {
                     connectedGame.removedStonesAccepted[color] = BoardPosition.points(fromPositionString: stones)
+                    republishActiveGame(connectedGame, id: ogsGameId)
                 }
             }
         case "phase":
@@ -2268,6 +2284,7 @@ class OGSService: ObservableObject {
                 if let _ = self.activeGames[ogsGameId] {
                     preferences[.latestOGSOverviewOutdated] = true
                 }
+                republishActiveGame(connectedGame, id: ogsGameId)
                 authoritativeGamePhases.send((game: connectedGame, phase: phase))
             }
         case "conditional_moves":
@@ -4734,7 +4751,9 @@ class OGSService: ObservableObject {
         #if DEBUG && (MAIN_APP || TESTING)
         if let actions = activityActions {
             let id = challenge.id
-            return answerForActivityFixture(challenge, actions: actions) { $0.removeChallengeForActivityFixture(id) }
+            return answerForActivityFixture(challenge, actions: actions) {
+                $0.removeChallengeForActivityFixture(id, actions: actions)
+            }
         }
         #endif
         return Future<Void, Error> { promise in

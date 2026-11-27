@@ -4,11 +4,12 @@
 //
 //  One window's connection status, for the screens that show it. The
 //  window's root owns it (ConnectionStatusHost.swift) and shares it with
-//  the moderator superchat cover and, later, the in-app notices; Activity's
-//  lists still make their own. It feeds `ConnectionStatusModel` from the
-//  window's `OGSService` socket status, the device's network path and
-//  whether the window is on screen, and wakes itself at the model's next
-//  deadline.
+//  every screen that says it: root screens and their Activity bar, the Now
+//  section, games, Activity's lists, conversations and the moderator
+//  superchat cover. Only captures, which have no window source, give a list
+//  its own. It feeds `ConnectionStatusModel` from the window's `OGSService`
+//  socket status, the device's network path and whether the window is on
+//  screen, and wakes itself at the model's next deadline.
 //
 
 import Combine
@@ -147,6 +148,16 @@ final class ConnectionStatusSource: ObservableObject {
 }
 
 extension ConnectionStatusModel.Announcement {
+    /// Whether a window's root posts what its source reports, from the place
+    /// the selected tab shows and the platform: from every screen, a root, a
+    /// conversation or a game, since each says the window's status, and on
+    /// the Mac too, whose VoiceOver users would otherwise hear nothing of an
+    /// outage. Once per app, from the window in front, as `AppAnnouncer`
+    /// decides. Activity's lists and the moderator cover never post.
+    static func windowPosts(from place: ActivityModel.Place, on platform: ActivityHostPolicy.Platform) -> Bool {
+        true
+    }
+
     /// What the app posts for it: once per app, from the window the user is
     /// in, with "Connected" at low priority.
     var appAnnouncement: AppAnnouncement {

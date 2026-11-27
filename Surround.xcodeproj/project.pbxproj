@@ -85,6 +85,23 @@
 		5C4E00432026111400000043 /* GameControlUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00422026111400000042 /* GameControlUITests.swift */; };
 		5C4E00512026111400000051 /* MainThreadWatchdog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00502026111400000050 /* MainThreadWatchdog.swift */; };
 		5C4E00532026111400000053 /* GameControlDriverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4E00522026111400000052 /* GameControlDriverTests.swift */; };
+		5C5E00022026112000000002 /* ActivityBarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00012026112000000001 /* ActivityBarModel.swift */; };
+		5C5E00032026112000000003 /* ActivityBarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00012026112000000001 /* ActivityBarModel.swift */; };
+		5C5E00052026112000000005 /* ActivityBarModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00042026112000000004 /* ActivityBarModelTests.swift */; };
+		5C5E00112026112000000011 /* ActivityBarState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00102026112000000010 /* ActivityBarState.swift */; };
+		5C5E00122026112000000012 /* ActivityBarState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00102026112000000010 /* ActivityBarState.swift */; };
+		5C5E00142026112000000014 /* ActivityBarStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00132026112000000013 /* ActivityBarStateTests.swift */; };
+		5C5E00212026112000000021 /* ActivityBarAccessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00202026112000000020 /* ActivityBarAccessibility.swift */; };
+		5C5E00222026112000000022 /* ActivityBarAccessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00202026112000000020 /* ActivityBarAccessibility.swift */; };
+		5C5E00242026112000000024 /* ActivityBarMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00232026112000000023 /* ActivityBarMetrics.swift */; };
+		5C5E00252026112000000025 /* ActivityBarMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00232026112000000023 /* ActivityBarMetrics.swift */; };
+		5C5E00272026112000000027 /* ActivityBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00262026112000000026 /* ActivityBarView.swift */; };
+		5C5E00292026112000000029 /* ActivityBarFitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00282026112000000028 /* ActivityBarFitTests.swift */; };
+		5C5E00312026112100000031 /* ActivityAccessoryHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00302026112100000030 /* ActivityAccessoryHost.swift */; };
+		5C5E00412026112100000041 /* ActivityNowSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00402026112100000040 /* ActivityNowSection.swift */; };
+		5C5E00512026112300000051 /* RootConnectionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00502026112300000050 /* RootConnectionStatus.swift */; };
+		5C5E00612026112400000061 /* ActivityBarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00602026112400000060 /* ActivityBarUITests.swift */; };
+		5C5E00812026112000000081 /* ActivityBarHosts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5E00802026112000000080 /* ActivityBarHosts.swift */; };
 		5FEB00012026111700000001 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
 		5FEB00032026111700000003 /* MoveCommitHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00022026111700000002 /* MoveCommitHaptics.swift */; };
 		5FEB00042026111700000004 /* VoiceCountdownAnnouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FEB00052026111700000005 /* VoiceCountdownAnnouncer.swift */; };
@@ -446,7 +463,6 @@
 		BCC3276227BB69B2005EB2E3 /* OGSChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */; };
 		BCC3276327BB69B2005EB2E3 /* OGSChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */; };
 		BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */; };
-		BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */; };
 		BCD0849C2B6B96E4000B15D6 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
 		BCD0849D2B6B96E5000B15D6 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
 		BCD0849E2B6B96E6000B15D6 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
@@ -667,6 +683,19 @@
 		5C4E00422026111400000042 /* GameControlUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlUITests.swift; sourceTree = "<group>"; };
 		5C4E00502026111400000050 /* MainThreadWatchdog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainThreadWatchdog.swift; sourceTree = "<group>"; };
 		5C4E00522026111400000052 /* GameControlDriverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlDriverTests.swift; sourceTree = "<group>"; };
+		5C5E00012026112000000001 /* ActivityBarModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarModel.swift; sourceTree = "<group>"; };
+		5C5E00042026112000000004 /* ActivityBarModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarModelTests.swift; sourceTree = "<group>"; };
+		5C5E00102026112000000010 /* ActivityBarState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarState.swift; sourceTree = "<group>"; };
+		5C5E00132026112000000013 /* ActivityBarStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarStateTests.swift; sourceTree = "<group>"; };
+		5C5E00202026112000000020 /* ActivityBarAccessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarAccessibility.swift; sourceTree = "<group>"; };
+		5C5E00232026112000000023 /* ActivityBarMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarMetrics.swift; sourceTree = "<group>"; };
+		5C5E00262026112000000026 /* ActivityBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarView.swift; sourceTree = "<group>"; };
+		5C5E00282026112000000028 /* ActivityBarFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarFitTests.swift; sourceTree = "<group>"; };
+		5C5E00302026112100000030 /* ActivityAccessoryHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityAccessoryHost.swift; sourceTree = "<group>"; };
+		5C5E00402026112100000040 /* ActivityNowSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityNowSection.swift; sourceTree = "<group>"; };
+		5C5E00502026112300000050 /* RootConnectionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootConnectionStatus.swift; sourceTree = "<group>"; };
+		5C5E00602026112400000060 /* ActivityBarUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarUITests.swift; sourceTree = "<group>"; };
+		5C5E00802026112000000080 /* ActivityBarHosts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityBarHosts.swift; sourceTree = "<group>"; };
 		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
 		5FEB00022026111700000002 /* MoveCommitHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveCommitHaptics.swift; sourceTree = "<group>"; };
 		5FEB00052026111700000005 /* VoiceCountdownAnnouncer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCountdownAnnouncer.swift; sourceTree = "<group>"; };
@@ -873,7 +902,6 @@
 		BCB98D27256D18C400B1F8FD /* game-25076729.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-25076729.json"; sourceTree = "<group>"; };
 		BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChatMessage.swift; sourceTree = "<group>"; };
 		BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineTimerView.swift; sourceTree = "<group>"; };
-		BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPopup.swift; sourceTree = "<group>"; };
 		BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SurroundNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BCD214D8255A946D00F78E2A /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		BCD214DA255A946D00F78E2A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -1104,9 +1132,11 @@
 				1C0AD3E8262AC421242AB561 /* SurroundThemeTests.swift */,
 				517D00052026102700000005 /* StonePlacementSoundTests.swift */,
 				AC7100052026110900000005 /* ActivityModelTests.swift */,
+				5C5E00042026112000000004 /* ActivityBarModelTests.swift */,
 				5C3E000D202611120000000D /* ActivityListModelTests.swift */,
 				5C4E00042026111400000004 /* GameControlModelTests.swift */,
 				5C4E00302026111400000030 /* GameControlChipFitTests.swift */,
+				5C5E00282026112000000028 /* ActivityBarFitTests.swift */,
 				5C4E00062026111400000006 /* GameControlSwitchTests.swift */,
 				5C4E00522026111400000052 /* GameControlDriverTests.swift */,
 				5C4E00082026111400000008 /* GameOverCardRuleTests.swift */,
@@ -1117,6 +1147,7 @@
 				5C2E00022026111100000002 /* SceneCoverPolicyTests.swift */,
 				5C2E00082026111100000008 /* SuperchatStoreTests.swift */,
 				5C3E000F202611120000000F /* ActivityResultsTests.swift */,
+				5C5E00132026112000000013 /* ActivityBarStateTests.swift */,
 				5C3E00112026111200000011 /* ActivityLastKnownTests.swift */,
 				5C4E00162026111400000016 /* StartedGamesRecorderTests.swift */,
 				5C4E00182026111400000018 /* LowTimeHapticWatcherTests.swift */,
@@ -1196,6 +1227,7 @@
 				5C2E00132026111100000013 /* SuperchatCoverUITests.swift */,
 				5C3E001E202611120000001E /* ActivityListUITests.swift */,
 				5C3E00202026111200000020 /* ActivityConversationUITests.swift */,
+				5C5E00602026112400000060 /* ActivityBarUITests.swift */,
 				5C4E00422026111400000042 /* GameControlUITests.swift */,
 				BC042B1124AB2CFA0050B2D1 /* Info.plist */,
 			);
@@ -1228,6 +1260,10 @@
 				BC92008125CE5BE400C14433 /* UserSelectionView.swift */,
 				BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */,
 				5C3E00182026111200000018 /* ActivityListView.swift */,
+				5C5E00262026112000000026 /* ActivityBarView.swift */,
+				5C5E00802026112000000080 /* ActivityBarHosts.swift */,
+				5C5E00402026112100000040 /* ActivityNowSection.swift */,
+				5C5E00502026112300000050 /* RootConnectionStatus.swift */,
 				BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */,
 				9932FB46E36E47B6A222B4A8 /* MessagesFriendsView.swift */,
 				07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */,
@@ -1253,6 +1289,9 @@
 			isa = PBXGroup;
 			children = (
 				AC7100022026110900000002 /* ActivityModel.swift */,
+				5C5E00012026112000000001 /* ActivityBarModel.swift */,
+				5C5E00202026112000000020 /* ActivityBarAccessibility.swift */,
+				5C5E00232026112000000023 /* ActivityBarMetrics.swift */,
 				5C3E00042026111200000004 /* ActivityListModel.swift */,
 				5C4E00012026111400000001 /* GameControlModel.swift */,
 				6A7E00022026110900000002 /* ActivityHostPolicy.swift */,
@@ -1332,7 +1371,6 @@
 				5C3E001C202611120000001C /* AutomatchEntryCell.swift */,
 				BC5EEBF6259C42EC00675761 /* ChatLine.swift */,
 				BC5EEC5D25A41D7900675761 /* ChatLog.swift */,
-				BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */,
 				06D2A58E5E3E4C3695A597A0 /* FriendshipControls.swift */,
 				BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */,
 				BC6B05F525FA0DF8004E1D66 /* BoardDemoView.swift */,
@@ -1349,6 +1387,7 @@
 				AA1600022026091600000002 /* StackRouter.swift */,
 				ACA1D0022026110900000002 /* ActivityPlaceRegistry.swift */,
 				6A7E00072026110900000007 /* ActivityHostSDK.swift */,
+				5C5E00302026112100000030 /* ActivityAccessoryHost.swift */,
 				8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */,
 				D90700022026090700000002 /* AppReviewPolicy.swift */,
 				D90700092026090700000009 /* AppReviewGameActivity.swift */,
@@ -1371,6 +1410,7 @@
 				5C2E00032026111100000003 /* SuperchatStore.swift */,
 				5C3E00012026111200000001 /* ActivitySession.swift */,
 				5C3E00072026111200000007 /* ActivityResults.swift */,
+				5C5E00102026112000000010 /* ActivityBarState.swift */,
 				5C3E000A202611120000000A /* ActivityLastKnown.swift */,
 				5C4E00102026111400000010 /* StartedGamesRecorder.swift */,
 				5C4E00132026111400000013 /* LowTimeHapticWatcher.swift */,
@@ -1858,11 +1898,15 @@
 				5FEB00012026111700000001 /* MoveCommitHaptics.swift in Sources */,
 				5FEB00042026111700000004 /* VoiceCountdownAnnouncer.swift in Sources */,
 				AC7100012026110900000001 /* ActivityModel.swift in Sources */,
+				5C5E00022026112000000002 /* ActivityBarModel.swift in Sources */,
+				5C5E00212026112000000021 /* ActivityBarAccessibility.swift in Sources */,
+				5C5E00242026112000000024 /* ActivityBarMetrics.swift in Sources */,
 				5C3E00052026111200000005 /* ActivityListModel.swift in Sources */,
 				5C4E00022026111400000002 /* GameControlModel.swift in Sources */,
 				ACA1D0012026110900000001 /* ActivityPlaceRegistry.swift in Sources */,
 				6A7E00012026110900000001 /* ActivityHostPolicy.swift in Sources */,
 				6A7E00062026110900000006 /* ActivityHostSDK.swift in Sources */,
+				5C5E00312026112100000031 /* ActivityAccessoryHost.swift in Sources */,
 				6A7E00082026110900000008 /* NoticesHostProbe.swift in Sources */,
 				5C0E00012026110900000001 /* SceneCover.swift in Sources */,
 				5C0E00032026110900000003 /* SceneCoverPolicy.swift in Sources */,
@@ -1877,6 +1921,7 @@
 				5C2E00042026111100000004 /* SuperchatStore.swift in Sources */,
 				5C3E00022026111200000002 /* ActivitySession.swift in Sources */,
 				5C3E00082026111200000008 /* ActivityResults.swift in Sources */,
+				5C5E00112026112000000011 /* ActivityBarState.swift in Sources */,
 				5C3E000B202611120000000B /* ActivityLastKnown.swift in Sources */,
 				5C4E00112026111400000011 /* StartedGamesRecorder.swift in Sources */,
 				5C4E00142026111400000014 /* LowTimeHapticWatcher.swift in Sources */,
@@ -1983,7 +2028,6 @@
 				BC55D2D624B81E90003E20E7 /* HomeView.swift in Sources */,
 				FC2610290000000000000002 /* SearchSpinner.swift in Sources */,
 				BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */,
-				BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */,
 				1373C1F45AB341E3BE209866 /* FriendshipControls.swift in Sources */,
 				BC3ECFC72B9EAE5500F4E546 /* PreferredSettingsView.swift in Sources */,
 				BC042B4624AB2DD10050B2D1 /* GameCell.swift in Sources */,
@@ -1993,6 +2037,10 @@
 				BC463AFE26624B6100D40D3A /* OGSPuzzle.swift in Sources */,
 				BC70596A25FF209300AC4DE9 /* SupporterView.swift in Sources */,
 				5C3E00192026111200000019 /* ActivityListView.swift in Sources */,
+				5C5E00272026112000000027 /* ActivityBarView.swift in Sources */,
+				5C5E00812026112000000081 /* ActivityBarHosts.swift in Sources */,
+				5C5E00412026112100000041 /* ActivityNowSection.swift in Sources */,
+				5C5E00512026112300000051 /* RootConnectionStatus.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2019,12 +2067,17 @@
 				5FEB00062026111700000006 /* VoiceCountdownAnnouncer.swift in Sources */,
 				517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */,
 				AC7100032026110900000003 /* ActivityModel.swift in Sources */,
+				5C5E00032026112000000003 /* ActivityBarModel.swift in Sources */,
+				5C5E00222026112000000022 /* ActivityBarAccessibility.swift in Sources */,
+				5C5E00252026112000000025 /* ActivityBarMetrics.swift in Sources */,
 				5C3E00062026111200000006 /* ActivityListModel.swift in Sources */,
 				5C4E00032026111400000003 /* GameControlModel.swift in Sources */,
 				AC7100042026110900000004 /* ActivityModelTests.swift in Sources */,
+				5C5E00052026112000000005 /* ActivityBarModelTests.swift in Sources */,
 				5C3E000E202611120000000E /* ActivityListModelTests.swift in Sources */,
 				5C4E00052026111400000005 /* GameControlModelTests.swift in Sources */,
 				5C4E00312026111400000031 /* GameControlChipFitTests.swift in Sources */,
+				5C5E00292026112000000029 /* ActivityBarFitTests.swift in Sources */,
 				5C4E00072026111400000007 /* GameControlSwitchTests.swift in Sources */,
 				5C4E00532026111400000053 /* GameControlDriverTests.swift in Sources */,
 				5C4E00092026111400000009 /* GameOverCardRuleTests.swift in Sources */,
@@ -2040,12 +2093,14 @@
 				5C2E00052026111100000005 /* SuperchatStore.swift in Sources */,
 				5C3E00032026111200000003 /* ActivitySession.swift in Sources */,
 				5C3E00092026111200000009 /* ActivityResults.swift in Sources */,
+				5C5E00122026112000000012 /* ActivityBarState.swift in Sources */,
 				5C3E000C202611120000000C /* ActivityLastKnown.swift in Sources */,
 				5C4E00122026111400000012 /* StartedGamesRecorder.swift in Sources */,
 				5C4E00152026111400000015 /* LowTimeHapticWatcher.swift in Sources */,
 				5C3E00152026111200000015 /* ConversationDraftStore.swift in Sources */,
 				5C2E00092026111100000009 /* SuperchatStoreTests.swift in Sources */,
 				5C3E00102026111200000010 /* ActivityResultsTests.swift in Sources */,
+				5C5E00142026112000000014 /* ActivityBarStateTests.swift in Sources */,
 				5C3E00122026111200000012 /* ActivityLastKnownTests.swift in Sources */,
 				5C4E00172026111400000017 /* StartedGamesRecorderTests.swift in Sources */,
 				5C4E00192026111400000019 /* LowTimeHapticWatcherTests.swift in Sources */,
@@ -2181,6 +2236,7 @@
 				5C2E00142026111100000014 /* SuperchatCoverUITests.swift in Sources */,
 				5C3E001F202611120000001F /* ActivityListUITests.swift in Sources */,
 				5C3E00212026111200000021 /* ActivityConversationUITests.swift in Sources */,
+				5C5E00612026112400000061 /* ActivityBarUITests.swift in Sources */,
 				5C4E00432026111400000043 /* GameControlUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

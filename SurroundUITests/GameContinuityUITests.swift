@@ -416,9 +416,8 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
 
         let window = resizeWindow(to: CGSize(width: 375, height: 548), in: app)
         XCTAssertEqual(window.width, 375, accuracy: 1, "The window reaches its minimum width")
-        let banner = app.buttons.matching(identifier: ID.liveGameBanner).firstMatch
-        XCTAssertTrue(banner.waitForExistence(timeout: 10), "Home shows the live-game banner")
-        tap(banner, description: "Open the live game", in: app)
+        let lead = activityLead(nowRow: "game-\(SurroundUITestContract.fixtureGameID)", in: app)
+        tap(lead, description: "Open the live game", in: app)
         element(ID.gameDetail(SurroundUITestContract.fixtureGameID), in: app)
 
         // Game Detail's frame in its window's own space, once it has held for

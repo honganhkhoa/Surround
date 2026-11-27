@@ -8,9 +8,10 @@
 //  and how its text fits a fixed frame, what a tap or a hold does, what
 //  VoiceOver says, how a Game Detail switches to another game, when the
 //  control's popover is open, which challenge the game-over card shows,
-//  and where a game says that the connection is down. Each reads only
-//  state Game Detail has before it draws, so SurroundTests checks it
-//  without a socket or a view.
+//  where a game says that the connection is down, and where a
+//  conversation shows the live game that needs you. Each reads only state
+//  its screen has before it draws, so SurroundTests checks it without a
+//  socket or a view.
 //
 
 import Foundation
@@ -77,6 +78,39 @@ enum GameControlSlot: Equatable {
                                         startedGames: startedGames, now: now)
         self.init(input, context: context)
     }
+
+    /// The control in a conversation's top bar, from the window's input for
+    /// the conversation (`ActivityModel.conversationControl(_:)`): another
+    /// live game on your move, or one that started elsewhere, with no +N and
+    /// no dot. Nil while no live game needs you.
+    init?(conversation input: ActivityModel.Input) {
+        guard let control = ActivityModel.conversationControl(input) else { return nil }
+        self.init(control)
+    }
+}
+
+/// Which control a custom item draws, and the identifier XCTest finds it by.
+enum GameControlItemRole: Equatable, CaseIterable {
+    /// Game Detail's Active games slot: a tap shows the chip's game, and a
+    /// touch and hold opens the popover.
+    case activeGames
+    /// Zen's control beside Exit: a tap shows the game; Zen has no popover.
+    case zen
+    /// A conversation's top bar while a live game needs you: a tap shows the
+    /// game through Home, with no hold and no popover.
+    case conversation
+
+    var accessibilityIdentifier: String {
+        switch self {
+        case .activeGames: SurroundUITestContract.AccessibilityID.gameActiveGamesButton
+        case .zen: SurroundUITestContract.AccessibilityID.gameZenControl
+        case .conversation: SurroundUITestContract.AccessibilityID.messagesConversationGameControl
+        }
+    }
+
+    /// A tap shows the game and nothing else, with no hold and no popover:
+    /// Zen's control and a conversation's, which VoiceOver says as Zen's.
+    var isTapOnly: Bool { self != .activeGames }
 }
 
 // MARK: - The window
@@ -777,6 +811,84 @@ struct GameControlNativeIdentity: Equatable {
     }
 }
 
+// MARK: - A conversation's control
+
+/// Where a conversation shows the live game that needs you
+/// (`GameControlSlot(conversation:)`). The window's size classes, the Duo's
+/// vertical toolbar and the platform choose, never a bar's measured width:
+/// a pushed conversation's toolbar is built in the pass that hides the tab
+/// bar, so the place it has there is the place every later pass gives it.
+///
+/// - Pushed, with a horizontal bar, in compact width and regular height (a
+///   phone in portrait, a compact iPad window): the system's small icon
+///   with a badge of 1, since the chip would cost the heading its room.
+/// - Pushed, with a horizontal bar elsewhere (an iPhone in landscape, an
+///   iPad in regular width): the chip, an item of its own.
+/// - With the Duo's vertical toolbar, pushed or in Messages' pane: the
+///   rail's icon with a badge of 1, as Game Detail's rail; none on the
+///   closed Duo turned sideways (compact both ways), where a third item
+///   would push Challenge and Profile into More.
+/// - Messages' pane with a horizontal bar, the Mac's two columns included:
+///   the chip in the pane's heading.
+/// - The Mac, pushed: the toolbar's icon with a badge of 1.
+/// - Inside Activity's own stack: none, since Back already shows its live
+///   row.
+///
+/// Each goes before Challenge and Profile.
+enum ConversationGameControlPlacement: Equatable {
+    case none
+    /// The system's icon with a badge of 1, among the top bar's trailing
+    /// items.
+    case barIcon
+    /// The chip, among the top bar's trailing items.
+    case barChip
+    /// The vertical toolbar's icon with a badge of 1, in a group of its own.
+    case railIcon
+    /// The chip in the pane's heading, which is no bar item.
+    case headingChip
+    /// The Mac's toolbar icon with a badge of 1.
+    case macToolbarIcon
+
+    /// What the window knows before the conversation draws.
+    struct Input: Equatable {
+        /// Messages' side pane, rather than a pushed screen.
+        var isPane: Bool
+        /// Activity's own stack, where `\.activityConnection` is set.
+        var isInActivityStack = false
+        /// The Duo's vertical toolbar (`\.isVerticalToolbar`).
+        var isVerticalToolbar = false
+        var isCompactWidth: Bool
+        var isCompactHeight: Bool
+        var isCatalyst = false
+    }
+
+    init(_ input: Input) {
+        if input.isInActivityStack {
+            self = .none
+        } else if input.isCatalyst {
+            self = input.isPane ? .headingChip : .macToolbarIcon
+        } else if input.isVerticalToolbar {
+            self = input.isCompactWidth && input.isCompactHeight ? .none : .railIcon
+        } else if input.isPane {
+            self = .headingChip
+        } else {
+            self = input.isCompactWidth && !input.isCompactHeight ? .barIcon : .barChip
+        }
+    }
+
+    /// The form the control draws and speaks in: the top bar's chip, or a
+    /// native item, whose label carries no time. Nil where none shows.
+    var form: GameControlForm? {
+        switch self {
+        case .none: nil
+        case .barChip, .headingChip: .topBar
+        case .barIcon: .narrowTopBar
+        case .railIcon: .rail
+        case .macToolbarIcon: .mac
+        }
+    }
+}
+
 // MARK: - Tap, touch and hold
 
 /// What a tap, a click or a touch and hold on the control does.
@@ -801,8 +913,8 @@ enum GameControlAction: Equatable {
 ///   system makes a long press's release a tap.
 /// - The bottom bar's floor shows the icon alone, so a tap opens the
 ///   popover there too, as a hold does.
-/// - Zen's circle and items: a tap switches; nothing else, since Zen has
-///   no popover.
+/// - Zen's circle and items, and a conversation's control: a tap shows the
+///   game; nothing else, since neither has a popover.
 struct GameControlInteraction: Equatable {
     /// How long a press lasts before it is a hold.
     static let holdDuration: TimeInterval = 0.5
@@ -929,7 +1041,8 @@ final class GameControlPress {
 /// their label carries no time, which would relabel a native item every
 /// second, and carries the count, which a native item can drop as a value.
 /// On the Mac that label is also the item's tooltip, so the pointer names
-/// the game.
+/// the game. Zen's control and a conversation's, which a tap only shows,
+/// say the chip's label with no value, and what that tap does.
 struct GameControlAccessibility: Equatable {
     var label: String
     var value: String?
@@ -950,10 +1063,18 @@ struct GameControlAccessibility: Equatable {
     static func gameStarted(with name: String) -> String {
         Words.gameStarted(with: name)
     }
+
+    /// What a root screen says once as a live challenge from `name` first
+    /// leads its bar or its Now section: the game-over card's label.
+    static func challenge(from name: String) -> String {
+        Words.challenge(from: name)
+    }
 }
 
 extension GameControlAccessibility {
     /// - Parameters:
+    ///   - isZen: A control a tap only shows (`GameControlItemRole.isTapOnly`):
+    ///     Zen's, or a conversation's.
     ///   - name: Who the state names: the chip's or a started game's
     ///     opponent, or the card's challenger.
     ///   - timeLeft: The chip's game's time on the user's clock; nil
@@ -1004,10 +1125,11 @@ extension GameControlAccessibility {
             tapHint = nil
         }
         if isZen {
-            // As the chip, without a value: a tap switches.
+            // As the chip, without a value: a tap switches to the game, or
+            // opens one that started, as a conversation's control can show.
             label = stateLabel
             value = nil
-            hint = Words.switchesToThatGame
+            hint = slot.gameID == nil ? nil : tapHint
         } else if iconAlone {
             label = waiting.map { Words.joined(stateLabel, $0) } ?? stateLabel
             value = nil
@@ -1063,13 +1185,13 @@ extension GameControlAccessibility {
 
         static func challenge(from name: String) -> String {
             String(localized: "Challenge from \(name)",
-                   comment: "In-game control, VoiceOver, after a game ends: the opponent sent the user a challenge. The value is the opponent's name")
+                   comment: "In-game control, VoiceOver, after a game ends: the opponent sent the user a challenge. Also spoken once on root screens when a live challenge first leads the Activity bar or the Now section. The value is the player's name")
         }
 
         static var activeGames: String { String(localized: "Active games") }
 
         static var activity: String {
-            String(localized: "Activity", comment: "Title of the list of the user's games, challenges, searches and messages")
+            String(localized: "Activity", comment: "Title of the list of the user's games, challenges, searches and messages. Also the Activity bar's VoiceOver name and the Mac's View menu command that opens the list")
         }
 
         /// What waits beyond the chip's or a started game's game.
@@ -1094,7 +1216,7 @@ extension GameControlAccessibility {
 
         static func waiting(_ count: Int) -> String {
             String(localized: "\(count) waiting",
-                   comment: "In-game control, VoiceOver: how many games, challenges and messages wait in Activity")
+                   comment: "In-game control, VoiceOver: how many games, challenges and messages wait in Activity. The Activity bar also shows it, as its first line when nothing live leads")
         }
 
         static var newActivityWaiting: String {
@@ -1522,7 +1644,9 @@ struct GameConnectionPlacement: Equatable {
 
     /// What the actions that need the connection show: Pass, Submit move,
     /// Accept removed stones and Rematch, which disable at once from the
-    /// socket in every layout.
+    /// socket in every layout. While the status shows they say
+    /// "Reconnecting…", or "Connecting…" before the window's first
+    /// connection (`ConnectionStatusModel.Status.gameActionWords`).
     enum Action: Equatable {
         /// The user doesn't play, so none of them shows.
         case none
@@ -1575,6 +1699,43 @@ extension ConnectionStatusModel.Status {
         case .reconnecting, .unreachable: true
         case .hidden, .connected: false
         }
+    }
+
+    /// What a game's title-slot capsule says while the outage shows, in the
+    /// words every carrier of the window's status says
+    /// (`RootConnectionLine.words(status:hasConnected:socket:)`): "Can’t
+    /// reach OGS" once the window gives up waiting, else "Reconnecting…", or
+    /// "Connecting…" before the window's first connection, while its socket
+    /// is on its first attempt. Never "Connected"; nil while nothing shows.
+    func gameCapsuleWords(hasConnected: Bool, socket: OGSWebsocketStatus) -> RootConnectionLine.Words? {
+        guard showsInGame else { return nil }
+        return RootConnectionLine.words(status: self, hasConnected: hasConnected, socket: socket)
+    }
+
+    /// What a game's actions that need the connection say while the outage
+    /// shows (`GameConnectionPlacement.Action`), as the clocks and the
+    /// capsule say it: "Connecting…" while the window has never connected
+    /// and its socket is on its first attempt, else "Reconnecting…". Never
+    /// "Can’t reach OGS": a relabelled action keeps one word. Nil while
+    /// nothing shows.
+    func gameActionWords(hasConnected: Bool, socket: OGSWebsocketStatus) -> RootConnectionLine.Words? {
+        guard showsInGame else { return nil }
+        return GameDetailClockState.recoversConnection(hasConnected: hasConnected, socket: socket)
+            ? .reconnecting : .connecting
+    }
+}
+
+extension GameConnectionPlacement.Action {
+    /// The VoiceOver value of each action that needs the connection while
+    /// `words` show: nil where the user doesn't play, so none shows.
+    func value(_ words: RootConnectionLine.Words?) -> RootConnectionLine.Words? {
+        self == .none ? nil : words
+    }
+
+    /// What the main action reads in place of its name while `words` show:
+    /// only where the game relabels it.
+    func relabel(_ words: RootConnectionLine.Words?) -> RootConnectionLine.Words? {
+        self == .relabelled ? words : nil
     }
 }
 

@@ -5,7 +5,7 @@ set -euo pipefail
 usage() {
   echo "Usage:" >&2
   echo "  $0 derived-data-path <simulator UDID>" >&2
-  echo "  $0 <build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|messages-3|messages-4|activity|game-control|composer|continuity> <simulator UDID> <result label>" >&2
+  echo "  $0 <build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|messages-3|messages-4|activity|activity-bar|game-control|composer|continuity> <simulator UDID> <result label>" >&2
 }
 
 if (( $# == 0 )); then
@@ -20,14 +20,14 @@ case "$phase" in
       exit 64
     fi
     ;;
-  build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|messages-3|messages-4|activity|game-control|composer|continuity)
+  build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|messages-3|messages-4|activity|activity-bar|game-control|composer|continuity)
     if (( $# != 3 )); then
       usage
       exit 64
     fi
     ;;
   *)
-    echo "Expected phase derived-data-path, build, preflight, main, main-1, main-2, main-3, profile, profile-1, profile-2, profile-3, messages, messages-1, messages-2, messages-3, messages-4, activity, game-control, composer, or continuity; received: $phase" >&2
+    echo "Expected phase derived-data-path, build, preflight, main, main-1, main-2, main-3, profile, profile-1, profile-2, profile-3, messages, messages-1, messages-2, messages-3, messages-4, activity, activity-bar, game-control, composer, or continuity; received: $phase" >&2
     exit 64
     ;;
 esac
@@ -116,6 +116,17 @@ readonly activity_test_classes=(
   ActivityListUITests
   ActivityConversationUITests
 )
+# The Activity bar's journeys have their own phase too, which main skips. CI
+# runs it in the Messages jobs after the Activity phase, under the game
+# control and continuity phases' deadline. With the iPad sidebar journey the
+# class takes about ten and a half minutes on a local iPadOS 26 simulator, so
+# at a hosted runner's usual twice that it would need about 22.6 of the
+# Activity phase's 26 minutes, leaving no room for the supervisor to rerun the
+# sidebar journey, about nine and a half minutes there. 41 minutes hold the
+# class and that rerun even at 2.3 times the local pace.
+readonly activity_bar_test_classes=(
+  ActivityBarUITests
+)
 # The in-game control's journeys have their own phase too, which main skips.
 # CI runs it in the profile jobs, which finish well before the main jobs.
 readonly game_control_test_classes=(
@@ -125,8 +136,9 @@ readonly game_control_test_classes=(
 # xcodebuild accepts an unknown -only-testing or -skip-testing selector and
 # exits successfully after running zero tests. Keep the isolation manifest tied
 # to its Swift declarations so a rename cannot silently move a composer test
-# into main, leave the profile, Messages, Activity, game control, or
-# continuity phase empty, or move a whole class between main's parts.
+# into main, leave the profile, Messages, Activity, Activity bar, game
+# control, or continuity phase empty, or move a whole class between main's
+# parts.
 classes_and_sources=(
   "${test_class}:${test_source}"
   "${profile_test_class}:${profile_test_source}"
@@ -137,7 +149,7 @@ for class_and_part in "${main_part_classes[@]}"; do
   classes_and_sources+=("${class_and_part%%:*}:SurroundUITests/${class_and_part%%:*}.swift")
 done
 for whole_test_class in "${composer_test_classes[@]}" "${activity_test_classes[@]}" \
-  "${game_control_test_classes[@]}"; do
+  "${activity_bar_test_classes[@]}" "${game_control_test_classes[@]}"; do
   classes_and_sources+=("${whole_test_class}:SurroundUITests/${whole_test_class}.swift")
 done
 for class_and_source in "${classes_and_sources[@]}"; do
@@ -178,15 +190,15 @@ for test_name in "$keyboard_preflight_test_name" "${composer_test_names[@]}"; do
   fi
 done
 
-# Each part, and the Activity, game control, composer and continuity phases,
-# run under supervise-ipad-ui-test-part.py. CI gives each part step, and the
-# composer step, 50 minutes; at 46 the supervisor interrupts xcodebuild, which
-# then has time to write its result bundle and the supervisor its evidence: at
-# most 1:45 of signal grace and under a minute of bounded collection. The game
-# control and continuity steps get 45 minutes and the Activity step 30, with
-# the same margin. A test that a simulator crash killed, or that failed only
-# because XCTest timed out on a UI query, is rerun once, within the same
-# deadline.
+# Each part, and the Activity, Activity bar, game control, composer and
+# continuity phases, run under supervise-ipad-ui-test-part.py. CI gives each
+# part step, and the composer step, 50 minutes; at 46 the supervisor
+# interrupts xcodebuild, which then has time to write its result bundle and
+# the supervisor its evidence: at most 1:45 of signal grace and under a minute
+# of bounded collection. The game control, Activity bar and continuity steps
+# get 45 minutes, and the Activity step gets 30, with the same margin. A test
+# that a simulator crash killed, or that failed only because XCTest timed out
+# on a UI query, is rerun once, within the same deadline.
 readonly part_deadline_seconds=$((46 * 60))
 readonly isolated_phase_deadline_seconds=$((41 * 60))
 readonly activity_phase_deadline_seconds=$((26 * 60))
@@ -228,7 +240,7 @@ select_main_tests() {
     selection_arguments+=("-skip-testing:${test_case}/${composer_test_name}")
   done
   for whole_test_class in "${composer_test_classes[@]}" "${activity_test_classes[@]}" \
-    "${game_control_test_classes[@]}"; do
+    "${activity_bar_test_classes[@]}" "${game_control_test_classes[@]}"; do
     selection_arguments+=("-skip-testing:${test_target}/${whole_test_class}")
   done
 }
@@ -268,6 +280,61 @@ run_supervised_tests() {
     -resultBundlePath "$result_bundle"
 }
 
+# Two of the Activity bar's journeys need a docked software keyboard, and fail
+# rather than pass when none shows. CI prefers a connected hardware keyboard
+# (configure-ios-simulator-hardware-keyboard.sh), and iPadOS 18.6 keeps it
+# through XCTest's typing, so no software keyboard shows there. The
+# activity-bar phase therefore detaches the hardware keyboard for itself
+# alone, on every iPadOS: it sets the booted simulator's
+# GSEventHardwareKeyboardAttached notify state, whose low byte says that a
+# hardware keyboard is attached, to 13369344, which clears that byte, and
+# posts it. When the phase ends, whatever its tests did, it sets back the
+# value it found and posts that. No preference changes, so the next boot
+# starts from Simulator's own again, and a test the supervisor reruns after a
+# simulator crash meets the keyboard of that boot. If the state can't be
+# read, the phase warns and leaves the keyboard as it found it.
+readonly hardware_keyboard_notification="GSEventHardwareKeyboardAttached"
+readonly detached_hardware_keyboard_state=13369344
+hardware_keyboard_found=""
+
+hardware_keyboard_state() {
+  xcrun simctl spawn "$simulator_id" notifyutil -g "$hardware_keyboard_notification" 2>/dev/null \
+    | awk -v name="$hardware_keyboard_notification" '$1 == name && $2 ~ /^[0-9]+$/ { print $2 }'
+}
+
+set_hardware_keyboard_state() {
+  xcrun simctl spawn "$simulator_id" notifyutil -s "$hardware_keyboard_notification" "$1" \
+    && xcrun simctl spawn "$simulator_id" notifyutil -p "$hardware_keyboard_notification"
+}
+
+# The EXIT trap: it keeps the phase's exit status.
+restore_hardware_keyboard() {
+  [[ -n "$hardware_keyboard_found" ]] || return 0
+  local after
+  after="$(hardware_keyboard_state || true)"
+  if set_hardware_keyboard_state "$hardware_keyboard_found" >/dev/null 2>&1; then
+    echo "Put the hardware keyboard back: ${after:-unreadable} after the tests, set to ${hardware_keyboard_found}, now $(hardware_keyboard_state || true)."
+  else
+    echo "Warning: could not set the simulator's hardware keyboard state back to ${hardware_keyboard_found}; it reads ${after:-unreadable}." >&2
+  fi
+}
+
+detach_hardware_keyboard() {
+  local found
+  found="$(hardware_keyboard_state || true)"
+  if [[ -z "$found" ]]; then
+    echo "Warning: could not read the simulator's hardware keyboard state, so it stays as found; the keyboard journeys fail if no docked software keyboard shows." >&2
+    return 0
+  fi
+  hardware_keyboard_found="$found"
+  trap restore_hardware_keyboard EXIT
+  if set_hardware_keyboard_state "$detached_hardware_keyboard_state" >/dev/null 2>&1; then
+    echo "Detached the hardware keyboard for the Activity bar journeys: found ${found}, set to ${detached_hardware_keyboard_state}, now $(hardware_keyboard_state || true)."
+  else
+    echo "Warning: could not detach the simulator's hardware keyboard (found ${found}); the keyboard journeys fail if no docked software keyboard shows." >&2
+  fi
+}
+
 case "$phase" in
   build)
     echo "Building the shared iPad UI-test products."
@@ -293,7 +360,7 @@ case "$phase" in
     mkdir -p TestResults
     select_main_tests
 
-    echo "Running the main iPad UI suite without profile, Messages, Activity, game control, composer, or continuity tests."
+    echo "Running the main iPad UI suite without profile, Messages, Activity, Activity bar, game control, composer, or continuity tests."
     xcodebuild test-without-building \
       "${common_arguments[@]}" \
       "${selection_arguments[@]}" \
@@ -409,6 +476,20 @@ case "$phase" in
     echo "Running the iPad Activity list and conversation UI tests."
     run_supervised_tests "$activity_phase_deadline_seconds" \
       "TestResults/SurroundUITests-${result_label}-Activity.xcresult" \
+      "${selection_arguments[@]}"
+    ;;
+
+  activity-bar)
+    mkdir -p TestResults
+    selection_arguments=()
+    for test_class_name in "${activity_bar_test_classes[@]}"; do
+      selection_arguments+=("-only-testing:${test_target}/${test_class_name}")
+    done
+
+    detach_hardware_keyboard
+    echo "Running the iPad Activity bar and root status UI tests."
+    run_supervised_tests "$isolated_phase_deadline_seconds" \
+      "TestResults/SurroundUITests-${result_label}-ActivityBar.xcresult" \
       "${selection_arguments[@]}"
     ;;
 
