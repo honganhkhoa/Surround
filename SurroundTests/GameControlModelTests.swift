@@ -592,29 +592,12 @@ final class GameControlModelTests: XCTestCase {
         XCTAssertEqual(Item(.dot, allowsPicker: true), Item(icon: .grid, badge: .dot), "An empty-text badge: a red dot")
         XCTAssertEqual(Item(.dot, allowsPicker: false), Item(icon: .inbox, badge: .dot))
         XCTAssertEqual(Item(.inbox(count: 3), allowsPicker: false), Item(icon: .inbox, badge: .count(3)))
-        XCTAssertNil(Item(nil, allowsPicker: true), "The slot hides.")
-        XCTAssertEqual(Item(nil, allowsPicker: true, keepsPlace: true), Item(icon: .inbox, badge: .none),
-                       "The Duo's wide poses keep the unbadged inbox glyph.")
+        XCTAssertNil(Item(nil, allowsPicker: true), "The slot hides, on the Duo's wide rail too.")
         let zen = ActivityModel.gameControl(zenInput(), context: Context(isZen: true)).map(GameControlSlot.init)
         XCTAssertEqual(zen.flatMap { Item($0, allowsPicker: true) }, Item(icon: .grid, badge: .count(1)),
                        "In Zen a badge of 1")
         XCTAssertEqual(GameControlIcon.grid.systemName, "square.grid.2x2")
         XCTAssertEqual(GameControlIcon.inbox.systemName, "tray")
-    }
-
-    /// With no slot only the Duo's wide rail keeps the item, so the pill
-    /// beside it stays put, and only while the user is signed in: signed out
-    /// nothing can wait, so no item opens a popover with nothing in it.
-    func testOnlyTheDuosWideRailKeepsThePlaceAndOnlySignedIn() {
-        typealias Item = GameControlNativeItem
-        let placements: [GameActiveGamesPlacement] = [.rail, .railSeparated, .bottomBar, .topBarBeforeModes,
-                                                      .topBarAfterModes]
-        for placement in placements {
-            XCTAssertEqual(Item.keepsPlace(at: placement, isSignedIn: true), placement == .railSeparated, "\(placement)")
-            XCTAssertFalse(Item.keepsPlace(at: placement, isSignedIn: false), "Signed out: \(placement)")
-        }
-        XCTAssertNil(Item(nil, allowsPicker: false, keepsPlace: Item.keepsPlace(at: .railSeparated, isSignedIn: false)),
-                     "Signed out the wide rail shows no item.")
     }
 
     private func zenInput() -> Model.Input {
@@ -929,8 +912,8 @@ final class GameControlModelTests: XCTestCase {
     }
 
     /// The native items' hint, which their button applies, says that a tap
-    /// opens Activity in every state, the kept place's unbadged inbox glyph
-    /// too, as Zen's native item says that a tap switches.
+    /// opens Activity in every state, an inbox at 0 too, as Zen's native item
+    /// says that a tap switches.
     func testTheNativeItemsHintThatATapOpensActivity() {
         let slots: [GameControlSlot] = [.chip(gameID: 7, plusN: 2, hasDot: true), .gameStarted(gameID: 8, plusN: 0, hasDot: false),
                                         .gameOverCard(challengeID: 9, plusN: 1), .base(plusN: 0), .base(plusN: 3), .dot,
@@ -1362,19 +1345,16 @@ final class GameControlModelTests: XCTestCase {
         XCTAssertEqual(slot(card), .base(plusN: 0), "And the card, whose popover keeps its result.")
     }
 
-    /// Signed out there is no slot, and no item keeps its place, not even
-    /// on the Duo's wide rail.
+    /// Signed out there is no slot, so no item shows.
     func testSignedOutThereIsNoSlot() throws {
         let window = try openWindow(.several)
         window.ogs.user = nil
         window.ogs.isLoggedIn = false
-        let keepsPlace = GameControlNativeItem.keepsPlace(at: .railSeparated, isSignedIn: window.ogs.isLoggedIn)
         for context in [Context.home, Context(isZen: true), Context(allowsPicker: false)] {
             let slot = GameControlSlot(ogs: window.ogs, showing: window.game, context: context,
                                        startedGames: window.seed.startedGames, now: clock.now)
             XCTAssertNil(slot, "\(context)")
-            XCTAssertNil(GameControlNativeItem(slot, allowsPicker: context.allowsPicker, keepsPlace: keepsPlace),
-                         "\(context)")
+            XCTAssertNil(GameControlNativeItem(slot, allowsPicker: context.allowsPicker), "\(context)")
         }
     }
     #endif
