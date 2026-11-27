@@ -12,15 +12,27 @@ on:
 permissions:
   contents: read
 
-# Every "part N of M" step below, and each composer step, keeps a 50-minute
-# limit: run-ipad-ui-tests.sh interrupts xcodebuild at 46 minutes and needs
-# the rest to save the result bundle and failure evidence. The game control,
-# iPad Activity bar and continuity steps keep 45 minutes, interrupted at 41,
-# and the iPad Activity steps keep 30, interrupted at 26. Change
-# part_deadline_seconds, isolated_phase_deadline_seconds and
-# activity_phase_deadline_seconds with these limits. The iPhone lanes' Activity
-# bar step keeps 30 minutes and runs xcodebuild directly, with five minutes a
-# test and no interruption.
+# A new push to a pull request cancels that pull request's run in progress:
+# its results describe a commit the branch has left behind, and its jobs would
+# keep the new run waiting for a runner. A push to main and a manual run each
+# form a group of their own, so they are never cancelled or held back.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+# Every main, profile and Messages "part N of M" step below, and each composer
+# step, keeps a 50-minute limit: run-ipad-ui-tests.sh interrupts xcodebuild at
+# 46 minutes and needs the rest to save the result bundle and failure
+# evidence. The game control and iPad Activity bar steps, and continuity's two
+# part steps, keep 45 minutes, interrupted at 41, and the iPad Activity steps
+# keep 30, interrupted at 26. Change part_deadline_seconds,
+# isolated_phase_deadline_seconds and activity_phase_deadline_seconds with
+# these limits. The iPhone lanes' Activity bar step keeps 30 minutes and runs
+# xcodebuild directly, with five minutes a test and no interruption.
+#
+# Only the unit tests on iOS 26 report code coverage. Every other build and
+# test passes -enableCodeCoverage NO, here and in run-ipad-ui-tests.sh, so the
+# app under UI test carries no coverage instrumentation.
 jobs:
   test:
     runs-on: macos-26
@@ -105,6 +117,7 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
             -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
             -parallel-testing-enabled NO \
+            -enableCodeCoverage NO \
             -only-testing:SurroundUITests
 
       - name: Run compact account and Messages navigation tests
@@ -138,6 +151,7 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
             -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
             -parallel-testing-enabled NO \
+            -enableCodeCoverage NO \
             "${selection_arguments[@]}" \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 300 \
@@ -178,6 +192,7 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
             -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
             -parallel-testing-enabled NO \
+            -enableCodeCoverage NO \
             "${selection_arguments[@]}" \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 900 \
@@ -205,6 +220,7 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
             -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
             -parallel-testing-enabled NO \
+            -enableCodeCoverage NO \
             "-only-testing:SurroundUITests/${test_class}" \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 300 \
@@ -439,7 +455,10 @@ jobs:
           retention-days: 14
 
   # The iOS 18 unit tests share this job with the profile and game control UI
-  # phases. The unit step also warms the UI build's derived data.
+  # phases. The unit step also warms the UI build's derived data, so it builds
+  # without code coverage, as the UI build does. The UI steps run whether or
+  # not the unit tests pass: a failing unit test must not also hide the iPadOS
+  # 18 profile and game control results.
   minimum-ios-18:
     runs-on: macos-15
     timeout-minutes: 250
@@ -483,9 +502,12 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.iphone_simulator.outputs.id }}" \
             -derivedDataPath "$derived_data_path" \
             -only-testing:SurroundTests \
+            -enableCodeCoverage NO \
             -resultBundlePath TestResults/SurroundTests-iOS18.xcresult
 
       - name: Prefer an iPadOS 18 hardware keyboard
+        id: ipad_keyboard
+        if: ${{ !cancelled() && steps.ipad_simulator.outcome == 'success' }}
         timeout-minutes: 10
         shell: bash
         run: |
@@ -494,6 +516,7 @@ jobs:
 
       - name: Build iPad UI tests on iPadOS 18
         id: ipad_ui_build
+        if: ${{ !cancelled() && steps.ipad_keyboard.outcome == 'success' }}
         timeout-minutes: 20
         shell: bash
         run: |
@@ -703,12 +726,14 @@ jobs:
 
   # Keep keyboard-sensitive journeys off the main/profile runners. Composer
   # and continuity have independent limits so adding fold journeys cannot
-  # consume the existing composer's budget. Leave 25 minutes for setup,
-  # building, and uploads beyond the 5 + 45 + 45 minute UI step limits.
+  # consume the existing composer's budget, and continuity runs in two parts
+  # so that neither reaches its interrupt and each can rerun its longest test.
+  # Leave 25 minutes for setup, building, and uploads beyond the
+  # 10 + 50 + 45 + 45 minute UI step limits.
   ipad-composer-ui-tests:
     name: iPadOS ${{ matrix.ios }} composer and continuity
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 130
+    timeout-minutes: 175
     strategy:
       fail-fast: false
       matrix:
@@ -763,12 +788,20 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh composer \
             "${{ steps.simulator.outputs.id }}" "iPadOS${{ matrix.ios }}"
 
-      - name: Run iPad game continuity UI tests
+      - name: Run iPad game continuity UI tests, part 1 of 2
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 45
         shell: bash
         run: |
-          .github/ci-tools/run-ipad-ui-tests.sh continuity \
+          .github/ci-tools/run-ipad-ui-tests.sh continuity-1 \
+            "${{ steps.simulator.outputs.id }}" "iPadOS${{ matrix.ios }}"
+
+      - name: Run iPad game continuity UI tests, part 2 of 2
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh continuity-2 \
             "${{ steps.simulator.outputs.id }}" "iPadOS${{ matrix.ios }}"
 
       - name: Upload iPad composer and continuity UI test results
