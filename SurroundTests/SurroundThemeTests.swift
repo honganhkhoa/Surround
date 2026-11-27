@@ -520,10 +520,10 @@ final class SurroundThemeTests: XCTestCase {
                 func routes(zen useZen: Bool, at time: TimeInterval) -> [KoiPondSwimRoute] {
                     let layout = useZen ? zen : play
                     return session.routes(for: .OGS(26268404), window: window, water: layout.water, board: layout.board,
-                                          detailed: true, avoiding: layout.panels, elapsed: time)
+                                          detailed: true, avoiding: layout.panels, elapsed: time, regularWidth: size.width >= 1000)
                 }
                 let baseline = routes(zen: startsInZen, at: 0)
-                XCTAssertEqual(baseline.count, 4)
+                XCTAssertEqual(baseline.count, size.width >= 1000 ? 7 : 5)
                 for (index, time) in [13.20, 13.24, 13.26, 15.0, 7200.0, 7200.05].enumerated() {
                     let isZen = index.isMultiple(of: 2) ? !startsInZen : startsInZen
                     let after = routes(zen: isZen, at: time)
@@ -607,7 +607,7 @@ final class SurroundThemeTests: XCTestCase {
         let initial = routes(session, game: 1, board: play.board, at: 2)
         let measured = routes(KoiPondSwimSession(seed: 31), game: 1, board: play.board, at: 2)
         let absent = routes(session, game: 1, board: nil, at: 6)
-        XCTAssertEqual(initial.count, 4)
+        XCTAssertEqual(initial.count, 5)
         try assertKoiEnterFromTheEdge(initial, in: window, at: 2)
         XCTAssertEqual(initial.map { $0.pose(at: 2) }, measured.map { $0.pose(at: 2) })
         XCTAssertEqual(initial.map(\.length), measured.map(\.length))
@@ -619,7 +619,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertTrue(routes(session, game: 2, board: nil, at: 8).isEmpty)
         let next = routes(session, game: 2, board: play.board, at: 9)
         let independent = routes(KoiPondSwimSession(seed: 31), game: 2, board: play.board, at: 9)
-        XCTAssertEqual(next.count, 4)
+        XCTAssertEqual(next.count, 5)
         try assertKoiEnterFromTheEdge(next, in: window, at: 9)
         XCTAssertEqual(next.map { $0.pose(at: 9) }, independent.map { $0.pose(at: 9) })
         XCTAssertNotEqual(next.map { $0.pose(at: 9) }, initial.map { $0.pose(at: 9) })
@@ -805,6 +805,104 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    func testKoiPondSchoolsHaveDistinctResidentsAndIndependentlySwimmingPortraits() {
+        let window = CGRect(x: 0, y: 0, width: 850, height: 780)
+        let board = CGRect(x: 215, y: 165, width: 420, height: 420)
+        let school = KoiPondSwimSchool(seed: 31)
+        for regular in [false, true] {
+            let fish = school.routes(in: window, gameArea: window, board: board,
+                                     detailed: true, avoiding: [], regularWidth: regular)
+            XCTAssertEqual(fish.filter(\.submerged).count, regular ? 3 : 2)
+            XCTAssertEqual(fish.filter { !$0.submerged }.count, regular ? 4 : 3)
+            XCTAssertEqual(Set(fish.map(\.id)).count, fish.count)
+            for siblings in Dictionary(grouping: fish, by: \.assetName).values {
+                for (index, a) in siblings.enumerated() {
+                    for b in siblings.prefix(index) {
+                        let times = stride(from: 0.0, through: 60, by: 0.5)
+                        XCTAssertTrue(times.contains { abs(a.pose(at: $0).tailAmplitude - b.pose(at: $0).tailAmplitude) > 0.25 },
+                                      "Two koi with the same markings must have independent strokes and glides")
+                        // Compare the courses over whole laps so a different start
+                        // time on a duplicate path cannot pass for a separate route.
+                        func course(_ route: KoiPondSwimRoute) -> [CGPoint] {
+                            (0...240).map { route.pose(at: (route.duration + 5) * Double($0) / 240).center }
+                        }
+                        let left = course(a), right = course(b)
+                        let separation = 0.25 * min(a.length, b.length)
+                        func leaves(_ path: [CGPoint], other: [CGPoint]) -> Bool {
+                            path.contains { point in
+                                !other.contains { hypot(point.x - $0.x, point.y - $0.y) < separation }
+                            }
+                        }
+                        XCTAssertTrue(leaves(left, other: right) || leaves(right, other: left),
+                                      "Identically marked koi must visit different parts of the pond")
+                    }
+                }
+            }
+        }
+    }
+
+    func testKoiPondSizeClassAloneAddsAndRetiresFishAtTheWindowEdge() throws {
+        let window = CGRect(x: 0, y: 0, width: 850, height: 780)
+        let board = CGRect(x: 215, y: 165, width: 420, height: 420)
+        let session = KoiPondSwimSession(seed: 86)
+        func school(regular: Bool, at time: Double, paused: Bool = false) -> [KoiPondSwimRoute] {
+            session.routes(for: .OGS(86), window: window, water: window, board: board, detailed: true,
+                           avoiding: [], elapsed: time, reduceMotion: paused, regularWidth: regular)
+        }
+        let compact = school(regular: false, at: 0, paused: true)
+        let compactIDs = Set(compact.map(\.id))
+        XCTAssertEqual(compactIDs.count, 5)
+        XCTAssertTrue(compact.allSatisfy { window.contains($0.pose(at: 0).center) })
+        let regular = school(regular: true, at: 0)
+        XCTAssertEqual(Set(regular.map(\.id)).count, 7)
+        try assertKoiStayInPlace(compact, regular, in: window, at: 0)
+        let additions = regular.filter { !compactIDs.contains($0.id) }
+        XCTAssertEqual(additions.count, 2)
+        XCTAssertEqual(additions.filter(\.submerged).count, 1)
+        try assertKoiEnterFromTheEdge(additions, in: window, at: 0)
+
+        let time = try XCTUnwrap((1...1200).map(Double.init).first { time in
+            additions.allSatisfy { window.contains($0.bounds(at: time)) }
+        })
+        let shrinking = school(regular: false, at: time)
+        try assertKoiStayInPlace(regular, shrinking, in: window, at: time)
+        let finish = time + (regular.map(\.duration).max() ?? 0) + 180
+        for addition in additions {
+            let leaving = try XCTUnwrap(shrinking.first { $0.id == addition.id })
+            let gone = try XCTUnwrap(stride(from: time, through: finish, by: 0.25).first { !leaving.isPresent(at: $0) })
+            XCTAssertFalse(leaving.bounds(at: gone - 0.25).intersects(window),
+                           "The entire retiring koi must clear the edge before its route disappears")
+        }
+        XCTAssertEqual(Set(school(regular: false, at: finish).map(\.id)), compactIDs)
+    }
+
+    func testKoiPondReducedMotionSizeClassChangesKeepAFullStillSchool() throws {
+        let window = CGRect(x: 0, y: 0, width: 850, height: 780)
+        let board = CGRect(x: 215, y: 165, width: 420, height: 420)
+        let session = KoiPondSwimSession(seed: 86)
+        func still(regular: Bool) -> [KoiPondSwimRoute] {
+            session.routes(for: .OGS(86), window: window, water: window, board: board, detailed: true,
+                           avoiding: [], elapsed: 0, reduceMotion: true, regularWidth: regular)
+        }
+        let compact = still(regular: false)
+        let expanded = still(regular: true)
+        let restored = still(regular: false)
+        let ids = Set(compact.map(\.id))
+        XCTAssertEqual(ids.count, 5)
+        XCTAssertEqual(expanded.count, 7)
+        XCTAssertEqual(restored.map(\.id), compact.map(\.id))
+        let newcomers = expanded.filter { !ids.contains($0.id) }
+        XCTAssertEqual(newcomers.count, 2)
+        XCTAssertTrue(newcomers.allSatisfy { $0.isPresent(at: 0) && window.contains($0.pose(at: 0).center) },
+                      "A paused pond must show both new residents without waiting for motion to resume")
+        for resident in compact {
+            let regular = try XCTUnwrap(expanded.first { $0.id == resident.id })
+            let again = try XCTUnwrap(restored.first { $0.id == resident.id })
+            XCTAssertEqual(regular.pose(at: 0), resident.pose(at: 0))
+            XCTAssertEqual(again.pose(at: 0), resident.pose(at: 0))
+        }
+    }
+
     func testKoiPondSlowSwimsFollowRepeatableButDistinctSeededRoutes() throws {
         let window = CGRect(x: 0, y: 0, width: 720, height: 900)
         let board = CGRect(x: 126, y: 240, width: 468, height: 468)
@@ -814,7 +912,7 @@ final class SurroundThemeTests: XCTestCase {
         }
         let first = routes(seed: 27)
         let repeated = routes(seed: 27)
-        XCTAssertEqual(first.count, 4)
+        XCTAssertEqual(first.count, 5)
         XCTAssertEqual(first.map(\.assetName), repeated.map(\.assetName))
         XCTAssertEqual(first.filter(\.submerged).count, 2)
         XCTAssertTrue(first.contains { !$0.submerged && $0.speed > 0 })
@@ -839,7 +937,7 @@ final class SurroundThemeTests: XCTestCase {
         let variants = routes(seed: 324)
         var different = false
         for route in first where route.duration > 0 {
-            let alternate = try XCTUnwrap(variants.first { $0.submerged == route.submerged && $0.assetName == route.assetName })
+            let alternate = try XCTUnwrap(variants.first { $0.id == route.id })
             let a = travelBounds(route), b = travelBounds(alternate)
             if abs(a.minX - b.minX) > 2 || abs(a.minY - b.minY) > 2
                 || abs(a.width - b.width) > 2 || abs(a.height - b.height) > 2 {
@@ -859,7 +957,7 @@ final class SurroundThemeTests: XCTestCase {
         for seed: UInt64 in [2, 31, 129] {
             let routes = KoiPondSwimSchool(seed: seed).routes(in: window, gameArea: play, board: board,
                                                               detailed: true, avoiding: panels)
-            XCTAssertEqual(routes.count, 4)
+            XCTAssertEqual(routes.count, 5)
             for route in routes {
                 XCTAssertGreaterThan(route.speed, 0)
                 XCTAssertLessThan(route.speed, route.length * 0.16, "Slow swimming takes several seconds per body length")
@@ -901,7 +999,7 @@ final class SurroundThemeTests: XCTestCase {
         let board = CGRect(x: 0, y: 285, width: 440, height: 440)
         let routes = KoiPondSwimSchool(seed: 31).routes(in: window, gameArea: window, board: board,
                                                        detailed: true, avoiding: [])
-        XCTAssertEqual(routes.count, 4)
+        XCTAssertEqual(routes.count, 5)
         let interval = 1.0 / 20
         var rhythms: [[CGFloat]] = []
         for route in routes {
@@ -1002,6 +1100,7 @@ final class SurroundThemeTests: XCTestCase {
                                              secondary: BoardSceneShadowRegion? = nil,
                                              @ViewBuilder cover: () -> Cover) throws -> (clear: UIImage, fish: UIImage) {
         let size = viewport?.size ?? CGSize(width: 440, height: 956)
+        let regularWidth = size.width >= 1000
         let board = BoardSceneShadowRegion(bounds: boardBounds, isDetailed: true, cellSize: boardBounds.width / 20)
         let school = KoiPondSwimSession(seed: seed)
         let pond = ZStack(alignment: .topLeading) {
@@ -1011,10 +1110,11 @@ final class SurroundThemeTests: XCTestCase {
             cover()
         }
         .environment(\.colorScheme, scheme)
+        .environment(\.horizontalSizeClass, regularWidth ? .regular : .compact)
         .frame(width: size.width, height: size.height)
         func render() throws -> UIImage { try XCTUnwrap(ImageRenderer(content: pond).uiImage) }
         _ = try render()
-        XCTAssertEqual(school.planned.count, 4)
+        XCTAssertEqual(school.planned.count, regularWidth ? 7 : 5)
         let times = stride(from: 0.0, through: 1800.0, by: 0.5)
         let clearTime = try XCTUnwrap(times.first { time in
             !school.planned.contains { $0.isPresent(at: time) && $0.bounds(at: time).intersects(probe) }
@@ -1350,6 +1450,49 @@ final class SurroundThemeTests: XCTestCase {
             XCTAssertEqual(try centerAlpha(scene: false), 255, "Standalone boards supply their own pond")
             XCTAssertEqual(try centerAlpha(scene: true, reduceTransparency: true), 255,
                            "Reduce Transparency uses the legible solid pond color")
+        }
+    }
+
+    @MainActor
+    func testKoiPondFrozenGameAndPreviewDrawTheSchoolForTheirHorizontalSizeClass() throws {
+        let window = CGRect(x: 0, y: 0, width: 960, height: 800)
+        let face = BoardSceneShadowRegion(bounds: CGRect(x: 265, y: 185, width: 430, height: 430), isDetailed: true)
+        for sizeClass: UserInterfaceSizeClass in [.compact, .regular] {
+            func render(boards: [BoardSceneShadowRegion], session: KoiPondSwimSession? = nil) throws
+                -> (pixels: [UInt8], width: Int, height: Int) {
+                let pond = KoiPondScene(scheme: .light, boards: boards, gameArea: window, swimSession: session)
+                    .environment(\.horizontalSizeClass, sizeClass)
+                    .frame(width: window.width, height: window.height)
+                return try nativeMaterialPixels(pond, scale: 0.5)
+            }
+            // A live session waiting for its first board paints just the pond and bank.
+            let background = try render(boards: [], session: KoiPondSwimSession(seed: 31))
+            for boards in [[face], []] {
+                let scene = try render(boards: boards)
+                var ink = stride(from: 0, to: scene.pixels.count, by: 4).map { i in
+                    (0..<3).contains { abs(Int(scene.pixels[i + $0]) - Int(background.pixels[i + $0])) > 8 }
+                }
+                // Each fish has one connected body. Ignore isolated fin rays and
+                // single antialiased pixels; the silhouettes are well apart in this window.
+                var bodies = 0
+                for start in ink.indices where ink[start] {
+                    var pending = [start], area = 0
+                    ink[start] = false
+                    while let i = pending.popLast() {
+                        area += 1
+                        let x = i % scene.width, y = i / scene.width
+                        for row in max(0, y - 1)...min(scene.height - 1, y + 1) {
+                            for column in max(0, x - 1)...min(scene.width - 1, x + 1) {
+                                let neighbor = row * scene.width + column
+                                if ink[neighbor] { ink[neighbor] = false; pending.append(neighbor) }
+                            }
+                        }
+                    }
+                    if area > 45 { bodies += 1 }
+                }
+                XCTAssertEqual(bodies, sizeClass == .regular ? 7 : 5,
+                               boards.isEmpty ? "A preview without a board needs a complete school" : "Frozen Game Detail needs a complete school")
+            }
         }
     }
 

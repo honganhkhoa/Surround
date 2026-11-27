@@ -141,16 +141,26 @@ private struct SwimGait {
 }
 
 private struct Swimmer {
+    enum Placement {
+        case board(x: CGFloat, y: CGFloat, size: CGFloat, across: Bool)
+        case outer(x: CGFloat, above: Bool, size: CGFloat, railY: CGFloat)
+    }
+
+    let id: KoiPondSwimRoute.ID
     let outline: SwimOutline
+    let placement: Placement
     let submerged: Bool
     let opacity: Double
     let pace, phase, bias, sizeFactor: CGFloat
     let gait: SwimGait
     let clockwise: Bool
 
-    init(_ outline: SwimOutline, submerged: Bool, opacity: Double, random: inout SwimRandom) {
+    init(_ id: KoiPondSwimRoute.ID, _ outline: SwimOutline, _ placement: Placement,
+         opacity: Double, random: inout SwimRandom) {
+        self.id = id
         self.outline = outline
-        self.submerged = submerged
+        self.placement = placement
+        if case .board = placement { submerged = true } else { submerged = false }
         self.opacity = opacity
         pace = submerged ? 0.050 + 0.015 * random.unit() : 0.080 + 0.020 * random.unit()
         phase = random.unit()
@@ -287,12 +297,18 @@ private struct SwimLeg {
 }
 
 struct KoiPondSwimRoute: Identifiable {
-    struct ID: Hashable {
-        let assetName: String
-        let submerged: Bool
+    /// Identity and compositing depth belong to the individual, including when
+    /// two surface koi share the same portrait.
+    enum ID: CaseIterable {
+        case submergedSanke, submergedGold, submergedKohaku
+        case upperKohaku, lowerSanke, surfaceGold, leftKohaku
+
+        var spreadsStartingPosition: Bool {
+            self == .submergedKohaku || self == .surfaceGold || self == .leftKohaku
+        }
     }
 
-    var id: ID { ID(assetName: assetName, submerged: submerged) }
+    var id: ID { swimmer.id }
 
     let assetName: String
     let submerged: Bool
@@ -450,52 +466,70 @@ struct KoiPondSwimSchool {
     private let swimmers: [Swimmer]
 
     var drawingOrder: [KoiPondSwimRoute.ID] {
-        swimmers.map { KoiPondSwimRoute.ID(assetName: $0.outline.asset, submerged: $0.submerged) }
+        KoiPondSwimRoute.ID.allCases
     }
 
     init(seed: UInt64) {
         var random = SwimRandom(state: seed)
         swimmers = [
-            Swimmer(.sanke, submerged: true, opacity: 0.66, random: &random),
-            Swimmer(.gold, submerged: true, opacity: 0.76, random: &random),
-            Swimmer(.kohaku, submerged: false, opacity: 0.92, random: &random),
-            Swimmer(.sanke, submerged: false, opacity: 0.92, random: &random)
+            Swimmer(.submergedSanke, .sanke, .board(x: 0.32, y: 0.39, size: 0.30, across: true),
+                    opacity: 0.66, random: &random),
+            Swimmer(.submergedGold, .gold, .board(x: 0.68, y: 0.66, size: 0.28, across: false),
+                    opacity: 0.76, random: &random),
+            Swimmer(.upperKohaku, .kohaku, .outer(x: 0.81, above: true, size: 1.0, railY: 0.28),
+                    opacity: 0.92, random: &random),
+            Swimmer(.lowerSanke, .sanke, .outer(x: 0.19, above: false, size: 0.91, railY: 0.70),
+                    opacity: 0.92, random: &random),
+            Swimmer(.surfaceGold, .gold, .outer(x: 0.82, above: false, size: 0.82, railY: 0.50),
+                    opacity: 0.91, random: &random),
+            Swimmer(.submergedKohaku, .kohaku, .board(x: 0.25, y: 0.75, size: 0.24, across: false),
+                    opacity: 0.64, random: &random),
+            Swimmer(.leftKohaku, .kohaku, .outer(x: 0.18, above: true, size: 0.88, railY: 0.12),
+                    opacity: 0.87, random: &random)
         ]
     }
 
     func routes(in window: CGRect, gameArea: CGRect, board: CGRect, detailed: Bool,
-                avoiding reservations: [CGRect]) -> [KoiPondSwimRoute] {
+                avoiding reservations: [CGRect], regularWidth: Bool = false) -> [KoiPondSwimRoute] {
         let water = gameArea.intersection(window)
         guard !water.isEmpty, !board.isEmpty else { return [] }
         let startObstacles = reservations.filter { !$0.isEmpty } + (detailed ? [] : [board])
         let blocked = startObstacles.map { $0.insetBy(dx: -2, dy: -2) }
         let side = min(board.width, board.height)
         var routes: [KoiPondSwimRoute] = []
+        // The first five share their seed and identity across all width classes.
+        let roster = swimmers.prefix(regularWidth ? swimmers.count : 5)
+        func startingObstacles(for swimmer: Swimmer) -> [CGRect] {
+            guard swimmer.id.spreadsStartingPosition else { return startObstacles }
+            // Prefer a separate patch for a still fish. Its path can later cross
+            // another koi, and foreground controls remain physical cover.
+            return startObstacles + routes.map { $0.bounds(at: 0).insetBy(dx: -3, dy: -3) }
+        }
         if detailed {
             // The two depths share the entire board. Long chords cross instead
             // of partitioning the glass into two little pools.
             let guide = board.intersection(water)
             if !guide.isEmpty, !Self.openings(in: guide, avoiding: blocked).isEmpty {
-                for i in 0..<2 {
-                    let swimmer = swimmers[i], first = i == 0
-                    let length = side * (first ? 0.30 : 0.28) * swimmer.sizeFactor
-                    let horizontal = guide.width > 1.6 * guide.height || (first && guide.height < 1.6 * guide.width)
-                    let start = CGPoint(x: guide.minX + guide.width * ((first ? 0.32 : 0.68) + 0.47 * swimmer.bias),
-                                        y: guide.minY + guide.height * ((first ? 0.39 : 0.66) + 0.48 * (swimmer.phase - 0.5)))
+                for swimmer in roster {
+                    guard case let .board(x, y, size, across) = swimmer.placement else { continue }
+                    let length = side * size * swimmer.sizeFactor
+                    let horizontal = guide.width > 1.6 * guide.height || (across && guide.height < 1.6 * guide.width)
+                    let start = CGPoint(x: guide.minX + guide.width * (x + 0.47 * swimmer.bias),
+                                        y: guide.minY + guide.height * (y + 0.48 * (swimmer.phase - 0.5)))
                     let knots = Self.passages(through: guide, in: window, horizontal: horizontal,
                                               length: length, swimmer: swimmer)
                     routes.append(KoiPondSwimRoute(swimmer, guide: guide, window: window,
-                                                  startObstacles: startObstacles, length: length, knots: knots, startNear: start))
+                                                  startObstacles: startingObstacles(for: swimmer), length: length, knots: knots, startNear: start))
                 }
             }
         }
 
         let requested = min(190, min(water.width, water.height) * 0.25)
         let outside = Self.openings(in: water.insetBy(dx: 2, dy: 2), avoiding: blocked + [board.insetBy(dx: -2, dy: -2)])
-        for i in 2..<4 {
-            let swimmer = swimmers[i], upper = i == 2
-            let length = requested * swimmer.sizeFactor * (upper ? 1 : 0.91)
-            let target = CGPoint(x: board.minX + board.width * ((upper ? 0.81 : 0.19) + 0.16 * swimmer.bias),
+        for swimmer in roster {
+            guard case let .outer(x, upper, size, railY) = swimmer.placement else { continue }
+            let length = requested * swimmer.sizeFactor * size
+            let target = CGPoint(x: board.minX + board.width * (x + 0.16 * swimmer.bias),
                                  y: upper ? board.minY - 0.38 * length : board.maxY + 0.75 * length)
             var candidates = outside
             if upper && detailed {
@@ -518,10 +552,10 @@ struct KoiPondSwimSchool {
                 let rightRail = right >= left
                 let rail = CGRect(x: rightRail ? water.maxX : window.minX, y: window.minY + window.height * 0.55,
                                   width: railWidth, height: window.height * 0.33)
-                let start = CGPoint(x: rail.midX, y: rail.minY + rail.height * ((upper ? 0.28 : 0.70) + 0.30 * swimmer.bias))
+                let start = CGPoint(x: rail.midX, y: rail.minY + rail.height * (railY + 0.30 * swimmer.bias))
                 let knots = Self.railPassages(through: rail, right: rightRail, length: length, swimmer: swimmer)
                 routes.append(KoiPondSwimRoute(swimmer, guide: rail, window: window,
-                                              startObstacles: startObstacles, length: length, knots: knots, startNear: start))
+                                              startObstacles: startingObstacles(for: swimmer), length: length, knots: knots, startNear: start))
             } else if let guide {
                 let horizontal = guide.width >= guide.height
                 let crossesUpperRim = upper && detailed && horizontal && guide.minY < board.minY && guide.maxY > board.minY
@@ -531,10 +565,11 @@ struct KoiPondSwimSchool {
                 let glass = detailed ? board.intersection(water) : nil
                 let knots = Self.passages(through: entry, in: window, horizontal: horizontal,
                                           length: length, swimmer: swimmer, adjoiningGlass: glass)
-                let start = CGPoint(x: entry.minX + entry.width * (0.50 + 0.80 * swimmer.bias),
+                let startX = swimmer.id.spreadsStartingPosition ? target.x : entry.minX + entry.width * (0.50 + 0.80 * swimmer.bias)
+                let start = CGPoint(x: min(entry.maxX, max(entry.minX, startX)),
                                     y: entry.minY + entry.height * (0.50 + 0.64 * (swimmer.phase - 0.5)))
                 routes.append(KoiPondSwimRoute(swimmer, guide: guide, window: window,
-                                              startObstacles: startObstacles, length: length, knots: knots, startNear: start, startingWater: entry))
+                                              startObstacles: startingObstacles(for: swimmer), length: length, knots: knots, startNear: start, startingWater: entry))
             }
         }
         return routes

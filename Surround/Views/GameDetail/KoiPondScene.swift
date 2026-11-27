@@ -41,6 +41,7 @@ struct KoiPondScene: View {
     var swimSession: KoiPondSwimSession?
     var gameID: GameID?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         GeometryReader { scene in
@@ -55,6 +56,7 @@ struct KoiPondScene: View {
                 dx: viewport.width * 0.16, dy: viewport.height * 0.19)
             let water = gameArea?.intersection(viewport) ?? viewport
             let detailed = visibleBoard?.isDetailed != false
+            let regularWidth = horizontalSizeClass == .regular
             let reservations = controlReservations + [shore.bank, shore.rocks].filter { !$0.isEmpty }
             ZStack {
                 Canvas { context, _ in
@@ -63,8 +65,9 @@ struct KoiPondScene: View {
                     pond.water(in: viewport)
                     if swimSession == nil {
                         pond.drawBank(shore)
-                        if detailed { pond.submergedPair(in: face) }
-                        pond.outerPair(around: face, in: water, window: viewport, excluding: reservations)
+                        if detailed { pond.submergedFish(in: face, regularWidth: regularWidth) }
+                        pond.surfaceFish(around: face, in: water, window: viewport,
+                                         excluding: reservations, regularWidth: regularWidth)
                     }
                 }
                 if let swimSession {
@@ -77,7 +80,7 @@ struct KoiPondScene: View {
                                                     water: water.applying(toWindow), board: measuredFace?.applying(toWindow),
                                                     detailed: detailed, avoiding: (reservations + otherBoards).map { $0.applying(toWindow) },
                                                     layout: layout, elapsed: swimSession.elapsed,
-                                                    reduceMotion: reduceMotion)
+                                                    reduceMotion: reduceMotion, regularWidth: regularWidth)
                     KoiPondMovingFish(scheme: scheme, session: swimSession, routes: routes,
                                       windowOrigin: window.origin, reduceMotion: reduceMotion)
                     // The irregular edges and gaps between the rocks occlude fish at the shoreline.
@@ -122,6 +125,7 @@ final class KoiPondSwimSession: ObservableObject {
         let gameID: GameID?
         let window: CGRect
         let layout: KoiPondSwimLayout
+        let regularWidth: Bool
     }
 
     private let seed: UInt64
@@ -142,8 +146,8 @@ final class KoiPondSwimSession: ObservableObject {
     func routes(for gameID: GameID?, window: CGRect, water: CGRect, board: CGRect?,
                 detailed: Bool, avoiding reservations: [CGRect],
                 layout: KoiPondSwimLayout = .init(),
-                elapsed: TimeInterval, reduceMotion: Bool = false) -> [KoiPondSwimRoute] {
-        let next = Habitat(gameID: gameID, window: window, layout: layout)
+                elapsed: TimeInterval, reduceMotion: Bool = false, regularWidth: Bool = false) -> [KoiPondSwimRoute] {
+        let next = Habitat(gameID: gameID, window: window, layout: layout, regularWidth: regularWidth)
         planned.removeAll { !$0.isPresent(at: elapsed) }
         guard next != habitat || planned.isEmpty else { return planned }
         let sameGame = habitat.map { $0.gameID == gameID } ?? false
@@ -157,17 +161,19 @@ final class KoiPondSwimSession: ObservableObject {
             school = KoiPondSwimSchool(seed: seed ^ gameSeed)
         }
         let fitted = school.routes(in: window, gameArea: water, board: board, detailed: detailed,
-                                   avoiding: reservations)
+                                   avoiding: reservations, regularWidth: regularWidth)
         let previous = sameGame ? planned : []
+        // A still pond has no future animation frames for a new fish to swim
+        // in or a retiring one to leave. Update its population on the resize.
+        let composeStillSchool = reduceMotion && (!sameGame || habitat?.regularWidth != regularWidth)
         planned = school.drawingOrder.compactMap { id in
             let prior = previous.first { $0.id == id }
             guard var route = fitted.first(where: { $0.id == id }) else {
-                return prior?.departing(in: window, at: elapsed)
+                return composeStillSchool ? nil : prior?.departing(in: window, at: elapsed)
             }
             if let prior {
                 route.continueFrom(prior, at: elapsed)
-            } else if !sameGame && reduceMotion {
-                // A visit opened with motion disabled starts with a populated still pond.
+            } else if composeStillSchool {
                 route.startInOpenWater(at: elapsed)
             } else {
                 route.enterFromEdge(at: elapsed)
@@ -239,10 +245,11 @@ private struct KoiPondShore {
     }
 }
 
-/// Board previews outside the shared scene get the same water and submerged
-/// pair. The board still draws its own glass, grid and interactive position.
+/// Board previews outside the shared scene get the same water and submerged koi.
+/// The board still draws its own glass, grid and interactive position.
 struct KoiPondSubmergedView: View {
     let scheme: ColorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         Canvas { context, size in
@@ -250,7 +257,7 @@ struct KoiPondSubmergedView: View {
             guard !face.isEmpty else { return }
             let pond = KoiPondArtwork(context: context, scheme: scheme)
             pond.water(in: face)
-            pond.submergedPair(in: face)
+            pond.submergedFish(in: face, regularWidth: horizontalSizeClass == .regular)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -282,29 +289,46 @@ private struct KoiPondArtwork {
         if !shore.rocks.isEmpty { context.draw(resolve("KoiPondRocks"), in: shore.rocks) }
     }
 
-    func submergedPair(in face: CGRect) {
+    func submergedFish(in face: CGRect, regularWidth: Bool) {
         let side = min(face.width, face.height)
         fish("KoiPondSanke", in: face, x: 0.29, y: 0.44, length: side * 0.31,
              heading: 216, opacity: 0.66)
         fish("KoiPondGold", in: face, x: 0.67, y: 0.72, length: side * 0.29,
              heading: 203, opacity: 0.76)
+        if regularWidth {
+            fish("KoiPondKohaku", in: face, x: 0.30, y: 0.78, length: side * 0.24,
+                 heading: 118, opacity: 0.68)
+        }
     }
 
-    func outerPair(around face: CGRect, in viewport: CGRect, window: CGRect, excluding controls: [CGRect]) {
+    func surfaceFish(around face: CGRect, in viewport: CGRect, window: CGRect,
+                     excluding controls: [CGRect], regularWidth: Bool) {
         guard !viewport.isEmpty else { return }
         let length = min(190, min(viewport.width, viewport.height) * 0.25)
-        let first = CGPoint(x: face.maxX - face.width * 0.19, y: face.minY - length * 0.32)
-        let second = CGPoint(x: face.minX + face.width * 0.19, y: face.maxY + length * 0.55)
+        let upperY = face.minY - length * 0.32, lowerY = face.maxY + length * 0.55
+        let left = face.minX + face.width * 0.19, right = face.maxX - face.width * 0.19
+        // Order by placement priority. Each fish also has a separate spot
+        // in the side rail for layouts where it is the only exposed water.
+        let count = regularWidth ? 4 : 3
+        var fishTargets: [(name: String, target: CGPoint, length: CGFloat, facesLeft: Bool, slot: Int)] = [
+            ("KoiPondKohaku", CGPoint(x: right, y: upperY), length, true, 0),
+            ("KoiPondSanke", CGPoint(x: left, y: lowerY), length, false, count - 1),
+            ("KoiPondGold", CGPoint(x: right, y: lowerY), length * 0.80, false, count - 2)
+        ]
+        if regularWidth {
+            let upperLeft = CGPoint(x: left, y: face.minY - length * 0.60)
+            fishTargets.append(("KoiPondKohaku", upperLeft, length * 0.75, false, 1))
+        }
         var openings = [viewport.insetBy(dx: 2, dy: 2)]
         for obstruction in [face] + controls {
             openings = openings.flatMap { $0.subtracting(obstruction.insetBy(dx: -2, dy: -2)) }
         }
-        for (name, target, upper) in [("KoiPondKohaku", first, true), ("KoiPondSanke", second, false)] {
+        for (name, target, length, facesLeft, slot) in fishTargets {
             let image = resolve(name)
             guard image.size.height > 0 else { continue }
             let aspect = image.size.width / image.size.height
             let placements = openings.compactMap {
-                KoiPondFishPlacement(in: $0, toward: target, length: length, aspect: aspect, upper: upper)
+                KoiPondFishPlacement(in: $0, toward: target, length: length, aspect: aspect, facesLeft: facesLeft)
             }
             // Scoring on a small phone can leave a hairline above the board
             // and a usable band below both players. Pick a recognizable fish
@@ -315,9 +339,9 @@ private struct KoiPondArtwork {
             // In Closed Duo Analyze, the tree, toolbar and board consume the
             // gameplay area. The lower part of the side rail still shows water.
             if (placement?.length ?? 0) < length * 0.55,
-               let rail = railWater(beside: viewport, in: window, upper: upper),
+               let rail = railWater(beside: viewport, in: window, slot: slot, count: count),
                let fallback = KoiPondFishPlacement(in: rail, toward: CGPoint(x: rail.midX, y: rail.midY),
-                                                   length: length, aspect: aspect, upper: upper),
+                                                   length: length, aspect: aspect, facesLeft: facesLeft),
                fallback.length > (placement?.length ?? 0) {
                 placement = fallback
             }
@@ -328,16 +352,17 @@ private struct KoiPondArtwork {
         }
     }
 
-    private func railWater(beside content: CGRect, in window: CGRect, upper: Bool) -> CGRect? {
+    private func railWater(beside content: CGRect, in window: CGRect, slot: Int, count: Int) -> CGRect? {
         let left = content.minX - window.minX, right = window.maxX - content.maxX
         let width = max(left, right)
         guard window.height > window.width, width >= max(30, window.width * 0.09),
               width < window.width * 0.30 else { return nil }
         // The status tray and tool buttons occupy the upper rail and the
         // active-games button sits at its foot. Split the water between them.
+        let row = window.height * 0.29 / CGFloat(count)
         return CGRect(x: left > right ? window.minX + 3 : content.maxX + 3,
-                      y: window.minY + window.height * (upper ? 0.59 : 0.74),
-                      width: width - 6, height: window.height * 0.14)
+                      y: window.minY + window.height * 0.59 + CGFloat(slot) * row + 1,
+                      width: width - 6, height: max(0, row - 2))
     }
 
     private func fish(_ name: String, in rect: CGRect, x: CGFloat, y: CGFloat, length: CGFloat,
@@ -361,14 +386,14 @@ private struct KoiPondFishPlacement {
     let bounds: CGRect
     let score: CGFloat
 
-    init?(in gap: CGRect, toward target: CGPoint, length requested: CGFloat, aspect: CGFloat, upper: Bool) {
+    init?(in gap: CGRect, toward target: CGPoint, length requested: CGFloat, aspect: CGFloat, facesLeft: Bool) {
         guard !gap.isEmpty, requested > 0 else { return nil }
         let wide = gap.width > gap.height
         if wide {
             let narrowRow = gap.height < requested * 0.6
-            heading = upper ? (narrowRow ? -85 : -78) : (narrowRow ? 96 : 111)
+            heading = facesLeft ? (narrowRow ? -85 : -78) : (narrowRow ? 96 : 111)
         } else {
-            heading = upper ? -25 : 158
+            heading = facesLeft ? -25 : 158
         }
         let angle = heading * .pi / 180
         let width = abs(cos(angle)) * aspect + abs(sin(angle))
