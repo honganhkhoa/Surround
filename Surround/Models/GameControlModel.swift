@@ -1531,7 +1531,7 @@ extension GameControlSlot {
 /// game's Rematch copies them (`OGSChallengeTemplate.rematch(for:)`). The
 /// highest challenge id wins.
 ///
-/// Nothing records yet when a game ended or when a challenge arrived, so the
+/// Nothing records when a game ended or when a challenge arrived, so the
 /// card names a challenge, never a rematch. The rule decides what leads the
 /// popover, never an action: an unusual challenge still offers View
 /// (`ActivityRowActionState`).

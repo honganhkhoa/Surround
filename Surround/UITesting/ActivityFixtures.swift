@@ -26,14 +26,10 @@ enum ActivityFixtures {
         func ago(_ seconds: TimeInterval) -> TimeInterval { reference - seconds }
     }
 
-    /// What Activity's caller adds to OGSService state, and data the rematch
-    /// label needs that Surround doesn't decode or record yet.
+    /// What Activity's caller adds to OGSService state.
     struct Seed: Equatable {
         var startedGames: [Int: TimeInterval] = [:]
         var firstSeen: [String: TimeInterval] = [:]   // keyed by ActivityModel.Waiting.id
-        var challengeNotificationTimes: [Int: TimeInterval] = [:]
-        var gameEndTimes: [Int: TimeInterval] = [:]
-        var rematchSourceGameIDs: [Int: Int] = [:]    // sent challenge → the game whose Rematch made it
     }
 
     /// As the app's input, every read conversation counts as recent.
@@ -352,10 +348,9 @@ enum ActivityFixtures {
             case .liveTheirMove:      // OrbitFox 4:05, you 12:34
                 addGame(id, vs: nil, Self.liveFischer, toMove: .black,
                         black: fischer(251), white: fischer(754), thinking: 6)
-            case .finished:           // you won by resignation 90 s ago
+            case .finished:           // you won by resignation
                 addGame(id, vs: nil, Self.liveFischer, toMove: .black,
                         black: fischer(251), white: fischer(754), thinking: 6, phase: .finished)
-                seed.gameEndTimes[id] = clock.ago(90)
             case .correspondenceTheirMove:   // OrbitFox 2d 3h, you 4d 1h
                 addGame(id, vs: nil, Self.correspondence, toMove: .black,
                         black: fischer(201_600), white: fischer(349_200), thinking: 18_000)
@@ -433,7 +428,6 @@ enum ActivityFixtures {
                                    ranked: template.ranked, rules: template.rules,
                                    komi: kind == .unusualRematch ? 0.5 : nil,
                                    gameID: ID.rematchGameID(ID.rematchChallengeID))
-                seed.challengeNotificationTimes[challenge.id] = clock.ago(20)
             }
             state.challengesReceived.append(challenge)
         }
@@ -449,7 +443,6 @@ enum ActivityFixtures {
                                    Self.liveFischer, ranked: template.ranked, rules: template.rules, komi: nil,
                                    gameID: ID.rematchGameID(ID.rematchSentChallengeID))
                 seed.firstSeen["sent-\(challenge.id)"] = clock.ago(30)
-                seed.rematchSourceGameIDs[challenge.id] = Contract.fixtureGameID
             }
             state.challengesSent.append(challenge)
         }
