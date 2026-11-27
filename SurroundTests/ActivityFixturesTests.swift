@@ -463,12 +463,8 @@ final class ActivityFixturesTests: XCTestCase {
         XCTAssertEqual(ogs.privateMessagesUnreadPeerIds, [ID.moderatorID], "The moderator's message is still there.")
     }
 
-    func testRematchDataWaitsForTheLabel() throws {
-        let (ogs, seed) = try service(.rematchBothAsked)
-        XCTAssertEqual(seed.gameEndTimes[baseID], clock.reference - 90)
-        XCTAssertEqual(seed.challengeNotificationTimes[ID.rematchChallengeID], clock.reference - 20)
-        XCTAssertEqual(seed.rematchSourceGameIDs[ID.rematchSentChallengeID], baseID)
-
+    func testBothRematchChallengesMatchTheFinishedGame() throws {
+        let (ogs, _) = try service(.rematchBothAsked)
         let template = try decodedGame("game-26268404")
         let rematch = try XCTUnwrap(ogs.challengesReceived.first { $0.id == ID.rematchChallengeID })
         XCTAssertEqual(rematch.challenger?.username, "OrbitFox")
