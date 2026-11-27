@@ -49,8 +49,9 @@ enum GameToolbarArrangement: Equatable {
 /// Where an arrangement puts Game Detail's Active games slot.
 enum GameActiveGamesPlacement: Equatable {
     case rail               // Duo's vertical bar: a group of its own below the controls
-    /// Duo's wide poses: `rail` after a flexible spacer that keeps the slot in
-    /// its own circle. The spacer is the slot's, emitted even when it is hidden.
+    /// Duo's wide poses: `rail` in its own circle above the controls, then a
+    /// flexible spacer. The spacer is the slot's, emitted even when it is
+    /// hidden, so the controls stay at the bottom of the rail either way.
     case railSeparated
     case bottomBar          // the bottom bar's leading item, before the spacer and the modes
     case topBarBeforeModes  // the first of the top bar's trailing items

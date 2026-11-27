@@ -742,14 +742,9 @@ struct GameControlNativeItem: Equatable {
     ///   game it stands for and +N. In Zen, where +N is 0, a badge of 1.
     /// - Base: the grid icon and +N. Inbox: the inbox glyph and its count.
     /// - Dot: the dot's icon with the red dot.
-    /// - No slot: hidden, except where `keepsPlace` keeps the unbadged inbox
-    ///   glyph (`keepsPlace(at:isSignedIn:)`).
-    init?(_ slot: GameControlSlot?, allowsPicker: Bool, keepsPlace: Bool = false) {
-        guard let slot else {
-            guard keepsPlace else { return nil }
-            self.init(icon: .inbox, badge: .none)
-            return
-        }
+    /// - No slot: hidden, as every form of the control is.
+    init?(_ slot: GameControlSlot?, allowsPicker: Bool) {
+        guard let slot else { return nil }
         let icon = GameControlIcon(slot, allowsPicker: allowsPicker)
         switch slot {
         case .chip, .gameStarted, .gameOverCard:
@@ -759,14 +754,6 @@ struct GameControlNativeItem: Equatable {
         case .dot:
             self.init(icon: icon, badge: .dot)
         }
-    }
-
-    /// Whether the item keeps its place, as the unbadged inbox glyph, while
-    /// no slot shows: in the Duo's wide poses, so the pill beside it stays
-    /// put, while the user is signed in. Signed out nothing can wait, so the
-    /// item hides there too, rather than open a popover with nothing in it.
-    static func keepsPlace(at placement: GameActiveGamesPlacement, isSignedIn: Bool) -> Bool {
-        placement == .railSeparated && isSignedIn
     }
 }
 

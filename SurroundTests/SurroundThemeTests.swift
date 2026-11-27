@@ -6538,8 +6538,11 @@ final class SurroundThemeTests: XCTestCase {
             let face = CGRect(origin: CGPoint(x: padding, y: padding), size: size)
             for stone: StoneColor in [.black, .white] {
                 for scheme: ColorScheme in [.light, .dark] {
+                    // Read the renderer's image, not its direct drawing: on iOS 18 the direct
+                    // drawing of a floured biscuit in Dark differs from the plain one at every
+                    // pixel under the labels. The image keeps those pixels.
                     func render(_ flour: GoldenCrumbCookieSurface.FlourPrint?) throws -> [UInt8] {
-                        try nativeMaterialPixelsUsingDirectContext(
+                        try nativeMaterialPixels(
                             GoldenCrumbCookieSurface(color: stone, cornerRadius: 12,
                                                     edgeClearance: size.height == 34 ? 4 : 6, flour: flour)
                                 .frame(width: size.width, height: size.height)
@@ -7303,8 +7306,12 @@ final class SurroundThemeTests: XCTestCase {
             for scheme: ColorScheme in [.light, .dark] {
                 for color: StoneColor in [.white, .black] {
                     for detailed in [true, false] {
+                        // Read the renderer's image, not its direct drawing. On iOS 18 the direct
+                        // drawing leaves out a gradient-masked overlay above an image that has no
+                        // color filter: this cue over the glass in Light, which then matched the
+                        // idle pane. The image has the cue there, and so does the app on screen.
                         func render(_ highlight: NightGardenClockHighlight?) throws -> [UInt8] {
-                            try nativeMaterialPixelsUsingDirectContext(
+                            try nativeMaterialPixels(
                                 NightGardenPaneMaterial(color: color, role: .clock, colorScheme: scheme,
                                     showsDetail: detailed, compact: compact, highlight: highlight)
                                     .frame(width: size.width, height: size.height)
@@ -8152,6 +8159,11 @@ final class SurroundThemeTests: XCTestCase {
 
     // Own and clear the target buffer so exact-zero projection checks do not
     // depend on the snapshot property's backing-store reuse for empty frames.
+    // Keep this to checks that need it. On iOS 18 the direct drawing is not
+    // always what the image and the screen show: it left out Night Garden's
+    // gradient-masked clock cue above an image with no color filter, and
+    // changed Golden Crumb's floured biscuit in Dark. A view compared with
+    // another rendering of itself can use nativeMaterialPixels instead.
     @MainActor
     private func nativeMaterialPixelsUsingDirectContext<Content: View>(
         _ content: Content, scale: CGFloat = 3

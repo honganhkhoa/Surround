@@ -5,7 +5,7 @@ set -euo pipefail
 usage() {
   echo "Usage:" >&2
   echo "  $0 derived-data-path <simulator UDID>" >&2
-  echo "  $0 <build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|messages-3|messages-4|activity|activity-bar|game-control|composer|continuity> <simulator UDID> <result label>" >&2
+  echo "  $0 <build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|messages-3|messages-4|activity|activity-bar|game-control|composer|continuity|continuity-1|continuity-2> <simulator UDID> <result label>" >&2
 }
 
 if (( $# == 0 )); then
@@ -20,14 +20,14 @@ case "$phase" in
       exit 64
     fi
     ;;
-  build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|messages-3|messages-4|activity|activity-bar|game-control|composer|continuity)
+  build|preflight|main|main-1|main-2|main-3|profile|profile-1|profile-2|profile-3|messages|messages-1|messages-2|messages-3|messages-4|activity|activity-bar|game-control|composer|continuity|continuity-1|continuity-2)
     if (( $# != 3 )); then
       usage
       exit 64
     fi
     ;;
   *)
-    echo "Expected phase derived-data-path, build, preflight, main, main-1, main-2, main-3, profile, profile-1, profile-2, profile-3, messages, messages-1, messages-2, messages-3, messages-4, activity, activity-bar, game-control, composer, or continuity; received: $phase" >&2
+    echo "Expected phase derived-data-path, build, preflight, main, main-1, main-2, main-3, profile, profile-1, profile-2, profile-3, messages, messages-1, messages-2, messages-3, messages-4, activity, activity-bar, game-control, composer, continuity, continuity-1, or continuity-2; received: $phase" >&2
     exit 64
     ;;
 esac
@@ -192,24 +192,26 @@ done
 
 # Each part, and the Activity, Activity bar, game control, composer and
 # continuity phases, run under supervise-ipad-ui-test-part.py. CI gives each
-# part step, and the composer step, 50 minutes; at 46 the supervisor
-# interrupts xcodebuild, which then has time to write its result bundle and
-# the supervisor its evidence: at most 1:45 of signal grace and under a minute
-# of bounded collection. The game control, Activity bar and continuity steps
-# get 45 minutes, and the Activity step gets 30, with the same margin. A test
-# that a simulator crash killed, or that failed only because XCTest timed out
-# on a UI query, is rerun once, within the same deadline.
+# main, profile and Messages part step, and the composer step, 50 minutes; at
+# 46 the supervisor interrupts xcodebuild, which then has time to write its
+# result bundle and the supervisor its evidence: at most 1:45 of signal grace
+# and under a minute of bounded collection. The game control and Activity bar
+# steps, and each of continuity's two part steps, get 45 minutes, and the
+# Activity step gets 30, with the same margin. A test that a simulator crash
+# killed, or that failed only because XCTest timed out on a UI query, is rerun
+# once, within the same deadline.
 readonly part_deadline_seconds=$((46 * 60))
 readonly isolated_phase_deadline_seconds=$((41 * 60))
 readonly activity_phase_deadline_seconds=$((26 * 60))
 
-# The main, profile, and Messages phases each outgrew one CI step, so CI runs
-# main and profile in three parts and Messages in four. Of N parts, part K > 1
-# runs every Nth test declaration of the phase's class, starting with the Kth
-# (the SurroundUITests class for main, less the tests main skips), plus, for
-# main, its whole classes listed above; part 1 runs the rest of the phase by
-# skipping exactly those, so a test this scan misses still runs in part 1.
-# Alternating declarations keeps the parts balanced as tests are added.
+# The main, profile, Messages and continuity phases each outgrew one CI step,
+# so CI runs main and profile in three parts, Messages in four and continuity
+# in two. Of N parts, part K > 1 runs every Nth test declaration of the
+# phase's class, starting with the Kth (the SurroundUITests class for main,
+# less the tests main skips), plus, for main, its whole classes listed above;
+# part 1 runs the rest of the phase by skipping exactly those, so a test this
+# scan misses still runs in part 1. Alternating declarations keeps the parts
+# balanced as tests are added.
 part_test_names() {
   local source="$1" part="$2" part_count="$3"
   grep -Eo "^[[:space:]]*func[[:space:]]+test[[:alnum:]_]*[[:space:]]*\\([[:space:]]*\\)" "$source" \
@@ -245,6 +247,11 @@ select_main_tests() {
   done
 }
 
+# The scheme's test action gathers code coverage, which only the iOS 26 unit
+# job reports. The UI products are built and run without it, so the app under
+# test carries no coverage instrumentation: the build phase and every test
+# phase share these arguments, and a product built with coverage would be
+# rebuilt.
 common_arguments=(
   -scheme Surround
   -project Surround.xcodeproj
@@ -252,6 +259,7 @@ common_arguments=(
   -destination "platform=iOS Simulator,id=${simulator_id}"
   -derivedDataPath "$derived_data_path"
   -parallel-testing-enabled NO
+  -enableCodeCoverage NO
 )
 
 # A UI test gets 15 minutes, and one that asks for more gets up to 20 in the
@@ -384,9 +392,10 @@ case "$phase" in
       "TestResults/SurroundUITests-${result_label}-Profile.xcresult"
     ;;
 
-  main-1|main-2|main-3|profile-1|profile-2|profile-3|messages-1|messages-2|messages-3|messages-4)
+  main-1|main-2|main-3|profile-1|profile-2|profile-3|messages-1|messages-2|messages-3|messages-4|continuity-1|continuity-2)
     mkdir -p TestResults
     part="${phase##*-}"
+    part_deadline="$part_deadline_seconds"
     case "$phase" in
       main-*)
         part_count=3
@@ -399,6 +408,16 @@ case "$phase" in
         part_test_case="$profile_test_case"
         part_test_source="$profile_test_source"
         part_result_name="Profile"
+        ;;
+      continuity-*)
+        # A continuity part keeps the whole phase's 45-minute step and its
+        # 41-minute interrupt: half the tests leave room to rerun the
+        # longest of them, about ten minutes on a hosted iPadOS 26 runner.
+        part_count=2
+        part_test_case="$continuity_test_case"
+        part_test_source="$continuity_test_source"
+        part_result_name="Continuity"
+        part_deadline="$isolated_phase_deadline_seconds"
         ;;
       *)
         part_count=4
@@ -448,7 +467,7 @@ case "$phase" in
     done
 
     echo "Running part ${part} of ${part_count} of the iPad ${part_result_name} UI tests."
-    run_supervised_tests "$part_deadline_seconds" \
+    run_supervised_tests "$part_deadline" \
       "TestResults/SurroundUITests-${result_label}-${part_result_name}-${part}.xcresult" \
       "${selection_arguments[@]}"
     ;;
