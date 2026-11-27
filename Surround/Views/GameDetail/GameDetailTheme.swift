@@ -1847,6 +1847,13 @@ extension SurroundTheme {
 
     var usesTintedClockShoulder: Bool { clockShoulderPigments != nil }
 
+    /// Extra space at each vertical edge of a compact card. Its usual 4 pt
+    /// padding plus this allowance clears the running border by 2 pt, even
+    /// at increased contrast. Both players reserve it throughout the game.
+    var compactClockBorderAllowance: CGFloat {
+        isFlowingInk ? 4 : 0 // 2 pt outside the ring + 4 pt of ink.
+    }
+
     /// The natural scenes use their own foregrounds, translucent pigment
     /// on older systems, and opaque controls under Increase Contrast.
     var usesLightSceneSurfaces: Bool { isFlowingInk || self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden || self == .christmasKeepsakes || self == .paperBlossoms || self == .sakuraStream || self == .whittledWoodland || self == .reefLight || self == .koiPond || self == .goldenCrumb }

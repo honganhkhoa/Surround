@@ -114,6 +114,35 @@ final class GameDetailLayoutTests: XCTestCase {
         }
     }
 
+    func testCompactClockSlotsReserveRoomAboveTheBadgeAndBelowTheFooter() {
+        let themes: [(theme: SurroundTheme, clearance: CGFloat)] = [
+            (.flowingInk, 4), (.flowingInkPlain, 4), (.flowingInkJade, 4), (.flowingInkJadePlain, 4),
+            (.christmasKeepsakes, 0), (.paperBlossoms, 0), (.standard, 0)
+        ]
+        let layouts: [(size: CGSize, compact: Bool, zen: Bool, bodyHeight: CGFloat)] = [
+            (CGSize(width: 440, height: 820), true, false, 50),   // Folded Play clock.
+            (CGSize(width: 390, height: 740), true, true, 68),    // Phone Zen badge row.
+            (CGSize(width: 1180, height: 714), false, true, 76)   // Stacked iPad Zen clocks.
+        ]
+        for (theme, clearance) in themes {
+            XCTAssertEqual(theme.compactClockBorderAllowance, clearance, theme.rawValue)
+            for (size, compact, zen, bodyHeight) in layouts {
+                for scale: CGFloat in [1, 1.1] {
+                    let plan = GameDetailLayoutPlan(size: size, compact: compact, zen: zen,
+                        analyze: false, chat: false, hidesBoard: false, keyboard: false,
+                        accessibility: false, foldsClock: !zen, clockScale: scale,
+                        compactClockBorderAllowance: theme.compactClockBorderAllowance)
+                    let cardHeight = bodyHeight * scale + 2 * clearance
+                    let slotHeight = plan.stackedClocks ? cardHeight * 2 + 8 : cardHeight
+                    let detail = "\(theme) \(size) scale=\(scale)"
+                    XCTAssertEqual(plan.clockStyle, .compact, detail)
+                    XCTAssertEqual(plan[.clocks].height, slotHeight, accuracy: 0.01, detail)
+                    XCTAssertFalse(plan[.clocks].intersects(plan[.board]), detail)
+                }
+            }
+        }
+    }
+
     func testLargerTextCompactClocksReserveTheBadgeRowWithoutLosingAccessibilityHeight() {
         for accessibility in [false, true] {
             let p = GameDetailLayoutPlan(size: CGSize(width: 390, height: 740),

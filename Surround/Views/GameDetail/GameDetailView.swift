@@ -560,7 +560,8 @@ struct GameDetailView: View {
             foldsClock: dynamicTypeSize >= .xxxLarge, clockScale: scale, actionSize: actions.horizontalSize,
             actionMetrics: actions, division: division, panelDivision: panelDivision,
             usesVerticalToolbar: isVerticalToolbar || (compactLandscape && verticalToolbarOutsideZen),
-            zenBoardCenterY: centerY, compactClockLineWidth: lineWidth, narrowChipWidth: chipWidth,
+            zenBoardCenterY: centerY, compactClockLineWidth: lineWidth,
+            compactClockBorderAllowance: theme.compactClockBorderAllowance, narrowChipWidth: chipWidth,
             spaciousNarrowChipWidth: spaciousChipWidth, chromeBandTop: chromeBandTop, boardDepth: board
         )
     }

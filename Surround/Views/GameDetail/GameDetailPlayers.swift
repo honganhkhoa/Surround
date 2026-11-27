@@ -117,15 +117,16 @@ struct GameDetailClockPair: View {
         if style == .full && columnCards {
             return ceil(GameDetailColumnDetailLayouts.fullCardHeight(grown: columnCardsGrow) * scale)
         }
-        let baseHeight: CGFloat = style == .full && narrowFullCards ? 110
-            : (style == .compact && dynamicTypeSize.isAccessibilitySize ? 76
-               : (style == .compact && compactStatusOnOwnRow ? (spaciousCompact ? 76 : 68)
-                  : (style == .compact && spaciousCompact ? 60 : style.cardHeight)))
+        if style == .compact {
+            let height = GameDetailClockStyle.compactCardHeight(scale: scale, accessibility: dynamicTypeSize.isAccessibilitySize,
+                spacious: spaciousCompact, separateStatusRow: compactStatusOnOwnRow,
+                borderAllowance: theme.compactClockBorderAllowance)
+            let detailHeight = columnCardsGrow ? GameDetailColumnDetailLayouts.compactLineGrowth * scale : 0
+            return max(44, height + detailHeight)
+        }
+        let baseHeight: CGFloat = style == .full && narrowFullCards ? 110 : style.cardHeight
         let cardScale = style == .full ? min(scale, fullCardScale ?? scale) : scale
-        // The column's two-line chips grow by one detail line together.
-        let grownLine: CGFloat = style == .compact && columnCardsGrow
-            ? GameDetailColumnDetailLayouts.compactLineGrowth : 0
-        return max(44, (baseHeight + grownLine) * cardScale)
+        return max(44, baseHeight * cardScale)
     }
 
     private var compactStatusOnOwnRow: Bool {
@@ -768,6 +769,7 @@ private struct GameDetailClockCard: View {
             // little more room there while keeping the turn badge off the top edge.
             .padding(.top, compactWoodClock ? 3 : 4)
             .padding(.bottom, 4)
+            .padding(.vertical, style == .compact ? theme.compactClockBorderAllowance : 0)
         }
     }
 

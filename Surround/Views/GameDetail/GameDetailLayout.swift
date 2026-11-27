@@ -17,6 +17,16 @@ enum GameDetailBottomEdgePolicy {
 enum GameDetailClockStyle {
     case full, compact, inline
 
+    static func compactCardHeight(scale: CGFloat, accessibility: Bool, spacious: Bool,
+                                  separateStatusRow: Bool, borderAllowance: CGFloat) -> CGFloat {
+        let base: CGFloat
+        if accessibility { base = 76 }
+        else if separateStatusRow { base = spacious ? 76 : 68 }
+        else { base = spacious ? 60 : Self.compact.cardHeight }
+        // Only the type scales. The painted edge has a fixed width in points.
+        return base * scale + 2 * borderAllowance
+    }
+
     /// At the default text size. The pair scales both cards together.
     var cardHeight: CGFloat {
         switch self {
@@ -101,6 +111,7 @@ struct GameDetailLayoutPlan {
          opponentSharesStatusWhenFolded: Bool = false,
          recoveryHeight: CGFloat = 0, fullClockFooterWidth: CGFloat = 0,
          compactClockLineWidth: CGFloat = 0,
+         compactClockBorderAllowance: CGFloat = 0,
          narrowChipWidth: CGFloat = 0,
          spaciousNarrowChipWidth: CGFloat = 0,
          compactColumnIdentityHeight: CGFloat? = nil,
@@ -166,12 +177,13 @@ struct GameDetailLayoutPlan {
         }
         let spaciousPortraitZen = spaciousCompactClocks && width <= height && !accessibility
         let fullClock = GameDetailClockStyle.full.cardHeight * fullClockScale
-        let foldedClock = (accessibility || spaciousCompactClocks ? 76 : GameDetailClockStyle.compact.cardHeight) * clockScale
-        func compactClockHeight(cardWidth: CGFloat) -> CGFloat {
+        func compactClockHeight(cardWidth: CGFloat, reserveStatusRow: Bool = false) -> CGFloat {
             // Narrow folded clocks put their turn badge on a third line.
             // Reserve it for both players so a turn never moves the board.
-            !accessibility && (cardWidth < compactClockBadgeWidth || enlargedCompactClockBadges)
-                ? max(foldedClock, 68 * clockScale) : foldedClock
+            GameDetailClockStyle.compactCardHeight(scale: clockScale, accessibility: accessibility,
+                spacious: spaciousCompactClocks, separateStatusRow: spaciousCompactClocks || reserveStatusRow
+                    || cardWidth < compactClockBadgeWidth || enlargedCompactClockBadges,
+                borderAllowance: compactClockBorderAllowance)
         }
         let inlineClock = max(GameDetailClockStyle.inline.cardHeight, GameDetailClockStyle.inline.cardHeight * clockScale)
         let analysisControlHeight: CGFloat = 52
@@ -300,8 +312,7 @@ struct GameDetailLayoutPlan {
                         clockStyle = .compact
                         let cardWidth = max(0, (rightRowWidth - gap) / 2)
                         compactClocksReserveStatusRow = !analyze && cardWidth < 200 * clockScale
-                        clockHeight = max(compactClockHeight(cardWidth: cardWidth),
-                                          compactClocksReserveStatusRow ? 68 * clockScale : 0)
+                        clockHeight = compactClockHeight(cardWidth: cardWidth, reserveStatusRow: compactClocksReserveStatusRow)
                     }
                     // The identity keeps its row between clocks and board;
                     // game status is part of the clocks themselves.

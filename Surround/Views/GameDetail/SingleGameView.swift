@@ -1006,6 +1006,7 @@ struct SingleGameView: View {
             recoveryHeight: recoveryHeight,
             fullClockFooterWidth: GameDetailClockPair.fullFooterWidth(game: game, scale: min(clockScale, 1.65), theme: theme),
             compactClockLineWidth: GameDetailClockPair.compactLineWidth(game: game, scale: min(clockScale, 1.65), theme: theme),
+            compactClockBorderAllowance: theme.compactClockBorderAllowance,
             narrowChipWidth: GameDetailClockPair.narrowChipWidth(game: game, scale: min(clockScale, 1.65), theme: theme),
             spaciousNarrowChipWidth: GameDetailClockPair.narrowChipWidth(game: game, scale: min(clockScale, 1.65),
                                                                          spacious: true, theme: theme),
