@@ -1905,7 +1905,8 @@ private struct GameToolbarLayout: ViewModifier {
         }
     }
 
-    /// Duo's vertical toolbar, with the control in its own group at the bottom.
+    /// Duo's vertical toolbar: the control in its own group at the bottom in
+    /// Closed, and in its own circle above the controls in the wide poses.
     @ToolbarContentBuilder private func verticalControlItems(_ slot: GameActiveGamesSlot) -> some ToolbarContent {
         if compact {
             flowingInkItems(placement: .topBarTrailing)
@@ -1927,13 +1928,15 @@ private struct GameToolbarLayout: ViewModifier {
             // only the system sidebar toggle. The controls move
             // to the vertical bar's lower group, which stays;
             // the game draws Back at the top of the bar itself.
+            // The control comes first, above them, so nothing
+            // below it moves when it shows or hides.
+            GameActiveGamesSlotItems(slot: slot)
             flowingInkItems(placement: .bottomBar)
             GameVerticalToolbarGroup(placement: .bottomBar) {
                 if !drawsBackInContent { backButton }
                 modeButtons
                 utilityButtons
             }
-            // The slot's own spacer keeps the control in its circle.
         } else {
             flowingInkItems(placement: .topBarTrailing)
             GameVerticalToolbarGroup(placement: .topBarTrailing) {
@@ -1941,7 +1944,9 @@ private struct GameToolbarLayout: ViewModifier {
                 utilityButtons
             }
         }
-        GameActiveGamesSlotItems(slot: slot)
+        if slot.placement != .railSeparated {
+            GameActiveGamesSlotItems(slot: slot)
+        }
     }
 
     /// Compact portrait: utilities at the top; the control, a spacer and the
@@ -2031,8 +2036,7 @@ private struct GameToolbarLayout: ViewModifier {
         let isShown: Bool
         var nativeBadge: GameControlNativeItem.Badge?
         if form.isNative {
-            let keepsPlace = GameControlNativeItem.keepsPlace(at: placement, isSignedIn: ogs.isLoggedIn)
-            let item = GameControlNativeItem(drawn, allowsPicker: allowsPicker, keepsPlace: keepsPlace)
+            let item = GameControlNativeItem(drawn, allowsPicker: allowsPicker)
             nativeBadge = item?.badge
             isShown = (item != nil && !zenMode) || isOpen
             let spoken = GameControlAccessibility(drawn ?? .inbox(count: 0), form: form, allowsPicker: allowsPicker,
@@ -2670,8 +2674,13 @@ private struct GameActiveGamesSlotItems: ToolbarContent {
     let slot: GameActiveGamesSlot
 
     var body: some ToolbarContent {
-        // Duo's wide poses keep Active games in its own circle at the bottom
-        // of the rail. The spacer stays without the slot, as it did before.
+        // Independent conditions (one is true at most), as in principalItems.
+        if slot.isShown && slot.placement.form == .rail {
+            GameVerticalToolbarGroup(placement: .bottomBar) { slot.view }
+        }
+        // Duo's wide poses put Active games in its own circle above the
+        // controls, then this spacer, which stays without the slot: the
+        // controls keep their place at the bottom of the rail either way.
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
         if slot.placement == .railSeparated {
             if #available(iOS 26.0, *) {
@@ -2679,10 +2688,6 @@ private struct GameActiveGamesSlotItems: ToolbarContent {
             }
         }
         #endif
-        // Independent conditions (one is true at most), as in principalItems.
-        if slot.isShown && slot.placement.form == .rail {
-            GameVerticalToolbarGroup(placement: .bottomBar) { slot.view }
-        }
         if slot.isShown && slot.placement == .bottomBar {
             ToolbarItem(placement: .bottomBar) { slot.view }
         }
