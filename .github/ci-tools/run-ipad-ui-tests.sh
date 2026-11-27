@@ -247,6 +247,11 @@ select_main_tests() {
   done
 }
 
+# The scheme's test action gathers code coverage, which only the iOS 26 unit
+# job reports. The UI products are built and run without it, so the app under
+# test carries no coverage instrumentation: the build phase and every test
+# phase share these arguments, and a product built with coverage would be
+# rebuilt.
 common_arguments=(
   -scheme Surround
   -project Surround.xcodeproj
@@ -254,6 +259,7 @@ common_arguments=(
   -destination "platform=iOS Simulator,id=${simulator_id}"
   -derivedDataPath "$derived_data_path"
   -parallel-testing-enabled NO
+  -enableCodeCoverage NO
 )
 
 # A UI test gets 15 minutes, and one that asks for more gets up to 20 in the

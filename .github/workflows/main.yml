@@ -29,6 +29,10 @@ concurrency:
 # isolated_phase_deadline_seconds and activity_phase_deadline_seconds with
 # these limits. The iPhone lanes' Activity bar step keeps 30 minutes and runs
 # xcodebuild directly, with five minutes a test and no interruption.
+#
+# Only the unit tests on iOS 26 report code coverage. Every other build and
+# test passes -enableCodeCoverage NO, here and in run-ipad-ui-tests.sh, so the
+# app under UI test carries no coverage instrumentation.
 jobs:
   test:
     runs-on: macos-26
@@ -113,6 +117,7 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
             -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
             -parallel-testing-enabled NO \
+            -enableCodeCoverage NO \
             -only-testing:SurroundUITests
 
       - name: Run compact account and Messages navigation tests
@@ -146,6 +151,7 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
             -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
             -parallel-testing-enabled NO \
+            -enableCodeCoverage NO \
             "${selection_arguments[@]}" \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 300 \
@@ -186,6 +192,7 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
             -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
             -parallel-testing-enabled NO \
+            -enableCodeCoverage NO \
             "${selection_arguments[@]}" \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 900 \
@@ -213,6 +220,7 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
             -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
             -parallel-testing-enabled NO \
+            -enableCodeCoverage NO \
             "-only-testing:SurroundUITests/${test_class}" \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 300 \
@@ -447,9 +455,10 @@ jobs:
           retention-days: 14
 
   # The iOS 18 unit tests share this job with the profile and game control UI
-  # phases. The unit step also warms the UI build's derived data. The UI steps
-  # run whether or not the unit tests pass: a failing unit test must not also
-  # hide the iPadOS 18 profile and game control results.
+  # phases. The unit step also warms the UI build's derived data, so it builds
+  # without code coverage, as the UI build does. The UI steps run whether or
+  # not the unit tests pass: a failing unit test must not also hide the iPadOS
+  # 18 profile and game control results.
   minimum-ios-18:
     runs-on: macos-15
     timeout-minutes: 250
@@ -493,6 +502,7 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.iphone_simulator.outputs.id }}" \
             -derivedDataPath "$derived_data_path" \
             -only-testing:SurroundTests \
+            -enableCodeCoverage NO \
             -resultBundlePath TestResults/SurroundTests-iOS18.xcresult
 
       - name: Prefer an iPadOS 18 hardware keyboard
