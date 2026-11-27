@@ -12,6 +12,14 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request cancels that pull request's run in progress:
+# its results describe a commit the branch has left behind, and its jobs would
+# keep the new run waiting for a runner. A push to main and a manual run each
+# form a group of their own, so they are never cancelled or held back.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 # Every "part N of M" step below, and each composer step, keeps a 50-minute
 # limit: run-ipad-ui-tests.sh interrupts xcodebuild at 46 minutes and needs
 # the rest to save the result bundle and failure evidence. The game control,
