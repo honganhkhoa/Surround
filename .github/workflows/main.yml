@@ -447,7 +447,9 @@ jobs:
           retention-days: 14
 
   # The iOS 18 unit tests share this job with the profile and game control UI
-  # phases. The unit step also warms the UI build's derived data.
+  # phases. The unit step also warms the UI build's derived data. The UI steps
+  # run whether or not the unit tests pass: a failing unit test must not also
+  # hide the iPadOS 18 profile and game control results.
   minimum-ios-18:
     runs-on: macos-15
     timeout-minutes: 250
@@ -494,6 +496,8 @@ jobs:
             -resultBundlePath TestResults/SurroundTests-iOS18.xcresult
 
       - name: Prefer an iPadOS 18 hardware keyboard
+        id: ipad_keyboard
+        if: ${{ !cancelled() && steps.ipad_simulator.outcome == 'success' }}
         timeout-minutes: 10
         shell: bash
         run: |
@@ -502,6 +506,7 @@ jobs:
 
       - name: Build iPad UI tests on iPadOS 18
         id: ipad_ui_build
+        if: ${{ !cancelled() && steps.ipad_keyboard.outcome == 'success' }}
         timeout-minutes: 20
         shell: bash
         run: |
