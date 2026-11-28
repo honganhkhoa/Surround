@@ -51,7 +51,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         assertMessagesLoadingFixture("friends:1;requests:1;errors:0;search:0", in: app)
         assertMessagesLoadingStatus("Loading friends…, Loading friend requests…", in: app)
         let empty = app.staticTexts["No conversations yet"].firstMatch
-        XCTAssertTrue(empty.waitForExistence(timeout: 10) && empty.isHittable,
+        XCTAssertTrue(empty.exists(within: 10) && empty.isHittable,
                       "Initial reads must retain the readable empty inbox.")
         var anchors = messagesLoadingAnchors(in: app, includesConversation: false)
         anchors["scroll"] = element("messages.inboxScroll", in: app, matching: .scrollView)
@@ -120,7 +120,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         assertMessagesLoadingStatus(nil, in: app)
         let emptyHeading = app.staticTexts.matching(NSPredicate(
             format: "label BEGINSWITH %@ AND label CONTAINS %@", "No Results for", emptyQuery)).firstMatch
-        let emptyHeadingVisible = emptyHeading.waitForExistence(timeout: 10)
+        let emptyHeadingVisible = emptyHeading.exists(within: 10)
             && waitUntilHittable(emptyHeading, timeout: stateSettleTimeout)
         if !emptyHeadingVisible {
             let hierarchy = XCTAttachment(string: app.debugDescription)
@@ -154,7 +154,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         tap(SurroundUITestContract.AccessibilityID.messagesLoadingReleaseSearch, in: app, matching: .button)
         assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
         assertMessagesLoadingStatus(nil, in: app)
-        XCTAssertTrue(app.staticTexts["Couldn’t search players"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Couldn’t search players"].exists(within: 10))
         assertMessagesLoadingFrames(anchors, equalTo: frames, in: app)
         keepScreenshot("Player search failure clears activity and preserves retry", in: app)
         tap(app.buttons["Try Again"].firstMatch, description: "Retry the failed player search", in: app)
@@ -368,7 +368,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             ? "[surround qa surround-e2e-browser-msg-20261002t123634z-def9830c 1/2] phone to duo/ipad delivery check."
             : SurroundUITestContract.messagesVideoHistoryLatestText
         let latest = transcript.staticTexts.matching(NSPredicate(format: "label == %@", latestText)).firstMatch
-        XCTAssertTrue(latest.waitForExistence(timeout: 10))
+        XCTAssertTrue(latest.exists(within: 10))
         if expectsColumns {
             assertWideRoot(in: app)
             let inbox = element("messages.inboxPane", in: app)
@@ -564,7 +564,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         }
         releaseMessagesReplay(in: app)
         for reply in replies {
-            XCTAssertTrue(reply.firstMatch.waitForExistence(timeout: 50),
+            XCTAssertTrue(reply.firstMatch.exists(within: 50),
                           "Both held incoming replies must arrive in the selected transcript.")
             XCTAssertEqual(reply.count, 1, "Each incoming reply must be delivered exactly once.")
         }
@@ -658,7 +658,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         try requireCompact(in: app)
         let scroll = element("messages.inboxScroll", in: app, matching: .scrollView)
         let navigationBar = app.navigationBars["Messages"].firstMatch
-        XCTAssertTrue(navigationBar.waitForExistence(timeout: 10))
+        XCTAssertTrue(navigationBar.exists(within: 10))
         let firstRequest = query(SurroundUITestContract.AccessibilityID.friendRequestProfile(
             SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]), in: app)
         for _ in 0..<6 {
@@ -681,7 +681,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             && navigationBar.frame.height <= 60 }, "Scrolling the inbox must collapse Messages into its native inline title.")
         XCTAssertTrue(!firstRequest.exists || firstRequest.frame.minY < requestOrigin - 30,
                       "The inbox content must actually scroll before asserting title collapse.")
-        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        XCTAssertTrue(search.exists(within: 10))
         XCTAssertTrue(app.windows.firstMatch.frame.contains(search.frame),
                       "The collapsed search field must remain fully inside the active window.")
         XCTAssertGreaterThanOrEqual(search.frame.minY, navigationBar.frame.maxY - 1)
@@ -696,7 +696,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             dx: search.frame.midX - window.frame.minX,
             dy: search.frame.midY - window.frame.minY)).tap()
         let keyboard = app.keyboards.firstMatch
-        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "Collapsed search must remain usable with the native keyboard.")
+        XCTAssertTrue(keyboard.exists(within: 10), "Collapsed search must remain usable with the native keyboard.")
         tap("messages.cancelPlayerSearch", in: app, matching: .button)
         XCTAssertTrue(waitForCondition { !keyboard.exists }, "Cancel must dismiss the search keyboard before restoring the large title.")
         for _ in 0..<6 {
@@ -706,7 +706,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(waitForCondition { firstRequest.isHittable && navigationBar.frame.height >= expandedHeight - 2 })
         XCTAssertEqual(navigationBar.frame.height, expandedHeight, accuracy: 2,
                        "Returning to the inbox top must restore the native large title.")
-        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        XCTAssertTrue(search.exists(within: 10))
         XCTAssertTrue(app.windows.firstMatch.frame.contains(search.frame),
                       "The restored search field must remain fully inside the active window.")
         keepScreenshot("Compact Messages title expands after returning to top", in: app)
@@ -725,7 +725,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         try requireCompact(in: app)
         let scroll = element("messages.inboxScroll", in: app, matching: .scrollView)
         let navigationBar = app.navigationBars["Messages"].firstMatch
-        XCTAssertTrue(navigationBar.waitForExistence(timeout: 10))
+        XCTAssertTrue(navigationBar.exists(within: 10))
         let firstRequest = query(SurroundUITestContract.AccessibilityID.friendRequestProfile(
             SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]), in: app)
         for _ in 0..<6 {
@@ -745,7 +745,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let search = anchors["search"]!
         tap(search, description: "Focus empty search from the expanded inbox", in: app)
         let keyboard = app.keyboards.firstMatch
-        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "Search must own the software keyboard.")
+        XCTAssertTrue(keyboard.exists(within: 10), "Search must own the software keyboard.")
         let description = app.staticTexts["Search by username to view a profile or start a conversation."].firstMatch
         XCTAssertTrue(waitUntilHittable(description, timeout: stateSettleTimeout))
         XCTAssertLessThanOrEqual(description.frame.maxY, keyboard.frame.minY + 1,
@@ -881,7 +881,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
             let message = app.staticTexts.matching(NSPredicate(format: "label == %@",
                 SurroundUITestContract.messagesShortHistoryLatestText)).firstMatch
-            XCTAssertTrue(message.waitForExistence(timeout: 10))
+            XCTAssertTrue(message.exists(within: 10))
             for sample in 1...3 {
                 RunLoop.current.run(until: Date().addingTimeInterval(1))
                 keepScreenshot("Short conversation opening \(opening) settled sample \(sample)", in: app)
@@ -948,7 +948,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let draft = "Unsent through repeated background returns"
         enterDraft(draft, in: composer, app: app)
         let sceneProbe = app.descendants(matching: .any).matching(identifier: "test.sceneActivation").firstMatch
-        XCTAssertTrue(sceneProbe.waitForExistence(timeout: 10))
+        XCTAssertTrue(sceneProbe.exists(within: 10))
         let original = try sceneProbeValue(sceneProbe)
         let sessionID = try XCTUnwrap(original["sessionID"] as? String)
         let sessionIDs = try XCTUnwrap(original["sessionIDs"] as? [String])
@@ -1084,7 +1084,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let search = element("messages.playerSearchField", in: app, matching: .textField)
         tap(search, description: "Focus empty player search", in: app)
         let keyboard = app.keyboards.firstMatch
-        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "A software keyboard is required.")
+        XCTAssertTrue(keyboard.exists(within: 10), "A software keyboard is required.")
         guard keyboard.exists else { return }
         let description = app.staticTexts["Search by username to view a profile or start a conversation."].firstMatch
         XCTAssertTrue(waitUntilHittable(description, timeout: stateSettleTimeout))
@@ -1447,7 +1447,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
                        "Safari must retain the authored path and query; fragments stay in the browser.")
         // The cold view service that delayed the request can also delay the page.
         let marker = app.webViews.staticTexts[ProfileBiographyBrowserServer.pageMarker].firstMatch
-        XCTAssertTrue(marker.waitForExistence(timeout: 30), "Safari must display the actual loopback page.")
+        XCTAssertTrue(marker.exists(within: 30), "Safari must display the actual loopback page.")
         XCTAssertTrue(waitUntilHittable(marker, timeout: 30))
         keepScreenshot("Profile biography – local page in Safari", in: app)
         var close: XCUIElement?
@@ -1916,7 +1916,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
                       "The About row must be clear of the navigation and tab bars before tapping.")
         tap(action, description: "Read the full player biography", in: app)
         element(SurroundUITestContract.AccessibilityID.screenPlayerAbout, in: app)
-        XCTAssertTrue(app.navigationBars["About"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["About"].exists(within: 10))
         biographyWebView(in: app)
         return sourceFrame
     }
@@ -1952,7 +1952,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
     private func biographyLink(_ label: String, in app: XCUIApplication) -> XCUIElement {
         let web = biographyWebView(in: app)
         let link = web.links[label].firstMatch
-        XCTAssertTrue(link.waitForExistence(timeout: 10), "The authored \(label) link must remain accessible.")
+        XCTAssertTrue(link.exists(within: 10), "The authored \(label) link must remain accessible.")
         revealBiographyElement(link, in: web, app: app)
         return link
     }
@@ -1963,7 +1963,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
 
     private func biographyText(containing text: String, in app: XCUIApplication) -> XCUIElement {
         let result = biographyWebView(in: app).staticTexts.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
-        XCTAssertTrue(result.waitForExistence(timeout: 10), "Expected authored or localized biography text \(text).")
+        XCTAssertTrue(result.exists(within: 10), "Expected authored or localized biography text \(text).")
         return result
     }
 
@@ -2432,7 +2432,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
 
     private func assertChallenge(for username: String, in app: XCUIApplication) {
         element(SurroundUITestContract.AccessibilityID.screenCustomGame, in: app)
-        XCTAssertTrue(app.navigationBars["Challenge"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Challenge"].exists(within: 10))
         XCTAssertTrue(element(SurroundUITestContract.AccessibilityID.customGameOpponent, in: app).label.contains(username))
     }
 
@@ -2564,12 +2564,12 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             let message = query(messageID, in: app)
             let edit = query(editID, in: app)
             // The pop can still be settling. One query for any of the
-            // profile's own controls, which waitForExistence re-checks at its
-            // deadline, instead of four per poll that a stalled snapshot
+            // profile's own controls, which `exists(within:)` checks once more
+            // after its deadline, instead of four per poll that a stalled snapshot
             // could cut to a single sample.
             let profileControl = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier IN %@", [aboutID, messageID, editID])).firstMatch
-            guard profileControl.waitForExistence(timeout: stateSettleTimeout) else {
+            guard profileControl.exists(within: stateSettleTimeout) else {
                 XCTFail("Back from \(title) must reach a profile; none of its About, Message or Edit controls appeared.")
                 return
             }
@@ -2613,7 +2613,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
     private func rootTranscript(in app: XCUIApplication) -> XCUIElement {
         let detail = element("messages.detailPane", in: app)
         let transcript = detail.scrollViews[SurroundUITestContract.AccessibilityID.profileConversation].firstMatch
-        XCTAssertTrue(transcript.waitForExistence(timeout: 10))
+        XCTAssertTrue(transcript.exists(within: 10))
         return transcript
     }
 
@@ -2762,7 +2762,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
 
     private func retryFixtureAcceptance(in app: XCUIApplication) {
         let alert = app.alerts.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 10))
+        XCTAssertTrue(alert.exists(within: 10))
         XCTAssertTrue(alert.staticTexts["Couldn’t accept friend request"].exists)
         XCTAssertEqual(app.alerts.count, 1, "The visible screen must own one error presenter.")
         tap(alert.buttons["Retry"].firstMatch, description: "Retry the offline failed acceptance", in: app)

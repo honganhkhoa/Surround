@@ -161,7 +161,7 @@ final class ActivityConversationUITests: SurroundJourneyUITestCase {
         let app = launchMac(.several)
         openPaneConversation(tenukiTomID, in: app)
         let chip = query(ID.messagesConversationGameControl, in: app)
-        XCTAssertTrue(chip.waitForExistence(timeout: 10), "A live game on your move puts the chip in the pane's heading")
+        XCTAssertTrue(chip.exists(within: 10), "A live game on your move puts the chip in the pane's heading")
         let heading = query("messages.conversation.heading", in: app).frame
         XCTAssertTrue(chip.label.contains("HarborMist"), "It shows HarborMist's game: \(chip.label)")
         XCTAssertTrue(heading.insetBy(dx: -1, dy: -1).contains(chip.frame),
@@ -189,7 +189,7 @@ final class ActivityConversationUITests: SurroundJourneyUITestCase {
             format: "identifier == %@ OR label BEGINSWITH %@", ID.messagesConversationGameControl,
             "HarborMist, your move in your live game"
         )).firstMatch
-        XCTAssertTrue(icon.waitForExistence(timeout: 10), "A live game on your move puts the icon in the toolbar")
+        XCTAssertTrue(icon.exists(within: 10), "A live game on your move puts the icon in the toolbar")
         attach("\(icon.label) at \(icon.frame), value \(String(describing: icon.value))", name: "The toolbar's icon")
         keepWindowScreenshots("The toolbar's icon in a conversation pushed from the profile", in: app)
         click(icon, name: "The toolbar's icon")
@@ -270,7 +270,7 @@ final class ActivityConversationUITests: SurroundJourneyUITestCase {
         XCTAssertFalse(line.exists, "Beside the Now section's row the composer's line hides")
         keepWindowScreenshots("Offline in the pane beside the Now section's row", in: app)
         XCTAssertTrue(waitForLabel("Can’t reach OGS", of: status, timeout: 40), "30 s in, the Now row says Can’t reach OGS")
-        XCTAssertTrue(query(ID.rootConnectionStatusRetry, in: app).waitForExistence(timeout: 10),
+        XCTAssertTrue(query(ID.rootConnectionStatusRetry, in: app).exists(within: 10),
                       "The Now row offers Retry at Can’t reach OGS")
         XCTAssertFalse(pollUntil(timeout: 3) { line.exists },
                        "At Can’t reach OGS too the composer's line hides beside the Now row, which holds the Retry")
@@ -297,7 +297,7 @@ final class ActivityConversationUITests: SurroundJourneyUITestCase {
                 XCTAssertTrue(pollUntil(timeout: 40) { self.rootStatusReading(in: app).line == .unreachable },
                               "30 s in, the title line says Can’t reach OGS")
                 assertComposerLine(saying: "Can’t reach OGS", in: app)
-                XCTAssertTrue(query(ID.activityConversationStatusRetry, in: app).waitForExistence(timeout: 10),
+                XCTAssertTrue(query(ID.activityConversationStatusRetry, in: app).exists(within: 10),
                               "The composer's line offers Retry, which the title line doesn't")
                 keepScreenshot("Can’t reach OGS in the pane, with the composer's Retry", in: app)
             case .floatingBar:
@@ -393,7 +393,7 @@ final class ActivityConversationUITests: SurroundJourneyUITestCase {
     private func revealInList(_ row: XCUIElement, in app: XCUIApplication,
                               file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
         let list = element(ID.activityList, in: app, file: file, line: line)
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "Expected \(row) in the list", file: file, line: line)
+        XCTAssertTrue(row.exists(within: 10), "Expected \(row) in the list", file: file, line: line)
         for _ in 0..<6 {
             let frame = list.frame
             let viewport = frame.insetBy(dx: 0, dy: 60)
@@ -446,7 +446,7 @@ final class ActivityConversationUITests: SurroundJourneyUITestCase {
         for attempt in 1...2 {
             tap(field, description: attempt == 1 ? "The reply field" : "The reply field again", in: app,
                 file: file, line: line)
-            if focused.waitForExistence(timeout: 3) { return }
+            if focused.exists(within: 3) { return }
             attach(app.debugDescription, name: "Accessibility hierarchy – the reply field without focus after tap \(attempt)")
         }
         XCTFail("The reply field takes keyboard focus", file: file, line: line)

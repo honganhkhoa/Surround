@@ -33,7 +33,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
     ) -> XCUIElement {
         let alert = app.alerts["Unable to open game"].firstMatch
         let retry = alert.buttons["Retry"].firstMatch
-        let appeared = retry.waitForExistence(timeout: 10)
+        let appeared = retry.exists(within: 10)
         if !appeared {
             let hierarchy = XCTAttachment(string: app.debugDescription)
             hierarchy.name =
@@ -130,7 +130,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             // no dismissal button. Derive an uncovered backdrop point from its
             // observed frame: a fixed point on the board can hit Share instead.
             let menu = app.collectionViews.containing(.button, identifier: menuItem.identifier).firstMatch
-            guard menu.waitForExistence(timeout: 3) else {
+            guard menu.exists(within: 3) else {
                 keepTextInputHierarchy(menuItem, in: app, reason: "missing Analyze menu surface")
                 XCTFail("Expected the native collection containing the Analyze menu item", file: file, line: line)
                 return
@@ -202,7 +202,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let subtitleElement = menuItem.descendants(matching: .any)
             .matching(subtitlePredicate)
             .firstMatch
-        let appeared = subtitleElement.waitForExistence(timeout: 10)
+        let appeared = subtitleElement.exists(within: 10)
         if !appeared {
             let hierarchy = XCTAttachment(
                 string: """
@@ -236,7 +236,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             .buttons
             .matching(identifier: "Delete branch")
             .firstMatch
-        let appeared = confirmationButton.waitForExistence(timeout: 10)
+        let appeared = confirmationButton.exists(within: 10)
         if !appeared {
             let hierarchy = XCTAttachment(string: app.debugDescription)
             hierarchy.name =
@@ -933,7 +933,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             tap(advanced, description: "Quick Match advanced settings", in: app)
         }
         XCTAssertTrue(
-            clockSystem.waitForExistence(timeout: 10),
+            clockSystem.exists(within: 10),
             "Expected Quick Match advanced settings to be expanded."
         )
     }
@@ -1124,7 +1124,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
         let signIn = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label == %@", "Sign in to your OGS account")).firstMatch
-        XCTAssertTrue(signIn.waitForExistence(timeout: 10))
+        XCTAssertTrue(signIn.exists(within: 10))
 
         // Exercise the main navigation so a collapsed sidebar cannot hide an
         // incorrectly exposed account destination from this assertion.
@@ -1154,50 +1154,50 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             format: "identifier == %@ AND label == %@",
             SurroundUITestContract.AccessibilityID.preferredSetting(0), "Edit"
         )).firstMatch
-        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        XCTAssertTrue(edit.exists(within: 10))
         scrollIntoTappableArea(edit, in: app)
         tap(edit, description: "Edit the first preferred setting", in: app)
-        XCTAssertTrue(app.navigationBars["Edit preferred setting"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Edit preferred setting"].exists(within: 10))
         let editor = element(SurroundUITestContract.AccessibilityID.screenCustomGame, in: app, matching: .scrollView)
 
         let advancedRules = app.buttons["Advanced rules settings"].firstMatch
-        XCTAssertTrue(advancedRules.waitForExistence(timeout: 10))
+        XCTAssertTrue(advancedRules.exists(within: 10))
         scrollIntoTappableArea(advancedRules, in: app)
         tap(advancedRules, description: "Open advanced rules from the setting editor", in: app)
-        XCTAssertTrue(app.navigationBars["Advanced rules settings"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Advanced rules settings"].exists(within: 10))
         // The preferred-setting fixture starts with Japanese rules. AGA also
         // changes the editor from its two-option picker to the rule-name link.
         tap(app.buttons["AGA"].firstMatch, description: "Choose AGA rules", in: app)
 
         func navigateBack(from title: String) {
             let bar = app.navigationBars[title].firstMatch
-            XCTAssertTrue(bar.waitForExistence(timeout: 10))
+            XCTAssertTrue(bar.exists(within: 10))
             let identifiedBack = bar.buttons.matching(identifier: "BackButton").firstMatch
             tap(identifiedBack.exists ? identifiedBack : bar.buttons.firstMatch,
                 description: "Back from \(title)", in: app)
         }
 
         navigateBack(from: "Advanced rules settings")
-        XCTAssertTrue(app.navigationBars["Edit preferred setting"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Edit preferred setting"].exists(within: 10))
         let retainedRule = editor.buttons.matching(NSPredicate(
             format: "label == %@ OR label BEGINSWITH %@", "AGA", "AGA "
         )).firstMatch
-        XCTAssertTrue(retainedRule.waitForExistence(timeout: 10),
+        XCTAssertTrue(retainedRule.exists(within: 10),
                       "Returning from Advanced rules must preserve the existing editor draft's rule.")
         keepScreenshot("Preferred setting – edited rule retained after Back", in: app)
 
         navigateBack(from: "Edit preferred setting")
         element(SurroundUITestContract.AccessibilityID.screenPreferredSettings, in: app)
-        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        XCTAssertTrue(edit.exists(within: 10))
         let add = app.navigationBars.buttons.matching(NSPredicate(
             format: "label == %@ OR label == %@ OR identifier == %@", "Add", "plus", "plus"
         )).firstMatch
         tap(add, description: "Add a new preferred setting", in: app)
-        XCTAssertTrue(app.navigationBars["New preferred setting"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["New preferred setting"].exists(within: 10))
         element(SurroundUITestContract.AccessibilityID.screenCustomGame, in: app)
         navigateBack(from: "New preferred setting")
         element(SurroundUITestContract.AccessibilityID.screenPreferredSettings, in: app)
-        XCTAssertTrue(edit.waitForExistence(timeout: 10),
+        XCTAssertTrue(edit.exists(within: 10),
                       "Cancelling creation must return to the original preferred-settings list.")
     }
 
@@ -1273,7 +1273,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 "BackButton", id.gameActiveGamesButton, "Active games"
             )).firstMatch
             tap(back, description: "Back to active games", in: app)
-            XCTAssertTrue(app.navigationBars["Active games"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.navigationBars["Active games"].exists(within: 10))
             // Let the sidebar finish any change before checking it.
             Thread.sleep(forTimeInterval: 1)
         }
@@ -1512,7 +1512,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         XCTAssertFalse(app.switches.matching(identifier: live).firstMatch.exists)
         XCTAssertTrue(recap.label.contains("Correspondence"))
         XCTAssertTrue(recap.label.contains("Fischer"))
-        XCTAssertTrue(popularLegend.waitForExistence(timeout: 5))
+        XCTAssertTrue(popularLegend.exists(within: 5))
         XCTAssertFalse(waitingLegend.exists)
 
         let options = app.segmentedControls[
@@ -1539,7 +1539,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: quickMatch
         )
         XCTAssertEqual(waitWithFinalCheck(for: [quickMatchSelected], timeout: 10), .completed)
-        XCTAssertTrue(quickMatchScroll.waitForExistence(timeout: 10))
+        XCTAssertTrue(quickMatchScroll.exists(within: 10))
 
         let liveTab = element(
             SurroundUITestContract.AccessibilityID.quickMatchSpeedTab("live"),
@@ -1593,7 +1593,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let homeSearchingBanner = app.buttons.matching(
             NSPredicate(format: "label CONTAINS %@", "Searching for")
         ).firstMatch
-        XCTAssertTrue(homeSearchingBanner.waitForExistence(timeout: 10))
+        XCTAssertTrue(homeSearchingBanner.exists(within: 10))
         XCTAssertTrue(homeSearchingBanner.isHittable)
         keepScreenshot("Home – restored search progress", in: app)
 
@@ -2164,7 +2164,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             .matching(identifier: SurroundUITestContract.AccessibilityID.gameZenEnter)
             .firstMatch
         for button in [analyzeButton, activeGamesButton, zenButton] {
-            XCTAssertTrue(button.waitForExistence(timeout: 10), "Expected a direct toolbar control: \(button)")
+            XCTAssertTrue(button.exists(within: 10), "Expected a direct toolbar control: \(button)")
             XCTAssertTrue(waitUntilHittable(button, timeout: 10), "Expected a hittable toolbar control: \(button)")
         }
         let order = XCTAttachment(string: """
@@ -2277,7 +2277,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         for gameID in gameIDs {
             let entries = popover.descendants(matching: .button)
                 .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesEntry(gameID))
-            XCTAssertTrue(entries.firstMatch.waitForExistence(timeout: 10))
+            XCTAssertTrue(entries.firstMatch.exists(within: 10))
             XCTAssertEqual(entries.count, 1, "Each popover game must have a unique entry identifier.")
             XCTAssertTrue(entries.firstMatch.label.contains("Friendly Match"))
             XCTAssertTrue(
@@ -2295,7 +2295,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         }
         let nextGame = popover.descendants(matching: .button)
             .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesEntry(gameIDs[1])).firstMatch
-        XCTAssertTrue(nextGame.waitForExistence(timeout: 10))
+        XCTAssertTrue(nextGame.exists(within: 10))
         tap(nextGame, description: "Switch to the second correspondence game", in: app)
         element(SurroundUITestContract.AccessibilityID.gameDetail(gameIDs[1]), in: app)
         let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: popover)
@@ -2306,7 +2306,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let selectedGame = reopened.descendants(matching: .button)
             .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesEntry(gameIDs[1]))
             .firstMatch
-        XCTAssertTrue(selectedGame.waitForExistence(timeout: 10))
+        XCTAssertTrue(selectedGame.exists(within: 10))
         XCTAssertTrue(selectedGame.isSelected, "Reopening must retain the selected game.")
         tap(selectedGame, description: "Return to the selected game", in: app)
         let reopenedDismissed = XCTNSPredicateExpectation(
@@ -2461,7 +2461,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         /// Taps the target once it exists and is hittable: at `point` when
         /// one is given, else wherever XCTest aims an element tap.
         func tapReady(_ target: XCUIElement, description: String, at point: XCUICoordinate? = nil) {
-            guard requireWithEvidence(target.waitForExistence(timeout: 10),
+            guard requireWithEvidence(target.exists(within: 10),
                                       "Expected \(description)."),
                   requireWithEvidence(waitUntilHittable(target, timeout: 10),
                                       "Expected responsive \(description) within ten seconds.") else { return }
@@ -2502,7 +2502,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         /// (`HomeRowSearch`).
         func tapOnHome(_ identifier: String, description: String, liesAbove: Bool) {
             let home = app.scrollViews.matching(identifier: id.screenHome).firstMatch
-            guard requireWithEvidence(home.waitForExistence(timeout: 10),
+            guard requireWithEvidence(home.exists(within: 10),
                                       "Expected Home's scroll view.") else { return }
             let matches = home.buttons.matching(identifier: identifier)
             // A drag that carries the button past the viewport is followed
@@ -2571,7 +2571,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
 
         func waitForGame(_ gameID: Int) {
             element(id.gameDetail(gameID), in: app)
-            XCTAssertTrue(board.waitForExistence(timeout: 10))
+            XCTAssertTrue(board.exists(within: 10))
             XCTAssertTrue(pollUntil(timeout: 10) { !popover.exists },
                           "The selected game must have an unobstructed board.")
         }
@@ -2580,7 +2580,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         // a touch and hold opens its popover, whose picker switches in place.
         func openActiveGames() {
             openGameControlPopover(in: app)
-            XCTAssertTrue(popover.waitForExistence(timeout: 10),
+            XCTAssertTrue(popover.exists(within: 10),
                           "Opening the control's popover must respond within ten seconds.")
         }
 
@@ -2595,7 +2595,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             guard requireWithEvidence(waitUntilHittable(board, timeout: 10),
                                       "The board must be usable before the cover rises.") else { return }
             post(.start)
-            guard requireWithEvidence(cover.waitForExistence(timeout: 10),
+            guard requireWithEvidence(cover.exists(within: 10),
                                       "The moderator cover must rise over the game within ten seconds.") else { return }
             requireWithEvidence(pollUntil(timeout: 10) { board.exists && !board.isHittable },
                                 "The board must not be hittable under the cover.")
@@ -2687,7 +2687,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         /// on its rail as the native item, whose label speaks no time.
         func checkTheChipTicks(in gameID: Int, cycle: Int) {
             guard cycleState == .chip, gameID != liveGameID, !isDuo else { return }
-            guard requireWithEvidence(control.waitForExistence(timeout: 10),
+            guard requireWithEvidence(control.exists(within: 10),
                                       "Cycle \(cycle): expected the chip in game \(gameID).") else { return }
             let before = control.label
             Thread.sleep(forTimeInterval: 2)
@@ -2821,7 +2821,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         func openHistoryGame() {
             tapOnHome(id.homeHistoryViewAll, description: "Home's history list", liesAbove: false)
             let history = app.descendants(matching: .any).matching(identifier: id.screenGameHistory).firstMatch
-            guard requireWithEvidence(history.waitForExistence(timeout: 10),
+            guard requireWithEvidence(history.exists(within: 10),
                                       "Game history must open within ten seconds.") else { return }
             // Home keeps its own row for the game behind the pushed list.
             tapReady(history.descendants(matching: .any).matching(identifier: id.homeHistoryGame(historyGameID))
@@ -3025,7 +3025,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         /// journeys press the control.
         func openLiveGameFromControl(_ identifier: String, _ description: String) {
             let control = app.buttons.matching(identifier: identifier).firstMatch
-            XCTAssertTrue(control.waitForExistence(timeout: 10), description)
+            XCTAssertTrue(control.exists(within: 10), description)
             XCTAssertTrue(waitUntilHittable(control, timeout: 10), description)
             XCTAssertTrue(pollUntil(timeout: 10) { !bar.exists }, "A game shows no Activity bar.")
             activate(control, at: CGVector(dx: 0.5, dy: 0.5))
@@ -3043,7 +3043,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             tap(back, description: "Back to active games", in: app)
             // Identify Home by its navigation bar and screen, even when its
             // New game button is scrolled offscreen after returning from history.
-            XCTAssertTrue(app.navigationBars["Active games"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.navigationBars["Active games"].exists(within: 10))
             element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
             XCTAssertFalse(app.descendants(matching: .any)
                 .matching(identifier: SurroundUITestContract.AccessibilityID.screenGameHistory)
@@ -3090,7 +3090,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             .descendants(matching: .any)
             .matching(identifier: SurroundUITestContract.AccessibilityID.homeHistoryGame(historyGameID))
             .firstMatch
-        XCTAssertTrue(historyGame.waitForExistence(timeout: 10))
+        XCTAssertTrue(historyGame.exists(within: 10))
         scrollIntoTappableArea(historyGame, in: app)
         tap(historyGame, description: "Open your finished realtime game from history", in: app)
         element(SurroundUITestContract.AccessibilityID.gameDetail(historyGameID), in: app)
@@ -3340,7 +3340,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         app.open(URL(string: "surround://home/\(missingGameID)")!)
         let failureAlert = openGameFailureAlert(in: app)
         let cancel = failureAlert.buttons["Cancel"].firstMatch
-        XCTAssertTrue(cancel.waitForExistence(timeout: 10))
+        XCTAssertTrue(cancel.exists(within: 10))
         cancel.tap()
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
 
@@ -3418,7 +3418,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         element(id.screenPublicGames, in: app)
         let prefix = String(id.publicGame(0).dropLast())   // publicGame(_:) ends with the game's id
         let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 10), "Public games lists the fixture's public game.")
+        XCTAssertTrue(card.exists(within: 10), "Public games lists the fixture's public game.")
         let publicGameID = try XCTUnwrap(Int(card.identifier.dropFirst(prefix.count)))
         tap(card, description: "Open the public game", in: app)
         element(id.gameDetail(publicGameID), in: app)
@@ -3556,15 +3556,15 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let board = element(id.gameBoard, in: app)
         let livePosition = try XCTUnwrap(board.value as? String)
         let pass = app.buttons["Pass"].firstMatch
-        XCTAssertTrue(pass.waitForExistence(timeout: 10))
+        XCTAssertTrue(pass.exists(within: 10))
         tap(pass, description: "Open the pass confirmation", in: app)
         let confirmation = app.alerts["Are you sure you want to pass?"].firstMatch
-        XCTAssertTrue(confirmation.waitForExistence(timeout: 10))
+        XCTAssertTrue(confirmation.exists(within: 10))
         XCTAssertTrue(confirmation.buttons["Pass"].isEnabled)
         XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertTrue(pollUntil(timeout: 10) { app.frame.width > app.frame.height },
                       "The app must actually adopt landscape before validating retention.")
-        XCTAssertTrue(confirmation.waitForExistence(timeout: 10),
+        XCTAssertTrue(confirmation.exists(within: 10),
                       "Rotation must preserve the pending confirmation.")
         tap(confirmation.buttons["Dismiss"], description: "Keep playing without passing", in: app)
         XCTAssertEqual(board.value as? String, livePosition)
@@ -3574,7 +3574,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         // full bounds, including half-cell margins around the 19 intersections.
         board.coordinate(withNormalizedOffset: CGVector(dx: 0.025, dy: 0.025)).tap()
         let submit = app.buttons["Submit move"].firstMatch
-        XCTAssertTrue(submit.waitForExistence(timeout: 10),
+        XCTAssertTrue(submit.exists(within: 10),
                       "A legal tentative move must reveal the Submit move action.")
         XCTAssertTrue(submit.isEnabled)
         XCTAssertEqual(board.value as? String, livePosition,
@@ -4149,7 +4149,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             "Review: #\(SurroundUITestContract.structuredChatReviewID)"
         let reviewLink = app.links[reviewRowID].firstMatch
         XCTAssertTrue(
-            reviewLink.waitForExistence(timeout: 10),
+            reviewLink.exists(within: 10),
             "Expected the structured review row to expose its review link."
         )
         XCTAssertTrue(
@@ -4379,7 +4379,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             )
             .firstMatch
         XCTAssertTrue(
-            copyCommand.waitForExistence(timeout: 10),
+            copyCommand.exists(within: 10),
             "Expected the system text-selection menu to include Copy"
         )
         assertNotSelected(firstLineID, in: app)
@@ -4553,16 +4553,16 @@ final class SurroundUITests: SurroundJourneyUITestCase {
 
         tap(SurroundUITestContract.AccessibilityID.homePreferredSettings, in: app)
         let setup = menuItem(SurroundUITestContract.AccessibilityID.homePreferredSetting(0), label: "9×9")
-        XCTAssertTrue(setup.waitForExistence(timeout: 10), "The menu lists the saved setups.")
+        XCTAssertTrue(setup.exists(within: 10), "The menu lists the saved setups.")
         tap(setup, description: "Open the first saved setup", in: app)
-        XCTAssertTrue(app.buttons["Create open challenge"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Create open challenge"].firstMatch.exists(within: 10))
         let chooseOpponent = app.buttons["Select your opponent…"].firstMatch
-        XCTAssertTrue(chooseOpponent.waitForExistence(timeout: 10))
+        XCTAssertTrue(chooseOpponent.exists(within: 10))
         tap(chooseOpponent, description: "Choose an opponent for the saved setup", in: app)
         let picker = element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
         keepScreenshot("home-preferred-settings-picker", in: app)
         let pickerNavigationBar = app.navigationBars["Select your opponent"].firstMatch
-        XCTAssertTrue(pickerNavigationBar.waitForExistence(timeout: 10))
+        XCTAssertTrue(pickerNavigationBar.exists(within: 10))
         // iOS 18 labels Back with the previous page's title. Scope the
         // action to this picker so the iPad sidebar button cannot match.
         let back = pickerNavigationBar.buttons.matching(NSPredicate(
@@ -4580,7 +4580,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         tap(SurroundUITestContract.AccessibilityID.homePreferredSettings, in: app)
         let edit = menuItem(SurroundUITestContract.AccessibilityID.homePreferredSettingsEdit,
                             label: "Edit Preferred Settings")
-        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        XCTAssertTrue(edit.exists(within: 10))
         tap(edit, description: "Open the Preferred Settings editor", in: app)
         element(SurroundUITestContract.AccessibilityID.screenPreferredSettings, in: app)
         element(SurroundUITestContract.AccessibilityID.preferredSetting(0), in: app)
@@ -5075,9 +5075,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             )
             .firstMatch
         XCTAssertTrue(
-            conditionalDeleteWarningText.waitForExistence(
-                timeout: 10
-            ),
+            conditionalDeleteWarningText.exists(within: 10),
             "Expected Delete branch to warn about registered conditional variations."
         )
         tapAnalyzeDeleteConfirmation(in: app)

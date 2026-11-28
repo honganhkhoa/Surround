@@ -68,12 +68,12 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(blackValue.contains("04:32"))
         XCTAssertTrue(blackValue.contains("running"), "The other clock still identifies the turn")
         XCTAssertFalse(blackValue.contains("move"), "The estimate replaces the ordinary turn badge")
-        XCTAssertTrue(app.buttons["Clear estimates"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Clear estimates"].exists(within: 10))
         keepScreenshot("Estimate lead on full clock", in: app)
 
         openGameChat(in: app)
         let titleClock = app.navigationBars.buttons.matching(identifier: "game.clock.white").firstMatch
-        XCTAssertTrue(titleClock.waitForExistence(timeout: 10),
+        XCTAssertTrue(titleClock.exists(within: 10),
                       "Portrait Chat must retain the leading clock in the title slot")
         XCTAssertTrue(pollUntil(timeout: 10) {
             (titleClock.value as? String)?.contains("estimate: ahead by 3.5") == true
@@ -187,7 +187,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         ], orientation: .portrait)
         defer { XCUIDevice.shared.orientation = .portrait }
         let board = app.descendants(matching: .any).matching(identifier: ID.gameBoard).firstMatch
-        XCTAssertTrue(board.waitForExistence(timeout: 10))
+        XCTAssertTrue(board.exists(within: 10))
         let initialBoard = try XCTUnwrap(board.value as? String)
         XCUIDevice.shared.orientation = .landscapeLeft
         let actions = app.buttons.matching(identifier: ID.gameActionsMenu).firstMatch
@@ -229,7 +229,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
 
     private func primaryHomeGameEntry(in app: XCUIApplication) -> XCUIElement {
         let home = app.scrollViews.matching(identifier: ID.screenHome).firstMatch
-        XCTAssertTrue(home.waitForExistence(timeout: 10))
+        XCTAssertTrue(home.exists(within: 10))
         let entry = home.descendants(matching: .any).matching(
             identifier: ID.homeGamePlayerInfo(SurroundUITestContract.screenshotPrimaryGameID)
         ).firstMatch
@@ -262,7 +262,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             start.press(forDuration: 0.05, thenDragTo: end,
                         withVelocity: .default, thenHoldForDuration: 0.1)
         }
-        XCTAssertTrue(entry.waitForExistence(timeout: 10),
+        XCTAssertTrue(entry.exists(within: 10),
                       "The exact primary fixture player details must appear after bounded Home scrolling.")
         XCTAssertTrue(waitUntilHittable(entry, timeout: 10))
         XCTAssertTrue(viewport().contains(entry.frame),
@@ -665,9 +665,9 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             // The control is the chip for the live game on your move; a
             // touch and hold opens its popover, whose picker switches here.
             openGameControlPopover(in: app)
-            XCTAssertTrue(popover.waitForExistence(timeout: 10))
+            XCTAssertTrue(popover.exists(within: 10))
             let entry = popover.buttons.matching(identifier: ID.gameActiveGamesEntry(gameID)).firstMatch
-            XCTAssertTrue(entry.waitForExistence(timeout: 10))
+            XCTAssertTrue(entry.exists(within: 10))
             tap(entry, description: "Switch to own game \(gameID)", in: app)
             element(ID.gameDetail(gameID), in: app)
             XCTAssertTrue(pollUntil(timeout: 10) { !popover.exists },
@@ -912,7 +912,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
                              in: app, matching: .button)
         let profile = app.descendants(matching: .any).matching(identifier: ID.profileLoaded).firstMatch
         tap(avatar, description: "Opponent avatar", in: app)
-        if !profile.waitForExistence(timeout: 5) {
+        if !profile.exists(within: 5) {
             // With the on-screen keyboard up, a first tap outside chat only
             // ends editing; it must not also act on what it lands on.
             XCTAssertFalse(chatInputHasKeyboardFocus(in: app))

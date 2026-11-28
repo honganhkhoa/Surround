@@ -29,9 +29,9 @@ final class ThemedScreensUITests: SurroundJourneyUITestCase {
         ], orientation: .portrait)
         element(ID.screenSettings, in: app)
         let bar = app.navigationBars["Settings"].firstMatch
-        XCTAssertTrue(bar.waitForExistence(timeout: 10))
+        XCTAssertTrue(bar.exists(within: 10))
         let scroll = app.scrollViews.firstMatch
-        XCTAssertTrue(scroll.waitForExistence(timeout: 10))
+        XCTAssertTrue(scroll.exists(within: 10))
         func waitForCondition(_ condition: @escaping () -> Bool) -> Bool {
             let expectation = XCTNSPredicateExpectation(
                 predicate: NSPredicate { _, _ in condition() }, object: nil
@@ -112,7 +112,7 @@ final class ThemedScreensUITests: SurroundJourneyUITestCase {
             element(ID.screenPublicGames, in: app)
             let game = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier BEGINSWITH %@", "publicGames.game.")).firstMatch
-            XCTAssertTrue(game.waitForExistence(timeout: 10), "\(theme): Public games lists the fixture game")
+            XCTAssertTrue(game.exists(within: 10), "\(theme): Public games lists the fixture game")
             keepScreenshot("Public games – \(theme)", in: app)
             assertPage(element(ID.screenPublicGames, in: app, matching: .scrollView), wears: theme)
             app.terminate()
@@ -148,7 +148,7 @@ final class ThemedScreensUITests: SurroundJourneyUITestCase {
         element(ID.screenPublicGames, in: app)
         let game = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "publicGames.game.")).firstMatch
-        XCTAssertTrue(game.waitForExistence(timeout: 10), "sakuraStream: Public games lists the fixture game")
+        XCTAssertTrue(game.exists(within: 10), "sakuraStream: Public games lists the fixture game")
         keepScreenshot("Public games – sakuraStream", in: app)
         app.terminate()
 

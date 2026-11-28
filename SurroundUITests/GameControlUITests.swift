@@ -84,7 +84,7 @@ final class GameControlUITests: SurroundJourneyUITestCase {
         backToHome(from: liveGameID, in: app)
 
         selectMainNavigation(ID.navigationPublicGames, in: app)
-        XCTAssertTrue(query(ID.gameDetail(publicGameID), in: app).waitForExistence(timeout: 10),
+        XCTAssertTrue(query(ID.gameDetail(publicGameID), in: app).exists(within: 10),
                       "Public games keeps its stack: its game is still there")
         keepScreenshot("Public games still shows its game", in: app)
         #endif
@@ -143,7 +143,7 @@ final class GameControlUITests: SurroundJourneyUITestCase {
         let list = element(ID.screenGameHistory, in: app)
         // Home keeps its own row for the game behind the pushed list.
         let row = list.descendants(matching: .any).matching(identifier: ID.homeHistoryGame(historyGameID)).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "Game history lists the finished game")
+        XCTAssertTrue(row.exists(within: 10), "Game history lists the finished game")
         scrollIntoTappableArea(row, in: app)
         tap(row, description: "Open the finished game from Game history", in: app)
         element(ID.gameDetail(historyGameID), in: app)
@@ -209,7 +209,7 @@ final class GameControlUITests: SurroundJourneyUITestCase {
         // the Mac, so the item is found by the game its label names.
         let control = app.toolbars.buttons
             .matching(NSPredicate(format: "label BEGINSWITH %@", "OrbitFox, your move")).firstMatch
-        XCTAssertTrue(control.waitForExistence(timeout: 10), "The toolbar shows the native item")
+        XCTAssertTrue(control.exists(within: 10), "The toolbar shows the native item")
         attach("label \(control.label)\nvalue \(String(describing: control.value))\nframe \(control.frame)",
                name: "The native item")
         keepScreenshot("The native item with its count", in: app)
@@ -269,7 +269,7 @@ final class GameControlUITests: SurroundJourneyUITestCase {
         let control = theControl(in: app)
         XCTAssertLessThan(control.frame.midY, windowFrame(in: app).midY, "The control is in the top bar")
         holdGameControl(control)
-        XCTAssertTrue(popover.waitForExistence(timeout: 10), "A hold opens the popover again from the new bar")
+        XCTAssertTrue(popover.exists(within: 10), "A hold opens the popover again from the new bar")
         XCTAssertTrue(waitForValue("gameControl", in: request, timeout: 10),
                       "The new popover made its own request: \(String(describing: request.value))")
         assertStillShowingTheGame(bannerGame, in: app)
@@ -304,7 +304,7 @@ final class GameControlUITests: SurroundJourneyUITestCase {
 
         tap(view, description: "View CedarWave's challenge", in: app)
         let card = app.popovers.firstMatch.navigationBars["Challenge"].firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 10), "View pushes the challenge's card inside the popover")
+        XCTAssertTrue(card.exists(within: 10), "View pushes the challenge's card inside the popover")
         tap(cardButton("Reject", in: app), description: "Reject on the challenge's card", in: app)
         let result = query(ID.activityRowResult(challenge), in: app)
         XCTAssertTrue(waitForLabel("Rejected", of: result), "Back in the list, the row says Rejected")
@@ -482,7 +482,7 @@ final class GameControlUITests: SurroundJourneyUITestCase {
         keepScreenshot("Zen in a live game", in: app)
         activate(zen, at: CGVector(dx: 0.5, dy: 0.5))
         element(ID.gameDetail(harborMist), in: app)
-        XCTAssertTrue(query(ID.gameZenExit, in: app).waitForExistence(timeout: 10),
+        XCTAssertTrue(query(ID.gameZenExit, in: app).exists(within: 10),
                       "From a live game to a live game, Zen stays")
         XCTAssertTrue(pollUntil(timeout: 10) { !query(ID.gameZenControl, in: app).exists },
                       "HarborMist's game has no other live game on your move")
@@ -540,7 +540,7 @@ final class GameControlUITests: SurroundJourneyUITestCase {
         XCTAssertTrue([reconnecting, cantReachOGS].contains(capsule.label), "The capsule: \(capsule.label)")
         XCTAssertFalse(pollUntil(timeout: 5) { !capsule.exists }, "The capsule stays")
         let accept = app.buttons.matching(NSPredicate(format: "label == %@", "Accept")).firstMatch
-        XCTAssertTrue(accept.waitForExistence(timeout: 10), "Stone removal offers Accept")
+        XCTAssertTrue(accept.exists(within: 10), "Stone removal offers Accept")
         XCTAssertFalse(accept.isEnabled, "Offline, Accept is disabled")
         XCTAssertEqual(accept.value as? String, reconnecting, "Accept says why")
         keepScreenshot("The capsule and Accept", in: app)
@@ -738,7 +738,7 @@ final class GameControlUITests: SurroundJourneyUITestCase {
     private func openFromHome(_ gameID: Int, in app: XCUIApplication,
                               file: StaticString = #filePath, line: UInt = #line) {
         let home = app.scrollViews.matching(identifier: ID.screenHome).firstMatch
-        XCTAssertTrue(home.waitForExistence(timeout: 10), "Expected Home's list", file: file, line: line)
+        XCTAssertTrue(home.exists(within: 10), "Expected Home's list", file: file, line: line)
         let row = home.buttons.matching(identifier: ID.homeGame(gameID)).firstMatch
         let maxDrags = 16
         var drags = 0
@@ -986,7 +986,7 @@ final class GameControlUITests: SurroundJourneyUITestCase {
         keepScreenshot("Largest text, \(form), before the holds", in: app)
 
         control.coordinate(withNormalizedOffset: offset).press(forDuration: 3)
-        XCTAssertTrue(popover.waitForExistence(timeout: 5), "In \(form) a hold opens the popover",
+        XCTAssertTrue(popover.exists(within: 5), "In \(form) a hold opens the popover",
                       file: file, line: line)
         assertStillShowingTheGame(game, in: app, file: file, line: line)
         keepScreenshot("Largest text, \(form), the popover after a hold", in: app)
@@ -995,7 +995,7 @@ final class GameControlUITests: SurroundJourneyUITestCase {
         let away = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         theControl(in: app, file: file, line: line).coordinate(withNormalizedOffset: offset)
             .press(forDuration: 1, thenDragTo: away, withVelocity: .default, thenHoldForDuration: 0.5)
-        XCTAssertTrue(popover.waitForExistence(timeout: 5),
+        XCTAssertTrue(popover.exists(within: 5),
                       "In \(form) the hold itself opens the popover, with no Large Content Viewer",
                       file: file, line: line)
         assertStillShowingTheGame(game, in: app, file: file, line: line)

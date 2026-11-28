@@ -17,7 +17,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
     ) -> XCUIElement {
         let control = element(identifier, in: app, matching: type)
         let scroll = app.scrollViews.containing(.textField, identifier: SurroundUITestContract.AccessibilityID.customGameName).firstMatch
-        XCTAssertTrue(scroll.waitForExistence(timeout: 10))
+        XCTAssertTrue(scroll.exists(within: 10))
         let center = CGVector(dx: 0.5, dy: 0.5)
         for _ in 0..<12 {
             let safeFrame = scroll.frame.intersection(app.frame).insetBy(dx: 0, dy: 12)
@@ -64,7 +64,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
     private func revealProfileControl(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         let control = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
         let scroll = app.scrollViews[SurroundUITestContract.AccessibilityID.screenPlayerProfile].firstMatch
-        XCTAssertTrue(scroll.waitForExistence(timeout: 10))
+        XCTAssertTrue(scroll.exists(within: 10))
         let interactionPoint = CGVector(dx: 0.5, dy: 0.5)
         for _ in 0..<14 {
             var safeFrame = scroll.frame.intersection(app.frame).insetBy(dx: 0, dy: 12)
@@ -112,7 +112,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         // Scope Back to the destination we actually opened.
         let destination = element(destinationID, in: app)
         let navigationBar = app.navigationBars[navigationTitle].firstMatch
-        XCTAssertTrue(navigationBar.waitForExistence(timeout: 10))
+        XCTAssertTrue(navigationBar.exists(within: 10))
         let identifiedBack = navigationBar.buttons.matching(identifier: "BackButton").firstMatch
         let back = identifiedBack.exists ? identifiedBack : navigationBar.buttons.firstMatch
         tap(back, description: "Return to profile", in: app)
@@ -292,7 +292,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
 
     private func retryFriendshipError(in app: XCUIApplication) {
         let alert = app.alerts.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 10), "A failed friendship action must explain the error.")
+        XCTAssertTrue(alert.exists(within: 10), "A failed friendship action must explain the error.")
         tap(alert.buttons["Retry"].firstMatch, description: "Retry the failed friendship action", in: app)
     }
     func testIPadAccountSheetsShareEntryPointsAndPreserveSelectedTab() throws {
@@ -466,13 +466,13 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                                     (id.navigationPublicGames, "Public games"),
                                     (id.navigationMessages, "Messages")] {
             let primary = app.buttons[identifier].firstMatch
-            XCTAssertTrue(primary.waitForExistence(timeout: 10),
+            XCTAssertTrue(primary.exists(within: 10),
                           "The top bar must retain an independent \(title) control.")
             XCTAssertTrue(primary.isHittable,
                           "The \(title) control must be visible without opening a group menu.")
         }
         let about = app.buttons[id.navigationAbout].firstMatch
-        XCTAssertTrue(about.waitForExistence(timeout: 10) && about.isHittable)
+        XCTAssertTrue(about.exists(within: 10) && about.isHittable)
         XCTAssertEqual(about.label, "About")
         tap(about, description: "Open the localized About top tab", in: app)
         element(id.screenAbout, in: app)
@@ -538,7 +538,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let settingsScreen = element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
         let settingsBar = app.navigationBars["Settings"].firstMatch
         let settingsDone = settingsBar.buttons["Done"].firstMatch
-        XCTAssertTrue(settingsDone.waitForExistence(timeout: 10))
+        XCTAssertTrue(settingsDone.exists(within: 10))
         let homeScreen = app.descendants(matching: .any)
             .matching(identifier: SurroundUITestContract.AccessibilityID.screenHome).firstMatch
         let doneFrameBeforeTap = settingsDone.frame
@@ -577,7 +577,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                                title: "Log out", in: app), description: "Log out from the account menu", in: app)
         let signIn = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label == %@", "Sign in to your OGS account")).firstMatch
-        XCTAssertTrue(signIn.waitForExistence(timeout: 10), "Logging out should show the Welcome sign-in action.")
+        XCTAssertTrue(signIn.exists(within: 10), "Logging out should show the Welcome sign-in action.")
         XCTAssertFalse(app.descendants(matching: .any)
             .matching(identifier: SurroundUITestContract.AccessibilityID.navigationMessages).firstMatch.exists,
             "Messages navigation must disappear after logging out.")
@@ -686,7 +686,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let accept = revealProfileControl(SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID), in: app)
         tap(accept, description: "Accept with a simulated connection failure", in: app)
         let alert = app.alerts.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 10))
+        XCTAssertTrue(alert.exists(within: 10))
         tap(alert.buttons["Cancel"].firstMatch, description: "Dismiss the failed acceptance", in: app)
         XCTAssertTrue(accept.exists, "A failed acceptance must preserve its request.")
         XCTAssertTrue(accept.isEnabled, "A failed action must unlock its controls.")
@@ -987,7 +987,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let settings = element(SurroundUITestContract.AccessibilityID.screenSettings,
                                in: app, matching: .scrollView)
         let hideRatings = settings.switches["Hide ranks and ratings"].firstMatch
-        XCTAssertTrue(hideRatings.waitForExistence(timeout: 10))
+        XCTAssertTrue(hideRatings.exists(within: 10))
         // Settings' visible part: below its bar, above the bottom chrome, or
         // 100 pt up from the window's bottom where none is measured.
         func settingsViewport() -> CGRect {
@@ -1047,7 +1047,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         ])
         tap(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
         let identity = element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
-        XCTAssertTrue(app.navigationBars["Profile"].waitForExistence(timeout: 10), "The own-profile title remains Profile.")
+        XCTAssertTrue(app.navigationBars["Profile"].exists(within: 10), "The own-profile title remains Profile.")
         XCTAssertTrue(waitForValue("dark", in: identity, timeout: stateSettleTimeout))
         keepScreenshot("Own profile – supporter identity in dark and largest Dynamic Type", in: app)
         let provisional = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("9x9"), in: app)
@@ -1084,7 +1084,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.profileFixturePickerFriendID), in: app, matching: .button)
         assertLoadedProfile(named: "BambooPath", in: app)
         for message in ["No active games", "No games together yet", "No finished games yet"] {
-            XCTAssertTrue(app.staticTexts[message].firstMatch.waitForExistence(timeout: 10),
+            XCTAssertTrue(app.staticTexts[message].firstMatch.exists(within: 10),
                           "An empty section must have a clear explanation: \(message).")
         }
         let overall = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("overall"), in: app)
@@ -1117,7 +1117,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.AccessibilityID.profileError).firstMatch.exists,
             "An unavailable section must not replace the loaded profile with a whole-page error.")
         for message in ["Couldn’t load active games", "Couldn’t load head-to-head record", "Couldn’t load game history"] {
-            XCTAssertTrue(app.staticTexts[message].firstMatch.waitForExistence(timeout: 10),
+            XCTAssertTrue(app.staticTexts[message].firstMatch.exists(within: 10),
                           "Missing section data must report its own error: \(message).")
         }
         let nine = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("9x9"), in: app)
@@ -1273,7 +1273,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         ])
         let prefix = SurroundUITestContract.AccessibilityID.profileRengoMenuPrefix
         let avatars = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
-        XCTAssertTrue(avatars.firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(avatars.firstMatch.exists(within: 10))
         // The fixture's twenty challenges are grouped and sorted by clock.
         // Exercise the first visible participant, without hunting a specific
         // card across the entire challenge list.
@@ -1337,7 +1337,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.appearanceLaunchArgument,
             appearance.rawValue,
         ])
-        let usesAccountMenu = app.buttons[SurroundUITestContract.AccessibilityID.accountMenu].waitForExistence(timeout: 2)
+        let usesAccountMenu = app.buttons[SurroundUITestContract.AccessibilityID.accountMenu].exists(within: 2)
         openOwnProfileFromMainNavigation(in: app)
         let header = element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
         XCTAssertTrue(waitForValue(appearance.rawValue, in: header, timeout: stateSettleTimeout),
@@ -1778,7 +1778,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
 
         func revealCoordinates(in settings: XCUIElement) -> XCUIElement? {
             let toggle = settings.switches["Board coordinates"].firstMatch
-            guard toggle.waitForExistence(timeout: 10) else {
+            guard toggle.exists(within: 10) else {
                 keepScreenshot("Gameplay coordinates – missing control", in: app)
                 XCTFail("Normal Settings must contain Board coordinates.")
                 return nil

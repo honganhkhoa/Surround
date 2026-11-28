@@ -195,7 +195,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
             keepScreenshot("Game started on the Duo's one-line bar", in: app)
             tap(lead, description: "The started game's lead", in: app)
         } else {
-            XCTAssertTrue(openGame.waitForExistence(timeout: 10), "A started game offers Open game")
+            XCTAssertTrue(openGame.exists(within: 10), "A started game offers Open game")
             keepScreenshot("Game started with Open game", in: app)
             tap(openGame, description: "Open game", in: app)
         }
@@ -357,13 +357,13 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
         element(ID.activityList, in: app)
         assertActivityPresentation(in: app)
         tap(ID.activityRow(usualChallenge, .reject), in: app, matching: .button)
-        XCTAssertTrue(query(ID.activityRowResult(usualChallenge), in: app).waitForExistence(timeout: stateSettleTimeout),
+        XCTAssertTrue(query(ID.activityRowResult(usualChallenge), in: app).exists(within: stateSettleTimeout),
                       "Reject shows its result in the list")
         keepScreenshot("CedarWave's challenge rejected in the list", in: app)
         closeList(in: app)
         // Home's own card of the challenge reads the service's lists.
         XCTAssertTrue(query(ID.profileChallengeEntry(FixtureID.usualChallengeID, cedarWaveID), in: app)
-            .waitForExistence(timeout: 10), "Home still shows the challenge's card: the service lists it")
+            .exists(within: 10), "Home still shows the challenge's card: the service lists it")
 
         barLead(in: app)
         assertLeads("live \(baseGame)", in: app)
@@ -688,7 +688,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
 
         tap(all, description: "All activity", in: app)
         element(ID.activityList, in: app)
-        XCTAssertTrue(app.popovers.firstMatch.waitForExistence(timeout: 10), "All activity opens a popover")
+        XCTAssertTrue(app.popovers.firstMatch.exists(within: 10), "All activity opens a popover")
         keepScreenshot("Activity from All activity", in: app)
         closeList(in: app)
         #endif
@@ -837,7 +837,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
         // All activity's popover closes as a turn hides the sidebar.
         tap(element(ID.activityNowAll, in: app), description: "All activity", in: app)
         element(ID.activityList, in: app)
-        XCTAssertTrue(app.popovers.firstMatch.waitForExistence(timeout: 10), "All activity opens a popover")
+        XCTAssertTrue(app.popovers.firstMatch.exists(within: 10), "All activity opens a popover")
         turnWindow(to: .portrait, in: app)
         XCTAssertTrue(pollUntil(timeout: 5) { !self.iPadSidebarIsShown(in: app) }, "A turn to portrait hides the sidebar")
         XCTAssertTrue(waitForAbsence(query(ID.activityList, in: app), timeout: 5),
@@ -947,7 +947,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
         let all = query(ID.activityNowAll, in: app)
         for (element, name) in [(game, "HarborMist's game"), (challenge, "CedarWave's challenge"),
                                 (view, "its View"), (all, "All activity")] {
-            XCTAssertTrue(element.waitForExistence(timeout: 10), "The Now section shows \(name)")
+            XCTAssertTrue(element.exists(within: 10), "The Now section shows \(name)")
         }
         XCTAssertFalse(query(ID.activityNowRowAction(harborMist), in: app).exists, "A live game's row has no action")
         attach("label \(all.label)\nvalue \(String(describing: all.value))", name: "All activity")
@@ -962,7 +962,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
         let windows = app.windows.count
         click(view, name: "View")
         let card = app.navigationBars["Challenge"].firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 10), "View pushes the challenge's card")
+        XCTAssertTrue(card.exists(within: 10), "View pushes the challenge's card")
         XCTAssertGreaterThan(app.windows.count, windows, "View opens a popover, a window of its own")
         keepWindowScreenshots("The challenge's card from View", in: app)
         closeWithEscape("View's popover", leaving: card, in: app)
@@ -976,7 +976,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
         keepWindowScreenshots("The Now section over HarborMist's game", in: app)
         goBack(in: app)
         element(ID.screenHome, in: app)
-        XCTAssertTrue(game.waitForExistence(timeout: 10), "Back on Home, the game's row comes back")
+        XCTAssertTrue(game.exists(within: 10), "Back on Home, the game's row comes back")
 
         resizeMacWindow(toContent: CGSize(width: 1200, height: 760), in: app)
         assertNowSection(at: "1200 × 760 after a live resize", rows: [game, challenge], all: all, in: app)
@@ -985,7 +985,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
         for (entry, title) in Self.macRootTitles {
             selectSidebarEntry(entry, in: app)
             assertWindowTitle(title, in: app)
-            XCTAssertTrue(all.waitForExistence(timeout: 10), "The section shows beside \(title)")
+            XCTAssertTrue(all.exists(within: 10), "The section shows beside \(title)")
         }
     }
 
@@ -998,7 +998,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
         var app = launchMac([SurroundUITestContract.activityStateLaunchArgument, State.several.rawValue],
                             size: CGSize(width: 900, height: 600))
         let all = query(ID.activityNowAll, in: app)
-        XCTAssertTrue(all.waitForExistence(timeout: 10), "The Now section shows All activity")
+        XCTAssertTrue(all.exists(within: 10), "The Now section shows All activity")
         let fromAllActivity = openPopover(byClicking: all, name: "All activity", in: app)
 
         chooseActivityInViewMenu(in: app)
@@ -1078,7 +1078,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
         let game = query(ID.activityNowRow(harborMist), in: app)
         let all = query(ID.activityNowAll, in: app)
         XCTAssertTrue(waitForLabel("Reconnecting to OGS", of: status), "Offline, the first row says the status")
-        XCTAssertTrue(game.waitForExistence(timeout: 10) && all.exists, "HarborMist's row and All activity stay below it")
+        XCTAssertTrue(game.exists(within: 10) && all.exists, "HarborMist's row and All activity stay below it")
         XCTAssertFalse(query(ID.activityNowRow(usualChallenge), in: app).exists,
                        "The status row takes the second row's place")
         XCTAssertEqual(Int((all.value as? String ?? "").prefix { $0.isNumber }), 3,
@@ -1089,7 +1089,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
 
         XCTAssertTrue(waitForLabel("Can’t reach OGS", of: status, timeout: 40), "30 s in, Can’t reach OGS")
         let retry = query(ID.rootConnectionStatusRetry, in: app)
-        XCTAssertTrue(retry.waitForExistence(timeout: 10), "Can’t reach OGS offers Retry")
+        XCTAssertTrue(retry.exists(within: 10), "Can’t reach OGS offers Retry")
         assertWindowTitle("Active games", in: app)
         keepWindowScreenshots("The Mac's status row: Can’t reach OGS with Retry", in: app)
         click(retry, name: "Retry")
@@ -1102,7 +1102,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
         keepWindowScreenshots("No status row over HarborMist's game", in: app)
         goBack(in: app)
         element(ID.screenHome, in: app)
-        XCTAssertTrue(status.waitForExistence(timeout: 10), "Back on Home, the status row shows again")
+        XCTAssertTrue(status.exists(within: 10), "Back on Home, the status row shows again")
         assertWindowTitle("Active games", in: app)
         app.terminate()
 
@@ -1238,8 +1238,8 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
                             file: StaticString = #filePath, line: UInt = #line) {
         let list = element(ID.activityList, in: app, file: file, line: line)
         let done = query(ID.activityDone, in: app)
-        XCTAssertTrue(done.waitForExistence(timeout: 10), "\(name) opens the sheet, with Done", file: file, line: line)
-        XCTAssertTrue(query(ID.activityEmpty, in: app).waitForExistence(timeout: 10), "\(name): nothing waiting",
+        XCTAssertTrue(done.exists(within: 10), "\(name) opens the sheet, with Done", file: file, line: line)
+        XCTAssertTrue(query(ID.activityEmpty, in: app).exists(within: 10), "\(name): nothing waiting",
                       file: file, line: line)
         keepWindowScreenshots("Activity's sheet from \(name)", in: app)
         click(done, name: "Done", file: file, line: line)
@@ -1251,10 +1251,10 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
     private func chooseActivityInViewMenu(in app: XCUIApplication, file: StaticString = #filePath,
                                           line: UInt = #line) {
         let view = app.menuBars.menuBarItems["View"].firstMatch
-        XCTAssertTrue(view.waitForExistence(timeout: 10), "The menu bar has View", file: file, line: line)
+        XCTAssertTrue(view.exists(within: 10), "The menu bar has View", file: file, line: line)
         view.click()
         let item = view.menuItems["Activity"].firstMatch
-        if !item.waitForExistence(timeout: 5) {
+        if !item.exists(within: 5) {
             attach(app.menuBars.firstMatch.debugDescription, name: "The menu bar")
         }
         XCTAssertTrue(item.exists, "View has Activity", file: file, line: line)
@@ -1266,10 +1266,10 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
     private func assertActivityInViewMenuIsOff(in app: XCUIApplication, file: StaticString = #filePath,
                                                line: UInt = #line) {
         let view = app.menuBars.menuBarItems["View"].firstMatch
-        XCTAssertTrue(view.waitForExistence(timeout: 10), "The menu bar has View", file: file, line: line)
+        XCTAssertTrue(view.exists(within: 10), "The menu bar has View", file: file, line: line)
         view.click()
         let item = view.menuItems["Activity"].firstMatch
-        XCTAssertTrue(item.waitForExistence(timeout: 5), "View has Activity", file: file, line: line)
+        XCTAssertTrue(item.exists(within: 5), "View has Activity", file: file, line: line)
         XCTAssertFalse(item.isEnabled, "View > Activity is off signed out", file: file, line: line)
         app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
     }
@@ -1802,10 +1802,10 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
     private func assertActivityPresentation(in app: XCUIApplication, file: StaticString = #filePath,
                                             line: UInt = #line) {
         if expectsActivityPopover(in: app) {
-            XCTAssertTrue(app.popovers.firstMatch.waitForExistence(timeout: 10),
+            XCTAssertTrue(app.popovers.firstMatch.exists(within: 10),
                           "In regular width Activity is a popover", file: file, line: line)
         } else {
-            XCTAssertTrue(query(ID.activityDone, in: app).waitForExistence(timeout: 10),
+            XCTAssertTrue(query(ID.activityDone, in: app).exists(within: 10),
                           "In compact width Activity is a sheet, with Done", file: file, line: line)
             XCTAssertFalse(app.popovers.firstMatch.exists, "In compact width there is no popover", file: file, line: line)
         }
@@ -1821,7 +1821,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
         ), in: popover.exists ? popover : (app as XCUIElement), description: "the list's Back", file: file, line: line)
         guard let back else { return }
         tap(back, description: "Back to Activity", in: app, file: file, line: line)
-        XCTAssertTrue(query(ID.activityList, in: app).waitForExistence(timeout: stateSettleTimeout),
+        XCTAssertTrue(query(ID.activityList, in: app).exists(within: stateSettleTimeout),
                       "Back shows the list", file: file, line: line)
     }
 
@@ -2152,7 +2152,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
             revealOnHome(ID.homeHistoryGame(historyGameID), within: Self.historySection, in: app,
                          file: file, line: line)
                 .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).press(forDuration: 2.5)
-            _ = menuItem.waitForExistence(timeout: 5)
+            _ = menuItem.exists(within: 5)
         }
         tap(requiredMenuButton(menuID, title: "View Profile", in: app, file: file, line: line),
             description: "View the finished game's opponent's profile", in: app, file: file, line: line)
@@ -2195,7 +2195,7 @@ final class ActivityBarUITests: SurroundJourneyUITestCase {
     private func revealOnHome(_ identifier: String, within section: String, in app: XCUIApplication,
                               file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
         let home = app.scrollViews.matching(identifier: ID.screenHome).firstMatch
-        XCTAssertTrue(home.waitForExistence(timeout: 10), "Expected Home's list", file: file, line: line)
+        XCTAssertTrue(home.exists(within: 10), "Expected Home's list", file: file, line: line)
         let row = home.descendants(matching: .any).matching(identifier: identifier).firstMatch
         let holder = home.descendants(matching: .any).matching(identifier: section).firstMatch
         for _ in 0..<12 {

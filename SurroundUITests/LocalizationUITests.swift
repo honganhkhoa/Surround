@@ -204,7 +204,7 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
             if !clockSystem.exists {
                 tap(advanced, description: "Open offline Quick Match clock preferences", in: app)
             }
-            XCTAssertTrue(clockSystem.waitForExistence(timeout: 10))
+            XCTAssertTrue(clockSystem.exists(within: 10))
             let either = elementAfterScrolling(
                 SurroundUITestContract.AccessibilityID.quickMatchClockPreference("flexible"),
                 in: app, matching: .button)
@@ -273,7 +273,7 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
         let home = app.scrollViews.matching(
             identifier: SurroundUITestContract.AccessibilityID.screenHome
         ).firstMatch
-        XCTAssertTrue(home.waitForExistence(timeout: 10))
+        XCTAssertTrue(home.exists(within: 10))
         let primaryGame = home.buttons.matching(
             identifier: SurroundUITestContract.AccessibilityID.homeGame(
                 SurroundUITestContract.screenshotPrimaryGameID)
@@ -309,7 +309,7 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
             start.press(forDuration: 0.05, thenDragTo: end,
                         withVelocity: .default, thenHoldForDuration: 0.1)
         }
-        XCTAssertTrue(primaryGame.waitForExistence(timeout: 10),
+        XCTAssertTrue(primaryGame.exists(within: 10),
                       "The exact primary fixture game must appear after bounded Home scrolling.")
         XCTAssertTrue(waitUntilHittable(primaryGame, timeout: 10))
         XCTAssertTrue(homeViewport().contains(primaryGame.frame),
@@ -605,7 +605,7 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
     ) -> XCUIElement {
         let query = app.descendants(matching: elementType).matching(
             NSPredicate(format: hasPrefix ? "label BEGINSWITH %@" : "label == %@", text))
-        XCTAssertTrue(query.firstMatch.waitForExistence(timeout: 10),
+        XCTAssertTrue(query.firstMatch.exists(within: 10),
                       "Expected the resolved localized label: \(text)")
         // Prefer the visible copy when an inactive retained tab or its title
         // exposes another accessibility element with the same label.
@@ -614,7 +614,7 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
 
     private func assertVisible(_ element: XCUIElement, in app: XCUIApplication) {
         let window = app.windows.firstMatch
-        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        XCTAssertTrue(window.exists(within: 10))
         let frame = element.frame
         XCTAssertGreaterThan(frame.width, 1)
         XCTAssertGreaterThan(frame.height, 1)
