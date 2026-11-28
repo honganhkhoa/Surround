@@ -1020,12 +1020,31 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
     func showIPadSidebar(_ shown: Bool, in app: XCUIApplication,
                          file: StaticString = #filePath, line: UInt = #line) {
         for _ in 0..<2 where iPadSidebarIsShown(in: app) != shown {
-            guard let toggle = nativeSidebarToggle(in: app) else { break }
+            guard let toggle = settledSidebarToggle(in: app) else { break }
             activate(toggle)
             if pollUntil(timeout: 5, condition: { iPadSidebarIsShown(in: app) == shown }) { break }
         }
         XCTAssertEqual(iPadSidebarIsShown(in: app), shown,
                        "Expected the iPad's sidebar \(shown ? "shown" : "hidden")", file: file, line: line)
+    }
+
+    /// The sidebar's toggle once a push or a pop has finished. Just after
+    /// one, no toggle is hittable yet, or two are listed, the leaving
+    /// screen's and the arriving one's, and a toggle taken by its index goes
+    /// stale when the first leaves: a tap on it then fails (iPadOS 18.6 and
+    /// 27.2, November 2026). So the toggle is taken when as many are listed
+    /// on three looks in a row, which outlasts the transition.
+    private func settledSidebarToggle(in app: XCUIApplication) -> XCUIElement? {
+        var counts = [Int]()
+        var toggle: XCUIElement?
+        _ = pollUntil(timeout: 5) {
+            let listed = sidebarToggles(in: app).allElementsBoundByIndex
+            counts.append(listed.count)
+            guard counts.suffix(3).count == 3, Set(counts.suffix(3)).count == 1 else { return false }
+            toggle = listed.first { $0.isHittable }
+            return toggle != nil
+        }
+        return toggle
     }
 
     /// The iPhone Duo: it lists its outer and its inner screen in every
@@ -1472,8 +1491,12 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         app.typeKey("z", modifierFlags: [.control, .option])
         #else
         let control = app.buttons.matching(identifier: identifier).firstMatch
+        // A toolbar's items come a moment after its screen, so one look just
+        // after a game opens can find no Zen button on a bar that is about to
+        // show it (iPadOS 18.6 and 27.2, November 2026). Give it two seconds
+        // before taking the overflow's way.
         if identifier == SurroundUITestContract.AccessibilityID.gameZenEnter,
-           !control.exists {
+           !control.waitForExistence(timeout: 2) {
             // Narrow navigation bars move this action into the native overflow.
             tap(
                 app.navigationBars.buttons["More"].firstMatch,
@@ -1520,10 +1543,14 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
     /// game hides the tab bar and keeps it in the navigation bar, and Duo's
     /// wide poses draw the game's own button in its place.
     func nativeSidebarToggle(in app: XCUIApplication) -> XCUIElement? {
+        sidebarToggles(in: app).allElementsBoundByIndex.first { $0.isHittable }
+    }
+
+    private func sidebarToggles(in app: XCUIApplication) -> XCUIElementQuery {
         app.buttons.matching(NSPredicate(
             format: "identifier IN %@ OR label CONTAINS[c] %@",
             ["ToggleSidebar", "ToggleSideBar", SurroundUITestContract.AccessibilityID.gameSidebarToggle], "sidebar"
-        )).allElementsBoundByIndex.first { $0.isHittable }
+        ))
     }
 
     func selectMainNavigation(_ identifier: String, in app: XCUIApplication) {
