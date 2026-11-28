@@ -397,11 +397,13 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         }
 
         // A docked software keyboard: taller than a hardware keyboard's bar,
-        // along the window's bottom edge.
+        // along the window's bottom edge. One snapshot reads it: asked for
+        // its frame after it was found, a keyboard that left in between
+        // recorded a failure (hosted iPadOS 26.5, November 28). The window
+        // is upright and full here, so the snapshot's frame is the screen's.
         func keyboardIsDocked() -> Bool {
-            let keyboard = app.keyboards.firstMatch
-            guard keyboard.exists else { return false }
-            let frame = keyboard.frame, window = windowFrame(in: app)
+            guard let frame = listedSnapshot(of: app.keyboards.firstMatch)?.frame else { return false }
+            let window = windowFrame(in: app)
             return frame.height > 100 && frame.width >= window.width * 0.6
                 && abs(window.maxY - frame.maxY) <= 100
         }
