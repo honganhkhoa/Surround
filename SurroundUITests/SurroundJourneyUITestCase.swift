@@ -20,6 +20,28 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         continueAfterFailure = false
     }
 
+    /// Where `waitsLookFirst` holds, the journey suites evaluate a wait's
+    /// condition directly before its waiter starts. A waiter evaluates a
+    /// predicate expectation about a second after the wait begins and never
+    /// sooner, and most of these waits are for something that already holds
+    /// (see `exists(within:)`). A condition that holds at once returns after
+    /// `settle`'s pause; any other wait goes on as before. The activity
+    /// names the wait in the log either way.
+    override func waitWithFinalCheck(
+        for expectations: [XCTNSPredicateExpectation],
+        timeout: TimeInterval
+    ) -> XCTWaiter.Result {
+        guard Self.waitsLookFirst else { return super.waitWithFinalCheck(for: expectations, timeout: timeout) }
+        let conditions = expectations.map(\.expectationDescription).joined(separator: ", ")
+        return XCTContext.runActivity(named: "Waiting \(timeout)s: \(conditions)") { _ in
+            if expectations.allSatisfy({ passesDirectCheck($0) }) {
+                Self.settle(arrived: false)
+                return .completed
+            }
+            return super.waitWithFinalCheck(for: expectations, timeout: timeout)
+        }
+    }
+
     var animationDiagnosticsEnabled: Bool {
         ProcessInfo.processInfo.environment[
             "SURROUND_UI_ANIMATION_DIAGNOSTICS"
@@ -116,7 +138,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             .descendants(matching: elementType)
             .matching(identifier: identifier)
             .firstMatch
-        let appeared = element.waitForExistence(timeout: 10)
+        let appeared = element.exists(within: 10)
         if !appeared {
             let hierarchy = XCTAttachment(string: app.debugDescription)
             hierarchy.name = "Accessibility hierarchy – missing \(identifier)"
@@ -164,7 +186,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         line: UInt = #line
     ) -> XCUIElement {
         let menuItem = menuButton(accessibilityIdentifier, title: title, in: app)
-        let appeared = menuItem.waitForExistence(timeout: 10)
+        let appeared = menuItem.exists(within: 10)
         if !appeared {
             let hierarchy = XCTAttachment(string: app.debugDescription)
             hierarchy.name =
@@ -226,7 +248,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             catalystTitle: catalystTitle,
             in: app
         )
-        let appeared = menuItem.waitForExistence(timeout: 10)
+        let appeared = menuItem.exists(within: 10)
         if !appeared {
             let hierarchy = XCTAttachment(string: app.debugDescription)
             hierarchy.name =
@@ -1020,12 +1042,31 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
     func showIPadSidebar(_ shown: Bool, in app: XCUIApplication,
                          file: StaticString = #filePath, line: UInt = #line) {
         for _ in 0..<2 where iPadSidebarIsShown(in: app) != shown {
-            guard let toggle = nativeSidebarToggle(in: app) else { break }
+            guard let toggle = settledSidebarToggle(in: app) else { break }
             activate(toggle)
             if pollUntil(timeout: 5, condition: { iPadSidebarIsShown(in: app) == shown }) { break }
         }
         XCTAssertEqual(iPadSidebarIsShown(in: app), shown,
                        "Expected the iPad's sidebar \(shown ? "shown" : "hidden")", file: file, line: line)
+    }
+
+    /// The sidebar's toggle once a push or a pop has finished. Just after
+    /// one, no toggle is hittable yet, or two are listed, the leaving
+    /// screen's and the arriving one's, and a toggle taken by its index goes
+    /// stale when the first leaves: a tap on it then fails (iPadOS 18.6 and
+    /// 27.2, November 2026). So the toggle is taken when as many are listed
+    /// on three looks in a row, which outlasts the transition.
+    private func settledSidebarToggle(in app: XCUIApplication) -> XCUIElement? {
+        var counts = [Int]()
+        var toggle: XCUIElement?
+        _ = pollUntil(timeout: 5) {
+            let listed = sidebarToggles(in: app).allElementsBoundByIndex
+            counts.append(listed.count)
+            guard counts.suffix(3).count == 3, Set(counts.suffix(3)).count == 1 else { return false }
+            toggle = listed.first { $0.isHittable }
+            return toggle != nil
+        }
+        return toggle
     }
 
     /// The iPhone Duo: it lists its outer and its inner screen in every
@@ -1064,7 +1105,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
     /// A click at the element's centre: on the Mac XCTest calls the content
     /// unhittable even with nothing over it.
     func click(_ element: XCUIElement, name: String, file: StaticString = #filePath, line: UInt = #line) {
-        XCTAssertTrue(element.waitForExistence(timeout: 10), "Expected \(name)", file: file, line: line)
+        XCTAssertTrue(element.exists(within: 10), "Expected \(name)", file: file, line: line)
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     }
 
@@ -1188,7 +1229,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
                 scrollView.swipeUp()
             }
         }
-        XCTAssertTrue(candidate.waitForExistence(timeout: 10),
+        XCTAssertTrue(candidate.exists(within: 10),
                       "Expected \(identifier) inside its scroll viewport", file: file, line: line)
         XCTAssertTrue(waitUntilHittable(candidate, timeout: stateSettleTimeout),
                       "Expected \(identifier) to be usable after bounded scrolling", file: file, line: line)
@@ -1301,7 +1342,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
                 control.exists && !control.frame.isEmpty && windowFrame(in: app).contains(control.frame)
             }, "Expected the in-game control on screen", file: file, line: line)
             holdGameControl(control)
-            if !popover.waitForExistence(timeout: 5) {
+            if !popover.exists(within: 5) {
                 let retry = XCTAttachment(string: "The first hold opened no popover; held again.\n"
                                           + control.debugDescription)
                 retry.name = "Game control hold retried"
@@ -1318,11 +1359,11 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
                 XCUIElement.ElementType.button.rawValue, XCUIElement.ElementType.menuItem.rawValue,
                 id.gameActiveGamesButton, "Active games", "Activity", "your move"
             )).firstMatch
-            XCTAssertTrue(item.waitForExistence(timeout: 10), "Expected the control in the overflow menu",
+            XCTAssertTrue(item.exists(within: 10), "Expected the control in the overflow menu",
                           file: file, line: line)
             tap(item, description: "the control in the overflow menu", in: app, file: file, line: line)
         }
-        XCTAssertTrue(popover.waitForExistence(timeout: 10),
+        XCTAssertTrue(popover.exists(within: 10),
                       "The control's popover must open within ten seconds", file: file, line: line)
         return popover
     }
@@ -1367,7 +1408,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
     func assertChatPanelLaidOutAtOneWidth(_ context: String, in app: XCUIApplication,
                                           file: StaticString = #filePath, line: UInt = #line) {
         let probe = app.descendants(matching: .any).matching(identifier: "game.chat.layoutSizes").firstMatch
-        guard probe.waitForExistence(timeout: 5) else {
+        guard probe.exists(within: 5) else {
             XCTFail("Missing the chat layout probe", file: file, line: line)
             return
         }
@@ -1472,8 +1513,12 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         app.typeKey("z", modifierFlags: [.control, .option])
         #else
         let control = app.buttons.matching(identifier: identifier).firstMatch
+        // A toolbar's items come a moment after its screen, so one look just
+        // after a game opens can find no Zen button on a bar that is about to
+        // show it (iPadOS 18.6 and 27.2, November 2026). Give it two seconds
+        // before taking the overflow's way.
         if identifier == SurroundUITestContract.AccessibilityID.gameZenEnter,
-           !control.exists {
+           !control.exists(within: 2) {
             // Narrow navigation bars move this action into the native overflow.
             tap(
                 app.navigationBars.buttons["More"].firstMatch,
@@ -1520,10 +1565,14 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
     /// game hides the tab bar and keeps it in the navigation bar, and Duo's
     /// wide poses draw the game's own button in its place.
     func nativeSidebarToggle(in app: XCUIApplication) -> XCUIElement? {
+        sidebarToggles(in: app).allElementsBoundByIndex.first { $0.isHittable }
+    }
+
+    private func sidebarToggles(in app: XCUIApplication) -> XCUIElementQuery {
         app.buttons.matching(NSPredicate(
             format: "identifier IN %@ OR label CONTAINS[c] %@",
             ["ToggleSidebar", "ToggleSideBar", SurroundUITestContract.AccessibilityID.gameSidebarToggle], "sidebar"
-        )).allElementsBoundByIndex.first { $0.isHittable }
+        ))
     }
 
     func selectMainNavigation(_ identifier: String, in app: XCUIApplication) {
@@ -1715,7 +1764,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             guard let matchingBar else { return }
             navigationBar = matchingBar
         }
-        XCTAssertTrue(navigationBar.waitForExistence(timeout: 10), file: file, line: line)
+        XCTAssertTrue(navigationBar.exists(within: 10), file: file, line: line)
         XCTAssertFalse(app.navigationBars.buttons["Close"].exists,
                        "Profiles must use stack navigation, without a modal Close action.",
                        file: file, line: line)
@@ -1817,13 +1866,13 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             centerInScrollContainer(row, in: app)
             row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).press(forDuration: pressDuration)
             #endif
-            if attempt == pressDurations.count - 1 || menuItem.waitForExistence(timeout: 10) { break }
+            if attempt == pressDurations.count - 1 || menuItem.exists(within: 10) { break }
             guard !(row.exists && row.isHittable) else { continue }
             // A Back tap can be ignored while the pushed screen settles.
             for _ in 0..<2 {
                 guard let back = backButtonOfPushedScreen(in: app) else { break }
                 tap(back, description: "Return from the row's destination", in: app, file: file, line: line)
-                if row.waitForExistence(timeout: 10) { break }
+                if row.exists(within: 10) { break }
             }
             XCTAssertTrue(row.exists, "The row must reappear after leaving its destination.", file: file, line: line)
         }
@@ -1878,9 +1927,9 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         let identity = header.descendants(matching: .staticText).matching(
             NSPredicate(format: "label == %@ OR label BEGINSWITH %@", username, username + " [")
         ).firstMatch
-        XCTAssertTrue(identity.waitForExistence(timeout: 10),
+        XCTAssertTrue(identity.exists(within: 10),
                       "The selected player's identity must appear in the loaded profile.")
-        XCTAssertTrue(app.navigationBars[isOwnProfile ? "Profile" : username].waitForExistence(timeout: 10),
+        XCTAssertTrue(app.navigationBars[isOwnProfile ? "Profile" : username].exists(within: 10),
                       "Own profiles use Profile; other profiles use the player's username as their title.")
     }
 }

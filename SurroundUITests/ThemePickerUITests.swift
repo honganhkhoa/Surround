@@ -78,7 +78,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
             host.descendants(matching: .any).matching(identifier: ID.themePreview($0)).firstMatch
         }
         for (theme, preview) in zip(debugThemes, previews) {
-            XCTAssertTrue(preview.waitForExistence(timeout: 10), "\(context): \(theme)'s preview is listed",
+            XCTAssertTrue(preview.exists(within: 10), "\(context): \(theme)'s preview is listed",
                           file: file, line: line)
         }
         let frames = previews.map(\.frame)
@@ -114,7 +114,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
     private func openHomeAppearance(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
         element(ID.screenHome, in: app, file: file, line: line)
         let appearance = app.navigationBars.buttons.matching(identifier: ID.homeAppearance).firstMatch
-        XCTAssertTrue(appearance.waitForExistence(timeout: 10), "The bar shows Appearance", file: file, line: line)
+        XCTAssertTrue(appearance.exists(within: 10), "The bar shows Appearance", file: file, line: line)
         XCTAssertFalse(moreButton(in: app).exists, "The bar has no More menu", file: file, line: line)
         // iPadOS 27 stops reporting the button as one while its popover is
         // open, so measure it first.
@@ -204,17 +204,17 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
 
         tap(scope.buttons["Games only"], description: "Keep the theme to games", in: app)
         XCTAssertTrue(scope.buttons["Games only"].isSelected)
-        XCTAssertTrue(app.staticTexts["Only games use it. Other screens stay Classic."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Only games use it. Other screens stay Classic."].exists(within: 5))
         keepScreenshot("Settings – Raked Garden in games only", in: app)
 
         let nebula = themeOption("nebulaPearl", in: app)
         tap(nebula, description: "Choose Nebula & Pearl", in: app)
         assertSelected(nebula, true)
         XCTAssertEqual(nebula.value as? String, "Always dark")
-        XCTAssertTrue(app.staticTexts["Nebula & Pearl is always dark, even in Light Mode."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Nebula & Pearl is always dark, even in Light Mode."].exists(within: 5))
         // On the whole app it turns every screen dark, and says so.
         tap(scopeControl(in: app).buttons["Whole app"], description: "Use the theme on the whole app", in: app)
-        XCTAssertTrue(app.staticTexts["Nebula & Pearl is always dark, so the whole app is too."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Nebula & Pearl is always dark, so the whole app is too."].exists(within: 5))
     }
 
     func testGameOptionsOffersTheThemes() throws {
@@ -425,7 +425,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
                 let publicGame = app.buttons.matching(NSPredicate(
                     format: "identifier BEGINSWITH %@", "publicGames.game."
                 )).firstMatch
-                XCTAssertTrue(publicGame.waitForExistence(timeout: 10), "\(context): Public games lists the fixture")
+                XCTAssertTrue(publicGame.exists(within: 10), "\(context): Public games lists the fixture")
                 XCTAssertTrue(waitUntilHittable(publicGame, timeout: 10))
                 keepScreenshot("\(context) – Public games", in: app)
 
@@ -491,7 +491,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         let garden = element(ID.themeOption("rakedGarden"), in: app, matching: .button)
         tap(garden, description: "Choose Raked Garden from Home", in: app)
         assertSelected(garden, true)
-        XCTAssertTrue(app.staticTexts["Only games use the theme. Change this in Settings."].waitForExistence(timeout: 5),
+        XCTAssertTrue(app.staticTexts["Only games use the theme. Change this in Settings."].exists(within: 5),
                       "With Games only, Home keeps Classic and says why.")
         keepScreenshot("Home – Appearance popover on Games only", in: app)
     }
@@ -611,7 +611,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         keepScreenshot("iPad Home – Appearance popover, turned to portrait while open", in: app)
         dismissPopover(in: app)
         let button = app.navigationBars.buttons.matching(identifier: ID.homeAppearance).firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 5), "The bar still shows Appearance after the turn")
+        XCTAssertTrue(button.exists(within: 5), "The bar still shows Appearance after the turn")
         assertAppearancePopover(turned, hangsFrom: button.frame)
         #endif
     }
@@ -679,7 +679,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
                 // Home fits: its large title never gives way to the inline one.
                 continue
             }
-            XCTAssertTrue(appearance.waitForExistence(timeout: 10), "\(context), \(position): the bar shows Appearance",
+            XCTAssertTrue(appearance.exists(within: 10), "\(context), \(position): the bar shows Appearance",
                           file: file, line: line)
             let frame = appearance.frame
             XCTAssertTrue(!frame.isEmpty && bar.frame.contains(CGPoint(x: frame.midX, y: frame.midY)),

@@ -34,7 +34,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
         let cover = element(ID.superchatCover, in: app)
         let message = cover.descendants(matching: .staticText)
             .matching(NSPredicate(format: "label == %@", moderatorMessage)).firstMatch
-        XCTAssertTrue(message.waitForExistence(timeout: 10), "The cover shows the moderator's message")
+        XCTAssertTrue(message.exists(within: 10), "The cover shows the moderator's message")
         XCTAssertEqual(element(ID.superchatCoverTitle, in: app).label, title)
         XCTAssertEqual(element(ID.superchatCoverSubtitle, in: app).label, subtitle)
         assertLiveGame(harborMistGameID, opponent: "HarborMist", turn: "Your move", in: app)
@@ -75,7 +75,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
         let cover = element(ID.superchatCover, in: app)
         for gameID in [fixtureGameID, harborMistGameID] {
             openLink(URL(string: "surround://home/\(gameID)")!)
-            XCTAssertTrue(cover.waitForExistence(timeout: 10), "The cover stays over link \(gameID)")
+            XCTAssertTrue(cover.exists(within: 10), "The cover stays over link \(gameID)")
             XCTAssertFalse(pollUntil(timeout: 3) { self.query(ID.gameDetail(gameID), in: app).exists },
                            "Link \(gameID) waits while covered")
             XCTAssertTrue(waitUntilNotHittable(query(ID.homeGame(fixtureGameID), in: app), timeout: 10),
@@ -194,7 +194,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
         // The commands reach this run: a start covers, and the echo left no
         // moderator behind, so there are no chips.
         post(.start)
-        XCTAssertTrue(cover.waitForExistence(timeout: 10), "A start after the echo covers")
+        XCTAssertTrue(cover.exists(within: 10), "A start after the echo covers")
         let chipPrefix = String(ID.superchatCoverModerator(0).dropLast())
         XCTAssertEqual(app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", chipPrefix)).count, 0,
@@ -331,7 +331,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
         tap(ID.gameActionsMenu, in: app)
         tap(requiredMenuButton(ID.gameResign, title: "Resign", in: app), description: "Resign", in: app)
         let alert = app.alerts["Are you sure you want to resign this game?"].firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 10), "Resign asks first")
+        XCTAssertTrue(alert.exists(within: 10), "Resign asks first")
         // A tap on Dismiss would close it; Resign is never touched.
         assertCoverHides("alert (Resign)", target: alert.buttons["Dismiss"].firstMatch, in: app) { alert.exists }
     }
@@ -402,7 +402,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
             description: "Open the test's loopback page in a Safari view", in: app)
         _ = try server.waitForRequest()
         let page = app.webViews.staticTexts[ProfileBiographyBrowserServer.pageMarker].firstMatch
-        XCTAssertTrue(page.waitForExistence(timeout: 30), "The Safari view shows the loopback page")
+        XCTAssertTrue(page.exists(within: 30), "The Safari view shows the loopback page")
         // A tap on its Done or Close would close it. Bound by index: on an
         // iPad the profile's own sheet has a Done of its own underneath.
         let closes = app.buttons.matching(NSPredicate(
@@ -532,7 +532,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
         let cover = query(ID.superchatCover, in: app)
         var verdict = PresentationVerdict(kind: kind, hitTestedElsewhere: hitTestedElsewhere)
         post(.start)
-        verdict.covered = cover.waitForExistence(timeout: 10)
+        verdict.covered = cover.exists(within: 10)
         if verdict.covered {
             verdict.listedUnderneath = target.exists
             verdict.notHittable = waitUntilNotHittable(target, timeout: 10)
@@ -542,7 +542,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
             keepScreenshot("\(kind) – covered, after a tap at its element", in: app)
             post(.end)
             let done = query(ID.superchatCoverDone, in: app)
-            if done.waitForExistence(timeout: 10), waitUntilHittable(done, timeout: stateSettleTimeout) {
+            if done.exists(within: 10), waitUntilHittable(done, timeout: stateSettleTimeout) {
                 activate(done)
                 verdict.lowered = waitForAbsence(cover, timeout: stateSettleTimeout)
             }
@@ -890,7 +890,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
             "BackButton", ID.gameActiveGamesButton, "Active games"
         )).firstMatch
         tap(back, description: "Back to Active games", in: app, file: file, line: line)
-        XCTAssertTrue(app.navigationBars["Active games"].waitForExistence(timeout: 10), file: file, line: line)
+        XCTAssertTrue(app.navigationBars["Active games"].exists(within: 10), file: file, line: line)
         XCTAssertTrue(waitForAbsence(query(ID.gameDetail(fixtureGameID), in: app), timeout: stateSettleTimeout),
                       "Back leaves the game", file: file, line: line)
     }
@@ -907,7 +907,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
             format: "(elementType == %lu OR elementType == %lu) AND (label == %@ OR identifier == %@)",
             XCUIElement.ElementType.cell.rawValue, XCUIElement.ElementType.button.rawValue, "Copy", "Copy"
         )).firstMatch
-        let appeared = copy.waitForExistence(timeout: 30)
+        let appeared = copy.exists(within: 30)
         if !appeared { attach(app.debugDescription, name: "Accessibility hierarchy – no share sheet Copy") }
         XCTAssertTrue(appeared, "The share sheet offers Copy", file: file, line: line)
         return copy
@@ -916,7 +916,7 @@ final class SuperchatCoverUITests: SurroundJourneyUITestCase {
     /// Swipes up in a scroll view or web view until the element is in view.
     private func reveal(_ target: XCUIElement, scrolling container: XCUIElement, in app: XCUIApplication,
                         file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
-        XCTAssertTrue(container.waitForExistence(timeout: 10), file: file, line: line)
+        XCTAssertTrue(container.exists(within: 10), file: file, line: line)
         for _ in 0..<16 {
             if target.exists && target.isHittable { return target }
             container.swipeUp(velocity: .slow)

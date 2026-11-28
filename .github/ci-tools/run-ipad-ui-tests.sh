@@ -190,6 +190,40 @@ for test_name in "$keyboard_preflight_test_name" "${composer_test_names[@]}"; do
   fi
 done
 
+# The journey suites wait for an element with exists(within:), which looks
+# at once. XCTest's waitForExistence(timeout:) first looks about a second
+# after the call, even for an element that is already there, and that second
+# was a quarter of the UI tests' time on hosted runners. These sources alone
+# call it: the shared base class and the two capture suites, whose pace is
+# part of what they capture, and the opt-in audits and device suites, which
+# CI skips.
+readonly xctest_wait_sources=(
+  AppStoreScreenshotTests
+  ArtboardPhoneAuditTests
+  CompatibilityScreenshotTests
+  DuoProfileSidebarUITests
+  DuoSidebarUITests
+  GameDetailDuoArtboardAuditTests
+  GameDetailIPadArtboardAuditTests
+  GameDetailThemePerformanceTests
+  SceneActivationUITests
+  SidebarKeyboardUITests
+  SurroundUITestCase
+)
+slow_waits=""
+for ui_test_source in SurroundUITests/*.swift; do
+  ui_test_source_name="$(basename "$ui_test_source" .swift)"
+  if [[ " ${xctest_wait_sources[*]} " == *" ${ui_test_source_name} "* ]]; then
+    continue
+  fi
+  slow_waits+="$(grep -Hn 'waitForExistence(' "$ui_test_source" || true)"
+done
+if [[ -n "$slow_waits" ]]; then
+  echo "A journey suite waits with exists(within:), not waitForExistence(timeout:), whose first look comes a second late:" >&2
+  echo "$slow_waits" >&2
+  exit 1
+fi
+
 # Each part, and the Activity, Activity bar, game control, composer and
 # continuity phases, run under supervise-ipad-ui-test-part.py. CI gives each
 # main, profile and Messages part step, and the composer step, 50 minutes; at

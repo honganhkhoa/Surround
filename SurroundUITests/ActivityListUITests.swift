@@ -38,12 +38,12 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         let app = launch(.several)
         tap(ID.homeSearching, in: app)
         element(ID.activityList, in: app)
-        XCTAssertTrue(app.navigationBars["Activity"].waitForExistence(timeout: 10), "The list is titled Activity")
+        XCTAssertTrue(app.navigationBars["Activity"].exists(within: 10), "The list is titled Activity")
         if isPhone {
             XCTAssertTrue(waitUntilHittable(query(ID.activityDone, in: app), timeout: 10), "The sheet has Done")
             XCTAssertFalse(app.popovers.firstMatch.exists, "At compact width Home's card opens a sheet")
         } else {
-            XCTAssertTrue(app.popovers.firstMatch.waitForExistence(timeout: 10),
+            XCTAssertTrue(app.popovers.firstMatch.exists(within: 10),
                           "At regular width Home's card opens a popover")
             XCTAssertFalse(query(ID.activityDone, in: app).exists, "A popover has no Done")
         }
@@ -92,14 +92,14 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         app = launch(.unusualChallenge, open: .sheet)
         let view = element(ID.activityRow(unusualID, .view), in: app, matching: .button)
         XCTAssertEqual(view.label, "View the challenge from JadeLantern")
-        XCTAssertTrue(warning(in: app).waitForExistence(timeout: 10), "The unusual challenge shows its warning")
+        XCTAssertTrue(warning(in: app).exists(within: 10), "The unusual challenge shows its warning")
         XCTAssertFalse(query(ID.activityRow(unusualID, .accept), in: app).exists, "No Accept in place for it")
         XCTAssertFalse(query(ID.activityRow(unusualID, .reject), in: app).exists, "No Reject in place for it")
         keepScreenshot("Activity – an unusual challenge with its warning and View", in: app)
 
         tap(view, description: "View JadeLantern's challenge", in: app)
         let card = app.navigationBars["Challenge"].firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 10), "View pushes the challenge's card")
+        XCTAssertTrue(card.exists(within: 10), "View pushes the challenge's card")
         XCTAssertTrue(cardButton("Accept", in: app).exists && cardButton("Reject", in: app).exists,
                       "The card decides with its own Accept and Reject")
         keepScreenshot("Activity – the unusual challenge's card", in: app)
@@ -112,7 +112,7 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         let app = launch(.challengeReceived, open: .gamePopover)
         element(ID.gameDetail(baseGameID), in: app)
         let popover = app.popovers.firstMatch
-        XCTAssertTrue(popover.waitForExistence(timeout: 10), "Over a game, Activity is a popover")
+        XCTAssertTrue(popover.exists(within: 10), "Over a game, Activity is a popover")
         let view = element(ID.activityRow(usualID, .view), in: app, matching: .button)
         XCTAssertFalse(query(ID.activityRow(usualID, .accept), in: app).exists,
                        "In a game's popover even a usual challenge offers View, not Accept")
@@ -122,7 +122,7 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
 
         tap(view, description: "View CedarWave's challenge", in: app)
         let card = popover.navigationBars["Challenge"].firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 10), "View pushes the challenge's card inside the popover")
+        XCTAssertTrue(card.exists(within: 10), "View pushes the challenge's card inside the popover")
         XCTAssertTrue(cardButton("Accept", in: app).exists, "The card decides with its own Accept")
         keepScreenshot("Activity – the challenge's card in a game's popover", in: app)
         backToList(leaving: card, in: app)
@@ -224,8 +224,10 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         let send = app.buttons["Send message"].firstMatch
         XCTAssertTrue(waitUntilDisabled(field), "Offline, the reply field is off")
         XCTAssertEqual(field.value as? String, reconnecting, "Offline, the reply field reads Reconnecting…")
+        // Send is off with an empty draft too, so only its word tells.
         XCTAssertTrue(waitUntilDisabled(send), "Offline, Send is off")
-        XCTAssertEqual(send.value as? String, reconnecting, "Offline, Send reads Reconnecting…")
+        XCTAssertTrue(waitForValue(reconnecting, in: send, timeout: stateSettleTimeout),
+                      "Offline, Send reads Reconnecting…: \(send.value as? String ?? "no value")")
         keepScreenshot("Activity offline – a conversation's composer off", in: app)
         backToList(leaving: conversation, in: app)
         let status = element(ID.activityStatus, in: app)
@@ -256,7 +258,7 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(view.isEnabled, "Offline, View still works")
         tap(view, description: "View JadeLantern's challenge offline", in: app)
         let card = app.navigationBars["Challenge"].firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 10), "Offline, View pushes the challenge's card")
+        XCTAssertTrue(card.exists(within: 10), "Offline, View pushes the challenge's card")
         for name in ["Accept", "Reject"] {
             let button = cardButton(name, in: app)
             XCTAssertTrue(waitUntilDisabled(button), "Offline, the card's \(name) is off")
@@ -299,7 +301,7 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
                       "A game shows no Activity bar")
         _ = openGameControlPopover(in: app)
         let popover = app.popovers.firstMatch
-        XCTAssertTrue(popover.waitForExistence(timeout: 10), "In a game, the control opens a popover")
+        XCTAssertTrue(popover.exists(within: 10), "In a game, the control opens a popover")
         element(ID.activityList, in: app)
         keepScreenshot("Activity – a game's popover from the control", in: app)
 
@@ -322,7 +324,7 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         let cardFrame = card.frame
         tap(card, description: "Home's Searching card", in: app)
         let popover = app.popovers.firstMatch
-        XCTAssertTrue(popover.waitForExistence(timeout: 10), "At regular width Home's card opens a popover")
+        XCTAssertTrue(popover.exists(within: 10), "At regular width Home's card opens a popover")
         element(ID.activityList, in: app)
         XCTAssertFalse(query(ID.activityDone, in: app).exists, "A popover has no Done")
         let frame = popover.frame
@@ -435,7 +437,7 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
     private func revealInList(_ row: XCUIElement, in app: XCUIApplication,
                               file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
         let list = element(ID.activityList, in: app, file: file, line: line)
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "Expected \(row) in the list", file: file, line: line)
+        XCTAssertTrue(row.exists(within: 10), "Expected \(row) in the list", file: file, line: line)
         for _ in 0..<6 {
             let viewport = list.frame.insetBy(dx: 0, dy: 60)
             let rowCenter = CGPoint(x: row.frame.midX, y: row.frame.midY)
