@@ -20,6 +20,28 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         continueAfterFailure = false
     }
 
+    /// Where `waitsLookFirst` holds, the journey suites evaluate a wait's
+    /// condition directly before its waiter starts. A waiter evaluates a
+    /// predicate expectation about a second after the wait begins and never
+    /// sooner, and most of these waits are for something that already holds
+    /// (see `exists(within:)`). A condition that holds at once returns after
+    /// `settle`'s pause; any other wait goes on as before. The activity
+    /// names the wait in the log either way.
+    override func waitWithFinalCheck(
+        for expectations: [XCTNSPredicateExpectation],
+        timeout: TimeInterval
+    ) -> XCTWaiter.Result {
+        guard Self.waitsLookFirst else { return super.waitWithFinalCheck(for: expectations, timeout: timeout) }
+        let conditions = expectations.map(\.expectationDescription).joined(separator: ", ")
+        return XCTContext.runActivity(named: "Waiting \(timeout)s: \(conditions)") { _ in
+            if expectations.allSatisfy({ passesDirectCheck($0) }) {
+                Self.settle(arrived: false)
+                return .completed
+            }
+            return super.waitWithFinalCheck(for: expectations, timeout: timeout)
+        }
+    }
+
     var animationDiagnosticsEnabled: Bool {
         ProcessInfo.processInfo.environment[
             "SURROUND_UI_ANIMATION_DIAGNOSTICS"

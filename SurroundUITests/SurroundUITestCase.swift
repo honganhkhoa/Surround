@@ -660,7 +660,7 @@ class SurroundUITestCase: XCTestCase {
     ) -> XCTWaiter.Result {
         let result = XCTWaiter.wait(for: expectations, timeout: timeout)
         guard result == .timedOut,
-              expectations.allSatisfy({ passesFinalCheck($0) })
+              expectations.allSatisfy({ passesDirectCheck($0) })
         else { return result }
         XCTContext.runActivity(named: "A \(Int(timeout)) s wait timed out, but its condition held on a final check") { _ in }
         return .completed
@@ -670,8 +670,8 @@ class SurroundUITestCase: XCTestCase {
     /// waiter reads an element's attributes in a safe mode where a missing
     /// element simply does not match; read directly, the same attributes
     /// record a test failure. Anything this check cannot read the waiter's
-    /// way keeps the timeout.
-    func passesFinalCheck(_ expectation: XCTNSPredicateExpectation) -> Bool {
+    /// way does not pass, so the waiter decides.
+    func passesDirectCheck(_ expectation: XCTNSPredicateExpectation) -> Bool {
         let predicate = expectation.predicate
         guard let element = expectation.object as? XCUIElement else {
             return predicate.evaluate(with: expectation.object)
@@ -680,13 +680,60 @@ class SurroundUITestCase: XCTestCase {
         if predicate.predicateFormat.hasPrefix("BLOCKPREDICATE") {
             return element.exists && predicate.evaluate(with: element)
         }
-        let attributes = FinalCheckAttributes(element)
+        let attributes = DirectCheckAttributes(element)
         return predicate.evaluate(with: attributes) && !attributes.isUnreadable
     }
 
     func pollUntil(
         timeout: TimeInterval,
         condition: () -> Bool
+    ) -> Bool {
+        Self.poll(timeout: timeout, until: condition)
+    }
+
+    /// Whether the journey suites' waits look before they wait: everywhere
+    /// but on the Mac, where the journeys were not run at this pace.
+    /// `SURROUND_UI_WAITS` (`TEST_RUNNER_SURROUND_UI_WAITS` for xcodebuild)
+    /// overrides this for one run: `xctest` gives XCTest's own waits, to tell
+    /// whether a failure comes from the pace, and `look-first` gives the Mac
+    /// the new ones.
+    static let waitsLookFirst: Bool = {
+        switch ProcessInfo.processInfo.environment["SURROUND_UI_WAITS"] {
+        case "xctest": return false
+        case "look-first": return true
+        default: break
+        }
+        #if targetEnvironment(macCatalyst)
+        return false
+        #else
+        return true
+        #endif
+    }()
+
+    /// How long a wait that holds at its first look still takes. The
+    /// journeys were written against waits that took a second, and lean on a
+    /// pause between their steps in more places than can be listed: XCTest
+    /// reports the app idle while a bar, a sheet, a popover or the sidebar
+    /// is still changing. With no pause, a popover's position was read as
+    /// the popover arrived (iPadOS 26.5), a sheet's Done was tapped as the
+    /// sheet rose and did nothing, and a Back button was tapped as the next
+    /// screen replaced it (iPadOS 18.6). With a quarter second every iPad
+    /// journey passed on iPadOS 26.5 and 18.6 (November 2026).
+    static let waitSettle: TimeInterval = 0.25
+
+    /// The pause after a wait that held: `waitSettle`, or half a second for
+    /// an element seen arriving, which can still be moving into place or not
+    /// take a tap yet. On iPadOS 27.2 a tap a fifth of a second after a
+    /// profile's About row appeared did nothing.
+    static func settle(arrived: Bool) {
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: arrived ? 2 * waitSettle : waitSettle))
+    }
+
+    /// Evaluates `condition` at once, then every quarter second until the
+    /// timeout, and once more after it.
+    static func poll(
+        timeout: TimeInterval,
+        until condition: () -> Bool
     ) -> Bool {
         let deadline = Date(timeIntervalSinceNow: timeout)
         repeat {
@@ -699,13 +746,40 @@ class SurroundUITestCase: XCTestCase {
     }
 }
 
-/// An element's attributes for a final check, each read only when the
+extension XCUIElement {
+    /// Whether the element exists now or comes to within `timeout`:
+    /// `waitForExistence(timeout:)` without most of its first second. XCTest
+    /// looks for the element about a second after that call and never
+    /// sooner, and nearly every wait in the journey suites is for an element
+    /// that is already there. On hosted runners that second, here and in
+    /// predicate waits, was a quarter of the UI tests' time (November 2026).
+    /// Where `waitsLookFirst` holds, this looks at once and then as
+    /// `pollUntil` does, and an element it finds gets `settle`'s pause;
+    /// elsewhere it is XCTest's wait. The journey suites wait with it; the
+    /// capture suites call XCTest's wait themselves.
+    func exists(within timeout: TimeInterval) -> Bool {
+        guard SurroundUITestCase.waitsLookFirst else { return waitForExistence(timeout: timeout) }
+        return XCTContext.runActivity(named: "Waiting \(timeout)s for \(self) to exist") { _ in
+            var looks = 0
+            let found = SurroundUITestCase.poll(timeout: timeout) {
+                looks += 1
+                return self.exists
+            }
+            if found {
+                SurroundUITestCase.settle(arrived: looks > 1)
+            }
+            return found
+        }
+    }
+}
+
+/// An element's attributes for a direct check, each read only when the
 /// predicate asks for it. A missing element reads as absent, like the
 /// waiter's safe mode. For an existing one, hittability comes from the
 /// element as the waiter reads it, and everything else from a snapshot,
 /// which throws rather than recording a failure; if that or a key fails,
 /// the check is unreadable.
-private final class FinalCheckAttributes: NSObject {
+private final class DirectCheckAttributes: NSObject {
     private let element: XCUIElement
     @objc let exists: Bool
     private(set) var isUnreadable = false
