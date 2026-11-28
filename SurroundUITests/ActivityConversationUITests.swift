@@ -470,12 +470,15 @@ final class ActivityConversationUITests: SurroundJourneyUITestCase {
     private func assertSendDims(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let field = element(ID.privateMessageComposer, in: app, matching: .textField, file: file, line: line)
         let send = app.buttons["Send message"].firstMatch
+        // Send is off with an empty draft too, so only its word tells, and a
+        // drop posted to the app takes a moment to bring it: wait for the word.
         XCTAssertTrue(waitUntilDisabled(send), "Offline, Send dims", file: file, line: line)
-        XCTAssertEqual(send.value as? String, "Reconnecting…", "Offline, Send reads Reconnecting…",
-                       file: file, line: line)
+        XCTAssertTrue(waitForValue("Reconnecting…", in: send, timeout: stateSettleTimeout),
+                      "Offline, Send reads Reconnecting…: \(send.value as? String ?? "no value")", file: file, line: line)
         XCTAssertTrue(waitUntilDisabled(field), "Offline, the reply field dims", file: file, line: line)
-        XCTAssertEqual(field.value as? String, "Reconnecting…", "Offline, the reply field reads Reconnecting…",
-                       file: file, line: line)
+        XCTAssertTrue(waitForValue("Reconnecting…", in: field, timeout: stateSettleTimeout),
+                      "Offline, the reply field reads Reconnecting…: \(field.value as? String ?? "no value")",
+                      file: file, line: line)
     }
 
     #if targetEnvironment(macCatalyst)

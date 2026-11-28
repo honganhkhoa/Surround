@@ -95,8 +95,11 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
                 && !value.contains("estimate:")
         }, "Clearing estimates must restore the ordinary turn status immediately")
         XCTAssertFalse((restoredWhite.value as? String ?? "").contains("estimate:"))
-        XCTAssertEqual(restoredWhite.frame.height, fullClockHeight, accuracy: 1,
-                       "The estimate must not change the clock card's footprint")
+        // Just after Chat closes the clock still reads a frame from the
+        // transition (199 points against 96 on an 11-inch iPad with iPadOS
+        // 18.6), so its footprint is compared once it has come to rest.
+        XCTAssertTrue(pollUntil(timeout: 10) { abs(restoredWhite.frame.height - fullClockHeight) <= 1 },
+                      "The estimate must not change the clock card's footprint: \(restoredWhite.frame.height) against \(fullClockHeight)")
         keepScreenshot("Cleared estimate restores clock turn badge", in: app)
     }
 

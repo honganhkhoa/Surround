@@ -224,8 +224,10 @@ final class ActivityListUITests: SurroundJourneyUITestCase {
         let send = app.buttons["Send message"].firstMatch
         XCTAssertTrue(waitUntilDisabled(field), "Offline, the reply field is off")
         XCTAssertEqual(field.value as? String, reconnecting, "Offline, the reply field reads Reconnecting…")
+        // Send is off with an empty draft too, so only its word tells.
         XCTAssertTrue(waitUntilDisabled(send), "Offline, Send is off")
-        XCTAssertEqual(send.value as? String, reconnecting, "Offline, Send reads Reconnecting…")
+        XCTAssertTrue(waitForValue(reconnecting, in: send, timeout: stateSettleTimeout),
+                      "Offline, Send reads Reconnecting…: \(send.value as? String ?? "no value")")
         keepScreenshot("Activity offline – a conversation's composer off", in: app)
         backToList(leaving: conversation, in: app)
         let status = element(ID.activityStatus, in: app)
